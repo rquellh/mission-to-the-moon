@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="An interactive 3D tour of NASA's Gemini and Apollo programs, built with real NASA imagery."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%23c9c9c4'/%3E%3Ccircle cx='11' cy='12' r='3' fill='%239a9a95'/%3E%3Ccircle cx='19' cy='20' r='4' fill='%239a9a95'/%3E%3C/svg%3E"
+    />
+    <title>Mission to the Moon</title>
+  </head>
+  <body>
+    <canvas id="stage" class="stage" role="img" tabindex="0" aria-label="3D view of Earth, the Moon, and stars"></canvas>
+
+    <header class="top-bar">
+      <h1 class="site-title">Mission to the Moon</h1>
+      <button type="button" class="button button--quiet" id="credits-button" aria-haspopup="dialog">
+        Credits
+      </button>
+    </header>
+
+    <div class="loading" id="loading" role="status">
+      <p class="loading__text" id="loading-text">Loading…</p>
+      <progress class="loading__bar" id="loading-progress" max="3" value="0"></progress>
+    </div>
+
+    <div class="message" id="message" role="alert" hidden>
+      <p class="message__text" id="message-text"></p>
+      <button type="button" class="button" id="message-reload" hidden>Reload</button>
+    </div>
+
+    <footer class="control-bar" id="control-bar">
+      <p class="scale-note" id="scale-note" aria-live="polite"></p>
+      <div class="control-row" role="group" aria-label="View controls">
+        <button type="button" class="button" id="focus-earth" disabled>Earth</button>
+        <button type="button" class="button" id="focus-moon" disabled>Moon</button>
+        <button type="button" class="button" id="scale-toggle" aria-pressed="false" disabled>True scale</button>
+      </div>
+    </footer>
+
+    <dialog class="credits" id="credits-dialog" aria-labelledby="credits-title">
+      <div class="credits__header">
+        <h2 class="credits__title" id="credits-title">Credits</h2>
+        <button type="button" class="button button--quiet" id="credits-close">Close</button>
+      </div>
+      <p class="credits__intro">
+        The images, data, and software behind this site, with where each came from and what we changed.
+      </p>
+      <ul class="credits__list" id="credits-list"></ul>
+    </dialog>
+
+    <noscript>
+      <p class="message">Mission to the Moon needs JavaScript turned on to show its 3D view.</p>
+    </noscript>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

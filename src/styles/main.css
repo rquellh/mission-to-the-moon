@@ -1,0 +1,364 @@
+/*
+ * Mission to the Moon: base styles.
+ * Deliberately minimal and dark; a full design pass comes later.
+ * System fonts only, so the page makes no third-party requests.
+ */
+
+:root {
+  --color-bg: #000;
+  --color-text: #e7e6e2;
+  --color-text-muted: rgb(231 230 226 / 0.72);
+  --color-surface: rgb(16 18 24 / 0.74);
+  --color-surface-hover: rgb(38 42 52 / 0.88);
+  --color-surface-solid: #101218;
+  --color-border: rgb(255 255 255 / 0.16);
+  --color-accent: #9cc2ff;
+  --color-accent-soft: rgb(156 194 255 / 0.18);
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --gutter: 16px;
+  --safe-top: max(12px, env(safe-area-inset-top));
+  --safe-right: max(var(--gutter), env(safe-area-inset-right));
+  --safe-bottom: max(var(--gutter), env(safe-area-inset-bottom));
+  --safe-left: max(var(--gutter), env(safe-area-inset-left));
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* ------------------------------------------------------------------ */
+/* 3D view                                                             */
+/* ------------------------------------------------------------------ */
+
+.stage {
+  position: fixed;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 900ms ease-out;
+  touch-action: none;
+  outline: none;
+}
+
+.stage--visible {
+  opacity: 1;
+}
+
+.stage:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -4px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Title and controls                                                  */
+/* ------------------------------------------------------------------ */
+
+.top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: var(--safe-top) var(--safe-right) 0 var(--safe-left);
+  pointer-events: none;
+}
+
+.top-bar > * {
+  pointer-events: auto;
+}
+
+.site-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  text-shadow: 0 1px 6px rgb(0 0 0 / 0.8);
+}
+
+.control-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
+  pointer-events: none;
+}
+
+.control-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.scale-note {
+  margin: 0;
+  font-size: 0.875rem;
+  text-align: center;
+  color: var(--color-text-muted);
+  text-shadow: 0 1px 6px rgb(0 0 0 / 0.9);
+}
+
+/* Hide the controls until the view is ready, without shifting layout. */
+body:not(.is-ready) .control-bar {
+  visibility: hidden;
+}
+
+.button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.button:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.button[aria-pressed="true"] {
+  border-color: rgb(156 194 255 / 0.6);
+  background: var(--color-accent-soft);
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.button--quiet {
+  background: rgb(16 18 24 / 0.4);
+  font-size: 0.875rem;
+  padding: 0 14px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Loading and messages                                                */
+/* ------------------------------------------------------------------ */
+
+.loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  pointer-events: none;
+}
+
+.loading__text {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.loading__bar {
+  width: min(200px, 60vw);
+  height: 4px;
+  border: 0;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.12);
+  overflow: hidden;
+  appearance: none;
+}
+
+.loading__bar::-webkit-progress-bar {
+  background: rgb(255 255 255 / 0.12);
+}
+
+.loading__bar::-webkit-progress-value {
+  background: var(--color-accent);
+  transition: width 300ms ease-out;
+}
+
+.loading__bar::-moz-progress-bar {
+  background: var(--color-accent);
+}
+
+.message {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(28rem, calc(100vw - 2 * var(--gutter)));
+  margin: 0;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-solid);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.message__text {
+  margin: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Credits dialog                                                      */
+/* ------------------------------------------------------------------ */
+
+.credits {
+  width: min(40rem, calc(100vw - 2 * var(--gutter)));
+  max-height: min(85vh, calc(100dvh - 2 * var(--gutter)));
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.credits::backdrop {
+  background: rgb(0 0 0 / 0.65);
+}
+
+.credits__header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 12px 20px;
+  background: var(--color-surface-solid);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.credits__title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.credits__intro {
+  margin: 14px 20px 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.credits__list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 20px 20px;
+}
+
+.credits__item {
+  padding: 16px 0;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+}
+
+.credits__item:last-child {
+  border-bottom: 0;
+}
+
+.credits__item-title {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.credits__details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.credits__details dt {
+  color: var(--color-text-muted);
+}
+
+.credits__details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.credits__link {
+  color: var(--color-accent);
+  text-underline-offset: 2px;
+}
+
+.credits__link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (max-width: 480px) {
+  .credits__details {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .credits__details dd {
+    margin-bottom: 8px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Reduced motion: no fades                                            */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .stage,
+  .loading__bar::-webkit-progress-value {
+    transition: none;
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "credits": [
+    {
+      "id": "earth-blue-marble",
+      "title": "Blue Marble: Next Generation with Topography and Bathymetry (December 2004)",
+      "credit": "NASA Earth Observatory",
+      "sourcePageUrl": "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/",
+      "fileUrl": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/december/world.topo.bathy.200412.3x5400x2700.jpg",
+      "usage": "Surface texture for the 3D Earth.",
+      "modifications": "Resized from 5400 x 2700 to 4096 x 2048 and 2048 x 1024 pixels and re-encoded as JPEG."
+    },
+    {
+      "id": "moon-cgi-moon-kit",
+      "title": "CGI Moon Kit: LROC color map (2019 version)",
+      "credit": "NASA's Scientific Visualization Studio (visualizer: Ernie Wright), from Lunar Reconnaissance Orbiter Camera (LROC) data",
+      "sourcePageUrl": "https://svs.gsfc.nasa.gov/4720",
+      "fileUrl": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_poles_4k.tif",
+      "usage": "Surface texture for the 3D Moon.",
+      "modifications": "Converted from TIFF to JPEG at 4096 x 2048 and resized to 2048 x 1024 pixels."
+    },
+    {
+      "id": "stars-deep-star-maps-2020",
+      "title": "Deep Star Maps 2020: star map in celestial coordinates",
+      "credit": "NASA/Goddard Space Flight Center Scientific Visualization Studio. Gaia DR2: ESA/Gaia/DPAC. Constellation figures based on those developed for the IAU by Alan MacRobert of Sky and Telescope magazine (Roger Sinnott and Rick Fienberg).",
+      "sourcePageUrl": "https://svs.gsfc.nasa.gov/4851",
+      "fileUrl": "https://svs.gsfc.nasa.gov/vis/a000000/a004800/a004851/starmap_2020_4k.exr",
+      "usage": "Background sky, shown dimmed.",
+      "modifications": "Converted from linear OpenEXR to sRGB JPEG at 4096 x 2048 and resized to 2048 x 1024 pixels."
+    },
+    {
+      "id": "nssdca-earth-fact-sheet",
+      "title": "Earth Fact Sheet",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "sourcePageUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+      "fileUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+      "usage": "Earth's volumetric mean radius (6,371.0 km) and axial tilt (23.44 degrees), used to size and tilt the 3D Earth.",
+      "modifications": "Radius used as the scene's unit of length."
+    },
+    {
+      "id": "nssdca-moon-fact-sheet",
+      "title": "Moon Fact Sheet",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "sourcePageUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+      "fileUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+      "usage": "The Moon's volumetric mean radius (1,737.4 km) and mean distance from Earth (384,400 km), used to size and place the 3D Moon.",
+      "modifications": "Values converted to Earth radii."
+    },
+    {
+      "id": "threejs",
+      "title": "three.js",
+      "credit": "three.js authors, MIT License",
+      "sourcePageUrl": "https://threejs.org/",
+      "fileUrl": "https://github.com/mrdoob/three.js/blob/dev/LICENSE",
+      "usage": "3D rendering library, bundled into this site's JavaScript under the MIT License.",
+      "modifications": "None; bundled and minified by Vite."
+    }
+  ]
+}
