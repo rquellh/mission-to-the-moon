@@ -14,6 +14,10 @@
  * per second to miles and kilometers per hour) are our arithmetic on the
  * cited values.
  *
+ * Durations in the text are written as minutes and seconds, rounded to the
+ * whole second, so they are easy to read: the 357.53 seconds in the source
+ * is "5 minutes 58 seconds" here. The cited source has the exact figure.
+ *
  * The flight path itself (orbits, burns, landing and splashdown points) is
  * described in src/sim/, not here.
  */
@@ -374,7 +378,7 @@ export const apollo11: Mission = {
         short:
           "The third stage fires its engine again for almost 6 minutes. This big push sends Apollo 11 out of Earth orbit toward the Moon.",
         more:
-          "This firing, called translunar injection, began 2 hours 44 minutes after launch and lasted 346.83 seconds. When it ended, Apollo 11 was moving at about 24,200 miles per hour (39,000 kilometers per hour) on its way to the Moon.",
+          "This firing, called translunar injection, began 2 hours 44 minutes after launch and lasted 5 minutes 47 seconds. When it ended, Apollo 11 was moving at about 24,200 miles per hour (39,000 kilometers per hour) on its way to the Moon.",
       },
       citations: [
         timeline("S-IVB 2nd burn ignition (STDV open)."),
@@ -438,7 +442,7 @@ export const apollo11: Mission = {
         short:
           "On July 17, a 3-second firing of the main engine fine-tunes Apollo 11's path to the Moon. It is the only correction needed on the way.",
         more:
-          "Apollo 11's path after leaving Earth orbit was nearly perfect, so only one midcourse correction was needed on the way to the Moon: a 3.13-second firing. During the long coast, the crew slowly rotated the spacecraft in a \"barbecue\" roll to keep its temperatures within limits.",
+          "Apollo 11's path after leaving Earth orbit was nearly perfect, so only one midcourse correction was needed on the way to the Moon: a 3-second firing. During the long coast, the crew slowly rotated the spacecraft in a \"barbecue\" roll to keep its temperatures within limits.",
       },
       citations: [
         timeline("Midcourse correction ignition."),
@@ -466,7 +470,7 @@ export const apollo11: Mission = {
         short:
           "Behind the Moon and out of contact with Earth, Columbia fires its main engine for about 6 minutes to slow down and go into orbit around the Moon.",
         more:
-          "The firing began 75 hours 49 minutes after launch and lasted 357.53 seconds. The coast from Earth to the Moon had lasted 73 hours 5 minutes. On the second orbit, the crew sent live color television of the Moon's surface and the approach path to the landing site.",
+          "The firing began 75 hours 49 minutes after launch and lasted 5 minutes 58 seconds. The coast from Earth to the Moon had lasted 73 hours 5 minutes. On the second orbit, the crew sent live color television of the Moon's surface and the approach path to the landing site.",
       },
       citations: [
         timeline("Lunar orbit insertion ignition."),
@@ -521,7 +525,7 @@ export const apollo11: Mission = {
       text: {
         short: "Eagle fires its descent engine to begin the final, 12½-minute drop to the Moon's surface.",
         more:
-          "The descent engine firing began 102 hours 33 minutes after launch and lasted 756.39 seconds, ending just after touchdown. It started on time, but Eagle was about 4.6 miles (7.4 kilometers) farther along its path than expected, so its landing point moved about that far past the planned one.",
+          "The descent engine firing began 102 hours 33 minutes after launch and lasted 12 minutes 36 seconds, ending just after touchdown. It started on time, but Eagle was about 4.6 miles (7.4 kilometers) farther along its path than expected, so its landing point moved about that far past the planned one.",
       },
       citations: [
         timeline("LM powered descent engine ignition."),
@@ -732,7 +736,7 @@ export const apollo11: Mission = {
         short:
           "Eagle's top half fires its engine and launches off the Moon, using its bottom half as a launch pad. The bottom half stays behind on the Moon.",
         more:
-          "The ascent engine fired 124 hours 22 minutes after launch, after Eagle had been on the Moon for 21 hours 36 minutes 20.9 seconds. About 7 minutes later, the ascent stage was in orbit around the Moon, ready to catch up with Columbia.",
+          "The ascent engine fired 124 hours 22 minutes after launch, after Eagle had been on the Moon for 21 hours 36 minutes 21 seconds. About 7 minutes later, the ascent stage was in orbit around the Moon, ready to catch up with Columbia.",
       },
       citations: [
         timeline("LM lunar liftoff ignition (LM APS)."),
@@ -801,7 +805,7 @@ export const apollo11: Mission = {
         short:
           "Columbia fires its main engine for about two and a half minutes to leave lunar orbit and head back to Earth.",
         more:
-          "The firing, called transearth injection, began 135 hours 23 minutes after launch and lasted 151.41 seconds. Apollo 11 had circled the Moon 30 times over 59 hours 30 minutes. As on the way out, only one small course correction was needed on the trip home.",
+          "The firing, called transearth injection, began 135 hours 23 minutes after launch and lasted 2 minutes 31 seconds. Apollo 11 had circled the Moon 30 times over 59 hours 30 minutes. As on the way out, only one small course correction was needed on the trip home.",
       },
       citations: [
         timeline("Transearth injection ignition (SPS)."),

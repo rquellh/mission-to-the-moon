@@ -31,7 +31,13 @@ export interface Cited<T> {
   discrepancy?: string;
 }
 
-/** Text at two reading levels. */
+/**
+ * Text at two reading levels.
+ *
+ * Write durations as minutes and seconds, rounded to the whole second:
+ * "5 minutes 58 seconds", not "357.53 seconds". The citation carries the
+ * exact figure for anyone who wants it.
+ */
 export interface LeveledText {
   /** One or two plain sentences a ten-year-old can follow. */
   short: string;
