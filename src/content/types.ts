@@ -34,9 +34,9 @@ export interface Cited<T> {
 /**
  * Text at two reading levels.
  *
- * Write durations as minutes and seconds, rounded to the whole second:
- * "5 minutes 58 seconds", not "357.53 seconds". The citation carries the
- * exact figure for anyone who wants it.
+ * Write a duration of a minute or more as minutes and seconds, not as raw
+ * seconds, and keep the precision the source gives: "5 minutes 57.53
+ * seconds", not "357.53 seconds" and not a rounded "5 minutes 58 seconds".
  */
 export interface LeveledText {
   /** One or two plain sentences a ten-year-old can follow. */
