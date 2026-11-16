@@ -24,63 +24,7 @@
  *   site does not state it as a fact.
  */
 import type { Citation, Cited, ElapsedTime } from "../types";
-
-/** A part the scene can draw. */
-export type VehiclePart =
-  /** The Saturn V's first stage, S-IC. */
-  | "first-stage"
-  /** The ring between the first and second stages, which stayed on the second stage for a while. */
-  | "aft-interstage"
-  /** The second stage, S-II, with the tapered interstage above it. */
-  | "second-stage"
-  /** The third stage, S-IVB, with the instrument unit on top. */
-  | "third-stage"
-  /** The spacecraft-LM adapter: the tapered shroud the lunar module rode in. */
-  | "adapter"
-  /** The launch escape tower on the command module's nose. */
-  | "escape-tower"
-  | "service-module"
-  | "command-module"
-  | "lm-descent-stage"
-  | "lm-ascent-stage"
-  | "drogue-parachutes"
-  | "main-parachutes";
-
-/** How the parts are put together. */
-export type VehicleLayout =
-  /** Stacked as they flew on the Saturn V, the lunar module inside the adapter. */
-  | "launch"
-  /** The command and service module apart from the third stage, turning around to face the lunar module on top of it. */
-  | "transposition"
-  /** The command module docked nose to nose with the lunar module, which still sits on the third stage. */
-  | "docked-on-stage"
-  /** The command and service module with the lunar module (or its ascent stage) docked on its nose. */
-  | "docked"
-  /** One spacecraft by itself. */
-  | "alone";
-
-/** A part left where it came to rest, from a cited moment to the end of the mission. */
-export interface LeftBehind {
-  part: VehiclePart;
-  /** The ship it came off; it stays at the site of that ship's time on the surface. */
-  ship: "lm";
-  /** When it is left behind. */
-  at: Cited<ElapsedTime>;
-  /** In plain words. */
-  label: string;
-}
-
-export interface VehicleChange {
-  /** The flight path ship this applies to. */
-  ship: "csm" | "lm";
-  /** When the ship takes this shape. */
-  at: Cited<ElapsedTime>;
-  /** The moment, in plain words. */
-  label: string;
-  layout: VehicleLayout;
-  /** The parts from this moment on. Empty while the ship is drawn as part of the other one. */
-  parts: readonly VehiclePart[];
-}
+import type { LeftBehind, VehicleChange, VehiclePart } from "../vehicle-types";
 
 /* ------------------------------------------------------------------ */
 /* Citation helpers.                                                   */

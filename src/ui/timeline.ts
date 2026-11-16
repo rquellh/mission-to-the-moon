@@ -1,7 +1,7 @@
 import type { Player } from '../app/contract';
 import { copy } from '../content/copy';
 import { button, byId, el, setText } from './dom';
-import { formatDate, formatElapsed, formatTimeOfDay, speakElapsed } from './format';
+import { formatDate, formatElapsed, formatTimeOfDay, isBeforeLiftoff, speakElapsed } from './format';
 import { icon } from './icons';
 import type { MissionIndex } from './mission-index';
 
@@ -197,7 +197,7 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
     play.classList.toggle('play--playing', player.playing);
 
     setText(met, formatElapsed(time));
-    setText(since, time < 0 ? copy.timeline.beforeLiftoff : copy.timeline.sinceLiftoff);
+    setText(since, isBeforeLiftoff(time) ? copy.timeline.beforeLiftoff : copy.timeline.sinceLiftoff);
     const date = index.utcAt(time);
     setText(utc, date ? `${formatDate(date, 'short')} ${formatTimeOfDay(date)} UTC` : '');
 

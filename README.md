@@ -2,15 +2,26 @@
 
 An interactive 3D tour of NASA's Gemini and Apollo programs: the launches, the flight paths, and what each crew accomplished. It runs in the browser on phones and desktops.
 
-So far it tells the story of Apollo 11, from liftoff to splashdown:
+So far it tells two stories:
 
-- **Take the tour** steps through 12 key moments, or **Explore on my own** lets you roam.
+- **Gemini 8** (March 1966): the first docking of two spacecraft in orbit, then a stuck thruster and an emergency return.
+- **Apollo 11** (July 1969): the first landing on the Moon.
+
+How it works:
+
+- The site opens on a list of missions. The mission name at the top of the screen brings the list back.
+- **Take the tour** steps through a mission's key moments, or **Explore** lets you roam.
 - Press play, or drag the timeline, to fly the mission. The clock shows real mission time. The trip is paced so every stretch between events is watchable, instead of days of coasting.
 - Each event has a short card, a longer "Tell me more", a NASA photo where there is one, and its sources.
-- The **Earth**, **Moon**, **Ship**, and **Both** buttons choose what the camera follows. **True scale** shows how far away the Moon really is.
+- The view buttons choose what the camera follows: **Earth** and **Ship** for every mission, plus **Moon** and **Both** for flights to the Moon. **True scale** shows real distances and orbit heights.
 - Drag (or swipe) to turn the view, and scroll (or pinch) to zoom. With the 3D view focused, the arrow keys turn the view and + and - zoom.
 
-A link can open the site at a moment and a view, for example `?t=102:45:40&view=moon` for the landing. `t` is mission time as hours:minutes:seconds, and `view` is `earth`, `moon`, `spacecraft`, or `journey`.
+A link can open a mission at a moment and a view, for example `?mission=apollo-11&t=102:45:40&view=moon` for the landing, or `?mission=gemini-8&t=06:33:16&view=spacecraft` for the first docking.
+
+- `mission` is `gemini-8` or `apollo-11` (Apollo 11 when left out).
+- `t` is mission time as hours:minutes:seconds. A minus sign means before liftoff.
+- `view` is `earth`, `moon`, `spacecraft`, or `journey`.
+- `start=tour` or `start=explore` skips the mission list.
 
 ### What is real and what is drawn
 
@@ -54,7 +65,7 @@ public/textures/           Earth, Moon, and star textures (2K and 4K JPEGs)
 public/media/              Mission photos from NASA, one folder per mission
 src/main.ts                Starts the app and connects the pieces
 src/content/               Facts and text: sources, physical constants, credits, interface copy
-src/content/missions/      One mission per file: events, flight plan, spacecraft shapes
+src/content/missions/      Three files per mission: story, flight plan, spacecraft shapes
 src/sim/                   Flight path math (plain TypeScript, no 3D code), with tests
 src/app/                   The mission clock, the tour, and the contract between scene and interface
 src/scene/                 three.js scene: Earth, Moon, stars, paths, spacecraft, camera

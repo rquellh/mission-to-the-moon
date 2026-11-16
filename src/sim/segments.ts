@@ -132,11 +132,28 @@ export interface OrbitReference {
 }
 
 /**
+ * The slow turning of an orbit by its body's equatorial bulge (the "J2"
+ * term of its gravity field), averaged over each revolution: the orbit's
+ * plane swings around the body's axis, and the craft's place in its orbit
+ * runs slightly fast or slow. Standard first-order secular rates (Vallado,
+ * "Fundamentals of Astrodynamics and Applications", section 9.6).
+ */
+export interface Oblateness {
+  /** Unit vector along the body's spin axis, in its inertial frame. */
+  pole: Readonly<Vec3>;
+  j2: number;
+  /** The body's equatorial radius, km. */
+  radius: number;
+}
+
+/**
  * An orbit of published size (periapsis and apoapsis radii) whose position
  * is pinned to a reference point and, optionally, to a published direction
  * at the end of the phase. To meet the end fix it adds a smooth correction
  * to the mean anomaly and a smooth rotation of the orbit, both zero at the
  * phase start and complete at the phase end (and zero rate at both ends).
+ * With `oblateness`, the orbit also turns steadily from the reference time
+ * as the body's bulge turns it (see Oblateness).
  */
 export class AnchoredOrbit implements Segment {
   readonly extendable = true;
@@ -145,11 +162,16 @@ export class AnchoredOrbit implements Segment {
   readonly phaseCorrection: number;
   /** Rotation applied by the end of the phase, radians, and its axis. */
   readonly planeCorrection: number;
+  /** Steady drift from oblateness, radians per second: node, periapsis, mean anomaly. */
+  readonly nodeRate: number;
+  readonly periapsisRate: number;
+  readonly meanAnomalyRate: number;
   readonly body: BodyId;
   readonly t0: number;
   readonly t1: number;
   private readonly sky: Sky;
   private readonly planeAxis: Vec3 = vec3(0, 1, 0);
+  private readonly pole: Vec3 = vec3(0, 1, 0);
   private readonly tmp = vec3();
 
   constructor(
@@ -162,6 +184,7 @@ export class AnchoredOrbit implements Segment {
     t1: number,
     reference: OrbitReference,
     endDirection?: Readonly<Vec3>,
+    oblateness?: Oblateness,
   ) {
     this.sky = sky;
     this.body = body;
@@ -183,22 +206,43 @@ export class AnchoredOrbit implements Segment {
       M0: base.meanFromTrue(reference.trueAnomaly),
     });
 
+    let nodeRate = 0;
+    let periapsisRate = 0;
+    let meanAnomalyRate = 0;
+    if (oblateness) {
+      const c = dot(this.conic.normal, oblateness.pole);
+      const k = 0.75 * oblateness.j2 * (oblateness.radius / p) ** 2 * this.conic.n;
+      nodeRate = -2 * k * c;
+      periapsisRate = k * (5 * c * c - 1);
+      meanAnomalyRate = k * Math.sqrt(1 - e * e) * (3 * c * c - 1);
+      normalize(this.pole, oblateness.pole);
+    }
+    this.nodeRate = nodeRate;
+    this.periapsisRate = periapsisRate;
+    this.meanAnomalyRate = meanAnomalyRate;
+
     let phaseCorrection = 0;
     let planeCorrection = 0;
     if (endDirection) {
       const conic = this.conic;
-      const Mnat = conic.meanAt(t1);
+      // Undo the drift's swing of the plane at t1, so the end direction can
+      // be compared with the orbit as the conic describes it.
+      const local = rotateAxis(vec3(), endDirection, this.pole, -this.drift(t1).node);
+      const { periapsis } = this.drift(t1);
+      const Mnat = conic.meanAt(t1) + this.drift(t1).mean;
       const nuNat = conic.trueFromMean(Mnat);
-      const nuEnd = Math.atan2(dot(endDirection, conic.qHat), dot(endDirection, conic.pHat));
+      const nuEnd = Math.atan2(dot(local, conic.qHat), dot(local, conic.pHat)) - periapsis;
       const turns = Math.round((nuNat - nuEnd) / (2 * Math.PI));
       const nuTarget = nuEnd + turns * 2 * Math.PI;
       phaseCorrection = conic.meanFromTrue(nuTarget) - Mnat;
       // Remaining out-of-plane offset: rotate the orbit about an axis in its plane.
-      const d1 = normalize(vec3(), conic.positionAtTrue(nuTarget, vec3()));
-      const axis = cross(vec3(), d1, endDirection);
+      const d1 = conic.positionAtTrue(nuTarget, vec3());
+      rotateAxis(d1, d1, conic.normal, periapsis);
+      normalize(d1, d1);
+      const axis = cross(vec3(), d1, local);
       const axisLen = length(axis);
       if (axisLen > 1e-12) {
-        planeCorrection = angleBetween(d1, endDirection);
+        planeCorrection = angleBetween(d1, local);
         scale(this.planeAxis, axis, 1 / axisLen);
       }
     }
@@ -206,23 +250,35 @@ export class AnchoredOrbit implements Segment {
     this.planeCorrection = planeCorrection;
   }
 
+  /** The oblateness drift since the reference time: node, periapsis, and mean anomaly, radians. */
+  private drift(t: number): { node: number; periapsis: number; mean: number } {
+    const dt = t - this.conic.t0;
+    return { node: this.nodeRate * dt, periapsis: this.periapsisRate * dt, mean: this.meanAnomalyRate * dt };
+  }
+
   /** Progress of the corrections at t: 0 before the phase, 1 after. */
   private progress(t: number): number {
     return smoothstep((t - this.t0) / (this.t1 - this.t0));
   }
 
+  /** Mean anomaly at t, with the drift and the phase correction. */
+  private meanAt(t: number): number {
+    return this.conic.meanAt(t) + this.meanAnomalyRate * (t - this.conic.t0) + this.phaseCorrection * this.progress(t);
+  }
+
   /** Position in the body's inertial frame, km. */
   inertialPosition(t: number, out: Vec3): Vec3 {
     const s = this.progress(t);
-    const M = this.conic.meanAt(t) + this.phaseCorrection * s;
-    this.conic.positionAtTrue(this.conic.trueFromMean(M), out);
+    this.conic.positionAtTrue(this.conic.trueFromMean(this.meanAt(t)), out);
+    if (this.periapsisRate !== 0) rotateAxis(out, out, this.conic.normal, this.periapsisRate * (t - this.conic.t0));
     if (this.planeCorrection !== 0) rotateAxis(out, out, this.planeAxis, this.planeCorrection * s);
+    if (this.nodeRate !== 0) rotateAxis(out, out, this.pole, this.nodeRate * (t - this.conic.t0));
     return out;
   }
 
-  /** True anomaly (unwrapped) at t, including the phase correction. */
+  /** True anomaly (unwrapped) at t, including the drift and the phase correction. */
   trueAnomalyAt(t: number): number {
-    return this.conic.trueFromMean(this.conic.meanAt(t) + this.phaseCorrection * this.progress(t));
+    return this.conic.trueFromMean(this.meanAt(t));
   }
 
   evaluate(t: number, out: Vec3): Vec3 {
@@ -230,11 +286,12 @@ export class AnchoredOrbit implements Segment {
     return fromBodyInertial(this.sky, this.body, this.tmp, t, out);
   }
 
-  /** Orbit normal at t (including the plane correction so far). */
+  /** Orbit normal at t (including the plane correction so far and the drift). */
   normalAt(t: number, out: Vec3): Vec3 {
-    return rotateAxis(out, this.conic.normal, this.planeAxis, this.planeCorrection * this.progress(t));
+    rotateAxis(out, this.conic.normal, this.planeAxis, this.planeCorrection * this.progress(t));
+    if (this.nodeRate !== 0) rotateAxis(out, out, this.pole, this.nodeRate * (t - this.conic.t0));
+    return out;
   }
-
 }
 
 /**
@@ -507,7 +564,9 @@ export class Follow implements Segment {
 
 /**
  * Closing in on another ship: the craft's own orbit, blended around the
- * body into the target's position so the two meet at the phase end.
+ * body into the target's position so the two meet at `meet` (the phase end
+ * unless given). From `meet` to the phase end the craft flies alongside
+ * the target, at its position.
  */
 export class Converge implements Segment {
   /** Before its start it is just the craft's own orbit, so a burn can lead into it. */
@@ -515,21 +574,33 @@ export class Converge implements Segment {
   readonly body: BodyId;
   readonly t0: number;
   readonly t1: number;
-  private readonly own: Segment;
+  /** When the craft reaches the target. */
+  readonly meet: number;
+  /** The craft's own orbit, before the blend. */
+  readonly own: Segment;
   private readonly target: (t: number, out: Vec3) => Vec3;
   private readonly a = vec3();
   private readonly b = vec3();
 
-  constructor(body: BodyId, own: Segment, target: (t: number, out: Vec3) => Vec3, t0: number, t1: number) {
+  constructor(
+    body: BodyId,
+    own: Segment,
+    target: (t: number, out: Vec3) => Vec3,
+    t0: number,
+    t1: number,
+    meet: number = t1,
+  ) {
     this.body = body;
     this.own = own;
     this.target = target;
     this.t0 = t0;
     this.t1 = t1;
+    this.meet = meet;
   }
 
   evaluate(t: number, out: Vec3): Vec3 {
-    const w = smoothstep((t - this.t0) / (this.t1 - this.t0));
+    if (t >= this.meet) return this.target(t, out);
+    const w = smoothstep((t - this.t0) / (this.meet - this.t0));
     const c = bodyCenter(this.body);
     sub(this.a, this.own.evaluate(t, this.a), c);
     sub(this.b, this.target(t, this.b), c);

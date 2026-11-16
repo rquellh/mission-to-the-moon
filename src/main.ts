@@ -2,7 +2,7 @@ import './styles/main.css';
 import type { Director, StoryMap } from './app/contract';
 import { MissionPlayer } from './app/player';
 import { copy } from './content/copy';
-import { nearestView } from './app/views';
+import { homeView, nearestView } from './app/views';
 import { bundleFor, missions } from './content/missions';
 import { elapsedToSeconds, type ElapsedTime, type EventView } from './content/types';
 import { Stage, WebGLUnavailableError } from './scene/stage';
@@ -12,10 +12,10 @@ import { mountInterface } from './ui/interface';
 import { setUpStatus } from './ui/status';
 
 /** A Director that does nothing, for when there is no 3D view. */
-function noDirector(): Director {
+function noDirector(view: EventView): Director {
   return {
     scaleMode: 'readable',
-    view: 'journey',
+    view,
     setScaleMode() {},
     setView() {},
     setViewInsets() {},
@@ -109,7 +109,7 @@ async function main(): Promise<void> {
     });
   } catch (error) {
     if (!(error instanceof WebGLUnavailableError)) console.error(error);
-    mountInterface({ mission, missions, player, director: noDirector(), has3D: false }).explore();
+    mountInterface({ mission, missions, player, director: noDirector(homeView(mission)), has3D: false }).explore();
     status.reveal();
     status.showMessage(copy.errors.noWebGL, false);
     return;

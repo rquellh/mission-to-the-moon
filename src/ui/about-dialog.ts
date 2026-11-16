@@ -106,9 +106,10 @@ export function renderAbout(mission: Mission): void {
   body.replaceChildren(...parts);
 }
 
-/** Fill the "How this is drawn" note. */
-export function renderHowDrawn(): void {
+/** Fill the "How this is drawn" note, which differs for Moon flights and Earth-orbit flights. */
+export function renderHowDrawn(mission: Mission): void {
   byId('drawn-title', HTMLHeadingElement).textContent = copy.howDrawn.title;
   const body = byId('drawn-body', HTMLDivElement);
-  body.replaceChildren(...copy.howDrawn.paragraphs.map((text) => el('p', 'note__paragraph', text)));
+  const paragraphs = copy.howDrawn.paragraphs[mission.destination];
+  body.replaceChildren(...paragraphs.map((text) => el('p', 'note__paragraph', text)));
 }

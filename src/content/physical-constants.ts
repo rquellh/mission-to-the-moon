@@ -43,6 +43,15 @@ export const EARTH_FLATTENING = 0.003353;
 // https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 export const EARTH_GM_KM3_PER_S2 = 398_600;
 
+/**
+ * Earth's J2, the size of its equatorial bulge in its gravity field,
+ * 1082.63 x 10^-6. It slowly turns low orbits: their planes swing west and
+ * their paths around the orbit run a little fast.
+ */
+// Source: NASA NSSDCA Earth Fact Sheet, "J2 (x 10^-6) 1082.63"
+// https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
+export const EARTH_J2 = 1082.63e-6;
+
 /** Earth's sidereal rotation period (one turn relative to the stars), in hours (23.9345). */
 // Source: NASA NSSDCA Earth Fact Sheet, "Sidereal rotation period (hrs)"
 // https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html

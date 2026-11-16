@@ -6,20 +6,21 @@ import type { Mission } from '../content/types';
 import { renderAbout, renderHowDrawn } from './about-dialog';
 import { renderCredits } from './credits-dialog';
 import { setUpDialog } from './dialogs';
-import { byId, reducedMotionQuery } from './dom';
+import { byId, hiddenText, reducedMotionQuery } from './dom';
 import { setUpEventCard } from './event-card';
 import { missionDates, speakElapsed } from './format';
+import { setUpHub } from './hub';
+import { icon } from './icons';
 import { watchViewInsets } from './layout';
 import { MissionIndex } from './mission-index';
 import { setUpSheet } from './sheet';
 import { setUpTimeline } from './timeline';
 import { focusTourNext, setUpTourPanel } from './tour-panel';
 import { setUpViewControls } from './view-controls';
-import { setUpWelcome } from './welcome';
 
 export interface InterfaceOptions {
   mission: Mission;
-  /** Every mission on the site, for the photo credits. */
+  /** Every mission on the site, in flight order: for the mission picker and the photo credits. */
   missions: readonly Mission[];
   player: Player;
   director: Director;
@@ -28,11 +29,11 @@ export interface InterfaceOptions {
 }
 
 export interface MissionInterface {
-  /** Show the welcome with its two choices. */
+  /** Show the mission picker over the 3D view, as the first thing a visitor sees. */
   welcome(): void;
-  /** Skip the welcome and start exploring. */
+  /** Skip the picker and start exploring. */
   explore(): void;
-  /** Skip the welcome and start the guided tour (or explore, if the mission has no tour). */
+  /** Skip the picker and start the guided tour (or explore, if the mission has no tour). */
   tour(): void;
 }
 
@@ -57,11 +58,19 @@ export function mountInterface({ mission, missions, player, director, has3D }: I
   const motion = reducedMotionQuery();
   const announce = makeAnnouncer();
 
+  /* The page, for this mission --------------------------------------- */
+  document.title = copy.pageTitle(mission.name);
+  byId('stage', HTMLCanvasElement).setAttribute('aria-label', copy.canvas[mission.destination]);
+  byId('loading-text', HTMLParagraphElement).textContent = copy.loadingMission(mission.name);
+
   /* Header and dialogs ----------------------------------------------- */
   byId('mission-name', HTMLSpanElement).textContent = mission.name;
   byId('mission-dates', HTMLSpanElement).textContent = missionDates(mission);
+  const hubButton = byId('hub-button', HTMLButtonElement);
+  hubButton.title = copy.header.missionsHint;
+  hubButton.append(icon('chevron-down', 'icon masthead__chevron'), hiddenText(`, ${copy.header.missions}`));
   renderAbout(mission);
-  renderHowDrawn();
+  renderHowDrawn(mission);
   renderCredits(credits, missions);
   const about = setUpDialog(byId('about-dialog', HTMLDialogElement));
   const drawn = setUpDialog(byId('drawn-dialog', HTMLDialogElement));
@@ -75,11 +84,11 @@ export function mountInterface({ mission, missions, player, director, has3D }: I
 
   /* View controls ---------------------------------------------------- */
   document.body.classList.toggle('no-3d', !has3D);
-  if (has3D) setUpViewControls(director, copy.scaleNote);
+  if (has3D) setUpViewControls(director, mission);
 
   /* Event card, timeline, and tour ---------------------------------- */
   const sheet = setUpSheet();
-  const tour = new Tour(index.events, player, director, { jumpStraight: () => motion.matches });
+  const tour = new Tour(mission, player, director, { jumpStraight: () => motion.matches });
 
   const describe = (eventIndex: number): string => {
     const event = index.events[eventIndex];
@@ -146,6 +155,41 @@ export function mountInterface({ mission, missions, player, director, has3D }: I
     },
   });
 
+  /* The mission picker ------------------------------------------------ */
+  const startTour = (): void => {
+    if (tour.total === 0) {
+      explore();
+    } else {
+      sheet.setExpanded(false);
+      tour.start(0);
+      focusTourNext();
+    }
+    remeasure();
+  };
+  const startExploring = (): void => {
+    explore();
+    remeasure();
+  };
+
+  // Reopening the picker pauses the clock; closing it without a choice plays on.
+  let resumeAfterHub = false;
+  const hub = setUpHub({
+    mission,
+    missions,
+    onTour: startTour,
+    onExplore: startExploring,
+    onReturn: () => {
+      if (resumeAfterHub) player.play();
+      resumeAfterHub = false;
+    },
+  });
+  hubButton.addEventListener('click', () => {
+    // A tour on its way to a stop arrives there when the clock pauses.
+    resumeAfterHub = player.playing && !tour.active;
+    player.pause();
+    hub.open(hubButton);
+  });
+
   /* Tell the scene what the interface covers ------------------------- */
   const remeasure = watchViewInsets(
     [
@@ -153,40 +197,21 @@ export function mountInterface({ mission, missions, player, director, has3D }: I
       { element: byId('views', HTMLDivElement), side: 'top' },
       { element: byId('sheet', HTMLElement), side: (wide) => (wide ? 'right' : 'bottom') },
       { element: byId('timeline', HTMLElement), side: 'bottom' },
-      { element: byId('welcome', HTMLElement), side: 'bottom' },
+      // The picker frames the view only as the welcome; reopened, it sits over everything.
+      {
+        element: byId('hub', HTMLDialogElement),
+        side: (wide) => (hub.mode !== 'welcome' ? null : wide ? 'right' : 'bottom'),
+      },
     ],
     (insets) => director.setViewInsets(insets),
   );
 
-  const startTour = (): void => {
-    sheet.setExpanded(false);
-    tour.start(0);
-    focusTourNext();
-    remeasure();
-  };
-
-  const welcome = setUpWelcome({
-    stops: tour.total,
-    onTour: startTour,
-    onExplore: () => {
-      explore();
-      remeasure();
-    },
-  });
-
   return {
     welcome() {
-      welcome.show();
+      hub.welcome();
       remeasure();
     },
-    explore() {
-      explore();
-      remeasure();
-    },
-    tour() {
-      if (tour.total > 0) startTour();
-      else explore();
-      remeasure();
-    },
+    explore: startExploring,
+    tour: startTour,
   };
 }

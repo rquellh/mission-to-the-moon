@@ -13,10 +13,11 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { Director, Player, ViewInsets } from '../app/contract';
-import type { LeftBehind, VehicleChange } from '../content/missions/apollo-11-vehicle';
-import { EARTH_RADIUS, MOON_RADIUS } from '../content/physical-constants';
-import { elapsedToSeconds, type EventView, type Mission } from '../content/types';
-import type { FlightPath } from '../sim';
+import { homeView, nearestView } from '../app/views';
+import { EARTH_MEAN_RADIUS_KM, EARTH_RADIUS, MOON_RADIUS } from '../content/physical-constants';
+import { elapsedToSeconds, type ElapsedTime, type EventView, type Mission } from '../content/types';
+import type { LeftBehind, VehicleChange } from '../content/vehicle-types';
+import type { FlightPath, Phase, ShipTrack } from '../sim';
 import {
   AMBIENT_INTENSITY,
   BODY_VIEW_ANGLE_DEG,
@@ -39,7 +40,7 @@ import { createEarth, type Earth } from './earth';
 import { fitDistance, interpolatePose, type CameraPose, type ClearArea, type SphereLike } from './framing';
 import { createMarkers, type MarkerPoint, type MarkerSet } from './markers';
 import { createMoon, type Moon } from './moon';
-import { createPathLine, type PathLine } from './path-lines';
+import { createPathLine, type PathFade, type PathLine } from './path-lines';
 import { createStarfield, type Starfield } from './stars';
 import { chooseTextureTier, loadStageTextures, type TextureTier } from './textures';
 import { easeInOutCubic, Tween } from './tween';
@@ -61,7 +62,7 @@ export interface StageOptions {
   mission: Mission;
   /** Cited moments at which each ship changes shape. */
   vehicle: readonly VehicleChange[];
-  /** Cited parts that stay behind (Eagle's descent stage at Tranquility Base). */
+  /** Cited parts that stay behind (for Apollo 11, Eagle's descent stage at Tranquility Base). */
   leftBehind: readonly LeftBehind[];
   onContextLost(): void;
   onContextRestored(): void;
@@ -75,7 +76,25 @@ export class WebGLUnavailableError extends Error {
   }
 }
 
-type ShipId = 'csm' | 'lm';
+/** What a ship is to the story. */
+type ShipRole = 'main' | 'lander' | 'target';
+
+/**
+ * A ship's role: main is the crew's spacecraft for the whole flight; a
+ * lander carries crew away and back (Apollo's lunar module); a target is
+ * an uncrewed vehicle the main ship meets (Gemini 8's Agena). Read from
+ * the flight plan when it says, otherwise: the first ship is the main one,
+ * a ship with id "lm" is a lander, and any other is a target.
+ */
+function roleOf(track: ShipTrack, index: number): ShipRole {
+  const role = (track as { readonly role?: unknown }).role;
+  if (role === 'main' || role === 'lander' || role === 'target') return role;
+  if (index === 0) return 'main';
+  return track.id === 'lm' ? 'lander' : 'target';
+}
+
+const phaseStart = (phase: Phase): number => elapsedToSeconds(phase.start.value);
+const phaseEnd = (phase: Phase): number => elapsedToSeconds(phase.end.value);
 
 const MAX_PIXEL_RATIO = 2;
 const CAMERA_FAR = 2000;
@@ -94,8 +113,22 @@ const CHASE_DISTANCE_SECONDS = 0.8;
 const OFFSET_SECONDS = 0.12;
 /** Where the ship view's camera sits, in the ship's frame: behind (-x), above (+y), to the side (+z). */
 const CHASE_OFFSET = new Vector3(-0.72, 0.34, 0.6).normalize();
-/** The ship being followed in the ship view is drawn this much larger. */
+/** The ship being followed in the ship view is drawn this much larger (more for a flight that stays in Earth orbit, where the ships meet up close). */
 const SUBJECT_SCALE = 1.35;
+const ORBIT_SUBJECT_SCALE = 5;
+/**
+ * A flight that stays in Earth orbit goes around many times, and drawn all
+ * at once its orbits pile up into a band. There, the path still to come
+ * fades out over the next revolution, and flown revolutions older than the
+ * last one dim (about one revolution, ORBIT_SECONDS, in low Earth orbit).
+ */
+const ORBIT_SECONDS = 5400;
+const ORBIT_PATH_FADE: PathFade = {
+  future: [0.4 * ORBIT_SECONDS, 1.0 * ORBIT_SECONDS],
+  past: [1.0 * ORBIT_SECONDS, 2.0 * ORBIT_SECONDS, 0.28],
+};
+/** The Earth view of an Earth-orbit flight looks at the orbit from this many degrees off its axis, toward the ship. */
+const ORBIT_VIEW_TILT_DEG = 70;
 /** A ship this many body radii up (or less) counts as near that body for the Earth and Moon views. */
 const NEAR_BODY_RADII = 4;
 /** Room kept at the edges of the journey view for a spacecraft model, in CSS pixels. */
@@ -109,6 +142,29 @@ const JOURNEY_LEFT_BEHIND_MAX_PX = 30;
 const SHIP_EDGE_PX = 28;
 /** In the Earth view, keep the camera at least this many degrees off the line behind Earth from the Moon. */
 const EARTH_VIEW_MOON_CLEARANCE_DEG = 50;
+/** The ship view moves the camera when the ship it follows changes to one at least this far away, in Earth radii. */
+const HANDOVER_DISTANCE = 0.02;
+/** Meters per scene unit (one Earth mean radius). */
+const METERS_PER_UNIT = EARTH_MEAN_RADIUS_KM * 1000;
+/*
+ * Two ships that dock (the main ship and a target): at these scales the
+ * real distances between them are far too small to see, so the models
+ * would sit on top of each other. In the ship view the target is drawn at
+ * least a model's length from the main ship, along the line between them.
+ * From the moment the main ship is alongside (station keeping) until
+ * docking, and just after undocking, in every view, the target is drawn
+ * where it would be docked plus a little room (swinging there over the top
+ * just before station keeping), and both share the docked pair's scale, so
+ * at docking they meet as they are drawn docked. All of this is
+ * illustration.
+ */
+/** Room drawn between the two, in CSS pixels: from the first when side by side, up to the second; PAIR_GAP_DISTANCE_M sets how fast it grows with their real distance. */
+const PAIR_GAP_MIN_PX = 34;
+const PAIR_GAP_MAX_PX = 84;
+const PAIR_GAP_DISTANCE_M = 2000;
+/** Story seconds over which the target swings to its docking side before station keeping. */
+const PAIR_ARRANGE_STORY_SECONDS = 1.5;
+const PAIR_CLOSE_STORY_SECONDS = 1.5;
 
 /** Vertical field of view for a screen shape; wider on tall screens. */
 function fieldOfViewFor(aspect: number): number {
@@ -124,12 +180,43 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 
 /** Per-ship state for the current frame. */
 interface ShipState extends ShipPose {
-  readonly id: ShipId;
+  readonly id: string;
+  readonly role: ShipRole;
+  readonly color: number;
+  readonly track: ShipTrack;
+  /** Its liftoff from Earth, if it has one: the time and the pad on the globe (globe-local). */
+  launch: { time: number; local: Vector3 } | null;
+}
+
+/** A docking or an undocking of a target ship with the main ship. */
+interface PairMoment {
+  /** Mission time. */
+  readonly time: number;
+  /** The main ship's docked shape (index in its model), and the target's own shape next to the moment. */
+  readonly docked: number;
+  readonly alone: number;
+  /** Along the main ship's travel, from its point on the path to the target's when docked, in meters. */
+  readonly contact: number;
+}
+
+interface Pairing {
+  readonly target: ShipState;
+  readonly targetModel: ShipModel;
+  readonly moments: readonly PairMoment[];
+  /** When the main ship was alongside the target before docking (its rendezvous phase's `alongside`), if published. */
+  readonly alongside: number | undefined;
+}
+
+/** A cited landing site, relative to the Moon's center, and the lander's facing there. */
+interface LandingSite {
+  readonly offset: Vector3;
+  readonly front: Vector3;
 }
 
 /**
- * The 3D scene: Earth, the Moon, the stars, and the Apollo 11 flight drawn
- * at the mission clock's time, with the camera views the interface asks for.
+ * The 3D scene: Earth, the Moon, the stars, and a mission's flight drawn at
+ * the mission clock's time, with the camera views the interface asks for
+ * (only those the mission offers, see app/views.ts).
  * Create it with `Stage.create`, then `await stage.load(...)`, then `start()`.
  */
 export class Stage implements Director {
@@ -154,9 +241,8 @@ export class Stage implements Director {
   private earthSites: MarkerSet | null = null;
   private moonSites: MarkerSet | null = null;
   private readonly moonAnchor = new Group();
-  /** The landing site relative to the Moon's center (it does not change with the scale), and Eagle's facing there. */
-  private readonly landingOffset = new Vector3();
-  private readonly landingFront = new Vector3(0, 0, 1);
+  /** Each lander's landing site on the Moon (it does not change with the scale), by ship id. */
+  private readonly landings = new Map<string, LandingSite>();
   private readonly sitePosition = new Vector3();
   private readonly siteUp = new Vector3();
   private fleet: Fleet | null = null;
@@ -172,13 +258,24 @@ export class Stage implements Director {
   private readonly eventSeconds: number[];
   private currentEvent = -2;
 
-  /* Ships. */
-  private readonly ships: Record<ShipId, ShipState>;
-  private readonly shipList: ShipState[];
-  private followed: ShipId = 'csm';
+  /* Ships, in flight plan order. */
+  private readonly ships: ShipState[];
+  private readonly main: ShipState;
+  private followed: ShipState;
+  /** Target ships that dock with the main ship, and when. */
+  private pairings: Pairing[] = [];
+  /** Where a ship's model is drawn this frame (a target may be moved apart from the main ship). */
+  private readonly drawnPose: ShipPose = {
+    exists: false,
+    position: new Vector3(),
+    forward: new Vector3(1, 0, 0),
+    up: new Vector3(0, 1, 0),
+  };
 
   /* Views and camera. */
-  private viewNow: EventView = 'journey';
+  private viewNow: EventView;
+  /** True for a flight that stays in Earth orbit: its Earth view frames Earth and every orbit. */
+  private readonly orbitMission: boolean;
   /** Set by setView; the framing waits a frame so any seek made with it is in place. */
   private pendingView: 'tween' | 'instant' | null = 'instant';
   private cameraTween: Tween | null = null;
@@ -191,6 +288,8 @@ export class Stage implements Director {
   private readonly worldUp = new Vector3(0, 1, 0);
   /** Camera offset from the anchor once settled (world space), for the Earth, Moon, and journey views. */
   private readonly settledOffset = new Vector3(0, 0, 10);
+  /** The scale mix the camera move under way is heading for. */
+  private tweenMix = 0;
   /** True once the person moves the camera themselves after a framing. */
   private userMovedCamera = false;
   /** Ship view: the smoothed ship frame, the camera's direction in it, and its distance. */
@@ -244,6 +343,8 @@ export class Stage implements Director {
     maxReachPixels: Infinity,
     dt: 0,
     snap: true,
+    reducedMotion: false,
+    metersPerPixel: 0,
   };
 
   private constructor(
@@ -261,11 +362,26 @@ export class Stage implements Director {
     this.path = options.path;
     this.player = options.player;
     this.eventSeconds = options.mission.events.map((event) => elapsedToSeconds(event.elapsed));
-    this.ships = {
-      csm: { id: 'csm', exists: false, position: new Vector3(), forward: new Vector3(1, 0, 0), up: new Vector3(0, 1, 0) },
-      lm: { id: 'lm', exists: false, position: new Vector3(), forward: new Vector3(1, 0, 0), up: new Vector3(0, 1, 0) },
-    };
-    this.shipList = [this.ships.csm, this.ships.lm];
+    this.ships = this.path.ships.map((track, index): ShipState => {
+      const role = roleOf(track, index);
+      return {
+        id: track.id,
+        role,
+        color: role === 'main' ? SHIP_COLORS.main : SHIP_COLORS.other,
+        track,
+        launch: null,
+        exists: false,
+        position: new Vector3(),
+        forward: new Vector3(1, 0, 0),
+        up: new Vector3(0, 1, 0),
+      };
+    });
+    const main = this.ships.find((ship) => ship.role === 'main') ?? this.ships[0];
+    if (!main) throw new Error('The flight path has no ships');
+    this.main = main;
+    this.followed = main;
+    this.viewNow = homeView(options.mission);
+    this.orbitMission = options.mission.destination === 'earth-orbit';
     this.journeyPoints = this.sampleJourney();
     this.journeyCenter.readable.copy(this.boundsCenter(this.journeyPoints.readable, MOON_DISTANCE.readable));
     this.journeyCenter.true.copy(this.boundsCenter(this.journeyPoints.true, MOON_DISTANCE.true));
@@ -392,9 +508,13 @@ export class Stage implements Director {
     return this.viewNow;
   }
 
-  /** Move the camera to a view. With `instant`, jump there (also the case with reduced motion). */
+  /**
+   * Move the camera to a view. With `instant`, jump there (also the case
+   * with reduced motion). A view the mission does not offer becomes the
+   * nearest one it does.
+   */
   setView(view: EventView, instant = false): void {
-    this.viewNow = view;
+    this.viewNow = nearestView(this.options.mission, view);
     this.userMovedCamera = false;
     this.pendingView = instant || !this.running ? 'instant' : 'tween';
     if (view === 'spacecraft') {
@@ -456,94 +576,182 @@ export class Stage implements Director {
     const earth = this.earth;
     if (!earth) return;
 
-    // Paths. The lunar module's stops at docking; from then on it rides with Columbia.
-    const dockTime = this.lmDockingTime();
-    const ids: ShipId[] = ['csm', 'lm'];
-    ids.forEach((id, i) => {
-      const polyline = this.path.polyline(id);
+    // Paths. A ship docked to another rides on that ship's line meanwhile.
+    this.ships.forEach((ship, i) => {
+      const polyline = this.path.polyline(ship.id);
       if (!polyline) return;
-      const line = createPathLine(polyline, SHIP_COLORS[id], i + 1, id === 'lm' ? dockTime : Infinity);
+      const hidden = ship.track.phases
+        .filter((phase) => phase.kind === 'docked')
+        .map((phase) => [phaseStart(phase), phaseEnd(phase)] as const);
+      const line = createPathLine(polyline, ship.color, i + 1, hidden, this.orbitMission ? ORBIT_PATH_FADE : null);
       line.mesh.renderOrder = 1 + i;
       line.setResolution(this.cssWidth, this.cssHeight);
       this.lines.push(line);
       this.scene.add(line.mesh);
     });
 
-    // Event markers, on the path of the ship the story follows at each event.
+    // Event markers, on the path of the ship the story follows at each event
+    // (or, before that ship flies, of a ship that already does).
     const points: MarkerPoint[] = [];
     this.eventSeconds.forEach((t, index) => {
-      const ship = this.followedAt(t);
-      const readable = [0, 0, 0];
-      const real = [0, 0, 0];
-      if (!this.path.position(ship, t, 0, readable) || !this.path.position(ship, t, 1, real)) return;
-      points.push({ readable, true: real, color: SHIP_COLORS[ship], eventIndex: index });
+      const followed = this.followedAt(t);
+      for (const ship of [followed, ...this.ships.filter((other) => other !== followed)]) {
+        const readable = [0, 0, 0];
+        const real = [0, 0, 0];
+        if (!this.path.position(ship.id, t, 0, readable) || !this.path.position(ship.id, t, 1, real)) continue;
+        points.push({ readable, true: real, color: ship.color, eventIndex: index });
+        break;
+      }
     });
     this.eventMarkers = createMarkers(points, false);
     this.scene.add(this.eventMarkers.points);
 
-    // Launch site and splashdown point, fixed to the turning Earth.
+    // Sites: where each ship lifted off from Earth, landed, and splashed down.
     const earthPoints: MarkerPoint[] = [];
-    for (const t of [this.path.start, this.path.end]) {
-      if (!this.path.position('csm', t, 1, this.scratch)) continue;
-      earth.setOrientation(this.path.earthAxisAngle(t), this.path.earthSpinAngle(t));
-      earth.root.updateMatrixWorld(true);
-      const local = earth.globe.worldToLocal(this.v1.fromArray(this.scratch));
-      earthPoints.push({ readable: local.toArray(), true: local.toArray(), color: 0xffffff, eventIndex: -1 });
+    const moonPoints: MarkerPoint[] = [];
+    for (const ship of this.ships) {
+      for (const phase of ship.track.phases) {
+        if (phase.kind === 'ascent' && phase.body === 'earth') {
+          const local = this.earthSite(ship.id, phaseStart(phase), 1);
+          if (!local) continue;
+          earthPoints.push({ readable: local.toArray(), true: local.toArray(), color: 0xffffff, eventIndex: -1 });
+          ship.launch ??= { time: phaseStart(phase), local };
+        } else if (phase.kind === 'entry' || (phase.kind === 'descent' && phase.body === 'earth')) {
+          const local = this.earthSite(ship.id, phaseEnd(phase), -1);
+          if (local) earthPoints.push({ readable: local.toArray(), true: local.toArray(), color: 0xffffff, eventIndex: -1 });
+        } else if (phase.kind === 'descent') {
+          const site = this.moonSite(ship.id, phaseEnd(phase));
+          if (!site) continue;
+          moonPoints.push({ readable: site.offset.toArray(), true: site.offset.toArray(), color: 0xffffff, eventIndex: -1 });
+          if (!this.landings.has(ship.id)) this.landings.set(ship.id, site);
+        }
+      }
     }
+    // Earth's sites turn with the globe; the Moon's ride with the Moon (which does not turn in this frame).
     this.earthSites = createMarkers(earthPoints, true);
     earth.globe.add(this.earthSites.points);
-
-    // Landing site, fixed to the Moon (which does not turn in this frame).
-    const landing = this.lmSurfaceTime();
-    const center = [0, 0, 0];
-    if (landing !== undefined && this.path.position('lm', landing, 0, this.scratch)) {
-      this.path.moonPosition(0, center);
-      const offset = this.v1.fromArray(this.scratch).sub(this.v2.fromArray(center)).toArray();
-      this.landingOffset.fromArray(offset);
-      // Which way Eagle faced as it set down: its travel just before landing, along the ground.
-      if (this.path.direction('lm', landing - 20, 0, this.scratch)) this.landingFront.fromArray(this.scratch);
-      this.moonSites = createMarkers([{ readable: offset, true: offset, color: 0xffffff, eventIndex: -1 }], true);
+    if (moonPoints.length > 0) {
+      this.moonSites = createMarkers(moonPoints, true);
       this.moonAnchor.add(this.moonSites.points);
     }
 
     // The spacecraft.
     this.fleet = buildFleet(
+      this.ships,
       this.options.vehicle,
       this.options.leftBehind,
       (moment) => elapsedToSeconds(moment.at.value),
-      SHIP_COLORS,
     );
     for (const ship of this.fleet.ships) this.shipScene.add(ship.halo, ship.root);
     for (const part of this.fleet.leftBehind) this.shipScene.add(part.root);
+    this.pairings = this.findPairings(this.fleet);
 
     const ratio = this.renderer.getPixelRatio();
     for (const set of [this.eventMarkers, this.earthSites, this.moonSites]) set?.setPixelRatio(ratio);
   }
 
-  private lmDockingTime(): number {
-    const lm = this.path.ships.find((ship) => ship.id === 'lm');
-    const docked = lm?.phases.find((phase) => phase.kind === 'docked');
-    return docked ? elapsedToSeconds(docked.start.value) : Infinity;
+  /**
+   * Where a ship is at mission time t (true scale), on the globe as it was
+   * turned then (globe-local), or null. At a phase boundary, `nudge` (+1
+   * or -1) says which side of it to try if the ship is not there exactly.
+   */
+  private earthSite(shipId: string, t: number, nudge: number): Vector3 | null {
+    const earth = this.earth;
+    if (!earth) return null;
+    let time = t;
+    if (!this.path.position(shipId, time, 1, this.scratch)) {
+      time = t + nudge * 0.001;
+      if (!this.path.position(shipId, time, 1, this.scratch)) return null;
+    }
+    earth.setOrientation(this.path.earthAxisAngle(time), this.path.earthSpinAngle(time));
+    earth.root.updateMatrixWorld(true);
+    return earth.globe.worldToLocal(new Vector3().fromArray(this.scratch));
   }
 
-  private lmSurfaceTime(): number | undefined {
-    const lm = this.path.ships.find((ship) => ship.id === 'lm');
-    const surface = lm?.phases.find((phase) => phase.kind === 'surface');
-    return surface ? elapsedToSeconds(surface.start.value) : undefined;
+  /** A landing site on the Moon at mission time t, relative to the Moon's center, and the lander's facing there. */
+  private moonSite(shipId: string, t: number): LandingSite | null {
+    let time = t;
+    if (!this.path.position(shipId, time, 0, this.scratch)) {
+      time = t - 0.001;
+      if (!this.path.position(shipId, time, 0, this.scratch)) return null;
+    }
+    const center = [0, 0, 0];
+    this.path.moonPosition(0, center);
+    const offset = new Vector3().fromArray(this.scratch).sub(this.v2.fromArray(center));
+    // Which way it faced as it set down: its travel just before landing, along the ground.
+    const front = new Vector3(0, 0, 1);
+    if (this.path.direction(shipId, time - 20, 0, this.scratch)) front.fromArray(this.scratch);
+    return { offset, front };
   }
 
-  /** The ship the story follows: the lunar module while it flies apart from Columbia, otherwise Columbia. */
-  private followedAt(t: number): ShipId {
-    const phase = this.path.phaseAt('lm', t);
-    return phase && phase.kind !== 'docked' ? 'lm' : 'csm';
+  /**
+   * Each target ship's dockings with the main ship and undockings from it,
+   * read from the vehicle changes: the target is drawn as part of the main
+   * ship (no parts of its own) while docked.
+   */
+  private findPairings(fleet: Fleet): Pairing[] {
+    const mainModel = fleet.ships[this.ships.indexOf(this.main)];
+    if (!mainModel) return [];
+    const pairings: Pairing[] = [];
+    this.ships.forEach((target, i) => {
+      const model = fleet.ships[i];
+      if (target.role !== 'target' || !model) return;
+      const moments: PairMoment[] = [];
+      for (let k = 1; k < model.shapeCount; k += 1) {
+        const before = model.shapeParts(k - 1).length > 0;
+        const after = model.shapeParts(k).length > 0;
+        if (before === after) continue;
+        const time = model.shapeTime(k);
+        // Docking: the main ship's shape from then on; undocking: its shape until then.
+        const docked = mainModel.shapeAt(after ? time - 1e-3 : time);
+        const alone = after ? k : k - 1;
+        if (docked < 0 || mainModel.shapeLayout(docked) !== 'docked') continue;
+        const middle = mainModel.partsMiddle(docked, model.shapeParts(alone));
+        if (middle === undefined) continue;
+        moments.push({ time, docked, alone, contact: middle - model.shapeMiddle(alone) });
+      }
+      // Station keeping: the main ship's rendezvous with this target says when it was alongside.
+      let alongside: number | undefined;
+      for (const phase of this.main.track.phases) {
+        if (phase.kind !== 'rendezvous' || phase.target !== target.id) continue;
+        const at = (phase as { readonly alongside?: { readonly value: ElapsedTime } }).alongside;
+        if (at) alongside = elapsedToSeconds(at.value);
+      }
+      if (moments.length > 0) pairings.push({ target, targetModel: model, moments, alongside });
+    });
+    return pairings;
   }
 
-  /** A few hundred points along both paths, for framing the journey view. */
+  /**
+   * The ship the story follows: a lander while it flies apart from the main
+   * ship, otherwise the main ship. A target is followed only before the main
+   * ship lifts off (Gemini 8's Agena flew first), as the only ship there is.
+   */
+  private followedAt(t: number): ShipState {
+    for (const ship of this.ships) {
+      if (ship.role !== 'lander') continue;
+      const phase = this.path.phaseAt(ship.id, t);
+      if (phase && phase.kind !== 'docked') return ship;
+    }
+    if (t < this.main.track.start) {
+      const flying = this.ships.find((ship) => t >= ship.track.start && t <= ship.track.end);
+      if (flying) return flying;
+    }
+    return this.main;
+  }
+
+  /** The ship the Earth and Moon views frame: the followed ship, or before it flies, the first one that does. */
+  private subject(): ShipState {
+    if (this.followed.exists) return this.followed;
+    return this.ships.find((ship) => ship.exists) ?? this.followed;
+  }
+
+  /** A few hundred points along every path, for framing the journey view (and an Earth-orbit flight's Earth view). */
   private sampleJourney(): { readable: Float32Array; true: Float32Array } {
     const readable: number[] = [];
     const real: number[] = [];
-    for (const id of ['csm', 'lm']) {
-      const line = this.path.polyline(id);
+    for (const ship of this.path.ships) {
+      const line = this.path.polyline(ship.id);
       if (!line) continue;
       const n = line.times.length;
       const step = Math.max(1, Math.floor(n / 300));
@@ -629,18 +837,41 @@ export class Stage implements Director {
     return found;
   }
 
-  /** Where each ship is and which way it is going. */
+  /**
+   * Where each ship is and which way it is going. A ship that has not
+   * lifted off yet waits at its pad on the turning Earth (not drawn), so
+   * the ship view can look there before liftoff.
+   */
   private updateShips(): void {
     const t = this.player.time;
-    for (let i = 0; i < this.shipList.length; i += 1) {
-      const ship = this.shipList[i] as ShipState;
+    for (let i = 0; i < this.ships.length; i += 1) {
+      const ship = this.ships[i] as ShipState;
       ship.exists = this.path.position(ship.id, t, this.mix, this.scratch);
-      if (!ship.exists) continue;
+      if (!ship.exists) {
+        if (ship.launch && t < ship.launch.time && this.earth) {
+          this.earth.root.updateMatrixWorld(true);
+          this.earth.globe.localToWorld(ship.position.copy(ship.launch.local));
+          ship.up.copy(ship.position).normalize();
+          ship.forward.copy(ship.up);
+        }
+        continue;
+      }
       ship.position.fromArray(this.scratch);
       if (this.path.direction(ship.id, t, this.mix, this.scratch)) ship.forward.fromArray(this.scratch);
       this.radialUp(ship.position, ship.up);
+      // Down on Earth (a capsule floating after splashdown): it came down, so it stays heat shield down.
+      const phase = this.path.phaseAt(ship.id, t);
+      if (phase?.kind === 'surface' && phase.body === 'earth') ship.forward.copy(ship.up).negate();
     }
-    this.followed = this.followedAt(t);
+    const followed = this.followedAt(t);
+    if (followed !== this.followed) {
+      // Handing the ship view to a ship somewhere else (the main ship at its liftoff): move the camera there.
+      const far = followed.position.distanceTo(this.followed.position) > HANDOVER_DISTANCE;
+      this.followed = followed;
+      if (far && this.viewNow === 'spacecraft' && !this.pendingView) {
+        this.pendingView = this.running && !this.reducedMotion ? 'tween' : 'instant';
+      }
+    }
   }
 
   /** Unit vector away from the nearer body (by height in body radii). */
@@ -671,7 +902,7 @@ export class Stage implements Director {
       case 'moon':
         return out.set(MOON_DISTANCE.readable + (MOON_DISTANCE.true - MOON_DISTANCE.readable) * mix, 0, 0);
       case 'spacecraft':
-        return out.copy(this.ships[this.followed].position);
+        return out.copy(this.followed.position);
       case 'journey':
         return out.lerpVectors(this.journeyCenter.readable, this.journeyCenter.true, mix);
     }
@@ -691,17 +922,27 @@ export class Stage implements Director {
    * chase so it starts behind and above the ship.
    */
   private framingOffset(out: Vector3, mix = this.mix): Vector3 {
-    const ship = this.ships[this.followed];
     switch (this.viewNow) {
       case 'journey':
         return this.journeyOffset(out, mix);
       case 'earth':
       case 'moon': {
+        const ship = this.subject();
         const isEarth = this.viewNow === 'earth';
         const center = isEarth ? this.origin : this.moonSphere(mix).center;
         const radius = isEarth ? EARTH_FRAME_RADIUS : MOON_RADIUS;
         const direction = this.bodyDirection(center, radius, this.v3);
         const spheres: SphereLike[] = [{ center, radius }];
+        if (isEarth && this.orbitMission) {
+          // A flight that stays in Earth orbit: Earth and every orbit, with room at the edges for a model.
+          spheres.push(...this.pathSpheres(mix));
+          const clear: ClearArea = {
+            width: Math.max(0.2, this.clear.width - (2 * SHIP_EDGE_PX) / this.cssWidth),
+            height: Math.max(0.2, this.clear.height - (2 * SHIP_EDGE_PX) / this.cssHeight),
+          };
+          const distance = fitDistance(this.camera, center, direction, spheres, 1.06, clear, this.worldUp);
+          return out.copy(direction).multiplyScalar(distance);
+        }
         if (ship.exists && ship.position.distanceTo(center) < radius * (1 + NEAR_BODY_RADII)) {
           spheres.push({ center: ship.position.clone(), radius: radius * 0.12 });
         }
@@ -709,6 +950,7 @@ export class Stage implements Director {
         return out.copy(direction).multiplyScalar(distance);
       }
       case 'spacecraft': {
+        const ship = this.followed;
         this.chaseFrameFor(ship, this.chaseFrame);
         this.chaseReady = true;
         this.chaseDistance = this.chaseAutoDistance(ship);
@@ -717,15 +959,9 @@ export class Stage implements Director {
     }
   }
 
-  /**
-   * The journey view is a diagram with one fixed orientation for the whole
-   * mission: seen from the north (above the plane of the path), Earth on the
-   * left, the Moon on the right. It never turns to follow the ship; a ship
-   * behind Earth or the Moon is drawn anyway (see updateFleet).
-   */
-  private journeyOffset(out: Vector3, mix: number): Vector3 {
-    const center = this.viewAnchor(new Vector3(), mix);
-    const spheres: SphereLike[] = [{ center: this.origin, radius: EARTH_FRAME_RADIUS }, this.moonSphere(mix)];
+  /** Small spheres along every path at scale mix `mix`, for framing. */
+  private pathSpheres(mix: number): SphereLike[] {
+    const spheres: SphereLike[] = [];
     const points = this.journeyPoints;
     for (let i = 0; i < points.readable.length; i += 3) {
       spheres.push({
@@ -737,6 +973,22 @@ export class Stage implements Director {
         radius: 0.05 + 0.02 * mix,
       });
     }
+    return spheres;
+  }
+
+  /**
+   * The journey view is a diagram with one fixed orientation for the whole
+   * mission: seen from the north (above the plane of the path), Earth on the
+   * left, the Moon on the right. It never turns to follow the ship; a ship
+   * behind Earth or the Moon is drawn anyway (see updateFleet).
+   */
+  private journeyOffset(out: Vector3, mix: number): Vector3 {
+    const center = this.viewAnchor(new Vector3(), mix);
+    const spheres: SphereLike[] = [
+      { center: this.origin, radius: EARTH_FRAME_RADIUS },
+      this.moonSphere(mix),
+      ...this.pathSpheres(mix),
+    ];
     // Leave room at the edges for a spacecraft model drawn at the end of the path.
     const clear: ClearArea = {
       width: Math.max(0.2, this.clear.width - (2 * JOURNEY_EDGE_PX) / this.cssWidth),
@@ -756,7 +1008,8 @@ export class Stage implements Director {
    * nearby, they show the body's day side.
    */
   private bodyDirection(center: Vector3, radius: number, out: Vector3): Vector3 {
-    const ship = this.ships[this.followed];
+    const ship = this.subject();
+    if (center === this.origin && this.orbitMission && this.orbitDirection(ship, out)) return out;
     const lean = this.v1.copy(this.sunDirection).addScaledVector(this.v2.set(0, 1, 0), 0.6);
     if (ship.exists && ship.position.distanceTo(center) < radius * (1 + NEAR_BODY_RADII)) {
       const toShip = out.subVectors(ship.position, center).normalize();
@@ -771,6 +1024,37 @@ export class Stage implements Director {
     if (center === this.origin) return out.copy(lean).normalize();
     // The Moon: from the Earth side (its near side), leaning sunward.
     return out.set(-1, 0.3, 0).addScaledVector(this.sunDirection, 0.7).normalize();
+  }
+
+  /**
+   * The Earth view of a flight that stays in Earth orbit: from above the
+   * ship's orbit (its north or sunlit side), tilted ORBIT_VIEW_TILT_DEG
+   * toward the ship, so the orbits show as rings around Earth rather than
+   * edge on. False when the ship's travel gives no orbit plane.
+   */
+  private orbitDirection(ship: ShipState, out: Vector3): boolean {
+    if (!ship.exists) return false;
+    // The orbit plane: the ship's own, or while it has none (climbing, falling under a
+    // parachute, or afloat), that of another ship still in orbit.
+    const normal = this.v2;
+    let found = false;
+    for (const candidate of [ship, ...this.ships]) {
+      if (!candidate.exists) continue;
+      normal.crossVectors(this.v1.copy(candidate.position).normalize(), candidate.forward);
+      if (normal.lengthSq() > 0.05) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) return false;
+    normal.normalize();
+    const radial = this.v1.copy(ship.position).normalize();
+    const preferred = this.v3.copy(this.sunDirection).multiplyScalar(0.6).add(this.worldUp);
+    if (normal.dot(preferred) < 0) normal.negate();
+    const tilt = MathUtils.degToRad(ORBIT_VIEW_TILT_DEG);
+    // (No turning away from the Moon here: that could turn the view edge on to the orbits.)
+    out.copy(normal).multiplyScalar(Math.cos(tilt)).addScaledVector(radial, Math.sin(tilt)).normalize();
+    return true;
   }
 
   /**
@@ -835,6 +1119,7 @@ export class Stage implements Director {
     this.tweenFrom.target.copy(this.controls.target);
     this.tweenFromUp.copy(this.camera.up);
     this.framingOffset(this.settledOffset, mix);
+    this.tweenMix = mix;
     const toMix = mix;
     this.controls.minDistance = 0;
     this.controls.maxDistance = Infinity;
@@ -908,8 +1193,12 @@ export class Stage implements Director {
   private reframeAfterLayout(): void {
     this.needsRender = true;
     if (!this.earth || this.userMovedCamera || this.pendingView) return;
-    if (this.cameraTween && !this.cameraTween.done) return;
     if (this.viewNow === 'spacecraft') return;
+    if (this.cameraTween && !this.cameraTween.done) {
+      // A move is under way (a tour starting as its card opens, say): have it land on the framing for the new clear area.
+      this.framingOffset(this.settledOffset, this.tweenMix);
+      return;
+    }
     if (this.reducedMotion) this.applyFraming(true);
     else this.startTween(REFRAME_MS);
   }
@@ -1031,7 +1320,7 @@ export class Stage implements Director {
       // After a seek or a pause, bring the ship back into view if it is hidden.
       // (The journey view keeps its one orientation; the ship view follows anyway.)
       const tweening = this.cameraTween !== null && !this.cameraTween.done;
-      if (!tweening && this.shipHidden(this.ships[this.followed])) {
+      if (!tweening && this.shipHidden(this.subject())) {
         this.applyFraming(this.reducedMotion);
         moved = true;
       }
@@ -1039,7 +1328,7 @@ export class Stage implements Director {
 
     // The ship view turns with the ship and eases its distance.
     if (this.viewNow === 'spacecraft' && this.chaseReady) {
-      const ship = this.ships[this.followed];
+      const ship = this.followed;
       this.chaseFrameFor(ship, this.q1);
       const auto = this.chaseAutoDistance(ship);
       if (jumped || this.reducedMotion) {
@@ -1198,19 +1487,105 @@ export class Stage implements Director {
     const offsetMoving = this.updateViewOffset(dt);
     const cameraMoved = this.updateCamera(dt, jumped, paused);
 
-    if (animating || worldChanged || offsetMoving || cameraMoved || this.needsRender) {
+    if (animating || worldChanged || offsetMoving || cameraMoved || this.needsRender || this.shipsTurning()) {
       this.renderFrame(dt, jumped);
     }
   };
+
+  /** True while a spacecraft keeps turning with the clock stopped (see ShipModel.idleTurning). */
+  private shipsTurning(): boolean {
+    const ships = this.fleet?.ships ?? [];
+    for (let i = 0; i < ships.length; i += 1) {
+      if ((ships[i] as ShipModel).idleTurning) return true;
+    }
+    return false;
+  }
+
+  /** Scene units per CSS pixel at a point, for a model drawn there; 0 when it is hidden behind Earth or the Moon or behind the camera. */
+  private unitsPerPixelAt(point: Vector3, exists: boolean, tanHalf: number): number {
+    // The journey view is a diagram: a ship behind Earth or the Moon is drawn anyway.
+    if (!exists || (this.viewNow !== 'journey' && this.occluded(point))) return 0;
+    const depth = this.v1.subVectors(point, this.camera.position).dot(this.cameraForward);
+    return depth > this.camera.near ? (2 * depth * tanHalf) / this.cssHeight : 0;
+  }
+
+  /**
+   * The target ship near the main ship now, if any: the docking or
+   * undocking it is nearest, how far it is set out in its docking place
+   * (0 to 1, see PAIR_GAP_MIN_PX), and the room between the two in CSS
+   * pixels.
+   */
+  private pairNow(): { pairing: Pairing; moment: PairMoment; arranged: number; gapPixels: number } | null {
+    const t = this.player.time;
+    if (!this.main.exists) return null;
+    for (const pairing of this.pairings) {
+      const target = pairing.target;
+      if (!target.exists) continue;
+      const index = pairing.targetModel.shapeAt(t);
+      let moment: PairMoment | null = null;
+      for (const candidate of pairing.moments) {
+        if (candidate.alone !== index) continue;
+        if (!moment || Math.abs(candidate.time - t) < Math.abs(moment.time - t)) moment = candidate;
+      }
+      if (!moment) continue;
+      // Their real distance apart, in meters.
+      if (!this.path.position(target.id, t, 1, this.scratch)) continue;
+      this.v3.fromArray(this.scratch);
+      if (!this.path.position(this.main.id, t, 1, this.scratch)) continue;
+      const meters = this.v3.distanceTo(this.v2.fromArray(this.scratch)) * METERS_PER_UNIT;
+      const story = this.player.storyTime;
+      // Before docking: set out from station keeping on (swinging there just before it).
+      // After undocking: at first, then letting go as the two drift apart.
+      const storyApart = Math.abs(this.player.story.toStory(moment.time) - story);
+      let arranged: number;
+      if (moment.time > t) {
+        const from = this.player.story.toStory(pairing.alongside ?? moment.time);
+        arranged = smoothstep(from - PAIR_ARRANGE_STORY_SECONDS, from, story);
+      } else {
+        arranged = 1 - smoothstep(PAIR_CLOSE_STORY_SECONDS, PAIR_CLOSE_STORY_SECONDS + PAIR_ARRANGE_STORY_SECONDS, storyApart);
+      }
+      const closing = smoothstep(0, PAIR_CLOSE_STORY_SECONDS, storyApart);
+      const room = PAIR_GAP_MIN_PX + (PAIR_GAP_MAX_PX - PAIR_GAP_MIN_PX) * (1 - Math.exp(-meters / PAIR_GAP_DISTANCE_M));
+      return { pairing, moment, arranged, gapPixels: closing * room };
+    }
+    return null;
+  }
+
+  /**
+   * Where to draw a target near the main ship (into `out`): at least
+   * `minPixels` from it, along the line between them, turning (over the
+   * top) toward its docking side `side` as `arranged` goes to 1.
+   */
+  private besideMain(target: ShipState, side: number, minPixels: number, arranged: number, units: number, out: Vector3): void {
+    const main = this.main;
+    const offset = this.v1.subVectors(target.position, main.position);
+    const realPixels = offset.length() / units;
+    const dock = this.v2.copy(main.forward).multiplyScalar(side >= 0 ? 1 : -1);
+    const real = realPixels > 1e-6 ? offset.normalize() : this.v1.copy(dock);
+    // After undocking, the real geometry takes over as they drift apart.
+    let a = arranged;
+    if (a >= 1 && realPixels > minPixels) a = 1 - smoothstep(minPixels, 3 * minPixels, realPixels);
+    const cos = MathUtils.clamp(real.dot(dock), -1, 1);
+    const angle = Math.acos(cos) * a;
+    const across = this.v3.copy(dock).addScaledVector(real, -cos);
+    if (across.lengthSq() < 1e-8) across.copy(main.up).addScaledVector(real, -main.up.dot(real));
+    if (across.lengthSq() < 1e-8) across.set(0, 1, 0).addScaledVector(real, -real.y);
+    across.normalize();
+    const direction = real.multiplyScalar(Math.cos(angle)).addScaledVector(across, Math.sin(angle));
+    const pixels = MathUtils.lerp(Math.max(realPixels, minPixels), minPixels, a);
+    out.copy(main.position).addScaledVector(direction, pixels * units);
+  }
 
   /** Size, place, and show or hide each spacecraft for this frame. */
   private updateFleet(dt: number, snap: boolean): void {
     if (!this.fleet) return;
     const context = this.poseContext;
-    context.time = this.player.time;
+    const t = this.player.time;
+    context.time = t;
     context.storyTime = this.player.storyTime;
     context.dt = dt;
     context.snap = snap;
+    context.reducedMotion = this.reducedMotion;
     // Smaller clear areas (phones) get somewhat smaller models.
     const clearPixels = Math.min(this.clear.width * this.cssWidth, this.clear.height * this.cssHeight);
     const screenScale = MathUtils.clamp(Math.sqrt(clearPixels / 600), 0.75, 1);
@@ -1221,38 +1596,77 @@ export class Stage implements Director {
     context.maxReachPixels = journey ? JOURNEY_SHIP_REACH_PX : Math.max(24, clearPixels / 2 - SHIP_EDGE_PX);
     this.camera.getWorldDirection(this.cameraForward);
     const tanHalf = Math.tan(MathUtils.degToRad(this.camera.fov) / 2);
+    const subjectScale = this.orbitMission ? ORBIT_SUBJECT_SCALE : SUBJECT_SCALE;
+    const sizeScaleOf = (ship: ShipState): number =>
+      screenScale * (this.viewNow === 'spacecraft' && ship === this.followed ? subjectScale : 1);
+
     const models = this.fleet.ships;
-    for (let i = 0; i < models.length; i += 1) {
-      const model = models[i] as ShipModel;
-      const ship = this.ships[model.shipId];
-      let unitsPerPixel = 0;
-      // The journey view is a diagram: a ship behind Earth or the Moon is drawn anyway.
-      if (ship.exists && (this.viewNow === 'journey' || !this.occluded(ship.position))) {
-        const depth = this.v1.subVectors(ship.position, this.camera.position).dot(this.cameraForward);
-        if (depth > this.camera.near) unitsPerPixel = (2 * depth * tanHalf) / this.cssHeight;
+    const mainIndex = this.ships.indexOf(this.main);
+    const mainModel = models[mainIndex];
+    const pair = mainModel ? this.pairNow() : null;
+
+    // The main ship first, so a target drawn beside it can share its scale.
+    let mainUnits = 0;
+    let mainSizeScale = 1;
+    if (mainModel) {
+      const ship = this.main;
+      context.sizeScale = mainSizeScale = sizeScaleOf(ship);
+      context.unitsPerPixel = mainUnits = this.unitsPerPixelAt(ship.position, ship.exists, tanHalf);
+      context.metersPerPixel = 0;
+      if (pair) {
+        // Grow or shrink toward the size the docked pair is drawn at.
+        const own = mainModel.metersPerPixelOf(mainModel.shapeAt(t), context);
+        const docked = mainModel.metersPerPixelOf(pair.moment.docked, context);
+        if (own > 0 && docked > 0) context.metersPerPixel = MathUtils.lerp(own, docked, pair.arranged);
       }
-      context.unitsPerPixel = unitsPerPixel;
-      context.sizeScale = screenScale * (this.viewNow === 'spacecraft' && model.shipId === this.followed ? SUBJECT_SCALE : 1);
-      model.update(ship, context);
+      mainModel.update(ship, context);
     }
 
-    // Parts left behind stand at the landing site from their cited moment on.
+    for (let i = 0; i < models.length; i += 1) {
+      if (i === mainIndex) continue;
+      const model = models[i] as ShipModel;
+      const ship = this.ships[i] as ShipState;
+      let pose: ShipPose = ship;
+      context.sizeScale = sizeScaleOf(ship);
+      context.metersPerPixel = 0;
+      context.unitsPerPixel = this.unitsPerPixelAt(ship.position, ship.exists, tanHalf);
+      const mainScale = mainModel?.drawnMetersPerPixel ?? 0;
+      const spread = pair !== null && (pair.arranged > 0 || this.viewNow === 'spacecraft');
+      if (pair && spread && pair.pairing.target === ship && mainUnits > 0 && mainScale > 0) {
+        // Never on top of the main ship in the ship view; in its docking place from station keeping on (an illustration).
+        const w = pair.arranged;
+        const drawn = this.drawnPose;
+        const minPixels = Math.abs(pair.moment.contact) / mainScale + pair.gapPixels;
+        this.besideMain(ship, pair.moment.contact, minPixels, w, mainUnits, this.sitePosition);
+        drawn.exists = true;
+        drawn.position.copy(this.sitePosition);
+        drawn.forward.lerpVectors(ship.forward, this.main.forward, w).normalize();
+        drawn.up.lerpVectors(ship.up, this.main.up, w).normalize();
+        pose = drawn;
+        const units = this.unitsPerPixelAt(drawn.position, true, tanHalf);
+        context.unitsPerPixel = units > 0 ? MathUtils.lerp(units, mainUnits, w) : 0;
+        context.sizeScale = MathUtils.lerp(context.sizeScale, mainSizeScale, w);
+        const own = model.metersPerPixelOf(model.shapeAt(t), context);
+        if (own > 0) context.metersPerPixel = MathUtils.lerp(own, mainScale, w);
+      }
+      model.update(pose, context);
+    }
+
+    // Parts left behind stand at their ship's landing site from their cited moment on.
+    context.metersPerPixel = 0;
     const parts = this.fleet.leftBehind;
-    this.sitePosition.copy(this.moonCenter).add(this.landingOffset);
-    this.siteUp.copy(this.landingOffset).normalize();
     for (let i = 0; i < parts.length; i += 1) {
       const part = parts[i] as LeftBehindModel;
-      const shown = this.player.time >= part.from - 1e-6;
-      let unitsPerPixel = 0;
-      if (shown && (this.viewNow === 'journey' || !this.occluded(this.sitePosition))) {
-        const depth = this.v1.subVectors(this.sitePosition, this.camera.position).dot(this.cameraForward);
-        if (depth > this.camera.near) unitsPerPixel = (2 * depth * tanHalf) / this.cssHeight;
-      }
-      context.unitsPerPixel = unitsPerPixel;
+      const site = this.landings.get(part.shipId);
+      this.sitePosition.copy(this.moonCenter).add(site?.offset ?? this.origin);
+      this.siteUp.copy(site?.offset ?? this.worldUp).normalize();
+      const shown = site !== undefined && t >= part.from - 1e-6;
+      context.unitsPerPixel = this.unitsPerPixelAt(this.sitePosition, shown, tanHalf);
       // Sized like the ascent stage that lifted off from it (smaller in the journey view).
-      if (this.viewNow === 'journey') context.maxPixels = JOURNEY_LEFT_BEHIND_MAX_PX;
-      context.sizeScale = screenScale * (this.viewNow === 'spacecraft' && this.followed === 'lm' ? SUBJECT_SCALE : 1);
-      part.update(shown, this.sitePosition, this.siteUp, this.landingFront, context);
+      if (journey) context.maxPixels = JOURNEY_LEFT_BEHIND_MAX_PX;
+      context.sizeScale =
+        screenScale * (this.viewNow === 'spacecraft' && this.followed.id === part.shipId ? SUBJECT_SCALE : 1);
+      part.update(shown, this.sitePosition, this.siteUp, site?.front ?? this.worldUp, context);
     }
   }
 

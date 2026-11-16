@@ -59,17 +59,22 @@ function mediaItem(entry: CreditEntry): HTMLLIElement {
   return item;
 }
 
-function photoItems(missions: readonly Mission[]): HTMLLIElement[] {
-  const items: HTMLLIElement[] = [];
+/**
+ * Photo credits, one list per mission in flight order, each under the
+ * mission's name. A photo used by more than one mission is listed once.
+ */
+function photoGroups(missions: readonly Mission[]): HTMLElement | null {
   const seen = new Set<string>();
+  const sections: HTMLElement[] = [];
   for (const mission of missions) {
+    const items: HTMLLIElement[] = [];
     for (const event of mission.events) {
       const photo = event.photo;
       if (!photo || seen.has(photo.src)) continue;
       seen.add(photo.src);
       const item = el('li', 'credits__item');
-      const heading = el('h4', 'credits__item-title');
-      heading.append(externalLink(photo.sourceUrl, `${mission.name}: ${event.title}`));
+      const heading = el('h5', 'credits__item-title');
+      heading.append(externalLink(photo.sourceUrl, event.title));
       item.append(
         heading,
         details([
@@ -79,11 +84,20 @@ function photoItems(missions: readonly Mission[]): HTMLLIElement[] {
       );
       items.push(item);
     }
+    if (!items.length) continue;
+    const section = el('section', 'credits__mission');
+    const list = el('ul', 'credits__list');
+    list.append(...items);
+    section.append(el('h4', 'credits__mission-title', mission.name), list);
+    sections.push(section);
   }
-  return items;
+  if (!sections.length) return null;
+  const block = el('section', 'credits__group');
+  block.append(el('h3', 'credits__group-title', copy.credits.photos), ...sections);
+  return block;
 }
 
-/** Fill the "Sources and credits" dialog: the source registry, photo credits, and media credits. */
+/** Fill the "Sources and credits" dialog: the source registry, photo credits per mission, and media credits. */
 export function renderCredits(credits: readonly CreditEntry[], missions: readonly Mission[]): void {
   const body = byId('credits-body', HTMLDivElement);
   const ids = Object.keys(SOURCES) as SourceId[];
@@ -91,8 +105,8 @@ export function renderCredits(credits: readonly CreditEntry[], missions: readonl
     el('p', 'credits__intro', copy.credits.intro),
     group(copy.credits.sources, ids.map(sourceItem)),
   ];
-  const photos = photoItems(missions);
-  if (photos.length) parts.push(group(copy.credits.photos, photos));
+  const photos = photoGroups(missions);
+  if (photos) parts.push(photos);
   parts.push(group(copy.credits.media, credits.map(mediaItem)));
   body.replaceChildren(...parts);
 }

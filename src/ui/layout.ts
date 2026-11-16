@@ -5,8 +5,12 @@ type Side = 'top' | 'bottom' | 'right';
 
 export interface CoveringPart {
   element: HTMLElement;
-  /** Which edge of the view it covers; may differ between the phone and wide layouts. */
-  side: Side | ((wide: boolean) => Side);
+  /**
+   * Which edge of the view it covers; may differ between the phone and wide
+   * layouts. Null means the part does not count right now, for example a
+   * dialog that sits over the view without moving the camera.
+   */
+  side: Side | ((wide: boolean) => Side | null);
 }
 
 function isShown(element: HTMLElement): boolean {
@@ -33,6 +37,7 @@ export function watchViewInsets(parts: readonly CoveringPart[], onChange: (inset
       if (!isShown(part.element)) continue;
       const box = part.element.getBoundingClientRect();
       const side = typeof part.side === 'function' ? part.side(wide.matches) : part.side;
+      if (side === null) continue;
       if (side === 'top') insets.top = Math.max(insets.top, box.bottom);
       if (side === 'bottom') insets.bottom = Math.max(insets.bottom, height - box.top);
       if (side === 'right') insets.right = Math.max(insets.right, width - box.left);

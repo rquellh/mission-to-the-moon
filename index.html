@@ -16,7 +16,7 @@
     <title>Mission to the Moon</title>
   </head>
   <body>
-    <canvas id="stage" class="stage" role="img" tabindex="0" aria-label="3D view of Earth, the Moon, and stars"></canvas>
+    <canvas id="stage" class="stage" role="img" tabindex="0" aria-label="3D view of the mission"></canvas>
 
     <!-- Everything a person reads and touches sits in this layer over the 3D view. -->
     <div class="hud" id="hud">
@@ -24,8 +24,13 @@
         <div class="masthead__titles">
           <h1 class="masthead__site">Mission to the Moon</h1>
           <h2 class="masthead__mission">
-            <span class="masthead__name" id="mission-name"></span>
-            <span class="masthead__dates" id="mission-dates"></span>
+            <!-- The mission's name opens the mission picker. -->
+            <button type="button" class="masthead__switch" id="hub-button" aria-haspopup="dialog">
+              <span class="masthead__label">
+                <span class="masthead__name" id="mission-name"></span>
+                <span class="masthead__dates" id="mission-dates"></span>
+              </span>
+            </button>
           </h2>
         </div>
         <div class="masthead__actions">
@@ -39,12 +44,8 @@
       </header>
 
       <div class="views" id="views">
-        <div class="segmented" role="group" aria-label="Look at" id="view-buttons">
-          <button type="button" class="segmented__item" data-view="earth" aria-pressed="false">Earth</button>
-          <button type="button" class="segmented__item" data-view="moon" aria-pressed="false">Moon</button>
-          <button type="button" class="segmented__item" data-view="spacecraft" aria-pressed="false">Ship</button>
-          <button type="button" class="segmented__item" data-view="journey" aria-pressed="false">Both</button>
-        </div>
+        <!-- One button for each view the mission offers, added by the script. -->
+        <div class="segmented" role="group" aria-label="Look at" id="view-buttons"></div>
         <button type="button" class="switch" id="scale-toggle" aria-pressed="false">
           <span class="switch__track" aria-hidden="true"><span class="switch__knob"></span></span>
           <span class="switch__label">True scale</span>
@@ -91,15 +92,17 @@
       </section>
     </div>
 
-    <section class="welcome" id="welcome" aria-labelledby="welcome-title" hidden>
-      <h2 class="welcome__title" id="welcome-title">Mission to the Moon</h2>
-      <p class="welcome__lede" id="welcome-lede"></p>
-      <div class="welcome__actions">
-        <button type="button" class="button button--primary button--large" id="welcome-tour">Take the tour</button>
-        <button type="button" class="button button--large" id="welcome-explore">Explore on my own</button>
+    <!-- The mission picker: the welcome, and reopened from the mission's name in the header. -->
+    <dialog class="hub" id="hub" aria-labelledby="hub-title" aria-describedby="hub-lede">
+      <div class="hub__head">
+        <div class="hub__intro">
+          <h2 class="hub__title" id="hub-title" tabindex="-1">Mission to the Moon</h2>
+          <p class="hub__lede" id="hub-lede"></p>
+        </div>
+        <button type="button" class="button button--quiet hub__close" id="hub-close" hidden>Close</button>
       </div>
-      <p class="welcome__note" id="welcome-note"></p>
-    </section>
+      <div class="hub__list" id="hub-list"></div>
+    </dialog>
 
     <div class="loading" id="loading" role="status">
       <p class="loading__text" id="loading-text">Loading…</p>

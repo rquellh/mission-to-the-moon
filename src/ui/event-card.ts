@@ -2,7 +2,7 @@ import { copy } from '../content/copy';
 import type { MissionEvent } from '../content/types';
 import { externalLink, sourcesBlock } from './citations';
 import { button, byId, el } from './dom';
-import { formatElapsed, formatUtc, missionDates } from './format';
+import { formatElapsed, formatUtc, isBeforeLiftoff, missionDates } from './format';
 import { icon } from './icons';
 import type { MissionIndex } from './mission-index';
 
@@ -118,7 +118,7 @@ export function setUpEventCard({ index, onStep, reducedMotion }: EventCardOption
       const date = event.utc ? new Date(event.utc) : index.utcAt(seconds);
       time.replaceChildren(
         el('span', 'card__met', formatElapsed(seconds)),
-        ` ${copy.card.afterLiftoff}`,
+        ` ${isBeforeLiftoff(seconds) ? copy.card.beforeLiftoff : copy.card.afterLiftoff}`,
       );
       if (date && !Number.isNaN(date.getTime())) {
         time.append(el('span', 'card__utc', formatUtc(date)));

@@ -61,7 +61,7 @@ function orbitPhase(end: number): Phase {
 }
 
 function plan(phases: Phase[]): FlightPlan {
-  return { missionId: "test", sky, ships: [{ id: "capsule", name: "Capsule", phases: phases as [Phase, ...Phase[]] }] };
+  return { missionId: "test", sky, ships: [{ id: "capsule", name: "Capsule", role: "main", phases: phases as [Phase, ...Phase[]] }] };
 }
 
 /** Ground point under the capsule at time t, from a plan that just keeps orbiting. */

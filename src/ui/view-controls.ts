@@ -1,39 +1,43 @@
-import type { Director, ScaleMode } from '../app/contract';
-import type { EventView } from '../content/types';
-import { byId } from './dom';
-
-const VIEWS: readonly EventView[] = ['earth', 'moon', 'spacecraft', 'journey'];
-
-function isView(value: string | undefined): value is EventView {
-  return VIEWS.includes(value as EventView);
-}
+import type { Director } from '../app/contract';
+import { nearestView, viewsFor } from '../app/views';
+import { copy } from '../content/copy';
+import type { Mission } from '../content/types';
+import { button, byId } from './dom';
 
 /**
- * The Earth, Moon, Ship, and Both buttons and the True scale switch. They
- * ask the Director for a view and show whatever view and scale it reports.
+ * The view buttons and the True scale switch. The buttons are the views this
+ * mission offers (Earth, Moon, Ship, and Both for a Moon flight; Earth and
+ * Ship for a flight that stayed in Earth orbit). They ask the Director for a
+ * view and show whatever view and scale it reports.
  */
-export function setUpViewControls(director: Director, scaleNotes: Record<ScaleMode, string>): void {
+export function setUpViewControls(director: Director, mission: Mission): void {
   const group = byId('view-buttons', HTMLDivElement);
-  const buttons = [...group.querySelectorAll<HTMLButtonElement>('button[data-view]')];
   const scaleToggle = byId('scale-toggle', HTMLButtonElement);
   const note = byId('scale-note', HTMLSpanElement);
+  const notes = copy.scaleNote[mission.destination];
 
-  for (const button of buttons) {
-    button.addEventListener('click', () => {
-      const view = button.dataset['view'];
-      if (isView(view)) director.setView(view);
-    });
-  }
+  group.setAttribute('aria-label', copy.views.groupLabel);
+  const buttons = viewsFor(mission).map((view) => {
+    const viewButton = button('segmented__item', copy.views[view]);
+    viewButton.dataset['view'] = view;
+    viewButton.setAttribute('aria-pressed', 'false');
+    viewButton.addEventListener('click', () => director.setView(view));
+    return viewButton;
+  });
+  group.replaceChildren(...buttons);
+
   scaleToggle.addEventListener('click', () => {
     director.setScaleMode(director.scaleMode === 'true' ? 'readable' : 'true');
   });
 
   const show = (): void => {
-    for (const button of buttons) {
-      button.setAttribute('aria-pressed', String(button.dataset['view'] === director.view));
+    // A view this mission does not offer shows as its home view.
+    const view = nearestView(mission, director.view);
+    for (const viewButton of buttons) {
+      viewButton.setAttribute('aria-pressed', String(viewButton.dataset['view'] === view));
     }
     scaleToggle.setAttribute('aria-pressed', String(director.scaleMode === 'true'));
-    const text = scaleNotes[director.scaleMode];
+    const text = notes[director.scaleMode];
     if (note.textContent !== text) note.textContent = text;
   };
   director.subscribe(show);

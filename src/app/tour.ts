@@ -1,5 +1,6 @@
-import { elapsedToSeconds, type MissionEvent } from '../content/types';
+import { elapsedToSeconds, type Mission, type MissionEvent } from '../content/types';
 import type { Director, Player } from './contract';
+import { nearestView } from './views';
 
 /**
  * Where the tour is:
@@ -20,9 +21,10 @@ export interface TourOptions {
 const DEFAULT_LEAD_IN_SECONDS = 3;
 
 /**
- * The guided tour: steps through the events marked `inTour`. For each stop it
- * moves the camera to the event's view, plays the clock from shortly before
- * the event up to it, pauses there, and waits for Next.
+ * The guided tour: steps through the mission's events marked `inTour`. For
+ * each stop it moves the camera to the event's view (or the nearest view the
+ * mission offers), plays the clock from shortly before the event up to it,
+ * pauses there, and waits for Next.
  */
 export class Tour {
   readonly stops: readonly MissionEvent[];
@@ -35,12 +37,12 @@ export class Tour {
   private readonly listeners = new Set<(tour: Tour) => void>();
 
   constructor(
-    events: readonly MissionEvent[],
+    private readonly mission: Mission,
     private readonly player: Player,
     private readonly director: Director,
     private readonly options: TourOptions = {},
   ) {
-    this.stops = events.filter((event) => event.inTour);
+    this.stops = mission.events.filter((event) => event.inTour);
   }
 
   get phase(): TourPhase {
@@ -112,7 +114,7 @@ export class Tour {
     this.indexNow = index;
     this.stopSeconds = elapsedToSeconds(stop.elapsed);
     this.targetStory = this.player.story.toStory(this.stopSeconds);
-    this.director.setView(stop.view);
+    this.director.setView(nearestView(this.mission, stop.view));
 
     const leadIn = (this.options.leadInSeconds ?? DEFAULT_LEAD_IN_SECONDS) * this.player.rate;
     if (this.options.jumpStraight?.() || leadIn <= 0) {

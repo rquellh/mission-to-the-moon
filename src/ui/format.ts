@@ -1,30 +1,49 @@
+import { copy } from '../content/copy';
 import { elapsedToSeconds, type Mission } from '../content/types';
 
 const pad = (value: number): string => String(value).padStart(2, '0');
 
 /**
- * Mission elapsed time as hours:minutes:seconds, for example "102:45:39".
- * Seconds are cut, not rounded, so the clock never runs ahead of an event.
+ * The whole second the mission clock shows. The fraction is cut off, toward
+ * liftoff, the way the sources print times: "-001:40:59.262" reads
+ * −01:40:59. Less than a second before liftoff reads 00:00:00.
+ */
+function clockSecond(seconds: number): number {
+  const size = Math.floor(Math.abs(seconds) + 1e-6);
+  return seconds < 0 ? -size : size;
+}
+
+/** True when the clock reads a time before liftoff. */
+export function isBeforeLiftoff(seconds: number): boolean {
+  return clockSecond(seconds) < 0;
+}
+
+/**
+ * Mission elapsed time as hours:minutes:seconds, for example "102:45:39",
+ * with a minus sign before liftoff: "−01:40:59".
  */
 export function formatElapsed(seconds: number): string {
-  const whole = Math.floor(Math.abs(seconds) + 1e-6);
-  const hours = Math.floor(whole / 3600);
-  const minutes = Math.floor((whole % 3600) / 60);
-  const secs = whole % 60;
-  const sign = seconds < 0 && whole > 0 ? '−' : '';
-  return `${sign}${pad(hours)}:${pad(minutes)}:${pad(secs)}`;
+  const whole = clockSecond(seconds);
+  const size = Math.abs(whole);
+  const hours = Math.floor(size / 3600);
+  const minutes = Math.floor((size % 3600) / 60);
+  const secs = size % 60;
+  return `${whole < 0 ? '−' : ''}${pad(hours)}:${pad(minutes)}:${pad(secs)}`;
 }
 
 /** The same time read out in words, for screen readers. */
 export function speakElapsed(seconds: number): string {
-  const whole = Math.floor(Math.abs(seconds) + 1e-6);
-  const hours = Math.floor(whole / 3600);
-  const minutes = Math.floor((whole % 3600) / 60);
-  if (whole < 60) return seconds < 0 ? 'just before liftoff' : 'at liftoff';
+  const whole = clockSecond(seconds);
+  const before = whole < 0;
+  const size = Math.abs(whole);
+  if (size < 60) return before ? copy.time.justBeforeLiftoff : copy.time.atLiftoff;
+  const hours = Math.floor(size / 3600);
+  const minutes = Math.floor((size % 3600) / 60);
   const parts: string[] = [];
-  if (hours) parts.push(`${hours} ${hours === 1 ? 'hour' : 'hours'}`);
-  parts.push(`${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`);
-  return `${parts.join(' ')} ${seconds < 0 ? 'before' : 'after'} liftoff`;
+  if (hours) parts.push(copy.time.hours(hours));
+  // "1 hour", not "1 hour 0 minutes".
+  if (minutes || !hours) parts.push(copy.time.minutes(minutes));
+  return copy.time.fromLiftoff(parts.join(' '), before);
 }
 
 const longDate = new Intl.DateTimeFormat('en-US', {

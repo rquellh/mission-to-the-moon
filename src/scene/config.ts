@@ -66,10 +66,14 @@ export const MAX_DISTANCE: Record<ScaleMode, number> = {
   true: 260,
 };
 
-/** Path line colors: the main ship (Columbia and the rocket) and the lunar module (Eagle). */
+/**
+ * Path line and halo colors by role: amber for the crew's main spacecraft
+ * (and its rocket), aqua for every other ship (a lander such as Eagle, or a
+ * target such as the Agena).
+ */
 export const SHIP_COLORS = {
-  csm: 0xf4b942,
-  lm: 0x6fd3e8,
+  main: 0xf4b942,
+  other: 0x6fd3e8,
 } as const;
 /** Path line width in CSS pixels, so it reads the same on every screen density. */
 export const PATH_WIDTH_PX = 2.5;

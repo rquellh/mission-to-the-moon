@@ -7,9 +7,12 @@
  *
  * Far from both bodies the warp is the uniform scaling k. Around each body a
  * radial term replaces it: a point at distance r from the body's center
- * moves to distance f(r) = k r + (R (1 - k) + A (1 - exp(-h / s))) C(h),
+ * moves to distance f(r) = k r + (R (1 - k) + A (1 - exp(-h / s)) + B S(h)) C(h),
  * where h = r - R is the height above the surface and C(h) = (1 - h / H)^3
- * fades the term to nothing at height H. So:
+ * fades the term to nothing at height H. S(h) is an optional band: it rises
+ * smoothly from 0 at one height to 1 at another (zero below the band, so
+ * everything under it is untouched), which spreads apart orbits that lie
+ * inside the band. So:
  * - f(R) = R: surface points stay on the surface;
  * - small heights are lifted (slope about A / s near the surface);
  * - beyond height H, f(r) = k r exactly, so the Moon's center lands on the
@@ -43,28 +46,69 @@ export interface RadialLift {
   buildUp: number;
   /** Height at which the warp returns to the uniform scale. */
   reach: number;
+  /**
+   * Extra lift that builds up smoothly between two heights (none below
+   * `from`, all of `amount` at `to`), so orbits inside the band read
+   * farther apart. Above the band it fades out again, as (1 - h / until)^3,
+   * so paths far from the body are left alone.
+   */
+  band?: Band;
+}
+
+export interface Band {
+  amount: number;
+  from: number;
+  to: number;
+  until: number;
 }
 
 /**
  * Presentation choices (not facts). With these, a 100 nautical mile Earth
  * orbit reads about 0.19 Earth radii up, and a 60 nautical mile lunar orbit
  * about 0.37 Moon radii up.
+ *
+ * Earth's band starts just above the highest point of Apollo 11's parking
+ * orbit (100.4 nautical miles above the equatorial radius, 0.0303 Earth
+ * radii above the mean radius), so launches and parking orbits up to there
+ * read exactly as before. Inside it (about 105 to 170 nautical miles) lie
+ * Gemini's rendezvous orbits: Gemini VIII's coelliptic orbit 15 nautical
+ * miles under the Agena reads about 0.025 Earth radii below it instead of
+ * about 0.015, so the two paths stay apart on a phone screen. The band
+ * fades out by 5 Earth radii up, so it moves Apollo 11's path only near
+ * Earth, after translunar injection and before entry (by up to 0.05
+ * Earth radii).
  */
-export const EARTH_LIFT: RadialLift = { radius: EARTH_RADIUS, amount: 0.5, buildUp: 0.06, reach: 38 };
+export const EARTH_LIFT: RadialLift = {
+  radius: EARTH_RADIUS,
+  amount: 0.5,
+  buildUp: 0.06,
+  reach: 38,
+  band: { amount: 0.05, from: 0.0315, to: 0.06, until: 5 },
+};
 export const MOON_LIFT: RadialLift = { radius: MOON_RADIUS, amount: 0.2, buildUp: 0.025, reach: 20 };
+
+/** The band's extra lift at height h: none below it, rising smoothly through it, fading out above. */
+function bandLift(h: number, band: Band): number {
+  if (h <= band.from || h >= band.until) return 0;
+  const u = Math.min(1, (h - band.from) / (band.to - band.from));
+  const out = 1 - h / band.until;
+  return band.amount * u * u * (3 - 2 * u) * out * out * out;
+}
 
 /**
  * Readable distance from a body's center for a true distance r. Strictly
- * increasing: its slope is at least k - (R (1 - k) + A) * 3 / H, which is
- * positive for both lifts above.
+ * increasing: its slope is at least
+ * k - (R (1 - k) + A + B) * 3 / H - 3 B / until, which is positive for both
+ * lifts above (B is the band's amount, or 0).
  */
 export function readableRadius(r: number, lift: RadialLift): number {
   const h = r - lift.radius;
   const base = WARP_SCALE * r;
   if (h >= lift.reach) return base;
   const fade = 1 - h / lift.reach;
+  const band = lift.band ? bandLift(h, lift.band) : 0;
   const deviation =
-    (lift.radius * (1 - WARP_SCALE) + lift.amount * (1 - Math.exp(-Math.max(h, 0) / lift.buildUp))) *
+    (lift.radius * (1 - WARP_SCALE) + lift.amount * (1 - Math.exp(-Math.max(h, 0) / lift.buildUp)) + band) *
     fade * fade * fade;
   return base + deviation;
 }

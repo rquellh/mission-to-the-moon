@@ -170,6 +170,7 @@ export const apollo11Flight: FlightPlan = {
     {
       id: "csm",
       name: "Command and service module",
+      role: "main",
       phases: [
         {
           kind: "ascent",
@@ -463,6 +464,7 @@ export const apollo11Flight: FlightPlan = {
     {
       id: "lm",
       name: "Lunar module",
+      role: "lander",
       phases: [
         {
           kind: "orbit",

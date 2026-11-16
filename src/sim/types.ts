@@ -7,7 +7,9 @@
  * number is `Cited`, so the type checker rejects an uncited value.
  *
  * Units are the ones the Apollo and Gemini sources print:
- * - times: mission clock (ground elapsed time), "hhh:mm:ss.ss"
+ * - times: mission clock (ground elapsed time), "hhh:mm:ss.ss"; a ship
+ *   launched before the mission clock starts (Gemini's Agena target) has
+ *   negative times, "-001:40:59.262"
  * - angles: degrees; latitude north positive, longitude east positive
  * - altitudes: nautical miles
  * - speeds: feet per second
@@ -51,12 +53,18 @@ export interface LunarFix {
 export interface StateFix extends Fix {
   /** When the fix applies. Omit to mean "at the phase boundary it belongs to". */
   time?: Cited<ElapsedTime>;
-  /** Space-fixed (inertial) speed, feet per second. */
+  /** Space-fixed (inertial) speed, feet per second (see `velocityFrame`). */
   speed?: Cited<number>;
-  /** Space-fixed flight-path angle above the local horizontal, degrees. */
+  /** Space-fixed flight-path angle above the local horizontal, degrees (see `velocityFrame`). */
   flightPathAngle?: Cited<number>;
-  /** Space-fixed heading, degrees east of north. */
+  /** Space-fixed heading, degrees east of north (see `velocityFrame`). */
   heading?: Cited<number>;
+  /**
+   * What the speed, flight-path angle, and heading are measured against:
+   * the stars ("space-fixed", the default) or the turning Earth
+   * ("earth-fixed", as reentry guidance prints them).
+   */
+  velocityFrame?: "space-fixed" | "earth-fixed";
 }
 
 /** A lunar state: longitude, altitude, speed, and flight-path angle. */
@@ -89,6 +97,7 @@ export interface AscentPhase extends PhaseBase {
 /**
  * Coasting in orbit. Its size is published (apoapsis and periapsis); its
  * position at the start and end is pinned to published fixes when given.
+ * Earth orbits also turn slowly with Earth's equatorial bulge (J2).
  */
 export interface OrbitPhase extends PhaseBase {
   kind: "orbit";
@@ -108,6 +117,13 @@ export interface OrbitPhase extends PhaseBase {
   startFix?: StateFix | LunarStateFix;
   /** Where the craft is at the end of the phase. */
   endFix?: Fix | LunarFix;
+  /**
+   * Instead of `endFix`: the craft's distance (nautical miles) to another
+   * ship at the phase end, trailing it along its orbit, as published for a
+   * rendezvous at terminal phase initiation. The end of the phase is pinned
+   * to that point in the other ship's orbit plane.
+   */
+  endRange?: { target: string; range: Cited<number> };
   /** Start from another ship's position at the phase start (undocking). */
   from?: string;
 }
@@ -151,12 +167,19 @@ export interface TransferPhase extends PhaseBase {
   freeReturn?: Cited<boolean>;
 }
 
-/** A Kepler coast about one body between two published fixes (for example, after retrofire). */
+/**
+ * A Kepler coast about one body (for example, after retrofire). When the end
+ * fix gives only a place, the coast is the conic from where the previous
+ * phase leaves off to that place, on time. When it gives a full state
+ * (altitude, speed, flight-path angle, and heading, about Earth), the coast
+ * is the conic through that state, run back to the phase start, and an orbit
+ * before the burn that leads into it is pinned to end where it begins.
+ */
 export interface CoastPhase extends PhaseBase {
   kind: "coast";
   body: BodyId;
-  /** Where the coast ends, at the phase end. */
-  endFix: Fix;
+  /** Where the coast ends, at the phase end (or at its own time). */
+  endFix: StateFix;
   sense: Cited<Sense>;
 }
 
@@ -180,9 +203,20 @@ export interface EntryPhase extends PhaseBase {
   splashdown: Fix;
   /** Drogue parachute deployment: the end of travel over the ground. */
   drogue?: Cited<ElapsedTime>;
+  /**
+   * Height at which the drogue parachute opened, nautical miles. When it is
+   * not given, the model uses an illustrative height (see build.ts).
+   */
+  drogueAltitude?: Cited<number>;
 }
 
-/** Closing in on another ship in orbit, ending side by side at docking. */
+/**
+ * Closing in on another ship in orbit, ending side by side at docking. The
+ * craft flies its own orbit (the published size after its last burn),
+ * blended around the body into the target's position. The blend is complete
+ * at `alongside` when given (the craft had reached the target and was
+ * keeping station beside it), otherwise at the phase end.
+ */
 export interface RendezvousPhase extends PhaseBase {
   kind: "rendezvous";
   body: BodyId;
@@ -190,6 +224,8 @@ export interface RendezvousPhase extends PhaseBase {
   apoapsis: Cited<number>;
   periapsis: Cited<number>;
   sense: Cited<Sense>;
+  /** When the craft reached the target and began flying alongside it, before docking. */
+  alongside?: Cited<ElapsedTime>;
 }
 
 /** Attached to another ship. */
@@ -212,11 +248,22 @@ export type Phase =
 
 export type PhaseKind = Phase["kind"];
 
+/**
+ * What a ship is for in the mission:
+ * - "main": the crew's spacecraft for the whole flight (Apollo's command
+ *   and service module, a Gemini spacecraft);
+ * - "lander": carries crew away from the main ship and back (Apollo's
+ *   lunar module);
+ * - "target": an uncrewed vehicle the main ship meets (Gemini's Agena).
+ */
+export type ShipRole = "main" | "lander" | "target";
+
 export interface ShipPlan {
   /** Unique within the plan, for example "csm". */
   id: string;
   /** Plain description, for example "Command and service module". */
   name: string;
+  role: ShipRole;
   /** In time order, each starting where the previous one ends. */
   phases: [Phase, ...Phase[]];
 }
@@ -266,14 +313,21 @@ export interface Polyline {
 export interface ShipTrack {
   readonly id: string;
   readonly name: string;
-  /** Mission clock seconds when the ship's path begins and ends. */
+  readonly role: ShipRole;
+  /**
+   * Mission clock seconds when the ship's path begins and ends. A ship
+   * launched before the main ship starts at a negative time.
+   */
   readonly start: number;
   readonly end: number;
   readonly phases: readonly Phase[];
 }
 
 export interface FlightPath {
-  /** Mission clock seconds: first liftoff and last splashdown. */
+  /**
+   * Mission clock seconds: first liftoff (of any ship, so negative when a
+   * target was launched before the crew) and last splashdown or path end.
+   */
   readonly start: number;
   readonly end: number;
   readonly ships: readonly ShipTrack[];

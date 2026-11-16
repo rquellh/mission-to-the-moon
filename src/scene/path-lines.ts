@@ -9,6 +9,7 @@ import {
   ReplaceStencilOp,
   ShaderMaterial,
   Vector2,
+  Vector3,
 } from 'three';
 import type { Polyline } from '../sim';
 import { PATH_FUTURE_OPACITY, PATH_WIDTH_PX } from './config';
@@ -37,9 +38,12 @@ const vertexShader = /* glsl */ `
   attribute vec3 instanceEnd;
   attribute vec3 trueStart;
   attribute vec3 trueEnd;
+  attribute float timeStart;
+  attribute float timeEnd;
 
   varying vec2 vUv;
   varying float vSample;
+  varying float vTime;
 
   float trimSegmentAlpha(const in vec4 start, const in vec4 end) {
     float a = projectionMatrix[2][2];
@@ -55,6 +59,7 @@ const vertexShader = /* glsl */ `
 
     // Sample index along the path: this segment runs from sample i to i + 1.
     vSample = float(gl_InstanceID) + (position.y < 0.5 ? 0.0 : 1.0);
+    vTime = position.y < 0.5 ? timeStart : timeEnd;
     vUv = uv;
 
     // Pull the line a hair toward the camera along each sight line, so it
@@ -103,12 +108,22 @@ const fragmentShader = /* glsl */ `
   uniform vec3 diffuse;
   uniform float uNow;
   uniform float uFutureOpacity;
+  uniform vec2 uHidden[MAX_HIDDEN];
+  uniform float uTimeNow;
+  uniform vec2 uFutureFade;
+  uniform vec3 uPastFade;
 
   varying vec2 vUv;
   varying float vSample;
+  varying float vTime;
 
   void main() {
     #include <logdepthbuf_fragment>
+
+    // Stretches drawn by another ship's line (while docked to it).
+    for (int i = 0; i < MAX_HIDDEN; i++) {
+      if (vSample > uHidden[i].x && vSample < uHidden[i].y) discard;
+    }
 
     // Round caps.
     if (abs(vUv.y) > 1.0) {
@@ -118,15 +133,34 @@ const fragmentShader = /* glsl */ `
     }
 
     float alpha = vSample <= uNow ? 1.0 : uFutureOpacity;
+    // Optionally, the far future fades out and older stretches dim (see PathFade).
+    float ahead = vTime - uTimeNow;
+    if (uFutureFade.y > 0.0 && ahead > 0.0) alpha *= 1.0 - smoothstep(uFutureFade.x, uFutureFade.y, ahead);
+    if (uPastFade.y > 0.0 && ahead < 0.0) alpha *= mix(1.0, uPastFade.z, smoothstep(uPastFade.x, uPastFade.y, -ahead));
+    if (alpha < 0.01) discard;
     gl_FragColor = vec4(diffuse, alpha);
     #include <colorspace_fragment>
   }
 `;
 
+/** Most stretches one line can leave out. */
+const MAX_HIDDEN = 4;
+
 /** Corner layout of one segment: a quad with a cap at each end (as in three's LineSegmentsGeometry). */
 const QUAD_POSITIONS = [-1, 2, 0, 1, 2, 0, -1, 1, 0, 1, 1, 0, -1, 0, 0, 1, 0, 0, -1, -1, 0, 1, -1, 0];
 const QUAD_UVS = [-1, 2, 1, 2, -1, 1, 1, 1, -1, -1, 1, -1, -1, -2, 1, -2];
 const QUAD_INDEX = [0, 2, 1, 2, 3, 1, 2, 4, 3, 4, 5, 3, 4, 6, 5, 6, 7, 5];
+
+/**
+ * How a long path is kept readable when it goes around and around (an
+ * Earth orbit): the part still to come fades out between `future[0]` and
+ * `future[1]` seconds ahead of now, and the flown part dims from full
+ * brightness to `past[2]` between `past[0]` and `past[1]` seconds ago.
+ */
+export interface PathFade {
+  future: readonly [number, number];
+  past: readonly [number, number, number];
+}
 
 export interface PathLine {
   readonly mesh: Mesh;
@@ -160,11 +194,19 @@ export function sampleIndexAt(times: Float64Array, t: number): number {
 }
 
 /**
- * Build the line for one ship. `endTime` stops the line early (for a ship
- * that is drawn with the other from then on). `stencilRef` must differ
- * between lines.
+ * Build the line for one ship. `hidden` lists stretches of mission time
+ * [start, end] the line leaves out, because the ship rides with another one
+ * then and that ship's line shows the way (a stretch running to the end of
+ * the path just stops the line early). `stencilRef` must differ between
+ * lines.
  */
-export function createPathLine(polyline: Polyline, color: number, stencilRef: number, endTime = Infinity): PathLine {
+export function createPathLine(
+  polyline: Polyline,
+  color: number,
+  stencilRef: number,
+  hidden: readonly (readonly [number, number])[] = [],
+  fade: PathFade | null = null,
+): PathLine {
   const geometry = new InstancedBufferGeometry();
   geometry.setIndex(QUAD_INDEX);
   geometry.setAttribute('position', new Float32BufferAttribute(QUAD_POSITIONS, 3));
@@ -178,13 +220,26 @@ export function createPathLine(polyline: Polyline, color: number, stencilRef: nu
   geometry.setAttribute('instanceEnd', new InterleavedBufferAttribute(readable, 3, 3));
   geometry.setAttribute('trueStart', new InterleavedBufferAttribute(real, 3, 0));
   geometry.setAttribute('trueEnd', new InterleavedBufferAttribute(real, 3, 3));
+  // Each sample's time, from the first sample (single precision keeps hundredths of a second over a day).
+  const t0 = polyline.times[0] ?? 0;
+  const relative = Float32Array.from(polyline.times, (time) => time - t0);
+  const clock = new InstancedInterleavedBuffer(relative, 1, 1);
+  geometry.setAttribute('timeStart', new InterleavedBufferAttribute(clock, 1, 0));
+  geometry.setAttribute('timeEnd', new InterleavedBufferAttribute(clock, 1, 1));
 
   const times = polyline.times;
   let samples = times.length;
-  if (Number.isFinite(endTime)) {
-    const last = Math.floor(sampleIndexAt(times, endTime));
-    if (last >= 1) samples = last + 1;
+  const lastTime = times[times.length - 1] ?? 0;
+  const gaps: Vector2[] = [];
+  for (const [from, to] of hidden) {
+    if (to >= lastTime) {
+      const last = Math.floor(sampleIndexAt(times, from));
+      if (last >= 1) samples = Math.min(samples, last + 1);
+    } else if (gaps.length < MAX_HIDDEN) {
+      gaps.push(new Vector2(sampleIndexAt(times, from), sampleIndexAt(times, to)));
+    }
   }
+  while (gaps.length < MAX_HIDDEN) gaps.push(new Vector2(-2, -2));
   geometry.instanceCount = Math.max(0, samples - 1);
 
   const material = new ShaderMaterial({
@@ -195,7 +250,12 @@ export function createPathLine(polyline: Polyline, color: number, stencilRef: nu
       uMix: { value: 0 },
       uNow: { value: -1 },
       uFutureOpacity: { value: PATH_FUTURE_OPACITY },
+      uHidden: { value: gaps },
+      uTimeNow: { value: 0 },
+      uFutureFade: { value: new Vector2(fade?.future[0] ?? 0, fade?.future[1] ?? 0) },
+      uPastFade: { value: new Vector3(fade?.past[0] ?? 0, fade?.past[1] ?? 0, fade?.past[2] ?? 1) },
     },
+    defines: { MAX_HIDDEN },
     vertexShader,
     fragmentShader,
     transparent: true,
@@ -213,6 +273,7 @@ export function createPathLine(polyline: Polyline, color: number, stencilRef: nu
   const uniforms = material.uniforms as {
     uMix: { value: number };
     uNow: { value: number };
+    uTimeNow: { value: number };
     resolution: { value: Vector2 };
   };
 
@@ -224,6 +285,7 @@ export function createPathLine(polyline: Polyline, color: number, stencilRef: nu
     },
     setTime(t) {
       uniforms.uNow.value = sampleIndexAt(times, t);
+      uniforms.uTimeNow.value = t - t0;
     },
     setResolution(width, height) {
       uniforms.resolution.value.set(width, height);
