@@ -292,6 +292,8 @@ export class Stage implements Director {
   private tweenMix = 0;
   /** True once the person moves the camera themselves after a framing. */
   private userMovedCamera = false;
+  /** True while the stage itself runs the controls (see handleControlChange). */
+  private updatingControls = false;
   /** Ship view: the smoothed ship frame, the camera's direction in it, and its distance. */
   private readonly chaseFrame = new Quaternion();
   private readonly chaseDirection = CHASE_OFFSET.clone();
@@ -407,6 +409,7 @@ export class Stage implements Director {
     this.controls.rotateSpeed = 0.6;
     this.controls.zoomSpeed = 0.9;
     this.controls.addEventListener('start', this.handleControlStart);
+    this.controls.addEventListener('change', this.handleControlChange);
 
     this.resizeObserver = new ResizeObserver(() => this.handleResize());
     this.resizeObserver.observe(canvas);
@@ -556,6 +559,7 @@ export class Stage implements Director {
     this.resizeObserver.disconnect();
     for (const cleanup of this.cleanups) cleanup();
     this.controls.removeEventListener('start', this.handleControlStart);
+    this.controls.removeEventListener('change', this.handleControlChange);
     this.controls.dispose();
     this.earth?.dispose();
     this.moon?.dispose();
@@ -1214,8 +1218,22 @@ export class Stage implements Director {
   private settleDamping(): void {
     const damping = this.controls.enableDamping;
     this.controls.enableDamping = false;
-    this.controls.update();
+    this.updateControls();
     this.controls.enableDamping = damping;
+  }
+
+  /** Run the controls from the stage's own code. Returns true if they moved the camera. */
+  private updateControls(dt: number | null = null): boolean {
+    this.updatingControls = true;
+    const changed = this.controls.update(dt);
+    this.updatingControls = false;
+    return changed;
+  }
+
+  /** Keep where the controls put the camera: as the ship view's chase offset, or the settled offset. */
+  private keepCameraOffset(): void {
+    if (this.viewNow === 'spacecraft' && this.chaseReady) this.readChase();
+    else this.settledOffset.subVectors(this.camera.position, this.controls.target);
   }
 
   private applyLimits(): void {
@@ -1241,6 +1259,19 @@ export class Stage implements Director {
     this.userMovedCamera = true;
   };
 
+  /**
+   * OrbitControls applies some input by itself as it arrives, between
+   * frames: each scroll or pinch step, each key press, and (without damping)
+   * a drag. The frame's own update then finds nothing new, so keep the move
+   * and draw it from here. Otherwise it is not drawn until something else
+   * changes, and the ship view puts the camera back where it was.
+   */
+  private readonly handleControlChange = (): void => {
+    if (this.updatingControls) return;
+    this.keepCameraOffset();
+    this.needsRender = true;
+  };
+
   /** Arrow keys turn the view and +/- zoom while the canvas has focus. */
   private handleKey(event: KeyboardEvent): void {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -1259,8 +1290,6 @@ export class Stage implements Director {
     event.preventDefault();
     this.handleControlStart();
     action();
-    if (this.viewNow === 'spacecraft') this.readChase();
-    this.needsRender = true;
   }
 
   /** In the ship view, take the camera's place relative to the ship as the new chase offset. */
@@ -1346,7 +1375,7 @@ export class Stage implements Director {
       if (this.cameraTween.done) {
         this.cameraTween = null;
         this.applyLimits();
-        this.controls.update();
+        this.updateControls();
       }
       return moved;
     }
@@ -1367,9 +1396,8 @@ export class Stage implements Director {
       this.controls.maxDistance = this.chaseDistance * 40;
       moved = true;
     }
-    const changed = this.controls.update(dt);
-    if (this.viewNow === 'spacecraft' && this.chaseReady && changed) this.readChase();
-    else if (changed) this.settledOffset.subVectors(this.camera.position, this.controls.target);
+    const changed = this.updateControls(dt);
+    if (changed) this.keepCameraOffset();
     return moved || changed;
   }
 
