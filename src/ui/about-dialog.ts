@@ -1,14 +1,13 @@
 import { copy } from '../content/copy';
 import type { Fact, Mission } from '../content/types';
 import type { Citation } from '../content/types';
-import { discrepancyNote, sourcesBlock } from './citations';
+import { sourcesBlock } from './citations';
 import { byId, el } from './dom';
 import { formatDate, formatTimeOfDay, missionDates } from './format';
 
-/** Any notes where sources disagree, then the folded list of sources. */
+/** The folded list of sources, with any notes where sources disagree inside it. */
 function sources(citations: readonly Citation[], ...discrepancies: Array<string | undefined>): HTMLElement[] {
-  const notes = discrepancies.filter((text): text is string => Boolean(text)).map(discrepancyNote);
-  return [...notes, sourcesBlock(citations)];
+  return [sourcesBlock(citations, ...discrepancies)];
 }
 
 function section(title: string): HTMLElement {

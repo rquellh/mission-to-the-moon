@@ -55,22 +55,28 @@ function countCitations(citations: readonly Citation[]): number {
 
 /**
  * A fact's sources, folded behind a "Sources (n)" summary so the text stays
- * easy to read. Opening it lists every source and the exact place in it.
+ * easy to read. Opening it lists every source and the exact place in it,
+ * then any notes on where the sources disagree. Those notes live here, with
+ * the sources, so they never interrupt the story.
  */
-export function sourcesBlock(citations: readonly Citation[]): HTMLDetailsElement {
+export function sourcesBlock(
+  citations: readonly Citation[],
+  ...discrepancies: Array<string | undefined>
+): HTMLDetailsElement {
   const details = el('details', 'sources');
   const summary = el('summary', 'sources__summary');
   summary.append(
     el('span', 'sources__label', `${copy.card.sources} (${countCitations(citations)})`),
     icon('chevron-down', 'icon sources__icon'),
   );
-  details.append(summary, citationList(citations));
+  const notes = discrepancies.filter((text): text is string => Boolean(text)).map(discrepancyNote);
+  details.append(summary, citationList(citations), ...notes);
   return details;
 }
 
-/** The note shown when sources disagree. */
-export function discrepancyNote(text: string): HTMLParagraphElement {
+/** The small-print note shown, under the sources, when sources disagree. */
+function discrepancyNote(text: string): HTMLParagraphElement {
   const note = el('p', 'discrepancy');
-  note.append(el('strong', 'discrepancy__label', copy.card.sourcesDiffer), ` ${text}`);
+  note.append(el('span', 'discrepancy__label', copy.card.sourcesDiffer), ` ${text}`);
   return note;
 }

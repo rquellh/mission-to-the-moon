@@ -605,7 +605,7 @@ export const apollo11: Mission = {
         nasaMission("Article summary for students: \"Neil Armstrong was the first person to walk on the moon.\""),
       ],
       discrepancy:
-        "Sources print the words differently. Apollo by the Numbers' mission summary and NSSDCA's Master Catalog have \"one small step for man\"; the Apollo by the Numbers timeline has \"one small step for a man\"; NASA's Apollo 11 mission page has \"one small step for [a] man.\" We quote the Apollo by the Numbers summary. NSSDCA agrees on the time, 02:56:15 UT.",
+        "Apollo by the Numbers' mission summary and NSSDCA's Master Catalog have \"one small step for man\"; the Apollo by the Numbers timeline has \"one small step for a man\"; NASA's Apollo 11 mission page has \"one small step for [a] man.\" We quote the Apollo by the Numbers summary. NSSDCA agrees on the time, 02:56:15 UT.",
       photo: nasaPhoto(
         "s69-42583",
         1600,

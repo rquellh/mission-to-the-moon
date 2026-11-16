@@ -1,6 +1,6 @@
 import { copy } from '../content/copy';
 import type { MissionEvent } from '../content/types';
-import { discrepancyNote, externalLink, sourcesBlock } from './citations';
+import { externalLink, sourcesBlock } from './citations';
 import { button, byId, el } from './dom';
 import { formatElapsed, formatUtc, missionDates } from './format';
 import { icon } from './icons';
@@ -129,11 +129,10 @@ export function setUpEventCard({ index, onStep, reducedMotion }: EventCardOption
 
       const moreParts: HTMLElement[] = [];
       if (event.text.more) moreParts.push(el('p', 'card__more-text', event.text.more));
-      if (event.discrepancy) moreParts.push(discrepancyNote(event.discrepancy));
       more.replaceChildren(...moreParts);
       moreToggle.hidden = moreParts.length === 0;
       more.hidden = moreParts.length === 0 || !moreOpen;
-      sources.replaceChildren(sourcesBlock(event.citations));
+      sources.replaceChildren(sourcesBlock(event.citations, event.discrepancy));
     } else {
       // Before the first event: show what the mission is.
       const mission = index.mission;
