@@ -32,6 +32,8 @@ export interface MissionInterface {
   welcome(): void;
   /** Skip the welcome and start exploring. */
   explore(): void;
+  /** Skip the welcome and start the guided tour (or explore, if the mission has no tour). */
+  tour(): void;
 }
 
 /** A polite screen reader announcement that waits for things to settle. */
@@ -156,14 +158,16 @@ export function mountInterface({ mission, missions, player, director, has3D }: I
     (insets) => director.setViewInsets(insets),
   );
 
+  const startTour = (): void => {
+    sheet.setExpanded(false);
+    tour.start(0);
+    focusTourNext();
+    remeasure();
+  };
+
   const welcome = setUpWelcome({
     stops: tour.total,
-    onTour: () => {
-      sheet.setExpanded(false);
-      tour.start(0);
-      focusTourNext();
-      remeasure();
-    },
+    onTour: startTour,
     onExplore: () => {
       explore();
       remeasure();
@@ -177,6 +181,11 @@ export function mountInterface({ mission, missions, player, director, has3D }: I
     },
     explore() {
       explore();
+      remeasure();
+    },
+    tour() {
+      if (tour.total > 0) startTour();
+      else explore();
       remeasure();
     },
   };

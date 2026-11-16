@@ -57,13 +57,19 @@ export interface Fact {
  * sources print it: hours:minutes:seconds, for example "102:45:39.9".
  * The sources start this clock at "range zero", the last whole second
  * before liftoff, so liftoff itself can be a fraction of a second in.
+ *
+ * A time before liftoff starts with a minus sign: "-001:40:59" is 1 hour,
+ * 40 minutes, 59 seconds before the clock starts. Gemini 8 needs this,
+ * because its Agena target was launched before the crew.
  */
 export type ElapsedTime = `${number}:${number}:${number}`;
 
-/** Converts an elapsed time to seconds on the mission clock. */
+/** Converts an elapsed time to seconds on the mission clock (negative before liftoff). */
 export function elapsedToSeconds(elapsed: ElapsedTime): number {
-  const [hours = 0, minutes = 0, seconds = 0] = elapsed.split(":").map(Number);
-  return hours * 3600 + minutes * 60 + seconds;
+  const before = elapsed.trim().startsWith("-");
+  const [hours = 0, minutes = 0, seconds = 0] = elapsed.replace("-", "").split(":").map(Number);
+  const total = hours * 3600 + minutes * 60 + seconds;
+  return before ? -total : total;
 }
 
 export type Program = "gemini" | "apollo";
@@ -139,6 +145,11 @@ export interface Mission {
   name: string;
   /** "memorial" is for Apollo 1, which has no flight to show. */
   kind: "flight" | "memorial";
+  /**
+   * How far the flight went. It decides which camera views the site offers:
+   * a flight that stayed in Earth orbit has no Moon view (see src/app/views.ts).
+   */
+  destination: "earth-orbit" | "moon";
   summary: Fact;
   crew: Cited<CrewMember[]>;
   launch?: Cited<{

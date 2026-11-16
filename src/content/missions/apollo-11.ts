@@ -119,6 +119,7 @@ export const apollo11: Mission = {
   program: "apollo",
   name: "Apollo 11",
   kind: "flight",
+  destination: "moon",
 
   summary: {
     text: {

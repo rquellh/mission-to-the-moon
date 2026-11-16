@@ -2,9 +2,8 @@ import './styles/main.css';
 import type { Director, StoryMap } from './app/contract';
 import { MissionPlayer } from './app/player';
 import { copy } from './content/copy';
-import { apollo11, missions } from './content/missions';
-import { apollo11Flight } from './content/missions/apollo-11-flight';
-import { apollo11LeftBehind, apollo11Vehicle } from './content/missions/apollo-11-vehicle';
+import { nearestView } from './app/views';
+import { bundleFor, missions } from './content/missions';
 import { elapsedToSeconds, type ElapsedTime, type EventView } from './content/types';
 import { Stage, WebGLUnavailableError } from './scene/stage';
 import { buildFlightPath, createStoryTime } from './sim';
@@ -24,20 +23,33 @@ function noDirector(): Director {
   };
 }
 
+/** What the address asks for. */
+interface DeepLink {
+  /** The mission's id, or null for the default mission. */
+  mission: string | null;
+  time: number | null;
+  view: EventView | null;
+  start: 'tour' | 'explore' | null;
+}
+
 /**
- * Deep links: `?t=102:45:40` opens paused at that mission time (hours,
- * minutes, and seconds since liftoff, or plain seconds) and skips the
- * welcome; `?view=` picks the view (journey, earth, moon, or spacecraft;
- * "both" and "ship" also work, as the buttons name them).
+ * Deep links:
+ * - `?mission=gemini-8` picks the mission.
+ * - `?t=102:45:40` opens paused at that mission time (hours, minutes, and
+ *   seconds since liftoff, or plain seconds; a leading minus sign means
+ *   before liftoff) and skips the welcome.
+ * - `?view=` picks the view (journey, earth, moon, or spacecraft; "both"
+ *   and "ship" also work, as the buttons name them).
+ * - `?start=tour` or `?start=explore` skips the welcome and begins that way.
  */
-function readDeepLink(): { time: number | null; view: EventView | null } {
+function readDeepLink(): DeepLink {
   const params = new URLSearchParams(window.location.search);
   let time: number | null = null;
   const t = params.get('t')?.trim();
   if (t) {
-    const seconds = /^\d+(\.\d+)?$/.test(t)
+    const seconds = /^-?\d+(\.\d+)?$/.test(t)
       ? Number(t)
-      : /^\d+:\d{1,2}(:\d{1,2}(\.\d+)?)?$/.test(t)
+      : /^-?\d+:\d{1,2}(:\d{1,2}(\.\d+)?)?$/.test(t)
         ? elapsedToSeconds((t.split(':').length === 2 ? `${t}:0` : t) as ElapsedTime)
         : Number.NaN;
     if (Number.isFinite(seconds)) time = seconds;
@@ -51,7 +63,9 @@ function readDeepLink(): { time: number | null; view: EventView | null } {
     ship: 'spacecraft',
   };
   const view = names[params.get('view')?.trim().toLowerCase() ?? ''] ?? null;
-  return { time, view };
+  const startParam = params.get('start')?.trim().toLowerCase();
+  const start = startParam === 'tour' || startParam === 'explore' ? startParam : null;
+  return { mission: params.get('mission')?.trim().toLowerCase() || null, time, view, start };
 }
 
 async function main(): Promise<void> {
@@ -62,8 +76,10 @@ async function main(): Promise<void> {
 
   // 1. The mission, its flight path, and its clock. Story time gives every
   //    stretch between two events a watchable length.
-  const mission = apollo11;
-  const path = buildFlightPath(apollo11Flight);
+  const link = readDeepLink();
+  const bundle = bundleFor(link.mission);
+  const mission = bundle.mission;
+  const path = buildFlightPath(bundle.flight);
   const storyTime = createStoryTime([
     path.start,
     path.end,
@@ -77,7 +93,6 @@ async function main(): Promise<void> {
   const keys = storyTime.keyTimes;
   const player = new MissionPlayer(keys[0] ?? path.start, keys[keys.length - 1] ?? path.end, story);
 
-  const link = readDeepLink();
   if (link.time !== null) player.seek(link.time);
 
   // 2. The 3D scene. Without WebGL, the mission can still be read.
@@ -87,8 +102,8 @@ async function main(): Promise<void> {
       path,
       player,
       mission,
-      vehicle: apollo11Vehicle,
-      leftBehind: apollo11LeftBehind,
+      vehicle: bundle.vehicle,
+      leftBehind: bundle.leftBehind,
       onContextLost: () => status.showMessage(copy.errors.contextLost, true),
       onContextRestored: () => status.hideMessage(),
     });
@@ -102,7 +117,7 @@ async function main(): Promise<void> {
   const motion = reducedMotionQuery();
   stage.setReducedMotion(motion.matches);
   motion.addEventListener('change', () => stage.setReducedMotion(motion.matches));
-  if (link.view) stage.setView(link.view, true);
+  if (link.view) stage.setView(nearestView(mission, link.view), true);
 
   // 3. The interface, connected to the clock and the scene.
   const ui = mountInterface({ mission, missions, player, director: stage, has3D: true });
@@ -117,7 +132,8 @@ async function main(): Promise<void> {
 
   stage.start();
   status.reveal();
-  if (link.time !== null) ui.explore();
+  if (link.start === 'tour') ui.tour();
+  else if (link.time !== null || link.start === 'explore') ui.explore();
   else ui.welcome();
 }
 
