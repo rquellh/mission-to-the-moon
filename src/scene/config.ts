@@ -1,51 +1,35 @@
-import { Vector3 } from 'three';
 import { EARTH_MOON_DISTANCE } from '../content/physical-constants';
 
 /**
  * Scene tuning: presentation choices, not physical facts. Physical
- * constants live in src/content/physical-constants.ts.
+ * constants live in src/content/physical-constants.ts; where things are at
+ * each moment comes from the flight path (src/sim).
  *
- * Frame of reference: Earth sits at the origin and +Y points to ecliptic
- * north. +X points toward ecliptic longitude 0 (the March equinox
- * direction) and longitude increases toward -Z, so motion that is
- * counterclockwise when seen from +Y is prograde (eastward).
+ * Frame of reference (the flight path's "scene frame"): Earth sits at the
+ * origin, the Moon on +X, and +Y points to ecliptic north. Longitude
+ * increases toward -Z, so motion that is counterclockwise when seen from +Y
+ * is prograde (eastward). The frame turns with the Moon, so Earth and the
+ * Moon both stay put, as in NASA's mission diagrams; Earth's axis, the Sun,
+ * and the stars turn instead.
  */
 
 export type ScaleMode = 'readable' | 'true';
 
 /** Earth-Moon distance in Earth radii for each scale mode. */
 export const MOON_DISTANCE: Record<ScaleMode, number> = {
-  /** Compressed so both bodies fit comfortably on one screen. */
+  /** Compressed so both bodies fit comfortably on one screen. Must equal the flight path's READABLE_MOON_DISTANCE. */
   readable: 10,
   /** The real mean distance, about 60.3 Earth radii. */
   true: EARTH_MOON_DISTANCE,
 };
 
-/**
- * Direction from Earth toward the Moon. The Moon is placed at ecliptic
- * longitude 0 (along +X) for a clean layout; its position is illustrative.
- */
-export const MOON_DIRECTION = new Vector3(1, 0, 0);
-
-/**
- * Direction from Earth toward the Sun: ecliptic longitude 240 degrees, in the
- * ecliptic plane. This lights Earth's day side toward the default views and,
- * with the Moon 120 degrees east of the Sun, shows a waxing gibbous Moon from
- * Earth. Northern winter (the Sun near longitude 270) matches the December
- * Blue Marble imagery.
- */
-export const SUN_DIRECTION = new Vector3(
-  Math.cos((240 * Math.PI) / 180),
-  0,
-  -Math.sin((240 * Math.PI) / 180),
-).normalize();
-
-/** Directional "sun" light intensity, and the faint ambient fill. */
+/** Directional "sun" light intensity. */
 export const SUN_INTENSITY = 3.0;
-export const AMBIENT_INTENSITY = 0.07;
-
-/** Decorative Earth spin, in radians per second (about one turn per 5 minutes). */
-export const EARTH_SPIN_RATE = (2 * Math.PI) / 300;
+/** A little fill light everywhere. Night sides get their own floor of light (src/scene/night-side.ts). */
+export const AMBIENT_INTENSITY = 0.05;
+/** Lights on the spacecraft models, which are drawn to be found, not to be realistic. */
+export const SHIP_SUN_INTENSITY = 2.2;
+export const SHIP_AMBIENT_INTENSITY = 0.9;
 
 /**
  * How bright the star map appears, as a fraction of its original display
@@ -55,6 +39,8 @@ export const STAR_BRIGHTNESS = 0.5;
 
 /** Camera transition and scale-change duration, in milliseconds. */
 export const TRANSITION_MS = 1500;
+/** A shorter move, for reframing after the interface changes size. */
+export const REFRAME_MS = 450;
 
 /** Camera vertical field of view on wide screens, in degrees. */
 export const CAMERA_FOV = 40;
@@ -67,23 +53,10 @@ export const PORTRAIT_MIN_HORIZONTAL_FOV = 36;
 /** Upper limit for the widened vertical field of view, in degrees. */
 export const PORTRAIT_MAX_FOV = 66;
 
-/**
- * Camera directions (from the framed point toward the camera) for each view.
- * They lean toward the Sun so the framed body shows mostly its day side.
- */
-export const VIEW_DIRECTION = {
-  /** Looking down on Earth and Moon from slightly above, Sun to the left. */
-  overviewLandscape: new Vector3(-0.2, 0.42, 1).normalize(),
-  /**
-   * From above and behind Earth, so on tall screens Earth sits low and the
-   * Moon high, using the screen's height.
-   */
-  overviewPortrait: new Vector3(-0.5, 0.82, 0.12).normalize(),
-  /** Earth with the Americas facing the camera near local noon. */
-  earth: new Vector3(-0.25, 0.3, 1).normalize(),
-  /** From the Earth side, so the Moon's near side faces the camera. */
-  moon: new Vector3(-1, 0.18, 0.5).normalize(),
-} as const;
+/** Height of the journey view's camera above the plane of the path, in degrees. */
+export const JOURNEY_ELEVATION_DEG = 58;
+/** Angle between a body's line to the ship and the camera in the Earth and Moon views, in degrees. */
+export const BODY_VIEW_ANGLE_DEG = 38;
 
 /** OrbitControls zoom limits, as multiples of the framed body's radius. */
 export const MIN_DISTANCE_FACTOR = 1.25;
@@ -92,3 +65,24 @@ export const MAX_DISTANCE: Record<ScaleMode, number> = {
   readable: 60,
   true: 260,
 };
+
+/** Path line colors: the main ship (Columbia and the rocket) and the lunar module (Eagle). */
+export const SHIP_COLORS = {
+  csm: 0xf4b942,
+  lm: 0x6fd3e8,
+} as const;
+/** Path line width in CSS pixels, so it reads the same on every screen density. */
+export const PATH_WIDTH_PX = 2.5;
+/** Opacity of the part of a path still to come. */
+export const PATH_FUTURE_OPACITY = 0.32;
+
+/** Marker sizes in CSS pixels. */
+export const MARKER_SIZE_PX = 7;
+export const MARKER_CURRENT_SIZE_PX = 13;
+export const SITE_MARKER_SIZE_PX = 12;
+
+/**
+ * Apparent length of a spacecraft model, in CSS pixels, for a model as long
+ * as the command and service module. Longer stacks look somewhat longer.
+ */
+export const SHIP_SIZE_PX = 34;

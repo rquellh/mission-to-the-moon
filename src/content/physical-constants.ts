@@ -28,6 +28,55 @@ export const EARTH_MOON_MEAN_DISTANCE_KM = 384_400;
 // https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 export const EARTH_AXIAL_TILT_DEG = 23.44;
 
+/** Earth's equatorial radius, in kilometers (6,378.137 km). */
+// Source: NASA NSSDCA Earth Fact Sheet, "Equatorial radius (km)"
+// https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
+export const EARTH_EQUATORIAL_RADIUS_KM = 6378.137;
+
+/** Earth's flattening (ellipticity), 0.003353. */
+// Source: NASA NSSDCA Earth Fact Sheet, "Ellipticity (Flattening)"
+// https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
+export const EARTH_FLATTENING = 0.003353;
+
+/** Earth's gravitational parameter GM, 0.39860 x 10^6 km^3/s^2. */
+// Source: NASA NSSDCA Earth Fact Sheet, "GM (x 10^6 km^3/s^2)"
+// https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
+export const EARTH_GM_KM3_PER_S2 = 398_600;
+
+/** Earth's sidereal rotation period (one turn relative to the stars), in hours (23.9345). */
+// Source: NASA NSSDCA Earth Fact Sheet, "Sidereal rotation period (hrs)"
+// https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
+export const EARTH_SIDEREAL_ROTATION_HOURS = 23.9345;
+
+/** Earth's sidereal orbit period around the Sun, in days (365.256). */
+// Source: NASA NSSDCA Earth Fact Sheet, "Sidereal orbit period (days)"
+// https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
+export const EARTH_SIDEREAL_ORBIT_DAYS = 365.256;
+
+/** The Moon's gravitational parameter GM, 0.00490 x 10^6 km^3/s^2. */
+// Source: NASA NSSDCA Moon Fact Sheet, "GM (x 10^6 km^3/s^2)"
+// https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html
+export const MOON_GM_KM3_PER_S2 = 4_900;
+
+/** The Moon's sidereal revolution period around Earth, in days (27.3217). */
+// Source: NASA NSSDCA Moon Fact Sheet, "Revolution period (days)"
+// https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html
+export const MOON_SIDEREAL_PERIOD_DAYS = 27.3217;
+
+/** One international nautical mile, in kilometers (exactly 1,852 m). */
+// Source: NASA SP-7012 (second revision, 1973), "The International System of
+// Units: Physical Constants and Conversion Factors", Conversion Factors,
+// Listing by Physical Quantity, Length: "nautical mile (international) ...
+// meter ... +03 1.852*" (* = exact)
+// https://ntrs.nasa.gov/citations/19730018242
+export const NAUTICAL_MILE_KM = 1.852;
+
+/** One foot, in kilometers (exactly 0.3048 m). */
+// Source: NASA SP-7012 (second revision, 1973), Conversion Factors, Listing by
+// Physical Quantity, Length: "foot ... meter ... -01 3.048*" (* = exact)
+// https://ntrs.nasa.gov/citations/19730018242
+export const FOOT_KM = 0.0003048;
+
 /* ------------------------------------------------------------------ */
 /* Derived values, in scene units (Earth radii) and radians.           */
 /* ------------------------------------------------------------------ */

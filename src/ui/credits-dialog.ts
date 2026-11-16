@@ -1,65 +1,98 @@
+import { copy } from '../content/copy';
 import type { CreditEntry } from '../content/credits';
+import { SOURCES, type SourceId } from '../content/sources';
+import type { Mission } from '../content/types';
+import { externalLink } from './citations';
 import { byId, el } from './dom';
+import { formatIsoDay } from './format';
 
-function link(href: string, text: string): HTMLAnchorElement {
-  const anchor = el('a', 'credits__link', text);
-  anchor.href = href;
-  anchor.target = '_blank';
-  anchor.rel = 'noopener noreferrer';
-  return anchor;
-}
-
-function renderEntry(entry: CreditEntry): HTMLLIElement {
-  const item = el('li', 'credits__item');
-  item.id = `credit-${entry.id}`;
-
-  const heading = el('h3', 'credits__item-title');
-  heading.append(link(entry.sourcePageUrl, entry.title));
-  item.append(heading);
-
-  const details = el('dl', 'credits__details');
-  const add = (term: string, value: string | Node): void => {
-    details.append(el('dt', undefined, term));
+function details(rows: Array<[string, string | Node]>): HTMLDListElement {
+  const list = el('dl', 'credits__details');
+  for (const [term, value] of rows) {
     const dd = el('dd');
     dd.append(value);
-    details.append(dd);
-  };
-  add('Credit', entry.credit);
-  add('Used for', entry.usage);
-  add('Changes', entry.modifications);
-  if (entry.fileUrl !== entry.sourcePageUrl) {
-    add('Original file', link(entry.fileUrl, entry.fileUrl.split('/').pop() ?? entry.fileUrl));
+    list.append(el('dt', undefined, term), dd);
   }
-  item.append(details);
+  return list;
+}
+
+function group(title: string, items: HTMLElement[]): HTMLElement {
+  const section = el('section', 'credits__group');
+  const list = el('ul', 'credits__list');
+  list.append(...items);
+  section.append(el('h3', 'credits__group-title', title), list);
+  return section;
+}
+
+function sourceItem(id: SourceId): HTMLLIElement {
+  const source = SOURCES[id];
+  const item = el('li', 'credits__item');
+  item.id = `source-${id}`;
+  const heading = el('h4', 'credits__item-title');
+  heading.append(externalLink(source.url, source.title));
+  item.append(
+    heading,
+    el('p', 'credits__publisher', source.publisher),
+    el('p', 'credits__use', source.use),
+    el('p', 'credits__checked', copy.credits.checked(formatIsoDay(source.checked))),
+  );
   return item;
 }
 
-/** Fill the credits dialog and wire its open and close buttons. */
-export function setUpCreditsDialog(credits: readonly CreditEntry[]): void {
-  const dialog = byId('credits-dialog', HTMLDialogElement);
-  const openButton = byId('credits-button', HTMLButtonElement);
-  const closeButton = byId('credits-close', HTMLButtonElement);
-  const list = byId('credits-list', HTMLUListElement);
+function mediaItem(entry: CreditEntry): HTMLLIElement {
+  const item = el('li', 'credits__item');
+  item.id = `credit-${entry.id}`;
+  const heading = el('h4', 'credits__item-title');
+  heading.append(externalLink(entry.sourcePageUrl, entry.title));
+  const rows: Array<[string, string | Node]> = [
+    [copy.credits.credit, entry.credit],
+    [copy.credits.usedFor, entry.usage],
+    [copy.credits.changes, entry.modifications],
+  ];
+  if (entry.fileUrl !== entry.sourcePageUrl) {
+    rows.push([
+      copy.credits.originalFile,
+      externalLink(entry.fileUrl, entry.fileUrl.split('/').pop() ?? entry.fileUrl),
+    ]);
+  }
+  item.append(heading, details(rows));
+  return item;
+}
 
-  list.replaceChildren(...credits.map(renderEntry));
+function photoItems(missions: readonly Mission[]): HTMLLIElement[] {
+  const items: HTMLLIElement[] = [];
+  const seen = new Set<string>();
+  for (const mission of missions) {
+    for (const event of mission.events) {
+      const photo = event.photo;
+      if (!photo || seen.has(photo.src)) continue;
+      seen.add(photo.src);
+      const item = el('li', 'credits__item');
+      const heading = el('h4', 'credits__item-title');
+      heading.append(externalLink(photo.sourceUrl, `${mission.name}: ${event.title}`));
+      item.append(
+        heading,
+        details([
+          [copy.credits.credit, photo.credit],
+          [copy.credits.usedFor, photo.alt],
+        ]),
+      );
+      items.push(item);
+    }
+  }
+  return items;
+}
 
-  openButton.addEventListener('click', () => {
-    dialog.showModal();
-    closeButton.focus();
-  });
-  closeButton.addEventListener('click', () => dialog.close());
-
-  // Close when the backdrop (outside the dialog box) is clicked.
-  dialog.addEventListener('click', (event) => {
-    if (event.target !== dialog) return;
-    const box = dialog.getBoundingClientRect();
-    const outside =
-      event.clientX < box.left ||
-      event.clientX > box.right ||
-      event.clientY < box.top ||
-      event.clientY > box.bottom;
-    if (outside) dialog.close();
-  });
-
-  dialog.addEventListener('close', () => openButton.focus());
+/** Fill the "Sources and credits" dialog: the source registry, photo credits, and media credits. */
+export function renderCredits(credits: readonly CreditEntry[], missions: readonly Mission[]): void {
+  const body = byId('credits-body', HTMLDivElement);
+  const ids = Object.keys(SOURCES) as SourceId[];
+  const parts: HTMLElement[] = [
+    el('p', 'credits__intro', copy.credits.intro),
+    group(copy.credits.sources, ids.map(sourceItem)),
+  ];
+  const photos = photoItems(missions);
+  if (photos.length) parts.push(group(copy.credits.photos, photos));
+  parts.push(group(copy.credits.media, credits.map(mediaItem)));
+  body.replaceChildren(...parts);
 }

@@ -12,6 +12,7 @@
     "useDefineForClassFields": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
 
     "strict": true,
     "noUnusedLocals": true,

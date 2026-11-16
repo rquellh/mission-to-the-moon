@@ -18,12 +18,88 @@
   <body>
     <canvas id="stage" class="stage" role="img" tabindex="0" aria-label="3D view of Earth, the Moon, and stars"></canvas>
 
-    <header class="top-bar">
-      <h1 class="site-title">Mission to the Moon</h1>
-      <button type="button" class="button button--quiet" id="credits-button" aria-haspopup="dialog">
-        Credits
-      </button>
-    </header>
+    <!-- Everything a person reads and touches sits in this layer over the 3D view. -->
+    <div class="hud" id="hud">
+      <header class="masthead" id="masthead">
+        <div class="masthead__titles">
+          <h1 class="masthead__site">Mission to the Moon</h1>
+          <h2 class="masthead__mission">
+            <span class="masthead__name" id="mission-name"></span>
+            <span class="masthead__dates" id="mission-dates"></span>
+          </h2>
+        </div>
+        <div class="masthead__actions">
+          <button type="button" class="button button--quiet" id="about-button" aria-haspopup="dialog" aria-label="About this mission">
+            <span>About<span class="wide-only"> this mission</span></span>
+          </button>
+          <button type="button" class="button button--quiet" id="credits-button" aria-haspopup="dialog" aria-label="Sources and credits">
+            <span>Sources<span class="wide-only"> and credits</span></span>
+          </button>
+        </div>
+      </header>
+
+      <div class="views" id="views">
+        <div class="segmented" role="group" aria-label="Look at" id="view-buttons">
+          <button type="button" class="segmented__item" data-view="earth" aria-pressed="false">Earth</button>
+          <button type="button" class="segmented__item" data-view="moon" aria-pressed="false">Moon</button>
+          <button type="button" class="segmented__item" data-view="spacecraft" aria-pressed="false">Ship</button>
+          <button type="button" class="segmented__item" data-view="journey" aria-pressed="false">Both</button>
+        </div>
+        <button type="button" class="switch" id="scale-toggle" aria-pressed="false">
+          <span class="switch__track" aria-hidden="true"><span class="switch__knob"></span></span>
+          <span class="switch__label">True scale</span>
+        </button>
+      </div>
+
+      <p class="caption" id="caption">
+        <span class="caption__note" id="scale-note" aria-live="polite"></span>
+        <button type="button" class="caption__link" id="drawn-button" aria-haspopup="dialog">How this is drawn</button>
+      </p>
+
+      <aside class="sheet" id="sheet" data-state="compact" aria-labelledby="card-title">
+        <button type="button" class="sheet__handle" id="sheet-handle" aria-expanded="false" aria-controls="card-body">
+          <span class="sheet__grip" aria-hidden="true"></span>
+          <span class="visually-hidden" id="sheet-handle-label">Show the whole card</span>
+        </button>
+        <section class="tour" id="tour" aria-label="Guided tour" hidden></section>
+        <article class="card" id="card"></article>
+      </aside>
+
+      <section class="timeline" id="timeline" aria-label="Timeline">
+        <button type="button" class="play" id="play" aria-label="Play"></button>
+        <p class="clock" id="clock">
+          <span class="clock__line">
+            <span class="clock__met" id="clock-met">00:00:00</span>
+            <span class="clock__since" id="clock-since">since liftoff</span>
+          </span>
+          <span class="clock__date" id="clock-utc"></span>
+        </p>
+        <label class="pick pick--chapter">
+          <span class="visually-hidden">Jump to a chapter</span>
+          <select class="pick__select" id="chapter-select"></select>
+        </label>
+        <div class="scrubber" id="scrubber">
+          <div class="scrubber__rail" aria-hidden="true"><div class="scrubber__played"></div></div>
+          <div class="scrubber__ticks" id="scrubber-ticks" aria-hidden="true"></div>
+          <input type="range" class="scrubber__input" id="scrubber-input" min="0" max="1" step="any" value="0" aria-label="Mission time" />
+        </div>
+        <div class="chapters" id="chapters" role="group" aria-label="Chapters"></div>
+        <label class="pick pick--speed">
+          <span class="visually-hidden">Speed</span>
+          <select class="pick__select" id="speed-select"></select>
+        </label>
+      </section>
+    </div>
+
+    <section class="welcome" id="welcome" aria-labelledby="welcome-title" hidden>
+      <h2 class="welcome__title" id="welcome-title">Mission to the Moon</h2>
+      <p class="welcome__lede" id="welcome-lede"></p>
+      <div class="welcome__actions">
+        <button type="button" class="button button--primary button--large" id="welcome-tour">Take the tour</button>
+        <button type="button" class="button button--large" id="welcome-explore">Explore on my own</button>
+      </div>
+      <p class="welcome__note" id="welcome-note"></p>
+    </section>
 
     <div class="loading" id="loading" role="status">
       <p class="loading__text" id="loading-text">Loading…</p>
@@ -35,24 +111,30 @@
       <button type="button" class="button" id="message-reload" hidden>Reload</button>
     </div>
 
-    <footer class="control-bar" id="control-bar">
-      <p class="scale-note" id="scale-note" aria-live="polite"></p>
-      <div class="control-row" role="group" aria-label="View controls">
-        <button type="button" class="button" id="focus-earth" disabled>Earth</button>
-        <button type="button" class="button" id="focus-moon" disabled>Moon</button>
-        <button type="button" class="button" id="scale-toggle" aria-pressed="false" disabled>True scale</button>
-      </div>
-    </footer>
+    <p class="visually-hidden" id="announcer" aria-live="polite"></p>
 
-    <dialog class="credits" id="credits-dialog" aria-labelledby="credits-title">
-      <div class="credits__header">
-        <h2 class="credits__title" id="credits-title">Credits</h2>
-        <button type="button" class="button button--quiet" id="credits-close">Close</button>
+    <dialog class="dialog" id="about-dialog" aria-labelledby="about-title">
+      <div class="dialog__head">
+        <h2 class="dialog__title" id="about-title">About this mission</h2>
+        <button type="button" class="button button--quiet dialog__close">Close</button>
       </div>
-      <p class="credits__intro">
-        The images, data, and software behind this site, with where each came from and what we changed.
-      </p>
-      <ul class="credits__list" id="credits-list"></ul>
+      <div class="dialog__body" id="about-body"></div>
+    </dialog>
+
+    <dialog class="dialog dialog--narrow" id="drawn-dialog" aria-labelledby="drawn-title">
+      <div class="dialog__head">
+        <h2 class="dialog__title" id="drawn-title">How this is drawn</h2>
+        <button type="button" class="button button--quiet dialog__close">Close</button>
+      </div>
+      <div class="dialog__body" id="drawn-body"></div>
+    </dialog>
+
+    <dialog class="dialog" id="credits-dialog" aria-labelledby="credits-title">
+      <div class="dialog__head">
+        <h2 class="dialog__title" id="credits-title">Sources and credits</h2>
+        <button type="button" class="button button--quiet dialog__close">Close</button>
+      </div>
+      <div class="dialog__body" id="credits-body"></div>
     </dialog>
 
     <noscript>

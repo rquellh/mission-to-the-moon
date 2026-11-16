@@ -6,9 +6,8 @@
  * that is not in the registry (sources.ts). That is how the site keeps its
  * first rule: every fact is cited.
  *
- * Not defined yet: the flight path (orbits, burns, landing and splashdown
- * points). It is added with the first full mission, when the way paths are
- * drawn is settled.
+ * The flight path (orbits, burns, landing and splashdown points) is described
+ * separately, by the flight plan types in src/sim/.
  */
 import type { SourceId } from "./sources";
 
@@ -48,12 +47,14 @@ export interface Fact {
 }
 
 /**
- * Time since liftoff, written the way the sources print it:
- * hours:minutes:seconds, for example "102:45:39.9".
+ * Time on the mission clock (ground elapsed time), written the way the
+ * sources print it: hours:minutes:seconds, for example "102:45:39.9".
+ * The sources start this clock at "range zero", the last whole second
+ * before liftoff, so liftoff itself can be a fraction of a second in.
  */
 export type ElapsedTime = `${number}:${number}:${number}`;
 
-/** Converts an elapsed time to seconds since liftoff. */
+/** Converts an elapsed time to seconds on the mission clock. */
 export function elapsedToSeconds(elapsed: ElapsedTime): number {
   const [hours = 0, minutes = 0, seconds = 0] = elapsed.split(":").map(Number);
   return hours * 3600 + minutes * 60 + seconds;
@@ -67,17 +68,52 @@ export interface CrewMember {
   role: string;
 }
 
+/** A photograph hosted with the site. */
+export interface Photo {
+  /** Path under public/, for example "media/apollo-11/as11-40-5903.jpg". */
+  src: string;
+  /** Pixel size of the hosted file. */
+  width: number;
+  height: number;
+  /** Describes the picture for someone who cannot see it. */
+  alt: string;
+  /** Credit line as the source gives it, for example "NASA". */
+  credit: string;
+  /** The page where the original can be found. */
+  sourceUrl: string;
+}
+
+/**
+ * Where the camera looks while an event is featured. A presentation hint,
+ * not a fact: "journey" shows Earth and Moon together.
+ */
+export type EventView = "earth" | "moon" | "spacecraft" | "journey";
+
+/** A named stretch of a mission, used to group events and to jump around the timeline. */
+export interface Chapter {
+  /** Unique within the mission, for example "landing". */
+  id: string;
+  /** Short and plain, for example "Landing". */
+  title: string;
+}
+
 /** A moment in a mission, placed on the mission clock. */
 export interface MissionEvent {
   /** Unique within the mission, for example "landing". */
   id: string;
   title: string;
+  /** The id of the chapter this event belongs to. */
+  chapter: string;
   elapsed: ElapsedTime;
   /** Universal time as ISO 8601, when the source gives it. */
   utc?: string;
   text: LeveledText;
   citations: Citations;
   discrepancy?: string;
+  photo?: Photo;
+  view: EventView;
+  /** True for the events the guided tour stops at. */
+  inTour?: boolean;
 }
 
 /** A flown spacecraft and the museum that displays it today. */
@@ -109,6 +145,8 @@ export interface Mission {
   /** Radio names of the spacecraft, for example Columbia and Eagle. */
   callSigns?: Cited<{ craft: string; name: string }[]>;
   accomplishments: Fact[];
+  /** In the order they happen. Empty for a memorial. */
+  chapters: Chapter[];
   /** In order of elapsed time. Empty for a memorial. */
   events: MissionEvent[];
   whereNow?: Cited<Exhibit>[];

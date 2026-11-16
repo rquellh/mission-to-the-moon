@@ -1,28 +1,63 @@
-import { byId } from './dom';
+import type { ViewInsets } from '../app/contract';
+import { wideLayoutQuery } from './dom';
+
+type Side = 'top' | 'bottom' | 'right';
+
+export interface CoveringPart {
+  element: HTMLElement;
+  /** Which edge of the view it covers; may differ between the phone and wide layouts. */
+  side: Side | ((wide: boolean) => Side);
+}
+
+function isShown(element: HTMLElement): boolean {
+  if (element.getClientRects().length === 0) return false;
+  return getComputedStyle(element).visibility !== 'hidden';
+}
 
 /**
- * Report how much of the canvas the title bar (top) and control bar (bottom)
- * cover, now and whenever their size or the window changes.
+ * Report how much of the window the interface covers on each side, now and
+ * whenever a part changes size, appears, or disappears, or the window
+ * changes. The 3D view fills the window, so the window is the reference.
  */
-export function watchViewInsets(
-  canvas: HTMLCanvasElement,
-  onChange: (top: number, bottom: number) => void,
-): void {
-  const header = document.querySelector<HTMLElement>('.top-bar');
-  const controls = byId('control-bar', HTMLElement);
+export function watchViewInsets(parts: readonly CoveringPart[], onChange: (insets: ViewInsets) => void): () => void {
+  const wide = wideLayoutQuery();
+  let last = '';
+  let frame: number | null = null;
 
   const measure = (): void => {
-    const area = canvas.getBoundingClientRect();
-    const top = header ? Math.max(0, header.getBoundingClientRect().bottom - area.top) : 0;
-    const bottom = controls.hidden
-      ? 0
-      : Math.max(0, area.bottom - controls.getBoundingClientRect().top);
-    onChange(Math.round(top), Math.round(bottom));
+    frame = null;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const insets: ViewInsets = { top: 0, right: 0, bottom: 0, left: 0 };
+    for (const part of parts) {
+      if (!isShown(part.element)) continue;
+      const box = part.element.getBoundingClientRect();
+      const side = typeof part.side === 'function' ? part.side(wide.matches) : part.side;
+      if (side === 'top') insets.top = Math.max(insets.top, box.bottom);
+      if (side === 'bottom') insets.bottom = Math.max(insets.bottom, height - box.top);
+      if (side === 'right') insets.right = Math.max(insets.right, width - box.left);
+    }
+    const rounded: ViewInsets = {
+      top: Math.max(0, Math.round(insets.top)),
+      right: Math.max(0, Math.round(insets.right)),
+      bottom: Math.max(0, Math.round(insets.bottom)),
+      left: 0,
+    };
+    const key = `${rounded.top},${rounded.right},${rounded.bottom}`;
+    if (key === last) return;
+    last = key;
+    onChange(rounded);
   };
 
-  const observer = new ResizeObserver(measure);
-  if (header) observer.observe(header);
-  observer.observe(controls);
-  observer.observe(canvas);
+  const schedule = (): void => {
+    if (frame === null) frame = requestAnimationFrame(measure);
+  };
+
+  const observer = new ResizeObserver(schedule);
+  for (const part of parts) observer.observe(part.element);
+  window.addEventListener('resize', schedule);
+  wide.addEventListener('change', schedule);
   measure();
+
+  return schedule;
 }

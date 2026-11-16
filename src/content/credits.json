@@ -53,6 +53,105 @@
       "fileUrl": "https://github.com/mrdoob/three.js/blob/dev/LICENSE",
       "usage": "3D rendering library, bundled into this site's JavaScript under the MIT License.",
       "modifications": "None; bundled and minified by Vite."
+    },
+    {
+      "id": "photo-s69-39961",
+      "title": "Liftoff of the Apollo 11 lunar landing mission (NASA ID S69-39961)",
+      "credit": "NASA",
+      "sourcePageUrl": "https://images.nasa.gov/details/S69-39961",
+      "fileUrl": "https://images-assets.nasa.gov/image/S69-39961/S69-39961~large.jpg",
+      "usage": "Photo for the Apollo 11 event \"Liftoff\".",
+      "modifications": "Resized from 1329 x 1920 to 1107 x 1600 pixels and re-encoded as JPEG."
+    },
+    {
+      "id": "photo-as11-36-5355",
+      "title": "View of Earth, showing Africa, Europe and Asia taken by Apollo 11 crewmember (NASA ID AS11-36-5355)",
+      "credit": "NASA",
+      "sourcePageUrl": "https://images.nasa.gov/details/as11-36-5355",
+      "fileUrl": "https://images-assets.nasa.gov/image/as11-36-5355/as11-36-5355~large.jpg",
+      "usage": "Photo for the Apollo 11 event \"A small course correction\".",
+      "modifications": "Resized from 1920 x 1920 to 1600 x 1600 pixels and re-encoded as JPEG."
+    },
+    {
+      "id": "photo-as11-44-6550",
+      "title": "Apollo 11 Mission image - View of moon limb,with Earth on the horizon,Mare Smythii Region (NASA ID AS11-44-6550)",
+      "credit": "NASA",
+      "sourcePageUrl": "https://images.nasa.gov/details/as11-44-6550",
+      "fileUrl": "https://images-assets.nasa.gov/image/as11-44-6550/as11-44-6550~large.jpg",
+      "usage": "Photo for the Apollo 11 event \"Into orbit around the Moon\".",
+      "modifications": "Resized from 1920 x 1920 to 1600 x 1600 pixels and re-encoded as JPEG."
+    },
+    {
+      "id": "photo-as11-44-6581",
+      "title": "Apollo 11 Mission image - View of Lunar Module separation from the Command Module (NASA ID AS11-44-6581)",
+      "credit": "NASA",
+      "sourcePageUrl": "https://images.nasa.gov/details/as11-44-6581",
+      "fileUrl": "https://images-assets.nasa.gov/image/as11-44-6581/as11-44-6581~large.jpg",
+      "usage": "Photo for the Apollo 11 event \"Eagle undocks\".",
+      "modifications": "Resized from 1920 x 1920 to 1600 x 1600 pixels and re-encoded as JPEG."
+    },
+    {
+      "id": "photo-as11-37-5458",
+      "title": "View form Lunar Module of surface of the moon near where LM touched down (NASA ID AS11-37-5458)",
+      "credit": "NASA",
+      "sourcePageUrl": "https://images.nasa.gov/details/as11-37-5458",
+      "fileUrl": "https://images-assets.nasa.gov/image/as11-37-5458/as11-37-5458~large.jpg",
+      "usage": "Photo for the Apollo 11 event \"The Eagle has landed\".",
+      "modifications": "Resized from 1920 x 1920 to 1600 x 1600 pixels and re-encoded as JPEG."
+    },
+    {
+      "id": "photo-s69-42583",
+      "title": "Inflight - Apollo 11 (Crew Activities) (NASA ID S69-42583)",
+      "credit": "NASA",
+      "sourcePageUrl": "https://images.nasa.gov/details/s69-42583",
+      "fileUrl": "https://images-assets.nasa.gov/image/s69-42583/s69-42583~orig.jpg",
+      "usage": "Photo for the Apollo 11 event \"First step on the Moon\".",
+      "modifications": "Resized from 2502 x 1900 to 1600 x 1215 pixels and re-encoded as JPEG."
+    },
+    {
+      "id": "photo-as11-40-5868",
+      "title": "Astronaut Edwin Aldrin descends steps of Lunar Module ladder to walk on moon (NASA ID AS11-40-5868)",
+      "credit": "NASA",
+      "sourcePageUrl": "https://images.nasa.gov/details/as11-40-5868",
+      "fileUrl": "https://images-assets.nasa.gov/image/as11-40-5868/as11-40-5868~orig.jpg",
+      "usage": "Photo for the Apollo 11 event \"Aldrin joins Armstrong\".",
+      "modifications": "Resized from 1833 x 1849 to 1586 x 1600 pixels and re-encoded as JPEG."
+    },
+    {
+      "id": "photo-as11-40-5875",
+      "title": "Astronaut Edwin Aldrin poses for photograph beside deployed U.S. flag (NASA ID AS11-40-5875)",
+      "credit": "NASA",
+      "sourcePageUrl": "https://images.nasa.gov/details/as11-40-5875",
+      "fileUrl": "https://images-assets.nasa.gov/image/as11-40-5875/as11-40-5875~large.jpg",
+      "usage": "Photo for the Apollo 11 event \"Planting the flag\".",
+      "modifications": "Resized from 1856 x 1920 to 1392 x 1440 pixels and re-encoded as JPEG."
+    },
+    {
+      "id": "photo-as11-40-5948",
+      "title": "Astronaut Edwin Aldrin after deployment of EASEP on surface of moon (NASA ID AS11-40-5948)",
+      "credit": "NASA",
+      "sourcePageUrl": "https://images.nasa.gov/details/as11-40-5948",
+      "fileUrl": "https://images-assets.nasa.gov/image/as11-40-5948/as11-40-5948~large.jpg",
+      "usage": "Photo for the Apollo 11 event \"Setting up experiments\".",
+      "modifications": "Resized from 1920 x 1920 to 1440 x 1440 pixels and re-encoded as JPEG."
+    },
+    {
+      "id": "photo-as11-44-6642",
+      "title": "Apollo 11 Lunar Module ascent stage photographed from Command Module (NASA ID AS11-44-6642)",
+      "credit": "NASA",
+      "sourcePageUrl": "https://images.nasa.gov/details/as11-44-6642",
+      "fileUrl": "https://images-assets.nasa.gov/image/as11-44-6642/as11-44-6642~large.jpg",
+      "usage": "Photo for the Apollo 11 event \"Back together\".",
+      "modifications": "Resized from 1920 x 1853 to 1600 x 1544 pixels and re-encoded as JPEG."
+    },
+    {
+      "id": "photo-s69-21698",
+      "title": "Recovery - Apollo 11 (NASA ID S69-21698)",
+      "credit": "NASA",
+      "sourcePageUrl": "https://images.nasa.gov/details/s69-21698",
+      "fileUrl": "https://images-assets.nasa.gov/image/s69-21698/s69-21698~large.jpg",
+      "usage": "Photo for the Apollo 11 event \"Splashdown\".",
+      "modifications": "Resized from 1909 x 1920 to 1193 x 1200 pixels and re-encoded as JPEG."
     }
   ]
 }

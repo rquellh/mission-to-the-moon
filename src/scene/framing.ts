@@ -10,6 +10,16 @@ export interface CameraPose {
   readonly target: Vector3;
 }
 
+/**
+ * The share of the view left clear of interface, as fractions (0 to 1] of
+ * the canvas width and height. The camera's view axis passes through the
+ * middle of the clear area (see Stage.applyViewOffset).
+ */
+export interface ClearArea {
+  width: number;
+  height: number;
+}
+
 const _forward = new Vector3();
 const _right = new Vector3();
 const _up = new Vector3();
@@ -17,10 +27,9 @@ const _rel = new Vector3();
 
 /**
  * Distance from `target` along `direction` (a unit vector pointing from the
- * target toward the camera) at which every sphere fits inside the camera's
- * view. `margin` (> 1) scales each sphere's size and offset to leave room.
- * `heightFraction` (0 to 1] is the share of the view height that is free of
- * interface, centered on the view axis.
+ * target toward the camera) at which every sphere fits inside the clear
+ * part of the camera's view. `margin` (> 1) scales each sphere's size and
+ * offset to leave room. `up` is the camera's up once it gets there.
  */
 export function fitDistance(
   camera: PerspectiveCamera,
@@ -28,15 +37,16 @@ export function fitDistance(
   direction: Vector3,
   spheres: readonly SphereLike[],
   margin: number,
-  heightFraction = 1,
+  clear: ClearArea,
+  up: Vector3 = camera.up,
 ): number {
   const tanV = Math.tan(MathUtils.degToRad(camera.fov) / 2);
-  const halfV = Math.atan(tanV * heightFraction);
-  const halfH = Math.atan(tanV * camera.aspect);
+  const halfV = Math.atan(tanV * clear.height);
+  const halfH = Math.atan(tanV * camera.aspect * clear.width);
 
   // Camera basis for a camera at target + direction * d, looking at target.
   _forward.copy(direction).negate();
-  _right.crossVectors(_forward, camera.up);
+  _right.crossVectors(_forward, up);
   if (_right.lengthSq() < 1e-8) _right.set(1, 0, 0);
   _right.normalize();
   _up.crossVectors(_right, _forward).normalize();
@@ -55,22 +65,6 @@ export function fitDistance(
     distance = Math.max(distance, Math.max(needH, needV) - _rel.dot(_forward));
   }
   return distance;
-}
-
-/** A camera pose that frames `spheres` around `target`, looking along -direction. */
-export function framePose(
-  camera: PerspectiveCamera,
-  target: Vector3,
-  direction: Vector3,
-  spheres: readonly SphereLike[],
-  margin: number,
-  heightFraction = 1,
-): CameraPose {
-  const distance = fitDistance(camera, target, direction, spheres, margin, heightFraction);
-  return {
-    target: target.clone(),
-    position: target.clone().addScaledVector(direction, distance),
-  };
 }
 
 const _dirA = new Vector3();
@@ -93,7 +87,14 @@ export function interpolatePose(from: CameraPose, to: CameraPose, t: number, out
   _dirA.divideScalar(lenA);
   _dirB.divideScalar(lenB);
 
-  _qFull.setFromUnitVectors(_dirA, _dirB);
+  if (_dirA.dot(_dirB) < -0.9999) {
+    // Opposite directions: turn about any axis across them.
+    _up.set(0, 1, 0);
+    if (Math.abs(_dirA.y) > 0.9) _up.set(1, 0, 0);
+    _qFull.setFromAxisAngle(_up.cross(_dirA).normalize(), Math.PI);
+  } else {
+    _qFull.setFromUnitVectors(_dirA, _dirB);
+  }
   _q.identity().slerp(_qFull, t);
   const length = lenA * Math.pow(lenB / lenA, t);
 
