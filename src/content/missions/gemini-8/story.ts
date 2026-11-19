@@ -178,6 +178,12 @@ export const story: Mission = {
       chronologyTable("A", "Flight crew, Command pilot and Pilot rows"),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "s65-58499",
+    1200,
+    948,
+    "David R. Scott, left, and Neil A. Armstrong, right, sit at a table in light blue flight suits with a small model of the Gemini spacecraft between them, an American flag and a NASA flag behind them.",
+  ),
 
   launch: {
     value: {

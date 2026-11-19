@@ -148,6 +148,12 @@ export const story: Mission = {
       nmc("Description"),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "S70-36485",
+    960,
+    1200,
+    "From left, James A. Lovell Jr., John L. \"Jack\" Swigert Jr., and Fred W. Haise Jr. in dark business suits and ties, gathered around a globe of the Moon in front of a backdrop of glowing red and orange stars.",
+  ),
 
   launch: {
     value: {

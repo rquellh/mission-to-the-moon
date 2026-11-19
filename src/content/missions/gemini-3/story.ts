@@ -151,6 +151,12 @@ export const story: Mission = {
       nasaMission('Mission Facts: "Crew: Virgil I. “Gus” Grissom (Command Pilot) and John W. Young (Pilot)"'),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "S64-19430",
+    957,
+    1200,
+    "Virgil I. Grissom, left, and John W. Young, right, smile in silver Gemini spacesuits and white helmets with the visors raised, posed against a plain blue backdrop.",
+  ),
 
   launch: {
     value: {

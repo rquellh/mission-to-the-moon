@@ -159,6 +159,12 @@ export const story: Mission = {
       table("Crew Information - Earth Orbit and Lunar Orbit Missions", "Commander, Command Module Pilot, and Lunar Module Pilot rows", ABTN_CREW),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "S68-50265",
+    943,
+    1200,
+    "From left, James A. Lovell Jr., William A. Anders, and Frank Borman pose in white spacesuits and yellow boot covers on the steps of the Apollo Mission Simulator at the Kennedy Space Center. Borman holds a clipboard.",
+  ),
 
   launch: {
     value: {

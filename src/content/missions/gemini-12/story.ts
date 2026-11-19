@@ -215,6 +215,12 @@ export const story: Mission = {
       chronology("November 11, 1966: \"command pilot Astronaut James A. Lovell, Jr., and pilot Astronaut Edwin E. Aldrin, Jr.\""),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "s66-46952",
+    949,
+    1200,
+    "Edwin E. Aldrin, Jr., left, and James A. Lovell, Jr., right, stand in light blue flight suits in the open hatches of a Gemini spacecraft, each holding a camera, with the spacecraft's dark nose pointing toward the viewer.",
+  ),
 
   launch: {
     value: {

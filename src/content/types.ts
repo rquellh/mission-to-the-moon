@@ -183,6 +183,11 @@ export interface Mission {
   destination: "earth-orbit" | "moon";
   summary: Fact;
   crew: Cited<CrewMember[]>;
+  /**
+   * NASA's portrait of the crew, shown in "About this mission". Its `alt`
+   * names each person from left to right, as NASA's caption does.
+   */
+  crewPhoto?: Photo;
   launch?: Cited<{
     /** Universal time as ISO 8601. */
     utc: string;

@@ -324,6 +324,11 @@ for (const folder of flights) {
 
     it("every photo exists under public/", () => {
       const problems = missingPhotos(story, "story");
+      const crewPhoto = story?.crewPhoto;
+      if (crewPhoto) {
+        if (!existsSync(new URL(crewPhoto.src, PUBLIC))) problems.push(`story.crewPhoto: public/${crewPhoto.src} does not exist`);
+        if (!crewPhoto.alt.trim()) problems.push("story.crewPhoto: alt is empty");
+      }
       assert.equal(problems.length, 0, report(problems));
     });
 

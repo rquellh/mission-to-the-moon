@@ -2056,7 +2056,9 @@ export class Stage implements Director {
     const story = this.player.storyTime;
     const playing = this.player.playing;
     const step = Number.isNaN(this.lastStory) ? 0 : Math.abs(story - this.lastStory);
-    const jumped = step > (playing ? Math.max(0.3, this.player.rate * 0.25) : 1e-9) || (!playing && step > 0);
+    // `speed` is the pace right now: the chosen rate, or a tour trip's own pace,
+    // which runs faster than the rate in the middle of a long trip.
+    const jumped = step > (playing ? Math.max(0.3, this.player.speed * 0.25) : 1e-9) || (!playing && step > 0);
     const paused = this.wasPlaying && !playing;
     this.lastStory = story;
     this.wasPlaying = playing;
@@ -2518,7 +2520,7 @@ export class Stage implements Director {
     const s = this.player.storyTime;
     const a = Math.max(0, s - 0.02);
     const b = Math.min(story.duration, s + 0.02);
-    return b > a ? ((story.toElapsed(b) - story.toElapsed(a)) / (b - a)) * this.player.rate : 0;
+    return b > a ? ((story.toElapsed(b) - story.toElapsed(a)) / (b - a)) * this.player.speed : 0;
   }
 
   /** Revolutions per mission second a ship makes around its body at mission time t (from its path). */

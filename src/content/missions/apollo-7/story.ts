@@ -150,6 +150,12 @@ export const story: Mission = {
       caption("S68-48662", '"astronauts Walter M. Schirra Jr., commander; Donn F. Eisele, command module pilot; and Walter Cunningham, lunar module pilot"'),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "S68-33744",
+    1200,
+    960,
+    "From left, Donn F. Eisele, Walter M. \"Wally\" Schirra Jr., and R. Walter Cunningham smile in white spacesuits, gathered beside the open hatch of an Apollo spacecraft.",
+  ),
 
   launch: {
     value: {

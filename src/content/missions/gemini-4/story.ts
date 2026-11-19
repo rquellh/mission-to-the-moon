@@ -167,6 +167,12 @@ export const story: Mission = {
       nasaMission("Mission Facts: \"Crew: James A. McDivitt Jr. (Command Pilot) and Edward H. White II (Pilot)\""),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "S65-19528",
+    962,
+    1200,
+    "Edward H. White II, left, and James A. McDivitt, right, smile in white spacesuits and helmets with the visors raised, standing in front of a launch tower at Cape Kennedy.",
+  ),
 
   launch: {
     value: {

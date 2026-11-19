@@ -183,6 +183,12 @@ export const story: Mission = {
       chronology("August 21, 1965: \"command pilot Astronaut L. Gordon Cooper, Jr., and pilot Astronaut Charles Conrad, Jr.\""),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "S65-46990",
+    1190,
+    1200,
+    "Charles Conrad, Jr., left, and L. Gordon Cooper, Jr., right, grin in white spacesuits without their helmets, standing in front of a red launch tower at Cape Kennedy under a blue sky.",
+  ),
 
   launch: {
     value: {

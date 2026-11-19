@@ -162,6 +162,12 @@ export const story: Mission = {
       chronology("December 15", "\"crewed by command pilot Astronaut Walter M. Schirra, Jr., and pilot Astronaut Thomas P. Stafford\""),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "S65-56151",
+    1200,
+    935,
+    "Thomas P. Stafford, left, and Walter M. Schirra Jr., right, pose in white spacesuits without their helmets, name tags on their chests, against a dark blue backdrop.",
+  ),
 
   launch: {
     value: {

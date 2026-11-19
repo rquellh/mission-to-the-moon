@@ -39,14 +39,28 @@ export interface Player {
   /** Now, in story seconds. */
   readonly storyTime: number;
   readonly playing: boolean;
-  /** Story seconds per real second. 1 is normal speed. */
+  /** Story seconds per real second the visitor chose for playing. 1 is normal speed. A playTo trip leaves it alone. */
   readonly rate: number;
-  /** Jump to a mission time. Does not change whether time is running. */
+  /**
+   * Story seconds per real second the clock is moving at right now: 0 when
+   * stopped, `rate` when playing, and a playTo trip's own changing pace
+   * during a trip. Use it, not `rate`, to judge how far one frame should move.
+   */
+  readonly speed: number;
+  /** Jump to a mission time. Ends a playTo trip (the clock then stops); otherwise does not change whether time is running. */
   seek(elapsedSeconds: number): void;
-  /** Jump to a story time. Does not change whether time is running. */
+  /** Jump to a story time. Ends a playTo trip (the clock then stops); otherwise does not change whether time is running. */
   seekStory(storySeconds: number): void;
-  /** Start the clock. At the end of the mission it starts over. */
+  /** Start the clock. At the end of the mission it starts over. During a playTo trip, play on from there at `rate` instead. */
   play(): void;
+  /**
+   * Play to a story time in a set number of real seconds, whatever the
+   * device's frame rate or the chosen rate, easing out of the start and into
+   * the end. `playing` is true on the way; the clock stops exactly on the
+   * target. pause, seek, seekStory, and play end the trip early.
+   */
+  playTo(storySeconds: number, seconds: number): void;
+  /** Stop the clock, and any playTo trip. */
   pause(): void;
   setRate(rate: number): void;
   /**

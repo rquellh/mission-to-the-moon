@@ -144,6 +144,12 @@ export const story: Mission = {
       chronologyTable("Flight crew, Command pilot and Pilot rows, \"Borman\" and \"Lovell\""),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "s65-41825",
+    1200,
+    960,
+    "James A. Lovell, Jr., left, and Frank Borman, right, stand in light blue flight suits and flight helmets, oxygen masks hanging loose, behind a small model of the Gemini spacecraft, with an American flag at left.",
+  ),
 
   launch: {
     value: {

@@ -195,6 +195,12 @@ export const story: Mission = {
       report("Section 1.0, \"Summary\" (printed page 1-1, PDF page 13)"),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "S72-50438",
+    1200,
+    901,
+    "Eugene A. Cernan sits on a lunar rover trainer in a white spacesuit. Behind him stand Harrison H. Schmitt, at left, and Ronald E. Evans, at right, also in spacesuits. Their Saturn V rocket stands on its launch pad in the distance, and the Apollo 17 emblem is set into the upper left corner.",
+  ),
 
   launch: {
     value: {

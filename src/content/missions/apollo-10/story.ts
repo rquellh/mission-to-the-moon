@@ -162,6 +162,12 @@ export const story: Mission = {
       table("Crew Information - Earth Orbit and Lunar Orbit Missions", "Commander, Command Module Pilot, and Lunar Module Pilot rows", ABTN_CREW),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "s69-34385",
+    822,
+    1200,
+    "From left, Eugene A. Cernan, John W. Young, and Thomas P. Stafford stand on the grass in white spacesuits. Behind them, their Saturn V rocket stands beside its red launch tower on Pad B at the Kennedy Space Center.",
+  ),
 
   launch: {
     value: {

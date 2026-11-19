@@ -178,6 +178,12 @@ export const story: Mission = {
       ),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "S69-31739",
+    1200,
+    943,
+    "From left, Neil A. Armstrong, Michael Collins, and Edwin E. \"Buzz\" Aldrin Jr. in white spacesuits. Armstrong and Aldrin sit, and Collins stands between them, in front of a large picture of the Moon.",
+  ),
 
   launch: {
     value: {

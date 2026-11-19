@@ -160,6 +160,12 @@ export const story: Mission = {
       details("Crew"),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "s72-16660",
+    1200,
+    1123,
+    "From left, Thomas K. Mattingly II, John W. Young, and Charles M. Duke Jr. stand in white spacesuits on a model of the lunar surface, with the Apollo 16 emblem and a picture of Earth on the blue backdrop behind them.",
+  ),
 
   launch: {
     value: {

@@ -5,6 +5,7 @@ import type { Citation } from '../content/types';
 import { sourcesBlock } from './citations';
 import { byId, el } from './dom';
 import { formatDate, formatTimeOfDay, missionDates } from './format';
+import { fillPhoto } from './photo';
 
 /** The folded list of sources, with any notes where sources disagree inside it. */
 function sources(citations: readonly Citation[], ...discrepancies: Array<string | undefined>): HTMLElement[] {
@@ -49,8 +50,18 @@ export function renderAbout(mission: Mission): void {
   intro.append(...sources(introCitations, mission.summary.discrepancy, mission.launch?.discrepancy));
   parts.push(intro);
 
-  // Crew.
+  // Crew: NASA's portrait when the mission has one, then the names and roles.
   const crew = section(copy.about.crew);
+  if (mission.crewPhoto) {
+    const figure = el('figure', 'card__photo about__crew-photo');
+    fillPhoto(figure, mission.crewPhoto);
+    // Say who is who for people looking at the picture. The words are the
+    // photo's own description, which screen readers already get from the image.
+    const who = el('p', 'about__crew-who', mission.crewPhoto.alt);
+    who.setAttribute('aria-hidden', 'true');
+    figure.insertBefore(who, figure.lastElementChild);
+    crew.append(figure);
+  }
   const crewList = el('ul', 'about__crew');
   for (const member of mission.crew.value) {
     const item = el('li', 'about__crew-member');

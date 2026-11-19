@@ -211,6 +211,12 @@ export const story: Mission = {
       chronology('"manned by command pilot Astronaut John W. Young and pilot Astronaut Michael Collins"'),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "s66-42725",
+    788,
+    1200,
+    "John W. Young, left, and Michael Collins, right, stand in white spacesuits and helmets with the visors raised, in front of a large radar dish at Kennedy Space Center.",
+  ),
 
   launch: {
     value: {

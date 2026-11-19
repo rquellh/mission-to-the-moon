@@ -168,6 +168,12 @@ export const story: Mission = {
       table("Crew Information - Lunar Landing Missions", "Commander, Command Module Pilot, and Lunar Module Pilot rows", ABTN_CREW),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "S70-55635",
+    1200,
+    800,
+    "From left, Edgar D. Mitchell, Alan B. Shepard Jr., and Stuart A. Roosa in white spacesuits, in front of a large Apollo 14 emblem on a starry backdrop.",
+  ),
 
   launch: {
     value: {

@@ -1,7 +1,7 @@
 import { copy } from '../content/copy';
 import type { CreditEntry } from '../content/credits';
 import { SOURCE_GROUPS, SOURCES, type SourceId } from '../content/sources';
-import type { Mission, MissionSummary } from '../content/types';
+import type { Mission, MissionSummary, Photo } from '../content/types';
 import type { ExtraMeta } from '../extras/types';
 import { externalLink } from './citations';
 import { byId, el } from './dom';
@@ -148,13 +148,17 @@ function sourceGroups({ mission, cited, summaries, extras }: CreditsOptions): HT
 function photoGroup(mission: Mission): HTMLElement {
   const seen = new Set<string>();
   const items: HTMLLIElement[] = [];
-  for (const event of mission.events) {
-    const photo = event.photo;
+  // The crew's portrait from "About this mission" first, then each event's photo.
+  const photos: Array<{ title: string; photo: Photo | undefined }> = [
+    { title: copy.about.crew, photo: mission.crewPhoto },
+    ...mission.events.map((event) => ({ title: event.title, photo: event.photo })),
+  ];
+  for (const { title, photo } of photos) {
     if (!photo || seen.has(photo.src)) continue;
     seen.add(photo.src);
     const item = el('li', 'credits__item');
     const heading = el('h4', 'credits__item-title');
-    heading.append(externalLink(photo.sourceUrl, event.title));
+    heading.append(externalLink(photo.sourceUrl, title));
     item.append(
       heading,
       details([

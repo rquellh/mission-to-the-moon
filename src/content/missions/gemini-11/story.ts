@@ -192,6 +192,12 @@ export const story: Mission = {
       nasm('Object description: "Astronauts Pete Conrad (commander) and Dick Gordon (pilot)"'),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "s65-58504",
+    1200,
+    950,
+    "Richard F. Gordon, Jr., left, and Charles Conrad, Jr., right, smile in light blue flight suits, holding a small model of the Gemini spacecraft between them, an American flag and a NASA flag behind them.",
+  ),
 
   launch: {
     value: {

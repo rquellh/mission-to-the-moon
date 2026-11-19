@@ -154,6 +154,12 @@ export const story: Mission = {
       nasaMission("Mission Facts: \"Original Backup Crew and New Prime Crew: Thomas P. Stafford (Command Pilot) and Eugene A. Cernan (Pilot)\""),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "s66-15621",
+    1200,
+    960,
+    "Thomas P. Stafford, left, and Eugene A. Cernan, right, sit at a table in white spacesuits, each holding his helmet in front of him, an American flag and a NASA flag behind them.",
+  ),
 
   launch: {
     value: {

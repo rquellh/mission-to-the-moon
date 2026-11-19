@@ -181,6 +181,9 @@ export const copy = {
     back: 'Back',
     next: 'Next',
     finish: 'Finish',
+    /** The Next button while the tour is on its way to a stop. */
+    skip: 'Skip',
+    skipLabel: 'Skip to this stop',
     exit: 'Exit tour',
     arrived: (index: number, total: number, title: string) => `Stop ${index} of ${total}: ${title}.`,
     endTitle: 'That’s the tour!',

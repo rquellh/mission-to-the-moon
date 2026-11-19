@@ -218,15 +218,15 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   });
   const timeline = setUpTimeline(player, index);
 
-  // The card follows the clock, except while the tour holds it at a stop.
+  // The card follows the clock, except on the tour, which holds it on its stop.
   let followed = -2;
   const follow = (): void => {
     const current = index.eventAt(player.time);
     if (current === followed) return;
     followed = current;
-    if (tour.phase === 'stopped' || tour.phase === 'finished') return;
+    if (tour.active) return;
     card.show(current);
-    if (!tour.active) announce(describe(current));
+    announce(describe(current));
   };
   player.subscribe(follow);
   follow();
@@ -242,6 +242,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     byId('play', HTMLButtonElement).focus({ preventScroll: true });
   };
 
+  let tourPhase = tour.phase;
   tour.subscribe(() => {
     document.body.classList.toggle('is-touring', tour.active);
     timeline.setLocked(tour.active);
@@ -251,12 +252,14 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     // "Try it" waits for the stop. At a stop the clock is already still.
     card.setTryItAllowed(tour.phase !== 'traveling');
     const stop = tour.stop;
-    // On the way to a stop, the card follows the clock again.
-    if (tour.phase === 'traveling') card.show(index.eventAt(player.time));
-    if (tour.phase === 'stopped' && stop) {
-      card.show(index.events.indexOf(stop));
-      announce(copy.tour.arrived(tour.index + 1, tour.total, stop.title));
-    }
+    // On the way, the card already shows the stop it is heading for, so it
+    // turns once as the trip begins rather than flicking through every event
+    // passed, which go by too quickly to read. The clock and the timeline show the way.
+    if (stop) card.show(index.events.indexOf(stop));
+    if (tour.phase === 'stopped' && stop) announce(copy.tour.arrived(tour.index + 1, tour.total, stop.title));
+    // Leaving the tour partway to a stop: the card catches up with the clock.
+    if (tour.phase === 'off' && tourPhase === 'traveling') card.show(index.eventAt(player.time));
+    tourPhase = tour.phase;
   });
   setUpTourPanel(tour, {
     onExplore: explore,

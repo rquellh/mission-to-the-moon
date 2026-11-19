@@ -171,6 +171,12 @@ export const story: Mission = {
       table("Crew Information - Lunar Landing Missions", "Apollo 12 column: Commander, Command Module Pilot, and Lunar Module Pilot rows", ABTN_CREW),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "S69-38852",
+    960,
+    1200,
+    "From left, Charles \"Pete\" Conrad Jr., Richard F. Gordon Jr., and Alan L. Bean stand in white spacesuits in front of a silver lunar module, with gold-colored science equipment on the gravel at their feet.",
+  ),
 
   launch: {
     value: {

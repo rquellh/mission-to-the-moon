@@ -161,6 +161,12 @@ export const story: Mission = {
     discrepancy:
       "The Mission Report (page 1-1, PDF page 10) prints the command module pilot as \"Alfred J. Worden.\" Apollo by the Numbers gives Alfred Merrill Worden, and NASA's mission details page Alfred M. Worden, which we follow.",
   },
+  crewPhoto: nasaPhoto(
+    "S71-37963",
+    1200,
+    923,
+    "From left, David R. Scott, Alfred M. Worden, and James B. Irwin in white spacesuits. Worden sits in front, between the other two, beneath a large Apollo 15 emblem on a cratered backdrop that looks like the Moon's surface.",
+  ),
 
   launch: {
     value: {

@@ -12,7 +12,7 @@ export interface TourPanelOptions {
 
 /**
  * The tour's controls inside the event sheet: which stop this is, a progress
- * row, and Back, Next, and Exit. After the last stop it shows the ending,
+ * row, and Back, Next (Skip while on the way), and Exit. After the last stop it shows the ending,
  * which hands off to exploring freely.
  */
 export function setUpTourPanel(tour: Tour, { onExplore, onRestart }: TourPanelOptions): void {
@@ -75,7 +75,16 @@ export function setUpTourPanel(tour: Tour, { onExplore, onRestart }: TourPanelOp
       const backHadFocus = document.activeElement === back;
       back.disabled = tour.index === 0;
       if (backHadFocus && back.disabled) next.focus();
-      nextLabel.textContent = tour.index >= tour.total - 1 ? copy.tour.finish : copy.tour.next;
+      // On the way, the same button skips ahead to the stop. Only its words
+      // change, so keyboard focus stays on it, and nothing new is announced:
+      // the tour announces the stop on arrival, as it always has.
+      if (phase === 'traveling') {
+        nextLabel.textContent = copy.tour.skip;
+        next.setAttribute('aria-label', copy.tour.skipLabel);
+      } else {
+        nextLabel.textContent = tour.index >= tour.total - 1 ? copy.tour.finish : copy.tour.next;
+        next.removeAttribute('aria-label');
+      }
     }
 
     // Keep keyboard focus somewhere sensible as the panel changes.

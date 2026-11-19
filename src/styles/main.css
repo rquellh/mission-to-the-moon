@@ -2143,6 +2143,27 @@ body.is-welcome .hud {
   margin: 0 0 18px;
 }
 
+/* The crew's portrait in "About this mission". It may stand taller than a
+   card's photo, since the dialog has the room and faces need the size. */
+.about__crew-photo {
+  margin: 0 0 14px;
+}
+
+.about__crew-photo .card__image {
+  max-height: min(420px, 50vh);
+  /* An upright portrait leaves room at the sides; let the dialog show through. */
+  background: none;
+}
+
+/* Who is who in the portrait, from left to right. */
+.about__crew-who {
+  max-width: 62ch;
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
 .memorial__toggle {
   margin-top: 10px;
 }

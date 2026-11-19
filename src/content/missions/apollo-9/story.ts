@@ -163,6 +163,12 @@ export const story: Mission = {
       report('1.0, "Summary"', "page 1-1, PDF page 8"),
     ],
   },
+  crewPhoto: nasaPhoto(
+    "S69-17590",
+    1200,
+    947,
+    "From left, James A. McDivitt, David R. Scott, and Russell L. \"Rusty\" Schweickart smile in white spacesuits under a blue sky, with a Saturn V rocket on its launch pad far behind them.",
+  ),
 
   launch: {
     value: {
