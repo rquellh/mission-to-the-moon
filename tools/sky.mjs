@@ -25,7 +25,8 @@
  * Agena's lift-off, the crew's lift-off, and landing.
  *
  * It sends Horizons only the ephemeris query (bodies, quantities, times).
- * It prints the query addresses too, so a reader can check every number.
+ * Each citation carries the complete address that returns its value (one per
+ * table, built from the times), so a reader can open it and check the number.
  *
  * Example (Apollo 11's samples):
  *   node tools/sky.mjs --zero "1969-07-16 13:32:00" \
@@ -36,9 +37,9 @@ const API = "https://ssd.jpl.nasa.gov/api/horizons.api";
 
 /** The three Horizons observer tables a sky sample needs. */
 const TABLES = [
-  { key: "moonEclipticLongitude", target: "Moon (301) from Earth's center", command: "301", center: "500@399", quantities: "31", column: "ObsEcLon" },
-  { key: "subLunarLongitude", target: "Earth (399) from the Moon's center", command: "399", center: "500@301", quantities: "14", column: "ObsSub-LON" },
-  { key: "sunEclipticLongitude", target: "Sun (10) from Earth's center", command: "10", center: "500@399", quantities: "31", column: "ObsEcLon" },
+  { key: "moonEclipticLongitude", constant: "MOON_FROM_EARTH", target: "Moon (301) from Earth's center", command: "301", center: "500@399", quantities: "31", column: "ObsEcLon" },
+  { key: "subLunarLongitude", constant: "EARTH_FROM_MOON", target: "Earth (399) from the Moon's center", command: "399", center: "500@301", quantities: "14", column: "ObsSub-LON" },
+  { key: "sunEclipticLongitude", constant: "SUN_FROM_EARTH", target: "Sun (10) from Earth's center", command: "10", center: "500@399", quantities: "31", column: "ObsEcLon" },
 ];
 
 function fail(message) {
@@ -172,14 +173,20 @@ async function main() {
   lines.push("// (the source that gives the launch, landing, or other event time). The type");
   lines.push("// checker rejects the plan until you do.");
   lines.push("");
-  lines.push("const HORIZONS =");
-  lines.push(`  ${JSON.stringify(query(times))};`);
+  const timesPart = "&TLIST_TYPE" + query(times).split("&TLIST_TYPE")[1];
+  lines.push("/** The Horizons query for each sky table, at the times below (printed by tools/sky.mjs). */");
+  lines.push(`const HORIZONS_TIMES = ${JSON.stringify(timesPart)};`);
+  lines.push("const HORIZONS_QUERY = (command: string, center: string, quantities: string): string =>");
+  lines.push(
+    "  `" + API + "?format=text&COMMAND=%27\${command}%27&CENTER=%27\${center}%27&QUANTITIES=%27\${quantities}%27&OBJ_DATA=%27NO%27&CSV_FORMAT=%27YES%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27\${HORIZONS_TIMES}`;",
+  );
   lines.push("");
-  lines.push("const horizons = (target: string, quantity: string, time: string): Citation => ({");
+  lines.push("const horizons = (target: string, quantity: string, time: string, url: string): Citation => ({");
   lines.push('  source: "jpl-horizons",');
-  lines.push("  locator: `Observer table, ${target}, ${quantity}, ${time} UT`,");
-  lines.push("  url: HORIZONS,");
+  lines.push("  locator: `Observer table, \${target}, \${quantity}, \${time} UT`,");
+  lines.push("  url,");
   lines.push("});");
+  for (const table of TABLES) lines.push(`const ${table.constant} = HORIZONS_QUERY(${JSON.stringify(table.command)}, ${JSON.stringify(table.center)}, ${JSON.stringify(table.quantities)});`);
   lines.push("");
   lines.push("  sky: [");
   times.forEach((t, i) => {
@@ -187,7 +194,7 @@ async function main() {
     lines.push(`      time: at(${JSON.stringify(clockTime(t.micro - zero.micro))}, TIME_SOURCE),`);
     for (const table of TABLES) {
       const target = JSON.stringify(table.target);
-      lines.push(`      ${table.key}: cite(${values[table.key][i]}, horizons(${target}, ${JSON.stringify(table.column)}, ${JSON.stringify(t.label)})),`);
+      lines.push(`      ${table.key}: cite(${values[table.key][i]}, horizons(${target}, ${JSON.stringify(table.column)}, ${JSON.stringify(t.label)}, ${table.constant})),`);
     }
     lines.push("    },");
   });

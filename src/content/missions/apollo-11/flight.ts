@@ -29,8 +29,10 @@ const MISSION_REPORT =
   "https://www.nasa.gov/wp-content/uploads/static/apollo50th/pdf/A11_MissionReport.pdf";
 const DESCENT_ASCENT = "https://ntrs.nasa.gov/api/citations/19700024568/downloads/19700024568.pdf";
 const OVERVIEW = "https://www.nasa.gov/missions/apollo/apollo-11-mission-overview/";
-const HORIZONS =
-  "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27&TLIST_TYPE=%27CAL%27&TLIST=%271969-07-16%2016:22:13.03%27,%271969-07-24%2016:35:05.7%27";
+/** The Horizons query for each sky table, at the times below (printed by tools/sky.mjs). */
+const HORIZONS_TIMES = "&TLIST_TYPE=%27CAL%27&TLIST=%271969-07-16%2016:22:13.03%27,%271969-07-24%2016:35:05.7%27";
+const HORIZONS_QUERY = (command: string, center: string, quantities: string): string =>
+  `https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27${command}%27&CENTER=%27${center}%27&QUANTITIES=%27${quantities}%27&OBJ_DATA=%27NO%27&CSV_FORMAT=%27YES%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27${HORIZONS_TIMES}`;
 
 function cite<T>(value: T, citation: Citation, ...more: Citation[]): Cited<T> {
   return { value, citations: [citation, ...more] };
@@ -90,11 +92,14 @@ const LUNAR_SITES: Citation = {
   locator: 'Apollo 11, "Lunar Module" row',
   url: "https://nssdc.gsfc.nasa.gov/planetary/lunar/lunar_sites.html",
 };
-const horizons = (target: string, quantity: string, time: string): Citation => ({
+const horizons = (target: string, quantity: string, time: string, url: string): Citation => ({
   source: "jpl-horizons",
   locator: `Observer table, ${target}, ${quantity}, ${time} UT`,
-  url: HORIZONS,
+  url,
 });
+const MOON_FROM_EARTH = HORIZONS_QUERY("301", "500@399", "31");
+const EARTH_FROM_MOON = HORIZONS_QUERY("399", "500@301", "14");
+const SUN_FROM_EARTH = HORIZONS_QUERY("10", "500@399", "31");
 
 /** Lunar orbits run east to west (retrograde), as these sources show. */
 const RETROGRADE: Cited<"retrograde"> = cite(
@@ -124,9 +129,12 @@ const PROGRADE_EOI: Cited<"prograde"> = cite("prograde", {
 /* The plan.                                                           */
 /* ------------------------------------------------------------------ */
 
+const LANDING_SITE_DIFFERS =
+  "Apollo by the Numbers' LM Lunar Landing table gives 0.67408 degrees N, 23.47297 degrees E (IAU mean Earth/polar axis coordinates). The Apollo 11 Mission Report (section 1.0, page 1-1, PDF page 12, and section 3.0, pages 3-1 and 3-2, PDF pages 15 and 16) gives 0 degrees 41 minutes 15 seconds N, 23 degrees 26 minutes E, on the 1967 Lunar Map ORB-II-6 (100): about 0.6875 N, 23.4333 E in decimal degrees (our arithmetic). We follow NSSDCA's Apollo Landing Site Coordinates, from Lunar Reconnaissance Orbiter images.";
+
 const LANDING_SITE = {
-  latitude: cite(0.67416, LUNAR_SITES),
-  longitude: cite(23.47314, LUNAR_SITES),
+  latitude: { ...cite(0.67416, LUNAR_SITES), discrepancy: LANDING_SITE_DIFFERS },
+  longitude: { ...cite(23.47314, LUNAR_SITES), discrepancy: LANDING_SITE_DIFFERS },
 };
 
 const CSM_PARKING_ORBIT = {
@@ -154,15 +162,15 @@ export const flight: FlightPlan = {
   sky: [
     {
       time: at("002:50:13.03", tliTable("GET")),
-      moonEclipticLongitude: cite(136.8221387, horizons("Moon (301) from Earth's center", "ObsEcLon", "1969-07-16 16:22:13.03")),
-      subLunarLongitude: cite(320.339872, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1969-07-16 16:22:13.03")),
-      sunEclipticLongitude: cite(113.9370697, horizons("Sun (10) from Earth's center", "ObsEcLon", "1969-07-16 16:22:13.03")),
+      moonEclipticLongitude: cite(136.8221387, horizons("Moon (301) from Earth's center", "ObsEcLon", "1969-07-16 16:22:13.03", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(320.339872, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1969-07-16 16:22:13.03", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(113.9370697, horizons("Sun (10) from Earth's center", "ObsEcLon", "1969-07-16 16:22:13.03", SUN_FROM_EARTH)),
     },
     {
       time: at("195:03:05.7", entryTable("Earth Entry GET")),
-      moonEclipticLongitude: cite(239.6496456, horizons("Moon (301) from Earth's center", "ObsEcLon", "1969-07-24 16:35:05.7")),
-      subLunarLongitude: cite(45.35307, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1969-07-24 16:35:05.7")),
-      sunEclipticLongitude: cite(121.5828807, horizons("Sun (10) from Earth's center", "ObsEcLon", "1969-07-24 16:35:05.7")),
+      moonEclipticLongitude: cite(239.6496456, horizons("Moon (301) from Earth's center", "ObsEcLon", "1969-07-24 16:35:05.7", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(45.35307, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1969-07-24 16:35:05.7", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(121.5828807, horizons("Sun (10) from Earth's center", "ObsEcLon", "1969-07-24 16:35:05.7", SUN_FROM_EARTH)),
     },
   ],
 
@@ -337,7 +345,11 @@ export const flight: FlightPlan = {
           body: "moon",
           start: at("100:39:52.9", lunarOrbitTable("CSM/LM separation ignition")),
           end: at("100:40:01.9", lunarOrbitTable("CSM/LM separation cutoff")),
-          deltaV: cite(2.7, lunarOrbitTable("CSM/LM separation cutoff")),
+          deltaV: {
+            ...cite(2.7, lunarOrbitTable("CSM/LM separation cutoff")),
+            discrepancy:
+              'The Apollo 11 Mission Report\'s Table 7-V, "Lunar Orbit Maneuver Summary" (page 7-11, PDF page 119), "Command module/lunar module separation" row, gives a 5.2-second firing and a velocity change of 1.4 ft/sec. We follow Apollo by the Numbers\' Lunar Orbit Phase table: 9.0 seconds (the 100:39:52.9 to 100:40:01.9 drawn here) and 2.7 ft/sec.',
+          },
         },
         {
           kind: "orbit",
@@ -379,7 +391,11 @@ export const flight: FlightPlan = {
           label: "Final separation",
           body: "moon",
           start: at("130:30:01.0", lunarOrbitTable("CSM/LM final separation ignition")),
-          end: at("130:30:08.1", lunarOrbitTable("CSM/LM final separation cutoff")),
+          end: {
+            ...at("130:30:08.1", lunarOrbitTable("CSM/LM final separation cutoff")),
+            discrepancy:
+              'The Apollo 11 Timeline gives cutoff ("CSM/LM final separation cutoff.") at 130:30:08.2. We follow the Lunar Orbit Phase table, 130:30:08.1.',
+          },
           deltaV: cite(2.2, lunarOrbitTable("CSM/LM final separation cutoff")),
         },
         {
@@ -493,12 +509,13 @@ export const flight: FlightPlan = {
           end: at("102:33:05.01", lunarOrbitTable("LM powered descent initiation")),
           // The table prints the descent orbit (58.5 by 7.8) on the powered
           // descent initiation row; its descent orbit insertion row shows
-          // 64.3 by 55.6, which does not reach the 50,000-foot starting
-          // height of powered descent.
+          // 64.3 by 55.6, which does not come down to the starting height of
+          // powered descent, about 50,000 feet. The 7.8-nautical-mile low
+          // point is about 47,400 feet (our arithmetic).
           apoapsis: {
             ...cite(58.5, lunarOrbitTable("LM powered descent initiation")),
             discrepancy:
-              'The "LM descent orbit insertion cutoff" row lists 64.3 by 55.6 nautical miles. We follow the powered descent initiation row, which matches a descent from about 60 nautical miles to 50,000 feet (NASA TM X-58040).',
+              'The "LM descent orbit insertion cutoff" row lists 64.3 by 55.6 nautical miles. We follow the powered descent initiation row, which agrees roughly with NASA TM X-58040 (PDF page 19): descent orbit insertion lowers the orbit "from approximately 60 nautical miles to 50 000 feet". 7.8 nautical miles is about 47,400 feet.',
           },
           periapsis: cite(7.8, lunarOrbitTable("LM powered descent initiation")),
           sense: RETROGRADE,
@@ -539,7 +556,13 @@ export const flight: FlightPlan = {
           body: "moon",
           start: at("124:29:15.67", lunarOrbitTable("LM orbit insertion cutoff")),
           end: at("125:19:35.0", lunarOrbitTable("LM coelliptic sequence initiation ignition")),
-          apoapsis: cite(48.0, lunarOrbitTable("LM orbit insertion cutoff")),
+          // Drawn as one orbit from insertion. The small trim that followed
+          // insertion (see the discrepancy note) is not drawn.
+          apoapsis: {
+            ...cite(48.0, lunarOrbitTable("LM orbit insertion cutoff")),
+            discrepancy:
+              'NASA TM X-58040, Table V, "Apollo 11 Ascent Summary" (PDF page 28), gives a velocity residual trim from 7:33 to 8:37 after ascent engine ignition, and a "Resulting orbit after residual trim" of 47.3 by 9.5 nautical miles. We follow Apollo by the Numbers\' 48.0 by 9.4 at insertion; the trim is not drawn.',
+          },
           periapsis: cite(9.4, lunarOrbitTable("LM orbit insertion cutoff")),
           sense: RETROGRADE,
           startFix: {

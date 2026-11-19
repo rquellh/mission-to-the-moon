@@ -107,7 +107,7 @@ function supplemental(locator: string): Citation {
 
 /** Summary of Rendezvous Operations, Gemini Summary Conference (page of the conference volume, and of the NTRS file). */
 function rendezvousPaper(locator: string): Citation {
-  return { source: "gemini-6a-rendezvous-summary", locator, url: RENDEZVOUS_PAPER };
+  return { source: "gemini-rendezvous-summary", locator, url: RENDEZVOUS_PAPER };
 }
 
 /** A photo from the NASA Image and Video Library, saved under public/media/gemini-6a/. */
@@ -166,7 +166,7 @@ export const story: Mission = {
   launch: {
     value: {
       utc: "1965-12-15T13:37:26.471Z",
-      site: "Launch Complex 19, Cape Canaveral, Florida",
+      site: "Launch Complex 19, Cape Kennedy, Florida",
       vehicle: "Titan II Gemini Launch Vehicle (GLV-6)",
     },
     citations: [
@@ -176,9 +176,10 @@ export const story: Mission = {
       chronologyTable("A", "Launch vehicle (GLV-6), Launch date, and Time (e.s.t.) rows"),
       chronology("December 15", "\"launched from complex 19 at 8:37 a.m., e.s.t.\""),
       geminiVII("Section 1.0, \"Mission Summary\" (page 1-1, PDF page 31): Gemini VII \"was launched from Complex 19, Cape Kennedy, Florida\""),
+      { source: "gemini-chronology", locator: "Part III (A), August 4, 1965: \"McDonnell delivered Gemini spacecraft No. 6 to Cape Kennedy.\"", url: CHRONOLOGY_1965 },
     ],
     discrepancy:
-      "NASA's Gemini VI page gives the launch site as \"Complex 19, Cape Canaveral\"; the Gemini VII mission report calls the same complex \"Complex 19, Cape Kennedy, Florida\". We follow NASA's Gemini VI page, and take Florida from the Gemini VII report.",
+      "NASA's Gemini VI page, a current page, gives the launch site as \"Complex 19, Cape Canaveral\". We follow the documents of the time: the Gemini VII mission report names the same complex \"Complex 19, Cape Kennedy, Florida\", and the Gemini chronology has spacecraft No. 6 delivered to Cape Kennedy.",
   },
 
   duration: {
@@ -561,7 +562,7 @@ export const story: Mission = {
         transcript("07:22:34, Gemini VII command pilot", "In fact, how about that right now?", 88),
         transcript("07:22:38, Gemini VII command pilot", "Okay, we'll just coast around here a little bit and see what it looks like.", 89),
         geminiVII("Section 1.0, \"Mission Summary\" (page 1-2, PDF page 32): \"each spacecraft 7 crew member spent approximately 5 minutes conducting station keeping with spacecraft 6 as the passive target vehicle\""),
-        geminiVII("Section 7.1.2.3.4, \"Rendezvous\" (page 7-2, PDF page 308): station keeping \"was not difficult and was judged to be similar to, but less difficult than, that experienced in the docking trainer\""),
+        geminiVII("Section 7.1.2.3.4, \"Rendezvous\" (page 7-52, PDF page 308): station keeping \"was not difficult and was judged to be similar to, but less difficult than, that experienced in the docking trainer\""),
         titans(288, "\"Flight Control told them to stop maneuvers when the VII tanks dropped to an 11 percent supply\""),
       ],
       photo: nasaPhoto(

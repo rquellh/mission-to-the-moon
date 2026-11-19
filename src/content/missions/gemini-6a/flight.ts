@@ -134,8 +134,10 @@ const CHRONOLOGY_TABLE_B = "https://www.nasa.gov/history/SP-4002/app1b.htm";
 const NMC_GEMINI_6A = "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1965-104A";
 const GEMINI_8_REPORT =
   "https://web.archive.org/web/20250908153858/https://www.nasa.gov/wp-content/uploads/static/history/alsj/43455667-Gemini-Program-Mission-Report-Gemini-Viii.pdf";
-const HORIZONS =
-  "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27&TLIST_TYPE=%27CAL%27&TLIST=%271965-12-15%2013:37:26.471%27,%271965-12-16%2015:28:50.471%27";
+/** The Horizons query for each sky table, at the times below (printed by tools/sky.mjs). */
+const HORIZONS_TIMES = "&TLIST_TYPE=%27CAL%27&TLIST=%271965-12-15%2013:37:26.471%27,%271965-12-16%2015:28:50.471%27";
+const HORIZONS_QUERY = (command: string, center: string, quantities: string): string =>
+  `https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27${command}%27&CENTER=%27${center}%27&QUANTITIES=%27${quantities}%27&OBJ_DATA=%27NO%27&CSV_FORMAT=%27YES%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27${HORIZONS_TIMES}`;
 
 function cite<T>(value: T, citation: Citation, ...more: Citation[]): Cited<T> {
   return { value, citations: [citation, ...more] };
@@ -195,16 +197,19 @@ const titans = (page: number, words: string): Citation => ({
 
 /** Table 2-IV of Summary of Rendezvous Operations. */
 const rendezvousTable = (row: string): Citation => ({
-  source: "gemini-6a-rendezvous-summary",
+  source: "gemini-rendezvous-summary",
   locator: `Table 2-IV, "Rendezvous Propellant Usage" (page 18 of the Gemini Summary Conference, PDF page 12), VI-A row, ${row}`,
   url: RENDEZVOUS_PAPER,
 });
 
-const horizons = (target: string, quantity: string, time: string): Citation => ({
+const horizons = (target: string, quantity: string, time: string, url: string): Citation => ({
   source: "jpl-horizons",
   locator: `Observer table, ${target}, ${quantity}, ${time} UT`,
-  url: HORIZONS,
+  url,
 });
+const MOON_FROM_EARTH = HORIZONS_QUERY("301", "500@399", "31");
+const EARTH_FROM_MOON = HORIZONS_QUERY("399", "500@301", "14");
+const SUN_FROM_EARTH = HORIZONS_QUERY("10", "500@399", "31");
 
 /* ------------------------------------------------------------------ */
 /* Times on Gemini VI-A's clock.                                       */
@@ -394,15 +399,15 @@ export const flight: FlightPlan = {
   sky: [
     {
       time: LIFTOFF,
-      moonEclipticLongitude: cite(175.4079019, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-12-15 13:37:26.471")),
-      subLunarLongitude: cite(249.392908, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-12-15 13:37:26.471")),
-      sunEclipticLongitude: cite(263.379067, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-12-15 13:37:26.471")),
+      moonEclipticLongitude: cite(175.4079019, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-12-15 13:37:26.471", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(249.392908, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-12-15 13:37:26.471", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(263.379067, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-12-15 13:37:26.471", SUN_FROM_EARTH)),
     },
     {
       time: LANDING,
-      moonEclipticLongitude: cite(190.2685923, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-12-16 15:28:50.471")),
-      subLunarLongitude: cite(233.84657, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-12-16 15:28:50.471")),
-      sunEclipticLongitude: cite(264.475414, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-12-16 15:28:50.471")),
+      moonEclipticLongitude: cite(190.2685923, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-12-16 15:28:50.471", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(233.84657, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-12-16 15:28:50.471", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(264.475414, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-12-16 15:28:50.471", SUN_FROM_EARTH)),
     },
   ],
 

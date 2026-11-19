@@ -82,8 +82,10 @@ import type { FlightPlan, StateFix } from "../../../sim/types.ts";
 const MISSION_REPORT =
   "https://web.archive.org/web/20250207014232/https://www.nasa.gov/wp-content/uploads/static/history/alsj/a410/A07_MissionReport.pdf";
 const ABN = "https://www.nasa.gov/wp-content/uploads/static/history/SP-4029/";
-const HORIZONS =
-  "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27&TLIST_TYPE=%27CAL%27&TLIST=%271968-10-11%2015:02:45.36%27,%271968-10-22%2011:11:48%27";
+/** The Horizons query for each sky table, at the times below (printed by tools/sky.mjs). */
+const HORIZONS_TIMES = "&TLIST_TYPE=%27CAL%27&TLIST=%271968-10-11%2015:02:45.36%27,%271968-10-22%2011:11:48%27";
+const HORIZONS_QUERY = (command: string, center: string, quantities: string): string =>
+  `https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27${command}%27&CENTER=%27${center}%27&QUANTITIES=%27${quantities}%27&OBJ_DATA=%27NO%27&CSV_FORMAT=%27YES%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27${HORIZONS_TIMES}`;
 
 function cite<T>(value: T, citation: Citation, ...more: Citation[]): Cited<T> {
   return { value, citations: [citation, ...more] };
@@ -152,11 +154,14 @@ const timeline = (row: string): Citation => ({
   locator: `Apollo 7 Timeline, row "${row}"`,
   url: `${ABN}Apollo_07f_Timeline.htm`,
 });
-const horizons = (target: string, quantity: string, time: string): Citation => ({
+const horizons = (target: string, quantity: string, time: string, url: string): Citation => ({
   source: "jpl-horizons",
   locator: `Observer table, ${target}, ${quantity}, ${time} UT`,
-  url: HORIZONS,
+  url,
 });
+const MOON_FROM_EARTH = HORIZONS_QUERY("301", "500@399", "31");
+const EARTH_FROM_MOON = HORIZONS_QUERY("399", "500@301", "14");
+const SUN_FROM_EARTH = HORIZONS_QUERY("10", "500@399", "31");
 
 /** The orbit runs west to east (prograde), as the heading at insertion shows. */
 const PROGRADE: Cited<"prograde"> = cite("prograde", {
@@ -350,15 +355,15 @@ export const flight: FlightPlan = {
   sky: [
     {
       time: LIFTOFF,
-      moonEclipticLongitude: cite(75.5010383, horizons("Moon (301) from Earth's center", "ObsEcLon", "1968-10-11 15:02:45.36")),
-      subLunarLongitude: cite(187.731131, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1968-10-11 15:02:45.36")),
-      sunEclipticLongitude: cite(198.3549468, horizons("Sun (10) from Earth's center", "ObsEcLon", "1968-10-11 15:02:45.36")),
+      moonEclipticLongitude: cite(75.5010383, horizons("Moon (301) from Earth's center", "ObsEcLon", "1968-10-11 15:02:45.36", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(187.731131, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1968-10-11 15:02:45.36", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(198.3549468, horizons("Sun (10) from Earth's center", "ObsEcLon", "1968-10-11 15:02:45.36", SUN_FROM_EARTH)),
     },
     {
       time: LANDING,
-      moonEclipticLongitude: cite(216.832136, horizons("Moon (301) from Earth's center", "ObsEcLon", "1968-10-22 11:11:48")),
-      subLunarLongitude: cite(14.776336, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1968-10-22 11:11:48")),
-      sunEclipticLongitude: cite(209.1159747, horizons("Sun (10) from Earth's center", "ObsEcLon", "1968-10-22 11:11:48")),
+      moonEclipticLongitude: cite(216.832136, horizons("Moon (301) from Earth's center", "ObsEcLon", "1968-10-22 11:11:48", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(14.776336, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1968-10-22 11:11:48", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(209.1159747, horizons("Sun (10) from Earth's center", "ObsEcLon", "1968-10-22 11:11:48", SUN_FROM_EARTH)),
     },
   ],
 

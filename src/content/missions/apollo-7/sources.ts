@@ -1,6 +1,6 @@
 import type { Source } from "../../source-types.ts";
 
-/** Sources cited only by Apollo 7. */
+/** Sources cited only by Apollo 7 (its photograph captions are from the shared "nasa-image-and-video-library"). */
 export const sources = {
   "apollo-7-mission-report": {
     title: "Apollo 7 Mission Report (MSC-PA-R-68-15)",
@@ -16,13 +16,6 @@ export const sources = {
     url: "https://www.nasa.gov/missions/apollo/about-apollo-7-the-first-crewed-apollo-space-mission/",
     checked: "2026-11-19",
     use: "Apollo 7 crew radio calls at launch and at the first main-engine firing, the transposition and simulated docking with the spent stage, the first live television broadcasts, why the service propulsion engine mattered for Moon flights, and that the flight cleared the way for the lunar orbit mission that followed.",
-  },
-  "nasa-images-apollo-7": {
-    title: "NASA Image and Video Library",
-    publisher: "NASA",
-    url: "https://images.nasa.gov/",
-    checked: "2026-11-19",
-    use: "NASA's captions for the Apollo 7 photographs used here: what each shows, and where and when it was taken.",
   },
   "nasm-apollo-7-command-module": {
     title: "Command Module, Apollo 7",

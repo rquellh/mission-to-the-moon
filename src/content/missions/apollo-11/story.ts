@@ -5,7 +5,8 @@
  * the canonical source for Apollo timelines: elapsed times exactly as its
  * Apollo 11 Timeline prints them, and UTC from that table's GMT columns.
  * Where another NASA source gives a different value, the `discrepancy` field
- * says what it gives; we always follow Apollo by the Numbers.
+ * says what it gives; we follow Apollo by the Numbers unless the note says
+ * otherwise.
  *
  * Elapsed times are ground elapsed time (GET), counted from range zero
  * (13:32:00 GMT). Liftoff itself came 0.63 seconds later.
@@ -94,6 +95,28 @@ function nmc(page: "csm" | "lm", section: string): Citation {
 /** The NASA Apollo 11 mission page. */
 function nasaMission(section: string): Citation {
   return { source: "nasa-apollo-11-mission", locator: section };
+}
+
+/** A place in the Apollo 11 Mission Report (MSC-00171). */
+function missionReport(place: string): Citation {
+  return {
+    source: "apollo-11-mission-report",
+    locator: place,
+    url: "https://www.nasa.gov/wp-content/uploads/static/apollo50th/pdf/A11_MissionReport.pdf",
+  };
+}
+
+/**
+ * A line of NASA's Apollo 11 technical air-to-ground transcript. Its times
+ * are days, hours, minutes and seconds from range zero: 04 13 24 48 is
+ * 109:24:48.
+ */
+function transcript(place: string): Citation {
+  return {
+    source: "apollo-11-technical-transcript",
+    locator: place,
+    url: "https://www.nasa.gov/wp-content/uploads/2026/01/as11-tec.pdf",
+  };
 }
 
 /** A photo from the NASA Image and Video Library, saved under public/media/apollo-11/. */
@@ -245,7 +268,7 @@ export const story: Mission = {
         short:
           "They left science experiments on the Moon, including a seismometer to measure moonquakes and a reflector for laser beams.",
         more:
-          "The seismometer picked up the astronauts walking on the surface and, later, moving around inside Eagle. It ran on solar power, so it worked only during the lunar day, and it was shut down on August 27, 1969. The laser ranging retroreflector required no power. A third experiment, a solar wind collector, was set out in direct sunlight and then packed up and brought back to Earth.",
+          "The seismometer picked up the astronauts walking on the surface and, later, moving around inside Eagle. It ran on solar power, so it could work only during the lunar day. As its power began to drop about 5 hours before sunset at the site, a command from Earth stopped its transmissions at 10:58:46 UT on August 3, 1969. It was turned on again the next lunar day, but on August 27, 1969, it no longer accepted commands from Earth, and the experiment was ended. The laser ranging retroreflector required no power. A third experiment, a solar wind collector, was set out in direct sunlight and then packed up and brought back to Earth.",
       },
       citations: [
         summary("Lunar Orbit/Lunar Surface Phase"),
@@ -255,7 +278,7 @@ export const story: Mission = {
         nmc("lm", "Mission Profile"),
       ],
       discrepancy:
-        "Apollo by the Numbers says the experiment package was turned off by ground command on August 27, 1969. NSSDCA's Master Catalog says that on that date it stopped accepting commands from Earth and the experiment was ended. Both give the same date.",
+        "Apollo by the Numbers' Apollo 11 Timeline lists \"EASEP turned off by ground command.\" on August 27, 1969, with no time. We follow NSSDCA's Master Catalog, which says the ground command stopped transmission at 10:58:46 UT on August 3, 1969, and that on August 27 the package no longer accepted commands from Earth and the experiment was ended.",
     },
     {
       text: {
@@ -386,7 +409,7 @@ export const story: Mission = {
         timeline("Translunar injection."),
         summary("Earth Orbit Phase"),
       ],
-      discrepancy: `${NMC_DIFFERS} command and service module gives the burn as 5 minutes, 48 seconds. Apollo by the Numbers gives 346.83 seconds (5 minutes, 46.83 seconds), which we follow.`,
+      discrepancy: `${NMC_DIFFERS} command and service module gives the burn as 5 minutes 48 seconds. Apollo by the Numbers gives 5 minutes 46.83 seconds, which we follow.`,
       view: "journey",
       inTour: true,
     },
@@ -443,12 +466,18 @@ export const story: Mission = {
         short:
           "On July 17, a 3-second firing of the main engine fine-tunes Apollo 11's path to the Moon. It is the only correction needed on the way.",
         more:
-          "Apollo 11's path after leaving Earth orbit was nearly perfect, so only one midcourse correction was needed on the way to the Moon: a 3.13-second firing. During the long coast, the crew slowly rotated the spacecraft in a \"barbecue\" roll to keep its temperatures within limits.",
+          "Apollo 11's path after leaving Earth orbit was nearly perfect. Of the four chances planned for a midcourse correction on the way to the Moon, only one was used: a 3.13-second firing. The changes that would have been needed at the later chances were very small, so no more corrections were required. During the long coast, the crew slowly rotated the spacecraft in a \"barbecue\" roll to keep its temperatures within limits.",
       },
       citations: [
         timeline("Midcourse correction ignition."),
         summary("Translunar Phase"),
         summary("Transearth Phase"),
+        missionReport(
+          'Section 3.0, "Mission Description", page 3-1 (PDF page 15): "Trajectory parameters after the translunar injection firing were nearly perfect ... Only one of the four options for midcourse corrections during the translunar phase was exercised."',
+        ),
+        missionReport(
+          'Section 7.4.3, "Translunar Midcourse Correction", pages 7-2 and 7-3 (PDF pages 110 and 111): the first option point was passed up, then "The first and only translunar midcourse correction was initiated on time"; "Two other opportunities for midcourse correction were available during the translunar phase, but the velocity changes required ... were well below the levels at which normal lunar orbit insertion can be retargeted. Therefore, no further translunar midcourse corrections were required."',
+        ),
         nmc("csm", "Mission Profile"),
       ],
       photo: nasaPhoto(
@@ -471,7 +500,7 @@ export const story: Mission = {
         short:
           "Behind the Moon and out of contact with Earth, Columbia fires its main engine for about 6 minutes to slow down and go into orbit around the Moon.",
         more:
-          "The firing began 75 hours 49 minutes after launch and lasted 5 minutes 57.53 seconds. The coast from Earth to the Moon had lasted 73 hours 5 minutes. On the second orbit, the crew sent live color television of the Moon's surface and the approach path to the landing site.",
+          "The firing began 75 hours 49 minutes after launch and lasted 5 minutes 57.53 seconds. The coast from Earth to the Moon had lasted 73 hours 5 minutes 34.83 seconds. On the second orbit, the crew sent live color television of the Moon's surface and the approach path to the landing site.",
       },
       citations: [
         timeline("Lunar orbit insertion ignition."),
@@ -534,7 +563,7 @@ export const story: Mission = {
         summary("Lunar Orbit/Lunar Surface Phase"),
         table("LM Lunar Landing", "PDI Burn Duration (sec) row", ABTN_LM_LANDING),
       ],
-      discrepancy: `${NMC_DIFFERS} lunar module gives the burn as 756.3 seconds. Apollo by the Numbers gives 756.39 seconds, which we follow.`,
+      discrepancy: `${NMC_DIFFERS} lunar module gives the burn as 12 minutes 36.3 seconds. Apollo by the Numbers gives 12 minutes 36.39 seconds, which we follow. How far along Eagle was: the text follows Apollo by the Numbers' mission summary, "about 4 n mi" (our conversion: about 4.6 miles, 7.4 kilometers), farther downrange at the start of the firing, and the landing point shifted by about the same. The Apollo 11 Mission Report (section 5.3, "Powered Descent", page 5-5, PDF page 54) gives a "20 000-foot downrange error" at powered descent initiation, about 3.3 nautical miles (our conversion). NASA TM X-58040, Apollo Lunar Descent and Ascent Trajectories, says the lunar module's down-range position was in error by "approximately 3 nautical miles" at powered descent initiation and through the descent (PDF page 20), and that the landing was "approximately 3 nautical miles down range from the target" (PDF page 33).`,
       view: "moon",
     },
     {
@@ -578,9 +607,12 @@ export const story: Mission = {
         },
         table("LM Lunar Landing", "Landing Site, GET, KSC Time, GMT Time, and Hover Time Remaining (sec) rows", ABTN_LM_LANDING),
         nmc("lm", "Description and Mission Profile"),
+        transcript(
+          'Tape 66/12, page 317 (PDF page 319): CDR, "Houston, Tranquility Base here." at 04 06 45 59, and CDR, "THE EAGLE HAS LANDED." at 04 06 46 04',
+        ),
       ],
       discrepancy:
-        "NSSDCA gives the landing time as 20:17:40 UT (4:17:40 p.m. EDT), on its Apollo 11 page (nssdc.gsfc.nasa.gov/planetary/lunar/apollo11info.html) and its Master Catalog pages. Apollo by the Numbers gives 102:45:39.9 elapsed, 20:17:39 GMT, which we follow.",
+        "NSSDCA gives the landing time as 20:17:40 UT (4:17:40 p.m. EDT), on its Apollo 11 page (nssdc.gsfc.nasa.gov/planetary/lunar/apollo11info.html) and its Master Catalog pages. Apollo by the Numbers gives 102:45:39.9 elapsed, 20:17:39 GMT, which we follow. The radio call is quoted as NSSDCA's Master Catalog prints it, with a dash. NASA's Apollo 11 mission page has \"Houston, Tranquility Base here, the Eagle has landed.\" NASA's technical air-to-ground transcript has \"Houston, Tranquility Base here.\" and \"THE EAGLE HAS LANDED.\" as two lines, at 04 06 45 59 and 04 06 46 04 (102:45:59 and 102:46:04).",
       photo: nasaPhoto(
         "as11-37-5458",
         1600,
@@ -608,9 +640,12 @@ export const story: Mission = {
         summary("Lunar Orbit/Lunar Surface Phase"),
         nmc("lm", "Mission Profile"),
         nasaMission("Article summary for students: \"Neil Armstrong was the first person to walk on the moon.\""),
+        transcript(
+          'Tape 70/24, page 377 (PDF page 379): CDR, "THAT\'S ONE SMALL STEP FOR MAN, ONE GIANT LEAP FOR MANKIND." at 04 13 24 48',
+        ),
       ],
       discrepancy:
-        "Apollo by the Numbers' mission summary and NSSDCA's Master Catalog have \"one small step for man\"; the Apollo by the Numbers timeline has \"one small step for a man\"; NASA's Apollo 11 mission page has \"one small step for [a] man.\" We quote the Apollo by the Numbers summary. NSSDCA agrees on the time, 02:56:15 UT.",
+        "Apollo by the Numbers' mission summary, NSSDCA's Master Catalog, and NASA's technical air-to-ground transcript have \"one small step for man\"; the Apollo by the Numbers timeline has \"one small step for a man\"; NASA's Apollo 11 mission page has \"one small step for [a] man.\" We quote the Apollo by the Numbers summary. NSSDCA agrees on the time, 02:56:15 UT. The transcript stamps the words at 04 13 24 48, that is 109:24:48, 33 seconds after the 109:24:15 that Apollo by the Numbers gives for the foot touching the surface.",
       photo: nasaPhoto(
         "s69-42583",
         1600,
@@ -630,13 +665,16 @@ export const story: Mission = {
         short:
           "Buzz Aldrin climbs down the ladder and joins Armstrong on the Moon. He calls the lunar surface \"magnificent desolation.\"",
         more:
-          "Aldrin stepped onto the surface about 19 minutes after Armstrong. The two then unveiled a plaque on Eagle and read it to the television audience: \"Here men from the planet Earth first set foot upon the Moon July 1969, A.D. We came in peace for all mankind.\" It carries the signatures of the three astronauts and President Richard M. Nixon.",
+          "Aldrin stepped onto the surface about 19 minutes after Armstrong. The two then unveiled a plaque on Eagle. It says, \"Here men from the planet Earth first set foot upon the Moon July 1969, A.D. We came in peace for all mankind,\" and carries the signatures of the three astronauts and President Richard M. Nixon. Armstrong read it aloud for the television audience; NASA's transcript records him reading, \"Here Man from the planet Earth first set foot upon the Moon.\"",
       },
       citations: [
         timeline("LMP on lunar surface."),
         timeline("Plaque unveiled (CDR)."),
         summary("Lunar Orbit/Lunar Surface Phase"),
         nmc("lm", "Mission Profile"),
+        transcript(
+          'Tape 71/5, page 385 (PDF page 387): the CDR line at the top of the page (stamped 04 13 52 40, faint on the scan), "For those who haven\'t read the plaque, we\'ll read the plaque ... Underneath it says \"Here Man from the planet Earth first set foot upon the Moon, July 1969 A.D. We came in peace for all mankind.\""',
+        ),
       ],
       discrepancy:
         "NSSDCA's Master Catalog prints the plaque as \"first set foot on the Moon.\" Apollo by the Numbers prints \"first set foot upon the Moon,\" which we follow.",
@@ -806,7 +844,7 @@ export const story: Mission = {
         short:
           "Columbia fires its main engine for about two and a half minutes to leave lunar orbit and head back to Earth.",
         more:
-          "The firing, called transearth injection, began 135 hours 23 minutes after launch and lasted 2 minutes 31.41 seconds. Apollo 11 had circled the Moon 30 times over 59 hours 30 minutes. As on the way out, only one small course correction was needed on the trip home.",
+          "The firing, called transearth injection, began 135 hours 23 minutes after launch and lasted 2 minutes 31.41 seconds. Apollo 11 had circled the Moon 30 times over 59 hours 30 minutes 25.79 seconds. As on the way out, only one small course correction was needed on the trip home.",
       },
       citations: [
         timeline("Transearth injection ignition (SPS)."),

@@ -6,7 +6,10 @@
  * need. `checked` is the date the URL was last confirmed to work.
  *
  * A source cited by one mission only lives in that mission's folder
- * (missions/<id>/sources.ts).
+ * (missions/<id>/sources.ts). A document cited by three or more missions is
+ * registered once below, as a shared source. A document two missions cite is
+ * registered once, in the earlier flight's folder, and the later mission
+ * cites it by that id (Gemini 7 cites some of Gemini 6A's).
  */
 import { sources as gemini3 } from "./missions/gemini-3/sources.ts";
 import { sources as gemini4 } from "./missions/gemini-4/sources.ts";
@@ -83,6 +86,21 @@ const SHARED = {
     url: "https://ntrs.nasa.gov/citations/19700024568",
     checked: "2026-11-15",
     use: "How the Apollo 11 lunar module came down and went back up: descent orbit geometry, the direction of travel over the landing site, and orbit insertion after liftoff.",
+  },
+  "gemini-rendezvous-summary": {
+    title: "Summary of Rendezvous Operations (Gemini Summary Conference, NASA SP-138, paper 2)",
+    publisher:
+      "By W. Bernard Evans, Office of Vehicles and Missions, Gemini Program Office, NASA Manned Spacecraft Center; and Marvin R. Czarnik, Dynamics Group Engineer, McDonnell Aircraft Corp. (NASA Technical Reports Server)",
+    url: "https://ntrs.nasa.gov/citations/19680005473",
+    checked: "2026-11-19",
+    use: "How Gemini's rendezvous flights were flown and where each spacecraft stood when its final approach began (Table 2-IV): Gemini VI-A and, below and behind Gemini VII, how the meeting began; each of Gemini IX-A's three final approaches, the equiperiod rendezvous and the rendezvous from above; and Gemini 11's first-orbit and later stable-orbit rendezvous (figures 2-7 and 2-8, terminal phase initiation). Also Gemini VI-A's two midcourse corrections (Table 2-V) and why rendezvous mattered to Apollo.",
+  },
+  "nasa-image-and-video-library": {
+    title: "NASA Image and Video Library",
+    publisher: "NASA",
+    url: "https://images.nasa.gov/",
+    checked: "2026-11-19",
+    use: "NASA's captions for the photographs used here: what each shows, and where and when it was taken.",
   },
   "jpl-horizons": {
     title: "Horizons System",

@@ -1,7 +1,11 @@
 import type { Source } from "../../source-types.ts";
 
 /**
- * Sources cited only by Gemini 6A. NASA's own copy of the Gemini VI-A
+ * Sources registered by Gemini 6A. Gemini 7 also cites the supplemental
+ * report, the voice transcript, and the Gemini VII mission report below, by
+ * these ids, because it draws the visiting spacecraft's path from them; the
+ * rest are cited only by Gemini 6A. The Gemini Summary Conference
+ * rendezvous paper is shared (see sources.ts). NASA's own copy of the Gemini VI-A
  * mission report (MSC-G-R-66-2) was not found, so the flight is told from
  * its supplemental report, its air-to-ground transcript, the Gemini VII
  * mission report (which covers the meeting from the other spacecraft), and
@@ -15,14 +19,14 @@ export const sources = {
       "NASA Manned Spacecraft Center, Gemini VI-A Mission Evaluation Team (prepared by IBM Federal Systems Division; NASA's scan, as hosted by the Virtual AGC project's document library at ibiblio.org)",
     url: "https://www.ibiblio.org/apollo/Documents/Gemini-6-7-PostFlightReports.pdf",
     checked: "2026-11-19",
-    use: "The onboard computer's record of Gemini VI-A: the moment of insertion into orbit, second-stage engine cutoff, terminal phase initiation, and the spacecraft's position and velocity at 400,000 feet on the way down.",
+    use: "The onboard computer's record of Gemini VI-A: the moment of insertion into orbit, second-stage engine cutoff, terminal phase initiation (also used for when the final approach to Gemini VII began, as Gemini 7 draws the visiting spacecraft), and the spacecraft's position and velocity at 400,000 feet on the way down.",
   },
   "gemini-6a-voice-transcript": {
     title: "Gemini VI Voice Communications (Air-to-Ground, Ground-to-Air and On-Board Transcription)",
     publisher: "NASA Manned Spacecraft Center (NASA History, Mission Transcripts: Mercury, Gemini, and Apollo)",
     url: "https://www.nasa.gov/wp-content/uploads/2026/01/gt06-tec.pdf",
     checked: "2026-11-19",
-    use: "Gemini VI-A crew and capsule communicator calls with their ground elapsed times: the catch-up burns, the sighting of Gemini VII, braking, station keeping, the Jingle Bells joke, retrofire, and the parachutes.",
+    use: "Gemini VI-A crew and capsule communicator calls with their ground elapsed times: the catch-up burns, the sighting of Gemini VII, braking, station keeping, the Jingle Bells joke, retrofire, and the parachutes (Gemini 7 also uses it for the catch-up burns, the distance from Gemini VII overnight, and the retrofire and drogue parachute calls, on Gemini VI-A's clock).",
   },
   "gemini-6a-gemini-vii-mission-report": {
     title: "Gemini Program Mission Report: Gemini VII (MSC-G-R-66-1)",
@@ -31,14 +35,6 @@ export const sources = {
     url: "https://www.ibiblio.org/apollo/Documents/Gemini7MissionReport.pdf",
     checked: "2026-11-19",
     use: "The rendezvous seen from Gemini VII: Gemini VI-A's launch time on both clocks, Gemini VII's orbit during the meeting (Table 4.3-IV), the Gemini VII crew's view of the approach, and the separation maneuver.",
-  },
-  "gemini-6a-rendezvous-summary": {
-    title: "Summary of Rendezvous Operations (Gemini Summary Conference, NASA SP-138, paper 2)",
-    publisher:
-      "NASA (W. Bernard Evans, Office of Vehicles and Missions, Gemini Program Office, NASA Manned Spacecraft Center; and Marvin R. Czarnik, Dynamics Group Engineer, McDonnell Aircraft Corp.), NASA Technical Reports Server",
-    url: "https://ntrs.nasa.gov/citations/19680005473",
-    checked: "2026-11-19",
-    use: "Where Gemini VI-A stood when its final approach began (Table 2-IV), its two midcourse corrections (Table 2-V), and why rendezvous mattered to Apollo.",
   },
   "gemini-6a-nasa-mission-page": {
     title: "Gemini VI",

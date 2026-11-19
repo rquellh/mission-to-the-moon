@@ -5,8 +5,9 @@
  * parts, until that ship's next entry. The scene draws simplified models
  * from these; it does not show any of this as text.
  *
- * Every time is copied from Apollo by the Numbers (NASA SP-2000-4029),
- * Apollo 11 Timeline, exactly as printed there.
+ * Every time but one is copied from Apollo by the Numbers (NASA SP-2000-4029),
+ * Apollo 11 Timeline, exactly as printed there. The exception is the main
+ * parachutes, below.
  *
  * Two gaps in the sources, and how they are handled:
  * - The adapter's panels: the sources say the command and service module
@@ -14,14 +15,20 @@
  *   docked with the LM. They do not time the opening of the adapter panels,
  *   so the adapter is drawn until that separation and not after it (the
  *   docking shows the LM was uncovered by then).
- * - The main parachutes: the Apollo 11 Timeline times the drogue
- *   parachutes but not the main parachutes, and neither does the Apollo 11
- *   Mission Report (its Table 7-VII stops at drogue deployment). The Apollo
- *   11 Flight Journal lists "Deployment of main parachutes reported" at
- *   195:13:22, from the public affairs commentary ("Apollo 11 should be on
- *   main chutes now"). That is a reported time, not a measured one. The
- *   model switches from the drogues to the main parachutes there, and the
- *   site does not state it as a fact.
+ * - The main parachutes: no NASA source times their opening. The Apollo 11
+ *   Timeline and the Apollo 11 Mission Report's Table 7-VII both stop at
+ *   drogue deployment, 195:12:06.9. Before entry, Mission Control's public
+ *   affairs commentary read out a predicted main parachute deployment time
+ *   of 195:12:52 (tape 545/1), then an updated one of 195:12:56 (tape
+ *   559/1). The model switches from the drogues to the main parachutes at
+ *   that updated prediction. It is a predicted time, not a measured one, and
+ *   the site does not state it as a fact.
+ *   What NASA's transcripts do record: the technical air-to-ground
+ *   transcript has "DROGUES." at 08 03 12 09 (195:12:09) and the recovery
+ *   ship's "Roger. 2500 on chutes." at 08 03 16 48 (195:16:48). The public
+ *   affairs commentary has "Apollo 11 should be on main chutes now." and
+ *   then "Aircraft reports visual with 3 full chutes." on a tape headed GET
+ *   195:10 (tape 570/1), whose lines carry no time of their own.
  */
 import type { Citation, Cited, ElapsedTime } from "../../types.ts";
 import type { LeftBehind, VehicleChange, VehiclePart } from "../../vehicle-types.ts";
@@ -31,7 +38,9 @@ import type { LeftBehind, VehicleChange, VehiclePart } from "../../vehicle-types
 /* ------------------------------------------------------------------ */
 
 const ABN = "https://www.nasa.gov/wp-content/uploads/static/history/SP-4029/";
-const NMC_CSM = "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1969-059A";
+const PAO = "https://www.nasa.gov/wp-content/uploads/2026/01/as11-pao.pdf";
+const TEC = "https://www.nasa.gov/wp-content/uploads/2026/01/as11-tec.pdf";
+const NMC_CSM ="https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1969-059A";
 const NMC_LM = "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1969-059C";
 
 /** A row of the Apollo by the Numbers Apollo 11 Timeline, quoted as printed. */
@@ -174,13 +183,29 @@ export const vehicle: readonly VehicleChange[] = [
   },
   {
     ship: "csm",
+    // A predicted time, not a measured one: no NASA source times the main
+    // parachutes opening (see the note at the top of this file). The
+    // transcripts cited after the prediction show only that the main
+    // parachutes were out between the drogues and splashdown.
     at: at(
-      "195:13:22",
+      "195:12:56",
       {
-        source: "apollo-11-flight-journal",
+        source: "apollo-11-pao-transcript",
         locator:
-          'Day 9, part 2: Entry and Splashdown, Index to events: "Deployment of main parachutes reported", 195:13:22 (a reported time, from the public affairs commentary)',
-        url: "https://www.apollojournals.org/afj/ap11fj/27day9-entry.html",
+          'Tape 559/1, headed GET 192:53 (PDF page 603): PAO, "Here\'s the updated times: ... main shoot deployment, 195:12:56" (a predicted time, read out before entry)',
+        url: PAO,
+      },
+      {
+        source: "apollo-11-pao-transcript",
+        locator:
+          'Tape 570/1, headed GET 195:10 (PDF page 615): PAO, "Apollo 11 should be on main chutes now." and later "Aircraft reports visual with 3 full chutes." (no time on each line)',
+        url: PAO,
+      },
+      {
+        source: "apollo-11-technical-transcript",
+        locator:
+          'Tape 125/6, page 623 (PDF page 625): "DROGUES." at 08 03 12 09; Tape 125/7, page 624 (PDF page 626): HORNET, "Roger. 2500 on chutes." at 08 03 16 48',
+        url: TEC,
       },
       PARACHUTES,
       {
@@ -190,7 +215,7 @@ export const vehicle: readonly VehicleChange[] = [
         url: `${ABN}Apollo_11a_Summary.htm`,
       },
     ),
-    label: "Main parachutes reported open",
+    label: "Main parachutes, drawn from Mission Control's predicted opening time (the opening itself was not timed)",
     layout: "alone",
     parts: ["command-module", "main-parachutes"],
   },

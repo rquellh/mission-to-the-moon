@@ -97,6 +97,23 @@ export interface Photo {
 }
 
 /**
+ * A short recording from the flight, hosted with the site. Its words are
+ * always written out beside it, so no one needs the sound to follow it.
+ */
+export interface AudioClip {
+  /** Path under public/, for example "media/apollo-11/the-eagle-has-landed.mp3". */
+  src: string;
+  /** Length of the hosted file in seconds. */
+  seconds: number;
+  /** Every word spoken, in order, with who speaks. */
+  transcript: { speaker: string; words: string }[];
+  /** Credit line as the source gives it, for example "NASA". */
+  credit: string;
+  /** The page where the original recording can be found. */
+  sourceUrl: string;
+}
+
+/**
  * Where the camera looks while an event is featured. A presentation hint,
  * not a fact: "journey" shows Earth and Moon together.
  */
@@ -124,9 +141,16 @@ export interface MissionEvent {
   citations: Citations;
   discrepancy?: string;
   photo?: Photo;
+  /** A real recording of this moment, when NASA publishes one. Its words must be cited like any other fact. */
+  audio?: AudioClip;
   view: EventView;
   /** True for the events the guided tour stops at. */
   inTour?: boolean;
+  /**
+   * The id of a hands-on extra (a folder under src/extras) that lets the
+   * visitor try this moment, for example "stages" on a liftoff.
+   */
+  handsOn?: string;
 }
 
 /** A flown spacecraft and the museum that displays it today. */

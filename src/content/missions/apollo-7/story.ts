@@ -89,7 +89,7 @@ function nasaArticle(passage: string): Citation {
 /** NASA's caption for a photograph in the NASA Image and Video Library. */
 function caption(nasaId: string, passage: string): Citation {
   return {
-    source: "nasa-images-apollo-7",
+    source: "nasa-image-and-video-library",
     locator: `Caption of ${nasaId}: ${passage}`,
     url: `https://images-api.nasa.gov/search?nasa_id=${nasaId}`,
   };

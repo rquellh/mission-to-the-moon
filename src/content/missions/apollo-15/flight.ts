@@ -48,8 +48,10 @@ import type { FlightPlan } from "../../../sim/types.ts";
 
 const ABN = "https://www.nasa.gov/wp-content/uploads/static/history/SP-4029/";
 const MISSION_REPORT = "https://ntrs.nasa.gov/api/citations/19720021182/downloads/19720021182.pdf";
-const HORIZONS =
-  "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27&TLIST_TYPE=%27CAL%27&TLIST=%271971-07-26%2013:34:00.58%27,%271971-07-26%2016:30:03.61%27,%271971-08-07%2020:32:54.7%27,%271971-08-07%2020:45:53.0%27";
+/** The Horizons query for each sky table, at the times below (printed by tools/sky.mjs). */
+const HORIZONS_TIMES = "&TLIST_TYPE=%27CAL%27&TLIST=%271971-07-26%2013:34:00.58%27,%271971-07-26%2016:30:03.61%27,%271971-08-07%2020:32:54.7%27,%271971-08-07%2020:45:53.0%27";
+const HORIZONS_QUERY = (command: string, center: string, quantities: string): string =>
+  `https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27${command}%27&CENTER=%27${center}%27&QUANTITIES=%27${quantities}%27&OBJ_DATA=%27NO%27&CSV_FORMAT=%27YES%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27${HORIZONS_TIMES}`;
 
 function cite<T>(value: T, citation: Citation, ...more: Citation[]): Cited<T> {
   return { value, citations: [citation, ...more] };
@@ -109,11 +111,14 @@ const LUNAR_SITES: Citation = {
   locator: 'Apollo 15, "Lunar Module" row',
   url: "https://nssdc.gsfc.nasa.gov/planetary/lunar/lunar_sites.html",
 };
-const horizons = (target: string, quantity: string, time: string): Citation => ({
+const horizons = (target: string, quantity: string, time: string, url: string): Citation => ({
   source: "jpl-horizons",
   locator: `Observer table, ${target}, ${quantity}, ${time} UT`,
-  url: HORIZONS,
+  url,
 });
+const MOON_FROM_EARTH = HORIZONS_QUERY("301", "500@399", "31");
+const EARTH_FROM_MOON = HORIZONS_QUERY("399", "500@301", "14");
+const SUN_FROM_EARTH = HORIZONS_QUERY("10", "500@399", "31");
 
 /** Lunar orbits run east to west (retrograde), as Table 3-III shows. */
 const RETROGRADE: Cited<"retrograde"> = cite("retrograde", {
@@ -171,27 +176,27 @@ export const flight: FlightPlan = {
   sky: [
     {
       time: at("000:00:00.58", timeline("Liftoff (umbilical disconnected).")),
-      moonEclipticLongitude: cite(170.2761302, horizons("Moon (301) from Earth's center", "ObsEcLon", "1971-07-26 13:34:00.58")),
-      subLunarLongitude: cite(22.756895, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1971-07-26 13:34:00.58")),
-      sunEclipticLongitude: cite(122.918668, horizons("Sun (10) from Earth's center", "ObsEcLon", "1971-07-26 13:34:00.58")),
+      moonEclipticLongitude: cite(170.2761302, horizons("Moon (301) from Earth's center", "ObsEcLon", "1971-07-26 13:34:00.58", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(22.756895, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1971-07-26 13:34:00.58", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(122.918668, horizons("Sun (10) from Earth's center", "ObsEcLon", "1971-07-26 13:34:00.58", SUN_FROM_EARTH)),
     },
     {
       time: at("002:56:03.61", tliTable("GET")),
-      moonEclipticLongitude: cite(171.7335485, horizons("Moon (301) from Earth's center", "ObsEcLon", "1971-07-26 16:30:03.61")),
-      subLunarLongitude: cite(339.919672, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1971-07-26 16:30:03.61")),
-      sunEclipticLongitude: cite(123.035493, horizons("Sun (10) from Earth's center", "ObsEcLon", "1971-07-26 16:30:03.61")),
+      moonEclipticLongitude: cite(171.7335485, horizons("Moon (301) from Earth's center", "ObsEcLon", "1971-07-26 16:30:03.61", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(339.919672, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1971-07-26 16:30:03.61", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(123.035493, horizons("Sun (10) from Earth's center", "ObsEcLon", "1971-07-26 16:30:03.61", SUN_FROM_EARTH)),
     },
     {
       time: at("294:58:54.7", entryTable("Earth Entry GET")),
-      moonEclipticLongitude: cite(328.7645714, horizons("Moon (301) from Earth's center", "ObsEcLon", "1971-08-07 20:32:54.7")),
-      subLunarLongitude: cite(66.521298, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1971-08-07 20:32:54.7")),
-      sunEclipticLongitude: cite(134.6758271, horizons("Sun (10) from Earth's center", "ObsEcLon", "1971-08-07 20:32:54.7")),
+      moonEclipticLongitude: cite(328.7645714, horizons("Moon (301) from Earth's center", "ObsEcLon", "1971-08-07 20:32:54.7", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(66.521298, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1971-08-07 20:32:54.7", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(134.6758271, horizons("Sun (10) from Earth's center", "ObsEcLon", "1971-08-07 20:32:54.7", SUN_FROM_EARTH)),
     },
     {
       time: at("295:11:53.0", entryTable("Earth Splashdown GET")),
-      moonEclipticLongitude: cite(328.896656, horizons("Moon (301) from Earth's center", "ObsEcLon", "1971-08-07 20:45:53.0")),
-      subLunarLongitude: cite(63.391375, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1971-08-07 20:45:53.0")),
-      sunEclipticLongitude: cite(134.6844558, horizons("Sun (10) from Earth's center", "ObsEcLon", "1971-08-07 20:45:53.0")),
+      moonEclipticLongitude: cite(328.896656, horizons("Moon (301) from Earth's center", "ObsEcLon", "1971-08-07 20:45:53.0", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(63.391375, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1971-08-07 20:45:53.0", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(134.6844558, horizons("Sun (10) from Earth's center", "ObsEcLon", "1971-08-07 20:45:53.0", SUN_FROM_EARTH)),
     },
   ],
 

@@ -93,8 +93,10 @@ import type { FlightPlan } from "../../../sim/types.ts";
 const MISSION_REPORT = "https://www.ibiblio.org/apollo/Documents/Gemini12MissionReport.pdf";
 const GEMINI_8_REPORT =
   "https://web.archive.org/web/20250908153858/https://www.nasa.gov/wp-content/uploads/static/history/alsj/43455667-Gemini-Program-Mission-Report-Gemini-Viii.pdf";
-const HORIZONS =
-  "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27&TLIST_TYPE=%27CAL%27&TLIST=%271966-11-11%2019:07:58.688%27,%271966-11-11%2020:46:33.419%27,%271966-11-13%2015:34:59.419%27,%271966-11-15%2019:21:03.419%27";
+/** The Horizons query for each sky table, at the times below (printed by tools/sky.mjs). */
+const HORIZONS_TIMES = "&TLIST_TYPE=%27CAL%27&TLIST=%271966-11-11%2019:07:58.688%27,%271966-11-11%2020:46:33.419%27,%271966-11-13%2015:34:59.419%27,%271966-11-15%2019:21:03.419%27";
+const HORIZONS_QUERY = (command: string, center: string, quantities: string): string =>
+  `https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27${command}%27&CENTER=%27${center}%27&QUANTITIES=%27${quantities}%27&OBJ_DATA=%27NO%27&CSV_FORMAT=%27YES%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27${HORIZONS_TIMES}`;
 
 function cite<T>(value: T, citation: Citation, ...more: Citation[]): Cited<T> {
   return { value, citations: [citation, ...more] };
@@ -132,11 +134,14 @@ const agenaInsertion = (row: string, page: "4-33 (PDF page 109)" | "4-34 (PDF pa
 /** Table 4.3-VIII, the Agena's maneuvers, "Actual" column. */
 const agenaManeuver = (name: string, row: string): Citation =>
   report(`Table 4.3-VIII, "GATV Maneuvers" (page 4-38, PDF page 114), ${name}, "${row}" row, actual column`);
-const horizons = (target: string, quantity: string, time: string): Citation => ({
+const horizons = (target: string, quantity: string, time: string, url: string): Citation => ({
   source: "jpl-horizons",
   locator: `Observer table, ${target}, ${quantity}, ${time} UT`,
-  url: HORIZONS,
+  url,
 });
+const MOON_FROM_EARTH = HORIZONS_QUERY("301", "500@399", "31");
+const EARTH_FROM_MOON = HORIZONS_QUERY("399", "500@301", "14");
+const SUN_FROM_EARTH = HORIZONS_QUERY("10", "500@399", "31");
 
 /* ------------------------------------------------------------------ */
 /* Clock arithmetic.                                                   */
@@ -345,27 +350,27 @@ export const flight: FlightPlan = {
   sky: [
     {
       time: AGENA_LIFTOFF,
-      moonEclipticLongitude: cite(218.0784549, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-11-11 19:07:58.688")),
-      subLunarLongitude: cite(238.488292, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-11-11 19:07:58.688")),
-      sunEclipticLongitude: cite(228.9454877, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-11-11 19:07:58.688")),
+      moonEclipticLongitude: cite(218.0784549, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-11-11 19:07:58.688", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(238.488292, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-11-11 19:07:58.688", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(228.9454877, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-11-11 19:07:58.688", SUN_FROM_EARTH)),
     },
     {
       time: LIFTOFF,
-      moonEclipticLongitude: cite(219.0771486, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-11-11 20:46:33.419")),
-      subLunarLongitude: cite(214.719654, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-11-11 20:46:33.419")),
-      sunEclipticLongitude: cite(229.0143665, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-11-11 20:46:33.419")),
+      moonEclipticLongitude: cite(219.0771486, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-11-11 20:46:33.419", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(214.719654, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-11-11 20:46:33.419", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(229.0143665, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-11-11 20:46:33.419", SUN_FROM_EARTH)),
     },
     {
       time: at("042:48:26", report('Section 4.1, "Actual Mission" (page 4-2, PDF page 76): "The hatch was opened at 42:48:26 g.e.t."')),
-      moonEclipticLongitude: cite(244.7152018, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-11-13 15:34:59.419")),
-      subLunarLongitude: cite(316.376251, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-11-13 15:34:59.419")),
-      sunEclipticLongitude: cite(230.8097822, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-11-13 15:34:59.419")),
+      moonEclipticLongitude: cite(244.7152018, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-11-13 15:34:59.419", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(316.376251, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-11-13 15:34:59.419", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(230.8097822, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-11-13 15:34:59.419", SUN_FROM_EARTH)),
     },
     {
       time: LANDING,
-      moonEclipticLongitude: cite(274.3116688, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-11-15 19:21:03.419")),
-      subLunarLongitude: cite(290.152657, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-11-15 19:21:03.419")),
-      sunEclipticLongitude: cite(232.9829187, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-11-15 19:21:03.419")),
+      moonEclipticLongitude: cite(274.3116688, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-11-15 19:21:03.419", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(290.152657, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-11-15 19:21:03.419", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(232.9829187, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-11-15 19:21:03.419", SUN_FROM_EARTH)),
     },
   ],
 
