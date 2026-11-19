@@ -59,6 +59,7 @@ import { createMoon as createMoonGlobe } from './moon';
 import { createStarfield, type Starfield } from './stars';
 import { chooseTextureTier, loadTexture } from './textures';
 import { buildStandaloneVehicle, launchStackHeights } from './vehicles';
+import { webGL2Available } from './webgl';
 
 export type { VehicleLayout, VehiclePart } from '../content/vehicle-types';
 
@@ -136,6 +137,20 @@ export function vectorToLatLon(direction: Vector3): { latitude: number; longitud
 /* A view of its own.                                                  */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Thrown by createMiniView when the browser cannot draw 3D (no WebGL 2).
+ * Catch it and show the extra's own fallback; nothing is logged.
+ */
+export class MiniViewUnavailableError extends Error {
+  constructor() {
+    super('WebGL 2 is not available');
+    this.name = 'MiniViewUnavailableError';
+  }
+}
+
+/** True when this browser can draw the kit's 3D views (WebGL 2), checked once on a throwaway canvas, quietly. */
+export { webGL2Available } from './webgl';
+
 export interface MiniViewOptions {
   /** Draw the star map behind everything (default false). */
   stars?: boolean;
@@ -208,10 +223,11 @@ export interface MiniView {
  * canvas a size in CSS), draws only when asked or while a frame callback
  * runs, stops drawing while the page is hidden, survives the loss of the
  * WebGL context, and follows the person's reduced-motion setting (no
- * drifting after a drag). Throws when WebGL 2 is not available.
+ * drifting after a drag). Throws MiniViewUnavailableError, without logging
+ * anything, when WebGL 2 is not available (see webGL2Available).
  */
 export function createMiniView(canvas: HTMLCanvasElement, options: MiniViewOptions = {}): MiniView {
-  if (typeof WebGL2RenderingContext === 'undefined') throw new Error('WebGL 2 is not available');
+  if (!webGL2Available()) throw new MiniViewUnavailableError();
   const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'default' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
   renderer.setClearColor(0x000000, 1);

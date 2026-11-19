@@ -6,7 +6,7 @@
  * Player (the mission clock) and a Director (the camera and scale), and the
  * scene reads the Player and implements the Director.
  */
-import type { EventView } from '../content/types';
+import type { EventView } from '../content/types.ts';
 
 /** "readable" compresses distances so everything fits; "true" shows real proportions. */
 export type ScaleMode = 'readable' | 'true';
@@ -84,6 +84,8 @@ export interface Director {
    * Optional, so a scene without it still works; it then just keeps drawing.
    */
   setDrawing?(drawing: boolean): void;
+  /** True while the followed ship circles too fast to follow and the scene shows its calm fast-forward view. Subscribers are told when it changes. */
+  readonly fastForward?: boolean;
   /** Hear when the view or the scale mode changes. Returns a function that stops listening. */
   subscribe(listener: (director: Director) => void): () => void;
 }

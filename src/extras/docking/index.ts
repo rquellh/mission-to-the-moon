@@ -104,6 +104,7 @@ const TEXT = {
   howTo:
     "Line up the Gemini's nose with the Agena's docking cone, then close in slowly. Things in space keep moving: each push keeps going until you push the other way.",
   storyMissing: "The story of the first docking could not be loaded.",
+  sourcesFor: "Where the sentence on why docking mattered comes from:",
   start: "Start",
   pad: "Thrusters",
   thrust: { up: "Up", down: "Down", left: "Left", right: "Right", forward: "Forward", back: "Back" } satisfies Record<Thrust, string>,
@@ -268,13 +269,20 @@ async function mount(host: HTMLElement, context: ExtraContext, params: URLSearch
   const introHeading = el("h3", "extra-heading", TEXT.introHeading);
   introHeading.id = "docking-intro-heading";
   intro.append(introHeading, el("p", "extra-text", TEXT.whatDocking));
-  if (why) {
-    intro.append(el("p", "extra-text", why.text), sourcesBlock(why.fact.citations, why.fact.discrepancy));
-  } else {
-    intro.append(el("p", "extra-note", TEXT.storyMissing));
-  }
+  // Everything to read before starting comes first, together; the folded
+  // sources of the cited sentence go under the Start button, labeled as its own.
+  const whyLine = el("p", "extra-text", why?.text ?? TEXT.storyMissing);
+  if (!why) whyLine.className = "extra-note";
   const startButton = button("button button--primary button--large docking__start", TEXT.start);
-  intro.append(el("p", "extra-note docking__how", TEXT.howTo), startButton);
+  intro.append(whyLine, el("p", "extra-note docking__how", TEXT.howTo), startButton);
+  if (why) {
+    const sources = sourcesBlock(why.fact.citations, why.fact.discrepancy);
+    sources.classList.add("docking__why-sources");
+    sources.setAttribute("aria-describedby", "docking-why-for");
+    const label = el("p", "docking__source-for", TEXT.sourcesFor);
+    label.id = "docking-why-for";
+    intro.append(label, sources);
+  }
 
   // While flying.
   const flying = el("section", "docking__fly");

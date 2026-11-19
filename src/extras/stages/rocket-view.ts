@@ -7,6 +7,10 @@
  * to black, to suggest the climb; neither is to scale or timed to the real
  * flight. Dropped parts fall back (a tower goes forward) and fade; with
  * reduced motion they fade where they are and nothing slides.
+ *
+ * Before a rocket is picked, the view shows the choices side by side, each
+ * drawn the same height (not to scale: the page says so), standing in even
+ * columns so labels and taps can follow the columns of the canvas.
  */
 import {
   Box3,
@@ -26,6 +30,14 @@ import { createGlow, createMiniView, createVehicle, type Vehicle } from "../../s
 export interface RocketView {
   /** Stand a new stack of these parts on the pad, framed, and draw it. */
   show(parts: readonly VehiclePart[], label: string): void;
+  /** Make room for `count` rockets side by side, in even columns of the canvas, all drawn the same height. */
+  showLineup(count: number, label: string): void;
+  /** Stand a rocket of these parts in one place of the lineup (they arrive as their missions load). */
+  setLineupRocket(index: number, parts: readonly VehiclePart[]): void;
+  /** Mark one place of the lineup, or none. */
+  highlight(index: number | null): void;
+  /** Take everything off the pad (when a rocket has been picked). */
+  clear(): void;
   /** Start or stop the climb's look (the engine glow, the ground falling away). */
   setClimbing(on: boolean): void;
   /** Let go of these parts: they drift off and fade (or fade in place). */
@@ -44,6 +56,12 @@ const HAZE = new Color(0x15212e);
 const SPACE = new Color(0x000000);
 const GROUND = 0x1b2026;
 const PAD = 0x3a3f46;
+/** The site's accent, for the lineup place being pointed at. */
+const PAD_MARKED = 0xf4b942;
+/** The height each rocket of the lineup is drawn at, meters of the model: all the same, so not to scale. */
+const LINEUP_HEIGHT = 60;
+/** The lineup is seen straight on and level, so the columns stay even and the rockets upright. */
+const LINEUP_LOOK = new Vector3(0, 0, 1);
 /** The engine glow: a soft warm light at the base while climbing. */
 const FLAME = 0xffa64a;
 /** Seen from a little to the side and a little below, as from the ground. */
@@ -119,6 +137,14 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
   let goal = new Box3();
   const camera = { y: 0, distance: 1 };
   let climbing = false;
+  let look = LOOK;
+
+  interface Lineup {
+    vehicles: Array<Vehicle | null>;
+    pads: Mesh[];
+    materials: MeshBasicMaterial[];
+  }
+  let lineup: Lineup | null = null;
 
   /** Where the camera fits a box: its height with a little room below and more above. */
   const fit = (box: Box3): { y: number; distance: number } => {
@@ -134,7 +160,7 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
   };
   const place = (): void => {
     const c = view.camera;
-    c.position.set(0, camera.y, 0).addScaledVector(LOOK, camera.distance);
+    c.position.set(0, camera.y, 0).addScaledVector(look, camera.distance);
     c.lookAt(0, camera.y, 0);
     // The kit's (switched off) controls still aim the camera at their target each frame.
     view.controls.target.set(0, camera.y, 0);
@@ -142,8 +168,28 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
     c.far = Math.max(2000, camera.distance * 40);
     c.updateProjectionMatrix();
   };
+  /**
+   * Frame the lineup: the height decides the distance, and the places are
+   * spread so each stands at the middle of its column of the canvas.
+   */
+  const layoutLineup = (row: Lineup): void => {
+    const count = row.vehicles.length;
+    // Room below for the labels under the pads, a little above the tips.
+    const low = -LINEUP_HEIGHT * 0.3;
+    const high = LINEUP_HEIGHT * 1.08;
+    const vertical = MathUtils.degToRad(view.camera.fov / 2);
+    const horizontal = Math.tan(vertical) * view.camera.aspect;
+    camera.y = (low + high) / 2;
+    camera.distance = (high - low) / 2 / Math.tan(vertical);
+    row.vehicles.forEach((vehicle, index) => {
+      const x = (-1 + (2 * index + 1) / count) * camera.distance * horizontal;
+      vehicle?.object.position.set(x, 0, 0);
+      row.pads[index]?.position.set(x, 0, 0);
+    });
+  };
   const snap = (): void => {
-    Object.assign(camera, fit(goal));
+    if (lineup) layoutLineup(lineup);
+    else Object.assign(camera, fit(goal));
     place();
   };
 
@@ -184,6 +230,19 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
     copies = [];
     leaving = [];
   };
+  const clearLineup = (): void => {
+    if (!lineup) return;
+    for (const vehicle of lineup.vehicles) {
+      if (!vehicle) continue;
+      view.scene.remove(vehicle.object);
+      vehicle.dispose();
+    }
+    for (const mesh of lineup.pads) land.remove(mesh);
+    for (const material of lineup.materials) material.dispose();
+    lineup = null;
+    pad.visible = true;
+    look = LOOK;
+  };
 
   // Keep the stack framed when the canvas changes size (the kit sets the new aspect first).
   const resize = new ResizeObserver(() => {
@@ -197,6 +256,7 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
 
   return {
     show(parts, label) {
+      clearLineup();
       clearRocket();
       rocket = createVehicle({ layout: "launch", parts });
       view.scene.add(rocket.object);
@@ -213,6 +273,55 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
       glow.visible = false;
       canvas.setAttribute("aria-label", label);
       snap();
+      view.requestRender();
+    },
+    showLineup(count, label) {
+      clearLineup();
+      clearRocket();
+      const row: Lineup = { vehicles: [], pads: [], materials: [] };
+      for (let index = 0; index < count; index += 1) {
+        const material = padMaterial.clone();
+        const mesh = new Mesh(disc, material);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.renderOrder = 1;
+        mesh.scale.setScalar(LINEUP_HEIGHT * 0.11);
+        land.add(mesh);
+        row.vehicles.push(null);
+        row.pads.push(mesh);
+        row.materials.push(material);
+      }
+      lineup = row;
+      look = LINEUP_LOOK;
+      pad.visible = false;
+      ground.scale.setScalar(LINEUP_HEIGHT * 12);
+      land.position.y = 0;
+      land.visible = true;
+      setOpacity([groundMaterial, padMaterial], 1);
+      background.copy(HAZE);
+      climbing = false;
+      glow.visible = false;
+      canvas.setAttribute("aria-label", label);
+      snap();
+      view.requestRender();
+    },
+    setLineupRocket(index, parts) {
+      const row = lineup;
+      if (!row || index < 0 || index >= row.vehicles.length || row.vehicles[index]) return;
+      const vehicle = createVehicle({ layout: "launch", parts });
+      vehicle.setHeight(LINEUP_HEIGHT);
+      view.scene.add(vehicle.object);
+      row.vehicles[index] = vehicle;
+      snap();
+      view.requestRender();
+    },
+    highlight(index) {
+      lineup?.materials.forEach((material, place) => material.color.setHex(place === index ? PAD_MARKED : PAD));
+      view.requestRender();
+    },
+    clear() {
+      clearLineup();
+      clearRocket();
+      glow.visible = false;
       view.requestRender();
     },
     setClimbing(on) {
@@ -301,6 +410,7 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
     },
     dispose() {
       resize.disconnect();
+      clearLineup();
       clearRocket();
       disc.dispose();
       groundMaterial.dispose();

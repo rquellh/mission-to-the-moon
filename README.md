@@ -12,7 +12,8 @@ How it works:
 - The site opens on a list of missions. The mission name at the top of the screen brings the list back.
 - **Tour** steps through a mission's key moments, or **Explore** lets you roam.
 - Press play, or drag the timeline, to fly the mission. The clock shows real mission time. The trip is paced so every stretch between events is watchable, instead of days of coasting. When a spacecraft circles many times between two events, the view switches to a calm fast forward: the model fades and its orbit shows as a bright ring.
-- Each event has a short card, a longer "Tell me more", a NASA photo where there is one, and its sources.
+- Each event has a short card, a longer "Tell me more", a NASA photo where there is one, and its sources. A few cards carry a real NASA recording of the moment, with every word written out beside the player.
+- Under the missions are things to try and explore: drop a rocket's stages at the right moment, dock a Gemini with its Agena target, turn the Moon to find the six landing sites, and stand the three rockets side by side. A liftoff or docking card offers the matching one with a "Try it" button.
 - The view buttons choose what the camera follows: **Earth** and **Ship** for every mission, plus **Moon** and **Both** for flights to the Moon. **True scale** shows real distances and orbit heights.
 - Drag (or swipe) to turn the view, and scroll (or pinch) to zoom. With the 3D view focused, the arrow keys turn the view and + and - zoom.
 
@@ -22,10 +23,12 @@ A link can open a mission at a moment and a view, for example `?mission=apollo-1
 - `t` is mission time as hours:minutes:seconds. A minus sign means before liftoff.
 - `view` is `earth`, `moon`, `spacecraft`, or `journey`.
 - `start=tour` or `start=explore` skips the mission list.
+- `event` opens a mission paused at one of its events, by the event's id.
+- `extra` opens one of the extras: `stages`, `docking`, `landing-sites`, or `rockets`.
 
 ### What is real and what is drawn
 
-Event times, places, and facts come from the cited sources, and each mission was checked against its sources by a separate pass before it went on the list. The flight path is computed from the published points (burns, orbits, landing, splashdown) and drawn as a smooth curve between them, so it shows the shape of the trip and not every turn. The spacecraft are simple shapes built in code and drawn far larger than life so you can see them. When two spacecraft fly side by side, the gap between them is not to scale. Each mission's flight plan and vehicle file list, in their opening comments, which values are illustrations. "How this is drawn" on the site explains the same thing in plain words.
+Event times, places, and facts come from the cited sources, and each mission was checked against its sources by a separate pass before it went on the list. The flight path is computed from the published points (burns, orbits, landing, splashdown) and drawn as a smooth curve between them, so it shows the shape of the trip and not every turn. The spacecraft are simple shapes built in code and drawn far larger than life so you can see them. When two spacecraft fly side by side, the gap between them is not to scale. The hands-on extras are practice toys, not simulators, and say so on screen; the facts they show (staging times, docking times, landing places, rocket heights) come from the missions' own citations or from sources registered for that extra. Each mission's flight plan and vehicle file list, in their opening comments, which values are illustrations. "How this is drawn" on the site explains the same thing in plain words.
 
 ## Run it
 
@@ -63,10 +66,12 @@ The site uses relative paths, so `dist/` works from any subpath. Each mission, a
 index.html                    Page markup
 gallery.html                  Developer page for looking at spacecraft models (dev server only)
 public/textures/              Earth, Moon, and star textures (2K and 4K JPEGs)
-public/media/<mission>/       Mission photos from NASA, one folder per mission
+public/media/<mission>/       Mission photos and recordings from NASA, one folder per mission
 src/main.ts                   Starts the app, loads the chosen mission, and connects the pieces
 src/content/                  Shared facts and text: sources, physical constants, credits, interface copy
 src/content/missions/<id>/    One folder per mission (see below)
+src/content/extras/           Sources cited only by an extra, one file per extra
+src/extras/<id>/              One folder per extra: a hands-on moment or something to explore
 src/sim/                      Flight path math (plain TypeScript, no 3D code), with tests
 src/app/                      The mission clock, the tour, and the contract between scene and interface
 src/scene/                    three.js scene: Earth, Moon, stars, paths, spacecraft, camera
@@ -89,6 +94,8 @@ A mission folder holds:
 Apollo 1's folder has `memorial.ts` in place of the story, flight plan, and vehicle file.
 
 Adding a mission means adding a folder. Nothing else needs editing: the mission list and the loader find folders by themselves, and `summary.ts` can carry `status: "draft"` to keep an unfinished mission off the published list (it still opens by address on the dev server).
+
+An extra is a folder too: `src/extras/<id>/meta.ts` (its title, one-line description, and whether it is something to try or to explore) and `index.ts` (which draws it into a full-screen sheet). The contract is in the comment at the top of `src/extras/types.ts`. An extra that needs a 3D view uses only `src/scene/kit.ts`, which hands out the same spacecraft models and globes the missions use.
 
 How the facts are kept honest:
 
@@ -119,7 +126,7 @@ Developer tools:
 3. Apollo 11 in full (done)
 4. Gemini 8 in full (done)
 5. The remaining crewed flights and an Apollo 1 memorial page (done)
-6. Hands-on moments and extras
+6. Hands-on moments and extras (done)
 7. Polish and launch
 
 ## Remove installed packages

@@ -52,6 +52,11 @@
         </button>
       </div>
 
+      <!-- Without a 3D view, a short note fills the space it would take. -->
+      <div class="stage-note" id="stage-note" hidden>
+        <p class="stage-note__text" id="stage-note-text"></p>
+      </div>
+
       <p class="caption" id="caption">
         <span class="caption__note" id="scale-note" aria-live="polite"></span>
         <button type="button" class="caption__link" id="drawn-button" aria-haspopup="dialog">How this is drawn</button>
@@ -75,6 +80,7 @@
           </span>
           <span class="clock__date">
             <span class="clock__day" id="clock-day" hidden></span>
+            <span class="clock__fast" id="clock-fast" hidden>Fast forward</span>
             <span class="clock__utc" id="clock-utc"></span>
           </span>
         </p>

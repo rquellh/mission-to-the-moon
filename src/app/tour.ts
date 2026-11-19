@@ -1,6 +1,6 @@
-import { elapsedToSeconds, type Mission, type MissionEvent } from '../content/types';
-import type { Director, Player } from './contract';
-import { nearestView } from './views';
+import { elapsedToSeconds, type Mission, type MissionEvent } from '../content/types.ts';
+import type { Director, Player } from './contract.ts';
+import { nearestView } from './views.ts';
 
 /**
  * Where the tour is:
@@ -16,9 +16,17 @@ export interface TourOptions {
   leadInSeconds?: number;
   /** When this returns true, jump straight to each stop instead of playing up to it. */
   jumpStraight?: () => boolean;
+  /** Real time in milliseconds; tests pass their own clock. */
+  now?: () => number;
 }
 
 const DEFAULT_LEAD_IN_SECONDS = 3;
+/**
+ * The run-up to a stop may take this much longer than planned, in real
+ * seconds, before the tour arrives anyway. A device that draws few frames
+ * plays slowly; the visitor should not wait on it.
+ */
+const TRAVEL_GRACE_SECONDS = 2;
 
 /**
  * The guided tour: steps through the mission's events marked `inTour`. For
@@ -34,14 +42,21 @@ export class Tour {
   private targetStory = 0;
   private stopSeconds = 0;
   private stopWatching: (() => void) | null = null;
+  private travelDeadlineMs = 0;
   private readonly listeners = new Set<(tour: Tour) => void>();
 
-  constructor(
-    private readonly mission: Mission,
-    private readonly player: Player,
-    private readonly director: Director,
-    private readonly options: TourOptions = {},
-  ) {
+  // Written out rather than as constructor parameter properties, so Node can
+  // run this file directly in a test (it strips types but does not compile them).
+  private readonly mission: Mission;
+  private readonly player: Player;
+  private readonly director: Director;
+  private readonly options: TourOptions;
+
+  constructor(mission: Mission, player: Player, director: Director, options: TourOptions = {}) {
+    this.mission = mission;
+    this.player = player;
+    this.director = director;
+    this.options = options;
     this.stops = mission.events.filter((event) => event.inTour);
   }
 
@@ -123,6 +138,7 @@ export class Tour {
     }
 
     this.phaseNow = 'traveling';
+    this.travelDeadlineMs = this.now() + ((this.options.leadInSeconds ?? DEFAULT_LEAD_IN_SECONDS) + TRAVEL_GRACE_SECONDS) * 1000;
     this.player.pause();
     this.player.seekStory(Math.max(0, this.targetStory - leadIn));
     this.notify();
@@ -130,10 +146,16 @@ export class Tour {
     this.player.play();
   }
 
+  /** Arrive when the clock reaches the stop, stops by itself, or the run-up has taken too long. */
   private readonly watchTravel = (player: Player): void => {
     if (this.phaseNow !== 'traveling') return;
-    if (player.storyTime >= this.targetStory - 1e-6 || !player.playing) this.arrive();
+    const reached = player.storyTime >= this.targetStory - 1e-6;
+    if (reached || !player.playing || this.now() > this.travelDeadlineMs) this.arrive();
   };
+
+  private now(): number {
+    return this.options.now ? this.options.now() : performance.now();
+  }
 
   private arrive(): void {
     this.stopTravel();

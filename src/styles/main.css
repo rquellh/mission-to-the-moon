@@ -557,6 +557,12 @@ body.is-welcome .hud {
   text-decoration-color: currentColor;
 }
 
+/* Phones: with the card expanded the 3D view is mostly covered, so its note
+   steps aside; on a short screen it would otherwise crowd the view buttons. */
+.hud:has(.sheet[data-state="expanded"]) .caption {
+  display: none;
+}
+
 /* Event sheet (phone) / side panel (wide) --------------------------- */
 
 .sheet {
@@ -564,6 +570,9 @@ body.is-welcome .hud {
   position: relative;
   display: flex;
   flex-direction: column;
+  /* On a short phone the sheet takes only the room left over (its card
+     scrolls), so the timeline never runs off the bottom of the screen. */
+  min-height: 0;
   max-height: 62dvh;
   border-top: 1px solid var(--color-line);
   border-radius: 18px 18px 0 0;
@@ -951,6 +960,14 @@ body.is-welcome .hud {
   color: var(--color-text-muted);
 }
 
+.audio__note {
+  max-width: 62ch;
+  margin: 10px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
 .audio__credit {
   margin: 10px 0 0;
   font-size: 0.75rem;
@@ -1063,8 +1080,8 @@ body.is-welcome .hud {
 
 .citations__places {
   display: grid;
-  gap: 2px;
-  margin: 4px 0 0;
+  gap: 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -1074,9 +1091,11 @@ body.is-welcome .hud {
   overflow-wrap: anywhere;
 }
 
+/* Each place is a full 44 pixels tall to tap. */
 .citations__link {
   display: inline-block;
-  padding: 3px 0;
+  min-height: 44px;
+  padding: 12px 0;
 }
 
 /* Timeline ---------------------------------------------------------- */
@@ -1181,8 +1200,25 @@ body.is-welcome .hud {
   color: var(--color-text);
 }
 
+/* Fast forward: a quiet mark in the date's place while the ship circles too fast to follow. */
+.clock__fast {
+  padding: 0 5px;
+  border: 1px solid var(--color-accent-line);
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 650;
+  line-height: 1.25;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.clock__date--fast .clock__utc {
+  display: none;
+}
+
 /* Phones: the day takes the year's room; the header shows the year. */
-.clock__day:not([hidden]) + .clock__utc .clock__year {
+.clock__day:not([hidden]) ~ .clock__utc .clock__year {
   display: none;
 }
 
@@ -1388,7 +1424,6 @@ body.is-welcome .hud {
   width: calc(var(--span) * 100%);
   height: 36px;
   padding: 0 6px;
-  overflow: hidden;
   border: 0;
   background: none;
   color: var(--color-text-faint);
@@ -1401,15 +1436,34 @@ body.is-welcome .hud {
   transition: color 160ms ease-out;
 }
 
-/* Reach down so each chapter name is a full 44 pixels tall to tap. */
+/* Reach down so each chapter name is a full 44 pixels tall to tap, and
+   at least 44 wide for a short chapter. */
 .chapters__item::after {
   content: "";
   position: absolute;
-  inset: 0 0 -8px;
+  top: 0;
+  bottom: -8px;
+  left: 50%;
+  width: max(100%, 44px);
+  transform: translateX(-50%);
 }
 
 .chapters__item:hover:not(:disabled) {
   color: var(--color-text);
+}
+
+.chapters__label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The current chapter, or the one with keyboard focus, shows its whole name. */
+.chapters__item--featured {
+  z-index: 2;
+  width: var(--grow, calc(var(--span) * 100%));
+  background: var(--color-surface-solid);
+  transform: translateX(var(--shift, 0px));
 }
 
 .chapters__item[aria-current] {
@@ -2209,6 +2263,15 @@ body.is-welcome .hud {
   line-height: 1.4;
 }
 
+/* A source's title link, and an original file's: 44 pixels tall to tap,
+   reaching into the quiet text around it without moving it. */
+.credits__item-title .link,
+.credits__details .link {
+  display: inline-block;
+  padding: 13px 0;
+  margin: -13px 0;
+}
+
 .credits__publisher,
 .credits__use,
 .credits__checked {
@@ -2244,6 +2307,33 @@ body.is-welcome .hud {
   margin: 0;
   color: var(--color-text-muted);
   overflow-wrap: anywhere;
+}
+
+/* Without a 3D view: a short note in the space the view would take. */
+.stage-note {
+  grid-row: 3;
+  grid-column: 1;
+  align-self: center;
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: min(34rem, calc(100% - 2 * var(--gutter)));
+  margin: 12px var(--gutter);
+  padding: 14px 18px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+  pointer-events: auto;
+}
+
+.stage-note__text {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--color-text-muted);
 }
 
 /* Without a 3D view there is nothing to point the camera at. */
@@ -2324,17 +2414,20 @@ body.is-welcome .hud {
     padding: 12px 16px 0 max(24px, env(safe-area-inset-left));
   }
 
-  .segmented {
+  /* The view switcher only: extras reuse .segmented and lay out their own rows. */
+  .views .segmented {
     flex: 0 1 auto;
   }
 
-  .segmented__item {
+  .views .segmented__item {
     flex: 0 0 auto;
     min-width: 72px;
     padding: 0 14px;
   }
 
-  .caption {
+  .caption,
+  .hud:has(.sheet[data-state="expanded"]) .caption {
+    display: flex;
     padding: 0 16px 10px max(24px, env(safe-area-inset-left));
   }
 
@@ -2437,7 +2530,7 @@ body.is-welcome .hud {
     font-size: 1.5rem;
   }
 
-  .clock__day:not([hidden]) + .clock__utc .clock__year {
+  .clock__day:not([hidden]) ~ .clock__utc .clock__year {
     display: inline;
   }
 
@@ -2496,7 +2589,8 @@ body.is-welcome .hud {
     padding-top: 6px;
   }
 
-  .caption {
+  .caption,
+  .hud:has(.sheet[data-state="expanded"]) .caption {
     display: none;
   }
 
@@ -2526,12 +2620,17 @@ body.is-welcome .hud {
 /* ------------------------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {
+  /* Animations end at once (and still report ending). Transitions are off
+     outright: a 1 ms one would turn every property change into a transition,
+     since transitions cover all properties by default. */
   *,
   *::before,
   *::after {
     animation-duration: 1ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 1ms !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
   }
 
   .stage {
@@ -2545,12 +2644,12 @@ body.is-welcome .hud {
     gap: 6px;
   }
 
-  .segmented__item {
+  .views .segmented__item {
     padding: 0 2px;
     font-size: 0.8125rem;
   }
 
-  .segmented__item::before {
+  .views .segmented__item::before {
     inset: 4px 2px;
   }
 

@@ -11,7 +11,7 @@ import { pauseAllAudio } from './audio-player';
 import { renderCredits } from './credits-dialog';
 import { recordVisit } from './device-store';
 import { setUpDialog } from './dialogs';
-import { byId, hiddenText, reducedMotionQuery } from './dom';
+import { byId, el, hiddenText, reducedMotionQuery } from './dom';
 import { setUpEventCard } from './event-card';
 import { setUpExtraSheet } from './extra-sheet';
 import { missionDates, speakMissionTime } from './format';
@@ -55,6 +55,8 @@ export interface InterfaceOptions {
   director: Director;
   /** False when there is no 3D view (for example, without WebGL). */
   has3D: boolean;
+  /** Without a 3D view: the short note to show where it would be, and whether reloading may help. */
+  no3D?: { note: string; offerReload: boolean };
 }
 
 export interface MissionInterface {
@@ -154,6 +156,37 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   /* View controls ---------------------------------------------------- */
   document.body.classList.toggle('no-3d', !has3D);
   if (has3D) setUpViewControls(director, mission);
+  if (options.no3D) {
+    const note = byId('stage-note', HTMLDivElement);
+    byId('stage-note-text', HTMLParagraphElement).textContent = options.no3D.note;
+    if (options.no3D.offerReload) {
+      const reload = el('button', 'button', copy.memorial.reload);
+      reload.type = 'button';
+      reload.addEventListener('click', () => window.location.reload());
+      note.append(reload);
+    }
+    note.hidden = false;
+  }
+
+  // Fast forward: the scene says when the ship circles too fast to follow.
+  // A quiet mark takes the date's place by the clock (the date spins too fast
+  // to read then), and screen readers hear why once, not on every lap.
+  const fastMark = byId('clock-fast', HTMLSpanElement);
+  fastMark.textContent = copy.timeline.fastForward;
+  let fastShown = false;
+  let fastSpokenAt = -Infinity;
+  director.subscribe(() => {
+    const fast = director.fastForward === true;
+    if (fast === fastShown) return;
+    fastShown = fast;
+    fastMark.hidden = !fast;
+    fastMark.parentElement?.classList.toggle('clock__date--fast', fast);
+    const now = performance.now();
+    if (fast && now - fastSpokenAt > 60_000) {
+      fastSpokenAt = now;
+      announce(copy.timeline.fastForwardSpoken);
+    }
+  });
 
   /* Event card, timeline, and tour ---------------------------------- */
   const sheet = setUpSheet();
@@ -281,6 +314,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   const hub = setUpHub({
     currentId: mission.id,
     currentName: mission.name,
+    ...(options.no3D ? { lede: copy.hub.ledeNo3D } : {}),
     summaries,
     isDraft,
     onMemorial: (id, from) => memorials.open(id, from),

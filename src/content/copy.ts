@@ -32,6 +32,8 @@ export const copy = {
   /** The mission picker: the first thing a visitor sees, and reachable from the header. */
   hub: {
     lede: 'Choose a flight and ride along in 3D, from liftoff to splashdown.',
+    /** The same, when this browser has no 3D view. */
+    ledeNo3D: 'Choose a flight and follow it, from liftoff to splashdown. This browser can’t show the 3D view, but every mission can still be read.',
     /** Added to the lede when the list has a memorial page, for a crew that never flew. */
     ledeMemorial: (names: string, count: number) => `${names} ${count === 1 ? 'is' : 'are'} remembered here too.`,
     tour: 'Tour',
@@ -130,6 +132,9 @@ export const copy = {
     beforeLiftoff: 'before liftoff',
     /** Beside the clock on flights longer than two days. Day 1 is the first 24 hours. */
     day: (day: number) => `Day ${day}`,
+    /** Beside the clock while the ship circles too fast to follow and the view holds still. */
+    fastForward: 'Fast forward',
+    fastForwardSpoken: 'Fast forward. The ship goes around too fast to see, so its path shows as a ring.',
     lockedDuringTour: 'The timeline follows the tour. Exit the tour to use it.',
   },
 
@@ -271,12 +276,12 @@ export const copy = {
 
   errors: {
     noWebGL:
-      'This 3D view needs WebGL 2, which this browser or device does not have turned on. You can still read about the mission below. To see the 3D view, try a current version of Chrome, Edge, Firefox, or Safari, or turn on hardware acceleration in your browser settings.',
+      'This browser can’t show the 3D view, but you can still read about every mission. To see it in 3D, try a current Chrome, Edge, Firefox, or Safari.',
     contextLost:
       'The 3D view stopped because the graphics processor reset. It should recover on its own; if it does not, reload the page.',
     textures:
       'Some images for the 3D view did not load. Check your connection and reload the page.',
-    scene: 'The 3D view did not load. You can still read about the mission below. To see the 3D view, check your connection and reload the page.',
+    scene: 'The 3D view did not load, but you can still read about every mission. To see it in 3D, check your connection and reload the page.',
     mission: (missionName: string) =>
       `${missionName} did not load. Check your connection and reload the page, or choose another mission.`,
     missionUnnamed: 'This mission did not load. Check your connection and reload the page, or choose another mission.',

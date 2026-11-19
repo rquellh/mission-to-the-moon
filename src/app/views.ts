@@ -3,7 +3,7 @@
  * each, and the scene only ever moves to one of them. Both sides read the
  * answer here, so they cannot disagree.
  */
-import type { EventView, Mission } from '../content/types';
+import type { EventView, Mission } from '../content/types.ts';
 
 const MOON_FLIGHT: readonly EventView[] = ['earth', 'moon', 'spacecraft', 'journey'];
 const EARTH_ORBIT_FLIGHT: readonly EventView[] = ['earth', 'spacecraft'];

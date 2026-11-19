@@ -30,9 +30,37 @@
 }
 
 [data-extra="stages"] .stages[data-screen="loading"] .stages__stage,
-[data-extra="stages"] .stages[data-screen="choose"] .stages__stage,
+[data-extra="stages"] .stages[data-screen="choose"] .stages__stage--flat,
 [data-extra="stages"] .stages[data-screen="missing"] .stages__stage {
   display: none;
+}
+
+/* The lineup: three rockets in even columns, a label under each; tapping a column picks it. */
+[data-extra="stages"] .stages[data-screen="choose"] .stages__stage {
+  height: min(38svh, 340px);
+}
+
+[data-extra="stages"] .stages[data-screen="choose"] .stages__canvas {
+  cursor: pointer;
+}
+
+[data-extra="stages"] .stages__tags {
+  display: none;
+  position: absolute;
+  inset: auto 0 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  pointer-events: none;
+}
+
+[data-extra="stages"] .stages[data-screen="choose"] .stages__tags {
+  display: grid;
+}
+
+[data-extra="stages"] .stages__tag {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: center;
 }
 
 /* On a phone the summary needs the room; the picture comes back with Try again. */
@@ -305,8 +333,11 @@
     column-gap: 16px;
   }
 
+  [data-extra="stages"] .stages[data-screen="choose"] .stages__stage {
+    height: auto;
+  }
+
   [data-extra="stages"] .stages[data-screen="loading"] .stages__panel,
-  [data-extra="stages"] .stages[data-screen="choose"] .stages__panel,
   [data-extra="stages"] .stages[data-screen="missing"] .stages__panel {
     flex: 1 1 auto;
     max-width: 62ch;

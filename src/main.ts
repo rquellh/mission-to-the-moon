@@ -10,7 +10,7 @@ import { extraFor, extras, hasExtra, isExtraReady, loadExtra } from './extras';
 import type { Stage } from './scene/stage';
 import { buildFlightPath, createStoryTime } from './sim';
 import { byId, reducedMotionQuery } from './ui/dom';
-import { mountInterface, setUpMissionList } from './ui/interface';
+import { mountInterface, setUpMissionList, type MissionInterface } from './ui/interface';
 import { setUpStatus } from './ui/status';
 
 /** A Director that does nothing, for when there is no 3D view. */
@@ -208,8 +208,23 @@ async function main(): Promise<void> {
     player,
   };
 
-  // 3. The 3D scene. Without WebGL, or if its code did not load, the
-  //    mission can still be read.
+  /** Begin where the address asks: the mission list, a tour, exploring, a memorial page, or an extra. */
+  const begin = (ui: MissionInterface): void => {
+    if (memorialId) {
+      ui.welcome({ mission: memorialId });
+      ui.memorial(memorialId);
+      return;
+    }
+    // An extra opens over the mission list, unless the address names a mission or a place in one.
+    const namesPlace = link.mission !== null || seeked || link.start !== null;
+    if (link.start === 'tour') ui.tour();
+    else if (seeked || link.start === 'explore' || (extraId && namesPlace)) ui.explore();
+    else ui.welcome(extraId ? { extra: extraId } : undefined);
+    if (extraId) ui.extra(extraId, link.extraParams);
+  };
+
+  // 3. The 3D scene. Without WebGL, or if its code did not load, every
+  //    mission can still be read, starting from the list as usual.
   const made = await makeStage(sceneCode, canvas, {
     path,
     player,
@@ -220,19 +235,23 @@ async function main(): Promise<void> {
     onContextRestored: () => status.hideMessage(),
   });
   if ('problem' in made) {
-    const ui = mountInterface({ ...shared, director: noDirector(homeView(mission)), has3D: false });
-    ui.explore();
-    if (memorialId) ui.memorial(memorialId);
-    else if (extraId) ui.extra(extraId, link.extraParams);
+    const ui = mountInterface({
+      ...shared,
+      director: noDirector(homeView(mission)),
+      has3D: false,
+      no3D: { note: made.problem, offerReload: made.offerReload },
+    });
     status.reveal();
-    status.showMessage(made.problem, made.offerReload);
+    begin(ui);
     return;
   }
   const stage = made.stage;
   const motion = reducedMotionQuery();
   stage.setReducedMotion(motion.matches);
   motion.addEventListener('change', () => stage.setReducedMotion(motion.matches));
-  if (link.view) stage.setView(nearestView(mission, link.view), true);
+  // A view in the address wins; an event in the address brings its own view, as a tour stop does.
+  const startView = link.view ?? atEvent?.view ?? null;
+  if (startView) stage.setView(nearestView(mission, startView), true);
 
   // 4. The interface, connected to the clock and the scene.
   const ui = mountInterface({ ...shared, director: stage, has3D: true });
@@ -247,17 +266,7 @@ async function main(): Promise<void> {
 
   stage.start();
   status.reveal();
-  if (memorialId) {
-    ui.welcome({ mission: memorialId });
-    ui.memorial(memorialId);
-    return;
-  }
-  // An extra opens over the mission list, unless the address names a mission or a place in one.
-  const namesPlace = link.mission !== null || seeked || link.start !== null;
-  if (link.start === 'tour') ui.tour();
-  else if (seeked || link.start === 'explore' || (extraId && namesPlace)) ui.explore();
-  else ui.welcome(extraId ? { extra: extraId } : undefined);
-  if (extraId) ui.extra(extraId, link.extraParams);
+  begin(ui);
 }
 
 void main();

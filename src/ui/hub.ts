@@ -16,6 +16,8 @@ export interface HubOptions {
   currentId: string | null;
   /** Its name, for the page title once the hub closes. */
   currentName?: string;
+  /** The opening line, when it should differ from the usual one (without a 3D view). */
+  lede?: string;
   /** The mission list, in date order. */
   summaries: readonly MissionSummary[];
   /** True for an unfinished mission (only the dev server lists one). */
@@ -113,9 +115,10 @@ export function setUpHub(options: HubOptions): Hub {
 
   title.textContent = copy.siteTitle;
   const memorials = summaries.filter((summary) => summary.kind === 'memorial').map((summary) => summary.name);
+  const opening = options.lede ?? copy.hub.lede;
   const lede = memorials.length
-    ? `${copy.hub.lede} ${copy.hub.ledeMemorial(new Intl.ListFormat('en-US').format(memorials), memorials.length)}`
-    : copy.hub.lede;
+    ? `${opening} ${copy.hub.ledeMemorial(new Intl.ListFormat('en-US').format(memorials), memorials.length)}`
+    : opening;
   byId('hub-lede', HTMLParagraphElement).textContent = lede;
   closeButton.textContent = copy.close;
 

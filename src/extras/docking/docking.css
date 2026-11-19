@@ -326,3 +326,17 @@
 [data-extra="docking"] [hidden] {
   display: none !important;
 }
+
+/* The caption that ties the folded sources under Start to the cited sentence above. */
+[data-extra="docking"] .docking__source-for {
+  margin: 6px 0 -6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-line);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+[data-extra="docking"] .docking__intro .docking__why-sources {
+  border-top: 0;
+}

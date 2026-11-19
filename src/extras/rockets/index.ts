@@ -10,7 +10,18 @@
  * (1.8 meters) is an illustration.
  */
 import "./rockets.css";
-import { Box3, CapsuleGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, SphereGeometry, Vector3 } from "three";
+import {
+  Box3,
+  CapsuleGeometry,
+  Group,
+  MathUtils,
+  Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  PlaneGeometry,
+  SphereGeometry,
+  Vector3,
+} from "three";
 import type { MissionBundle } from "../../content/missions/bundle.ts";
 import type { Citation, MissionSummary } from "../../content/types.ts";
 import { createMiniView, createVehicle, disposeObject, type MiniView, type Vehicle } from "../../scene/kit.ts";
@@ -24,6 +35,11 @@ import { ROCKETS, heightMeters, liftoffParts, metersText, rocketOf, type Rocket 
 const PERSON_HEIGHT = 1.8;
 /** Space between the rockets, meters (a drawing choice). */
 const GAP = 14;
+/** Room kept on screen above the tallest rocket for its label, and below the row, CSS pixels. */
+const LABEL_ROOM = 38;
+const FOOT_ROOM = 12;
+/** Where the camera looks from: straight ahead and a little above, so heights read true. */
+const LOOK_FROM = new Vector3(0, 0.06, 1).normalize();
 
 interface Stand {
   rocket: Rocket;
@@ -58,7 +74,7 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
   );
   const labels = el("div", "rk__labels");
   labels.setAttribute("aria-hidden", "true");
-  const personLabel = el("div", "rk__label rk__label--person", "Person");
+  const personLabel = el("div", "rk__label rk__label--person", "Person →");
   labels.append(personLabel);
   stage.append(canvas, labels);
 
@@ -66,7 +82,7 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
   const intro = el(
     "p",
     "extra-note rk__intro",
-    "These three rockets launched the crews on this site. They stand side by side at their true heights. Tap a rocket to learn about it.",
+    "These three rockets launched the crews on this site. They stand side by side at their true heights. The small figure at the far left is a person, for scale. Tap a rocket to learn about it.",
   );
   const choices = el("div", "segmented rk__choices");
   choices.setAttribute("role", "group");
@@ -160,6 +176,36 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
   };
   personLabel.hidden = true;
 
+  /** The row's extent, meters, once it stands. */
+  let row: { left: number; right: number; height: number } | null = null;
+
+  /**
+   * Put the camera where the row fills the view: the tallest rocket nearly
+   * reaches the top, with room for its label, and the row fits side to
+   * side. (The kit's frame fits a sphere, which leaves a tall row small.)
+   */
+  const fit = (): void => {
+    if (!view || !row) return;
+    const camera = view.camera;
+    const pixels = Math.max(1, canvas.clientHeight);
+    const tan = Math.tan(MathUtils.degToRad(camera.fov) / 2);
+    const tall = (row.height * pixels) / Math.max(1, pixels - LABEL_ROOM - FOOT_ROOM);
+    const wide = ((row.right - row.left) * 1.12) / camera.aspect;
+    const visible = Math.max(tall, wide);
+    const bottom = (-visible * FOOT_ROOM) / pixels;
+    const center = new Vector3((row.left + row.right) / 2, bottom + visible / 2, 0);
+    const distance = visible / 2 / tan;
+    camera.position.copy(center).addScaledVector(LOOK_FROM, distance);
+    camera.lookAt(center);
+    view.controls.target.copy(center);
+    view.controls.minDistance = distance * 0.3;
+    view.controls.maxDistance = distance * 2;
+    view.controls.update();
+    view.requestRender();
+  };
+  // Refit when the view changes size (the kit's own resize runs first, as it observed first).
+  const resized = new ResizeObserver(() => fit());
+
   /** Stand the loaded rockets in a row, smallest first, with the person at the left, and frame them. */
   const standUp = (): void => {
     if (!view) return;
@@ -187,18 +233,17 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
     ground.scale.set(3000, 3000, 1);
     ground.position.set(width / 2 - 0.5, 0, 0);
     view.scene.add(ground);
-    // Room above the tallest for its label.
-    const center = new Vector3(width / 2 - 0.5, tallest * 0.54, 0);
-    const radius = Math.max(tallest * 0.56, width * 0.55);
-    view.frame(center, radius, new Vector3(0, 0.08, 1).normalize());
+    // The kit's frame sets the near plane and the controls; fit() then places the camera.
+    view.frame(new Vector3(width / 2 - 0.5, tallest / 2, 0), Math.max(tallest, width) / 2, LOOK_FROM);
+    row = { left: -0.5, right: width - 0.5, height: tallest };
     // Turn a little either way and look from a little higher, never from below the ground.
     view.controls.minPolarAngle = Math.PI / 2 - 0.6;
     view.controls.maxPolarAngle = Math.PI / 2 - 0.02;
     view.controls.minAzimuthAngle = -1;
     view.controls.maxAzimuthAngle = 1;
-    view.controls.minDistance = radius * 0.4;
     view.scene.onAfterRender = placeLabels;
-    view.requestRender();
+    fit();
+    resized.observe(canvas);
   };
 
   /* Choosing a rocket. */
@@ -322,6 +367,7 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
 
   return {
     dispose() {
+      resized.disconnect();
       if (view) {
         view.scene.onAfterRender = () => undefined;
         for (const stand of stands) {

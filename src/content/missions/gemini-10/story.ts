@@ -184,7 +184,7 @@ export const story: Mission = {
   summary: {
     text: {
       short:
-        "Gemini 10 flew for three days in July 1966. John Young and Michael Collins docked with an Agena target rocket, rode its engine higher than anyone had flown before, and then met a second Agena, where Collins floated across on a spacewalk.",
+        "Gemini 10 flew for three days in July 1966. John Young and Michael Collins docked with an uncrewed target rocket called an Agena, rode its engine higher than anyone had flown before, and then met a second Agena, where Collins floated across on a spacewalk.",
       more:
         "Gemini 10 lifted off from Cape Kennedy, Florida, on July 18, 1966, 1 hour 40 minutes 40.517 seconds after its target, an uncrewed Agena rocket. Young and Collins caught the Agena and docked with it on their fourth trip around Earth, but the chase used so much fuel that the plan had to change: they stayed docked for 38 hours 47 minutes and let the Agena's engines move them. Its main engine lifted them to a record height, then brought them down close to the orbit of a second Agena, the one Gemini 8 had left behind in March. After letting go of their own Agena, they reached the old one with Gemini 10's thrusters, and Collins went outside and floated over to it. They splashed down in the Atlantic Ocean 70 hours 46 minutes 39 seconds after liftoff.",
     },
@@ -306,7 +306,7 @@ export const story: Mission = {
       utc: "1966-07-18T20:39:46.131Z",
       text: {
         short:
-          "An Atlas rocket launches an Agena, an uncrewed target rocket. Gemini 10 will chase it, dock with it, and then use its engine.",
+          "An Atlas rocket launches an uncrewed target rocket called an Agena. Gemini 10 will chase it, dock with it, and then use its engine.",
         more:
           "The Atlas-Agena lifted off from Launch Complex 14 at Cape Kennedy at 3:39 p.m. Eastern Standard Time on July 18, 1966, after a countdown with no holds. The Agena reached a nearly circular orbit 156.6 to 162.0 nautical miles up (about 180 to 186 miles, or 290 to 300 kilometers). A second target was already up there: the Agena launched for Gemini 8 in March, no longer working.",
       },

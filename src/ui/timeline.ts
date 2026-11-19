@@ -109,7 +109,9 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
     const next = index.chapters[i + 1];
     const from = fraction(start.seconds);
     const to = next ? fraction(next.seconds) : 1;
-    const chapterButton = button('chapters__item', start.chapter.title);
+    // The label cuts itself off, not the button, so the button's taller tap area is not clipped.
+    const chapterButton = button('chapters__item');
+    chapterButton.append(el('span', 'chapters__label', start.chapter.title));
     // The full name, for when a short chapter cuts its label off.
     chapterButton.title = start.chapter.title;
     chapterButton.style.setProperty('--at', String(from));
@@ -148,24 +150,30 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
   // A short chapter has no room for its name. A name that does not fit is
   // hidden (the button stays, and its tick still marks the spot), and the
   // current chapter grows over its neighbors so it can always be read,
-  // without running past the row's end.
+  // without running past the row's end. A chapter with keyboard focus does
+  // the same while it has focus, so a focused button is never a blank box.
+  let focusedChapter = -1;
   const fitCurrentChapter = (): void => {
+    const featured = focusedChapter >= 0 ? focusedChapter : shownChapter;
     for (const chapterButton of chapterButtons) {
       chapterButton.style.removeProperty('--grow');
       chapterButton.style.removeProperty('--shift');
-      chapterButton.classList.remove('chapters__item--hidden');
+      chapterButton.classList.remove('chapters__item--hidden', 'chapters__item--featured');
     }
-    const current = chapterButtons[shownChapter];
+    const current = chapterButtons[featured];
     if (!current || current.offsetParent === null) return;
+    current.classList.add('chapters__item--featured');
 
     // Measure every name before changing anything, so nothing is laid out twice.
+    // The natural width is the label's full text plus the padding before it.
     const rowWidth = chapterRow.clientWidth;
     const boxes = chapterButtons.map((chapterButton) => ({
       left: chapterButton.offsetLeft,
       width: chapterButton.clientWidth,
-      natural: chapterButton.scrollWidth,
+      natural:
+        (chapterButton.firstElementChild?.scrollWidth ?? 0) + parseFloat(getComputedStyle(chapterButton).paddingLeft),
     }));
-    const box = boxes[shownChapter]!;
+    const box = boxes[featured]!;
     const grows = box.natural > box.width + 1;
     // The measured width leaves out the padding after the text, so add it back.
     const grown = Math.ceil(box.natural + parseFloat(getComputedStyle(current).paddingRight)) + 1;
@@ -174,7 +182,7 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
     const currentRight = currentLeft + (grows ? grown : box.width);
 
     chapterButtons.forEach((chapterButton, i) => {
-      if (i === shownChapter) return;
+      if (i === featured) return;
       const other = boxes[i]!;
       const cutOff = other.natural > other.width + 1;
       const covered = grows && other.left < currentRight && other.left + other.width > currentLeft;
@@ -186,6 +194,14 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
     }
   };
   new ResizeObserver(fitCurrentChapter).observe(chapterRow);
+  chapterRow.addEventListener('focusin', (event) => {
+    focusedChapter = chapterButtons.indexOf(event.target as HTMLButtonElement);
+    fitCurrentChapter();
+  });
+  chapterRow.addEventListener('focusout', () => {
+    focusedChapter = -1;
+    fitCurrentChapter();
+  });
   let lastValueText = '';
   let lastValueTextAt = 0;
 

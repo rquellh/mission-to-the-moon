@@ -2700,7 +2700,17 @@ export class LeftBehindModel {
     const size = sizeOf(this.root, [item.part], 0);
     this.largest = size.largest;
     this.reach = size.reach;
+    this.top = extentOf(this.root, [item.part])[1];
     this.root.visible = false;
+  }
+
+  /** The height of the part's top, in meters above the ground. */
+  private readonly top: number;
+
+  /** Where a label for it goes: just above its top, in world space, as last drawn. */
+  labelPoint(out: Vector3): Vector3 {
+    this.root.updateMatrixWorld(true);
+    return this.root.localToWorld(out.set(this.holder.position.x, this.top * 1.15, this.holder.position.z));
   }
 
   /**

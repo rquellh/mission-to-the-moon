@@ -97,7 +97,21 @@ export function setUpEventCard({ index, onStep, reducedMotion, extraTitle, onTry
     moreLabel.textContent = open ? copy.card.tellLess : copy.card.tellMore;
     more.hidden = !open;
   };
-  moreToggle.addEventListener('click', () => setMoreOpen(!moreOpen));
+  moreToggle.addEventListener('click', () => {
+    setMoreOpen(!moreOpen);
+    if (moreOpen) revealMore();
+  });
+
+  // The fuller text opens under its button. If it starts out of sight below
+  // the card's edge (often on a phone), scroll just enough to bring the
+  // button to the top so the new text can be read.
+  const revealMore = (): void => {
+    const view = card.getBoundingClientRect();
+    const start = more.getBoundingClientRect().top;
+    if (start < view.bottom - 48) return;
+    const by = moreToggle.getBoundingClientRect().top - view.top - 8;
+    card.scrollBy({ top: by, behavior: reducedMotion() ? 'auto' : 'smooth' });
+  };
   previous.addEventListener('click', () => onStep(-1));
   next.addEventListener('click', () => onStep(1));
 
@@ -181,6 +195,10 @@ export function setUpEventCard({ index, onStep, reducedMotion, extraTitle, onTry
 
     previous.disabled = eventIndex <= 0;
     next.disabled = eventIndex >= index.events.length - 1;
+    // Stepping to the first or last event disables the button just pressed;
+    // keep keyboard focus on the one that can still be used.
+    if (document.activeElement === next && next.disabled && !previous.disabled) previous.focus();
+    if (document.activeElement === previous && previous.disabled && !next.disabled) next.focus();
 
     if (!firstRender && !reducedMotion()) {
       card.animate(

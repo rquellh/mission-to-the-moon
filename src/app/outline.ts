@@ -3,7 +3,7 @@
  * from the flight plan and vehicle file. The interface uses it to say only
  * what is true of this flight (see "How this is drawn").
  */
-import type { MissionBundle } from '../content/missions/bundle';
+import type { MissionBundle } from '../content/missions/bundle.ts';
 
 export interface FlightOutline {
   /** How many ships the flight plan follows (the crew's spacecraft, a lander, a target). */

@@ -1,5 +1,6 @@
 import {
   AmbientLight,
+  CanvasTexture,
   Color,
   DirectionalLight,
   Group,
@@ -8,6 +9,8 @@ import {
   PerspectiveCamera,
   Quaternion,
   Scene,
+  Sprite,
+  SpriteMaterial,
   Vector3,
   WebGLRenderer,
 } from 'three';
@@ -51,6 +54,7 @@ import {
 } from './path-lines';
 import { createStarfield, type Starfield } from './stars';
 import { chooseTextureTier, loadStageTextures, type TextureTier } from './textures';
+import { webGL2Available } from './webgl';
 import { easeInOutCubic, Tween } from './tween';
 import {
   buildFleet,
@@ -139,6 +143,22 @@ const ORBIT_FADE = {
   past: [1.0, 2.0, 0.28],
   gone: [3.0, 5.0],
 } as const;
+/*
+ * In the ship view, another ship that is not paired with the followed one
+ * (not docked, not keeping station, not about to dock) would be drawn as a
+ * tiny model beside it when far off: a toy at its feet. Beyond
+ * COMPANION_MODEL_M meters its model fades out, and by COMPANION_MARKER_M it
+ * is a small dot of its color instead, COMPANION_MARKER_PX across. Closer
+ * (just after undocking), both models show.
+ */
+const COMPANION_MODEL_M = 300;
+/** The pointer toward a followed ship out of the Earth or Moon view: its size, and how far in from the clear area's edge, in CSS pixels. */
+const POINTER_PX = 16;
+const POINTER_INSET_PX = 22;
+/** A part left behind is labeled when the camera is closer than the first, fading out by the second, in Moon radii. */
+const LABEL_NEAR_MOON_RADII = [1.4, 2.2] as const;
+const COMPANION_MARKER_M = 1500;
+const COMPANION_MARKER_PX = 9;
 /** Story seconds over which a ship's line fades out once its path has ended (see fadeEndedPaths). */
 const PATH_END_FADE_STORY_SECONDS = 1.5;
 /** A stay in lunar orbit of more revolutions than this fades loop by loop. */
@@ -154,6 +174,9 @@ const LONG_LUNAR_STAY_REVOLUTIONS = 40;
 const FAST_FORWARD_PACE = 0.5;
 /** The fade starts at this share of FAST_FORWARD_PACE. */
 const FAST_FORWARD_ONSET = 0.7;
+/** The fast-forward level (0 to 1) at which the interface is told it is on, and off again (see Stage.fastForward). */
+const FAST_FORWARD_ON = 0.6;
+const FAST_FORWARD_OFF = 0.3;
 /** How quickly the look changes, in seconds of real time (at once under reduced motion). */
 const FAST_FORWARD_SECONDS = 0.45;
 /** The steady view: this many degrees off the orbit's axis, toward the ship. */
@@ -353,6 +376,9 @@ export class Stage implements Director {
   private moon: Moon | null = null;
   private stars: Starfield | null = null;
   private lines: PathLine[] = [];
+  /** Each ship's dot for the ship view when it is far from the followed ship (see COMPANION_MODEL_M). */
+  private companionMarkers: Sprite[] = [];
+  private dotMap: CanvasTexture | null = null;
   /** Each ship's line. */
   private readonly lineOf = new Map<ShipState, PathLine>();
   private eventMarkers: MarkerSet | null = null;
@@ -432,6 +458,10 @@ export class Stage implements Director {
   private chaseDistance = 1;
   private chaseReady = false;
   private readonly chaseForward = new Vector3(1, 0, 0);
+  /** Where the ship view's camera was last drawn from, to draw only when it moves. */
+  private readonly lastChasePosition = new Vector3(Infinity, 0, 0);
+  private readonly lastChaseTarget = new Vector3();
+  private readonly lastChaseUp = new Vector3();
 
   /* Interface insets and the picture's offset. */
   private insets: ViewInsets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -448,6 +478,13 @@ export class Stage implements Director {
   /* Loop. */
   private reducedMotion = false;
   private running = false;
+  /** What the fastForward getter says now. */
+  private fastForwardShown = false;
+  /** The pointer toward the followed ship when it is out of the Earth or Moon view (see updatePointer), and each part left behind's label. */
+  private pointer: Sprite | null = null;
+  private labels: Sprite[] = [];
+  /** The insets the clear area keeps, in CSS pixels (as clamped by updateClearArea). */
+  private readonly clearInsets = { top: 0, right: 0, bottom: 0, left: 0 };
   /** False while something covers the whole view (see setDrawing). */
   private drawing = true;
   private needsRender = true;
@@ -511,7 +548,8 @@ export class Stage implements Director {
     private readonly canvas: HTMLCanvasElement,
     private readonly options: StageOptions,
   ) {
-    if (typeof WebGL2RenderingContext === 'undefined') {
+    // Checked quietly first: three.js logs errors when it cannot make a context.
+    if (!webGL2Available()) {
       throw new WebGLUnavailableError();
     }
     try {
@@ -671,6 +709,17 @@ export class Stage implements Director {
     this.notify();
   }
 
+  /**
+   * True while the followed ship circles too fast to follow and the scene
+   * shows its calm fast-forward view (the model faded, its orbit a ring).
+   * It turns on once that look is mostly in, and off once the model is
+   * mostly back (a little apart, so it does not flicker), and is always
+   * false with the clock stopped. Subscribers hear when it changes.
+   */
+  get fastForward(): boolean {
+    return this.fastForwardShown;
+  }
+
   get view(): EventView {
     return this.viewNow;
   }
@@ -734,6 +783,13 @@ export class Stage implements Director {
     this.earthSites?.dispose();
     this.moonSites?.dispose();
     this.fleet?.dispose();
+    for (const marker of this.companionMarkers) (marker.material as SpriteMaterial).dispose();
+    for (const sprite of [this.pointer, ...this.labels]) {
+      const material = sprite?.material as SpriteMaterial | undefined;
+      material?.map?.dispose();
+      material?.dispose();
+    }
+    this.dotMap?.dispose();
     this.renderer.dispose();
   }
 
@@ -821,7 +877,24 @@ export class Stage implements Director {
       (moment) => elapsedToSeconds(moment.at.value),
     );
     for (const ship of this.fleet.ships) this.shipScene.add(ship.halo, ship.root);
+    this.companionMarkers = this.ships.map((ship) => {
+      const marker = new Sprite(
+        new SpriteMaterial({ map: this.dotTexture(), color: ship.color, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false }),
+      );
+      marker.visible = false;
+      marker.renderOrder = 10;
+      this.shipScene.add(marker);
+      return marker;
+    });
     for (const part of this.fleet.leftBehind) this.shipScene.add(part.root);
+    this.pointer = new Sprite(
+      new SpriteMaterial({ map: this.arrowTexture(), transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false }),
+    );
+    this.pointer.visible = false;
+    this.pointer.renderOrder = 12;
+    this.shipScene.add(this.pointer);
+    this.labels = this.options.leftBehind.map((item) => this.labelSprite(item.label));
+    for (const label of this.labels) this.shipScene.add(label);
     this.pairings = this.findPairings(this.fleet);
     this.stations = this.findStations();
 
@@ -1615,8 +1688,117 @@ export class Stage implements Director {
   private shipHidden(ship: ShipState): boolean {
     if (!ship.exists) return false;
     if (this.occluded(ship.position)) return true;
+    return !this.inClearArea(ship.position, SHIP_EDGE_PX);
+  }
+
+  /** True when a point is drawn inside the clear area the interface leaves (in front of the camera), at least `margin` CSS pixels in. */
+  private inClearArea(point: Vector3, margin: number): boolean {
+    const p = this.v1.copy(point).project(this.camera);
+    if (p.z > 1) return false;
+    const x = ((p.x + 1) / 2) * this.cssWidth;
+    const y = ((1 - p.y) / 2) * this.cssHeight;
+    const i = this.clearInsets;
+    return x >= i.left + margin && x <= this.cssWidth - i.right - margin && y >= i.top + margin && y <= this.cssHeight - i.bottom - margin;
+  }
+
+  /**
+   * In the Earth and Moon views, a followed ship out of the clear area that
+   * a reframing cannot bring in (it is far from the body, on its way between
+   * Earth and the Moon) gets a small arrow of its color at the clear area's
+   * edge, pointing toward it. Not when it is behind the body.
+   */
+  private updatePointer(tanHalf: number): void {
+    const pointer = this.pointer;
+    if (!pointer) return;
+    pointer.visible = false;
+    const ship = this.subject();
+    if ((this.viewNow !== 'earth' && this.viewNow !== 'moon') || !ship.exists || this.occluded(ship.position)) return;
+    if (this.inClearArea(ship.position, SHIP_EDGE_PX)) return;
     const p = this.v1.copy(ship.position).project(this.camera);
-    return Math.abs(p.x) > 0.98 || Math.abs(p.y) > 0.98 || p.z > 1;
+    // Behind the camera, the projection is mirrored.
+    if (p.z > 1) p.multiplyScalar(-1);
+    const i = this.clearInsets;
+    const cx = (i.left + this.cssWidth - i.right) / 2;
+    const cy = (i.top + this.cssHeight - i.bottom) / 2;
+    const dx = ((p.x + 1) / 2) * this.cssWidth - cx;
+    const dy = ((1 - p.y) / 2) * this.cssHeight - cy;
+    const halfW = (this.cssWidth - i.left - i.right) / 2 - POINTER_INSET_PX;
+    const halfH = (this.cssHeight - i.top - i.bottom) / 2 - POINTER_INSET_PX;
+    if (halfW <= 0 || halfH <= 0 || (dx === 0 && dy === 0)) return;
+    const t = Math.min(dx !== 0 ? halfW / Math.abs(dx) : Infinity, dy !== 0 ? halfH / Math.abs(dy) : Infinity);
+    const x = cx + dx * t;
+    const y = cy + dy * t;
+    pointer.position.set((x / this.cssWidth) * 2 - 1, 1 - (y / this.cssHeight) * 2, 0.5).unproject(this.camera);
+    pointer.scale.setScalar((2 * POINTER_PX * tanHalf) / this.cssHeight);
+    const material = pointer.material as SpriteMaterial;
+    // The arrow is drawn pointing up; turn it toward the ship (screen y runs down).
+    material.rotation = Math.atan2(-dy, dx) - Math.PI / 2;
+    material.color.setHex(ship.color);
+    pointer.visible = true;
+  }
+
+  /** An arrow pointing up, drawn once (tinted by the pointer's color). */
+  private arrowTexture(): CanvasTexture {
+    const size = 32;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const g = canvas.getContext('2d');
+    if (g) {
+      g.lineJoin = 'round';
+      g.lineWidth = 3;
+      g.strokeStyle = 'rgba(5, 8, 13, 0.95)';
+      g.fillStyle = '#ffffff';
+      g.beginPath();
+      g.moveTo(size / 2, 3);
+      g.lineTo(size - 5, size - 6);
+      g.lineTo(size / 2, size - 12);
+      g.lineTo(5, size - 6);
+      g.closePath();
+      g.stroke();
+      g.fill();
+    }
+    return new CanvasTexture(canvas);
+  }
+
+  /** A small label in plain words (a part left behind's), drawn once; its center at its bottom. */
+  private labelSprite(text: string): Sprite {
+    const ratio = 2;
+    const font = `${12 * ratio}px system-ui, -apple-system, sans-serif`;
+    const canvas = document.createElement('canvas');
+    const g = canvas.getContext('2d');
+    // Up to two lines of at most about 190 CSS pixels.
+    const lines: string[] = [];
+    if (g) {
+      g.font = font;
+      let line = '';
+      for (const word of text.split(/\s+/)) {
+        const next = line ? `${line} ${word}` : word;
+        if (g.measureText(next).width > 190 * ratio && line) {
+          lines.push(line);
+          line = word;
+        } else line = next;
+      }
+      if (line) lines.push(line);
+      if (lines.length > 2) lines.splice(2, lines.length - 2, `${lines[1]}…`);
+      const width = Math.ceil(Math.max(...lines.map((l) => g.measureText(l).width))) + 8 * ratio;
+      canvas.width = width;
+      canvas.height = lines.length * 16 * ratio + 4 * ratio;
+      g.font = font;
+      g.textAlign = 'center';
+      g.textBaseline = 'top';
+      g.shadowColor = 'rgba(0, 0, 0, 0.9)';
+      g.shadowBlur = 3 * ratio;
+      g.fillStyle = '#e8ecf1';
+      lines.forEach((l, k) => g.fillText(l, width / 2, 2 * ratio + k * 16 * ratio));
+    }
+    const sprite = new Sprite(new SpriteMaterial({ map: new CanvasTexture(canvas), transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false }));
+    sprite.center.set(0.5, 0);
+    sprite.userData['aspect'] = canvas.width / Math.max(1, canvas.height);
+    sprite.userData['pixels'] = canvas.height / ratio;
+    sprite.visible = false;
+    sprite.renderOrder = 11;
+    return sprite;
   }
 
   /** True when the line from the camera to `point` passes through Earth or the Moon. */
@@ -1694,9 +1876,10 @@ export class Stage implements Director {
     this.viewAnchor(this.anchor);
     const delta = this.v1.subVectors(this.anchor, this.controls.target);
     if (delta.lengthSq() > 0) {
-      this.controls.target.add(delta);
+      this.controls.target.copy(this.anchor);
       this.camera.position.add(delta);
-      moved = true;
+      // The controls nudge the target by rounding errors each frame; only a real move needs drawing, so a still scene stops drawing.
+      if (delta.lengthSq() > 1e-24) moved = true;
     }
     const fast = this.viewNow === 'spacecraft' && this.chaseReady ? this.followed.fastForward : 0;
     this.updateFastView(fast);
@@ -1707,7 +1890,18 @@ export class Stage implements Director {
       this.controls.minDistance = this.chaseDistance * 0.08;
       this.controls.maxDistance = this.chaseDistance * 40;
       if (fast > 0.001) this.blendFastView();
-      moved = true;
+      // Draw only when the camera has moved by more than a fraction of a pixel (the chase eases to rest): a stopped clock then draws nothing.
+      const tolerance = 2e-5 * Math.max(this.chaseDistance, 1e-6);
+      if (
+        this.camera.position.distanceToSquared(this.lastChasePosition) > tolerance * tolerance ||
+        this.controls.target.distanceToSquared(this.lastChaseTarget) > tolerance * tolerance ||
+        this.camera.up.distanceToSquared(this.lastChaseUp) > 4e-10
+      ) {
+        moved = true;
+        this.lastChasePosition.copy(this.camera.position);
+        this.lastChaseTarget.copy(this.controls.target);
+        this.lastChaseUp.copy(this.camera.up);
+      }
     }
     const changed = this.updateControls(dt);
     // While fast-forwarding, the ship view holds a steady view of the body and
@@ -1759,6 +1953,7 @@ export class Stage implements Director {
     const bottom = Math.min(Math.max(0, this.insets.bottom), height * 0.7);
     const left = Math.min(Math.max(0, this.insets.left), width * 0.4);
     const right = Math.min(Math.max(0, this.insets.right), width * 0.6);
+    Object.assign(this.clearInsets, { top, right, bottom, left });
     this.clear.width = Math.max(0.25, (width - left - right) / width);
     this.clear.height = Math.max(0.25, (height - top - bottom) / height);
     // Shift the picture so the view's axis passes through the middle of the clear area.
@@ -1876,6 +2071,12 @@ export class Stage implements Director {
     const worldChanged = this.updateWorld();
     if (worldChanged) this.updateShips();
     const fastForward = this.updateFastForward(dt, jumped);
+    const level = this.followed.fastForward;
+    const shown = this.player.playing && (this.fastForwardShown ? level > FAST_FORWARD_OFF : level > FAST_FORWARD_ON);
+    if (shown !== this.fastForwardShown) {
+      this.fastForwardShown = shown;
+      this.notify();
+    }
     const offsetMoving = this.updateViewOffset(dt);
     const cameraMoved = this.updateCamera(dt, jumped, paused);
 
@@ -2063,6 +2264,29 @@ export class Stage implements Director {
     out.up.set(0, 0, 1).applyQuaternion(this.q2);
   }
 
+  /** A round dot with a dark rim, drawn once (tinted by each marker's color). */
+  private dotTexture(): CanvasTexture {
+    if (this.dotMap) return this.dotMap;
+    const size = 32;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const g = canvas.getContext('2d');
+    if (g) {
+      g.fillStyle = 'rgba(5, 8, 13, 0.95)';
+      g.beginPath();
+      g.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#ffffff';
+      g.beginPath();
+      g.arc(size / 2, size / 2, size * 0.32, 0, Math.PI * 2);
+      g.fill();
+    }
+    this.dotMap = new CanvasTexture(canvas);
+    return this.dotMap;
+  }
+
+
   /** How visible a ship's model is now (it fades out while many orbits pass in a moment). */
   private opacityOf(ship: ShipState): number {
     return 1 - ship.fastForward;
@@ -2147,6 +2371,25 @@ export class Stage implements Director {
       return walk;
     };
     const pair = this.pairNow();
+    // In the ship view, how far each ship is a dot rather than a model (see COMPANION_MODEL_M).
+    const companion = (ship: ShipState): number => {
+      if (this.viewNow !== 'spacecraft' || ship === this.followed || !ship.exists || !this.followed.exists) return 0;
+      if (pair && (pair.anchor === ship || pair.mover === ship)) return 0;
+      const meters = this.metersApart(ship, this.followed, t);
+      return Number.isFinite(meters) ? smoothstep(COMPANION_MODEL_M, COMPANION_MARKER_M, meters) : 0;
+    };
+    const dotScale = (2 * COMPANION_MARKER_PX * tanHalf) / this.cssHeight;
+    this.ships.forEach((ship, i) => {
+      const marker = this.companionMarkers[i];
+      if (!marker) return;
+      const level = companion(ship) * this.opacityOf(ship);
+      const units = level > 0.01 ? this.unitsPerPixelAt(ship.position, true, tanHalf) : 0;
+      marker.visible = units > 0;
+      if (!marker.visible) return;
+      marker.position.copy(ship.position);
+      marker.scale.setScalar(dotScale);
+      (marker.material as SpriteMaterial).opacity = level;
+    });
     // The ship that stays put (the main ship, or one of a pair) first, so the one drawn beside it can share its scale.
     const anchorIndex = this.ships.indexOf(pair ? pair.anchor : this.main);
     const moverIndex = pair ? this.ships.indexOf(pair.mover) : -1;
@@ -2169,7 +2412,7 @@ export class Stage implements Director {
       context.sizeScale = anchorSizeScale = sizeScaleOf(ship);
       context.unitsPerPixel = anchorUnits = this.unitsPerPixelAt(ship.position, ship.exists, tanHalf);
       context.metersPerPixel = 0;
-      context.opacity = this.opacityOf(ship);
+      context.opacity = this.opacityOf(ship) * (1 - companion(ship));
       if (pair && moverModel) {
         // Grow or shrink toward the size the two share: the docked pair's, or the larger of their own.
         const own = anchorModel.metersPerPixelOf(anchorModel.shapeAt(t), context);
@@ -2189,7 +2432,7 @@ export class Stage implements Director {
       context.sizeScale = sizeScaleOf(ship);
       context.metersPerPixel = 0;
       context.unitsPerPixel = this.unitsPerPixelAt(ship.position, ship.exists, tanHalf);
-      context.opacity = this.opacityOf(ship);
+      context.opacity = this.opacityOf(ship) * (1 - companion(ship));
       const anchorScale = anchorModel?.drawnMetersPerPixel ?? 0;
       const spread = pair !== null && (pair.arranged > 0 || this.viewNow === 'spacecraft');
       if (pair && spread && anchorModel && i === moverIndex && anchorUnits > 0 && anchorScale > 0) {
@@ -2247,8 +2490,21 @@ export class Stage implements Director {
       const standing = lander !== undefined && lander.root.visible && this.path.phaseAt(part.shipId, t)?.kind === 'surface';
       context.metersPerPixel = standing ? lander.drawnMetersPerPixel : 0;
       part.update(shown, this.sitePosition, this.siteUp, site?.front ?? this.worldUp, context);
+      // Its label, only when the camera is close to it.
+      const label = this.labels[i];
+      if (label) {
+        const near = 1 - smoothstep(LABEL_NEAR_MOON_RADII[0], LABEL_NEAR_MOON_RADII[1], this.camera.position.distanceTo(this.sitePosition) / MOON_RADIUS);
+        label.visible = part.root.visible && context.unitsPerPixel > 0 && near > 0.01;
+        if (label.visible) {
+          part.labelPoint(label.position);
+          const h = (2 * (label.userData['pixels'] as number) * tanHalf) / this.cssHeight;
+          label.scale.set(h * (label.userData['aspect'] as number), h, 1);
+          (label.material as SpriteMaterial).opacity = near;
+        }
+      }
     }
     context.metersPerPixel = 0;
+    this.updatePointer(tanHalf);
   }
 
   /* ---------------------------------------------------------------- */

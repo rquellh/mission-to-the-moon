@@ -71,7 +71,10 @@ export function setUpTourPanel(tour: Tour, { onExplore, onRestart }: TourPanelOp
         dot.classList.toggle('tour__dot--done', i < tour.index);
         dot.classList.toggle('tour__dot--current', i === tour.index);
       });
+      // Back is disabled at the first stop; if it had focus, Next takes it.
+      const backHadFocus = document.activeElement === back;
       back.disabled = tour.index === 0;
+      if (backHadFocus && back.disabled) next.focus();
       nextLabel.textContent = tour.index >= tour.total - 1 ? copy.tour.finish : copy.tour.next;
     }
 

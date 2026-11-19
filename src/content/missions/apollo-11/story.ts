@@ -629,6 +629,7 @@ export const story: Mission = {
       audio: {
         src: "media/apollo-11/the-eagle-has-landed.mp3",
         seconds: 14.78,
+        note: "On the recording, Mission Control starts to say \"Tranquility\", stumbles, and says it again. That is the \"Twan\".",
         transcript: [
           { speaker: "Neil Armstrong", words: "Houston, Tranquility Base here. The Eagle has landed." },
           {

@@ -13,7 +13,6 @@ const ABN = "https://www.nasa.gov/wp-content/uploads/static/history/SP-4029/";
 /** Apollo by the Numbers' "Launch Vehicle/Spacecraft Key Facts" table, printed over three pages. */
 const KEY_FACTS = [1, 2, 3].map((page) => `${ABN}Apollo_18-1${page}_Launch_Vehicle-Spacecraft_Key_Facts.htm`);
 const PROJECT_GEMINI = "https://ntrs.nasa.gov/api/citations/19670001419/downloads/19670001419.pdf";
-
 /** Meters in a foot (the international foot, exact). Conversions with it are ours, and say so. */
 export const METERS_PER_FOOT = 0.3048;
 
@@ -49,8 +48,10 @@ export const ROCKETS: readonly Rocket[] = [
           url: PROJECT_GEMINI,
         },
       ],
+      // The other figure is named here, not cited: a citation must support 109 feet.
+      // Its source is registered as "rockets-ksc-early-years" (src/content/extras/rockets.ts).
       discrepancy:
-        'NASA Kennedy Space Center\'s "The Early Years: Mercury to Apollo-Soyuz" (Information Summaries PMS 017-C, September 1991) says "The combined Gemini-Titan stood 32.9 meters (108 feet) high" (page 2) and lists "Height: 32.9 meters (108 feet)" (PDF page 10). We follow the earlier NASA document, from 1966, during the Gemini program.',
+        'NASA Kennedy Space Center\'s "The Early Years: Mercury to Apollo-Soyuz" (Information Summaries PMS 017-C, September 1991; https://www.nasa.gov/wp-content/uploads/2015/03/167718main_early_years.pdf) says "The combined Gemini-Titan stood 32.9 meters (108 feet) high" (printed page 2, PDF page 3) and lists "Height: 32.9 meters (108 feet)" (PDF page 10). We follow the earlier NASA document, Project Gemini (1966), from during the Gemini program.',
     },
     about: {
       text: {

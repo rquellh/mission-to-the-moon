@@ -73,13 +73,16 @@ export function createAudioPlayer(clip: AudioClip): AudioPlayer {
     transcript.append(item);
   }
 
+  // A short note about the recording, when it has one (for example, a stumble in it).
+  const note = clip.note ? el('p', 'audio__note', clip.note) : null;
+
   const credit = el('p', 'audio__credit');
   credit.append(`${copy.audio.credit} ${clip.credit}. `, externalLink(clip.sourceUrl, copy.card.original));
 
   // State changes are spoken here, next to the button that caused them.
   const status = el('p', 'visually-hidden');
   status.setAttribute('role', 'status');
-  root.append(controls, transcript, credit, status);
+  root.append(controls, transcript, ...(note ? [note] : []), credit, status);
 
   type State = 'idle' | 'loading' | 'playing' | 'paused' | 'failed';
   let state: State = 'idle';

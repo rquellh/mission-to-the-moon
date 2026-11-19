@@ -107,6 +107,12 @@ export interface AudioClip {
   seconds: number;
   /** Every word spoken, in order, with who speaks. */
   transcript: { speaker: string; words: string }[];
+  /**
+   * One plain sentence shown under the transcript, when the recording needs
+   * a word of explanation (a stumble, a cut, a voice that is hard to place).
+   * It describes the recording itself, so the recording is its source.
+   */
+  note?: string;
   /** Credit line as the source gives it, for example "NASA". */
   credit: string;
   /** The page where the original recording can be found. */

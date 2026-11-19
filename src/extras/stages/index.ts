@@ -78,6 +78,11 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
   } catch (error) {
     console.warn(error);
   }
+  // The lineup's labels, one per column of the canvas, under each rocket (the buttons below carry the names for screen readers).
+  const tags = el("div", "stages__tags");
+  tags.setAttribute("aria-hidden", "true");
+  for (const id of CHOICES) tags.append(el("span", "stages__tag", context.summaries.find((summary) => summary.id === id)?.name ?? id));
+  if (view) stage.append(tags);
   if (!view) {
     canvas.remove();
     stage.classList.add("stages__stage--flat");
@@ -123,7 +128,7 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
     panel.replaceChildren(...children);
   };
   const heading = (text: string): HTMLHeadingElement => {
-    const h = el("h2", "extra-heading", text);
+    const h = el("h3", "extra-heading", text);
     h.tabIndex = -1;
     return h;
   };
@@ -155,6 +160,8 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
 
   /** Open one mission's rocket, or say why it cannot be shown. */
   const openRocket = (id: string): void => {
+    // The lineup goes as soon as a rocket is picked.
+    view?.clear();
     showLoading("Loading the rocket.");
     const mine = turn;
     load(id).then(
@@ -171,33 +178,72 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
     );
   };
 
+  /** The choice of rockets: the buttons at once, each rocket's name and picture as its mission loads. */
   const showChoose = (): void => {
     stop();
-    showLoading("Loading the rockets.");
+    const title = heading("Pick a rocket");
+    const intro = el("p", "extra-text", "Each one climbs to orbit by dropping parts on the way up. You drop them.");
+    const list = el("ul", "stages__choices");
+    const names = CHOICES.map((id, index) => {
+      const name = el("span", "stages__choice-name", `${summaryOf(id)?.name ?? id}'s rocket`);
+      const flight = el("span", "stages__choice-flight", flightLine(id));
+      const pick = button("stages__choice");
+      pick.append(name, flight);
+      const mark = (): void => view?.highlight(index);
+      const unmark = (): void => view?.highlight(null);
+      pick.addEventListener("click", () => openRocket(id), { signal: context.signal });
+      pick.addEventListener("pointerenter", mark, { signal: context.signal });
+      pick.addEventListener("focus", mark, { signal: context.signal });
+      pick.addEventListener("pointerleave", unmark, { signal: context.signal });
+      pick.addEventListener("blur", unmark, { signal: context.signal });
+      const item = el("li");
+      item.append(pick);
+      list.append(item);
+      return { name, flight };
+    });
+    const children: Node[] = [title, intro, list];
+    if (view) children.push(el("p", "extra-note", "The drawings are simplified, and all drawn the same height: they are not to scale."));
+    setScreen("choose", ...children);
+    view?.showLineup(
+      CHOICES.length,
+      `Simplified drawings of the three rockets standing side by side, not to scale: ${CHOICES.map((id) => summaryOf(id)?.name ?? id).join(", ")}. Tap one to pick it, or use the buttons.`,
+    );
+    const first = list.querySelector("button");
+    if (first) focus(first);
     const mine = turn;
-    void Promise.allSettled(CHOICES.map(load)).then((settled) => {
-      if (disposed || turn !== mine) return;
-      const title = heading("Pick a rocket");
-      const intro = el("p", "extra-text", "Each one climbs to orbit by dropping parts on the way up. You drop them.");
-      const list = el("ul", "stages__choices");
-      CHOICES.forEach((id, index) => {
-        const result = settled[index];
-        const mission = result?.status === "fulfilled" ? result.value.mission : undefined;
-        const pick = button("stages__choice");
-        pick.append(
-          el("span", "stages__choice-name", mission?.launch?.value.vehicle ?? `${summaryOf(id)?.name ?? id}'s rocket`),
-          el("span", "stages__choice-flight", flightLine(id, mission?.name)),
-        );
-        pick.addEventListener("click", () => openRocket(id), { signal: context.signal });
-        const item = el("li");
-        item.append(pick);
-        list.append(item);
-      });
-      setScreen("choose", title, intro, list);
-      const first = list.querySelector("button");
-      if (first) focus(first);
+    CHOICES.forEach((id, index) => {
+      load(id).then(
+        (bundle) => {
+          if (disposed || turn !== mine) return;
+          const shown = names[index];
+          if (shown) {
+            shown.name.textContent = bundle.mission.launch?.value.vehicle ?? shown.name.textContent;
+            shown.flight.textContent = flightLine(id, bundle.mission.name);
+          }
+          const climb = climbFor(bundle);
+          if (climb) view?.setLineupRocket(index, climb.liftoffParts);
+        },
+        (error: unknown) => console.warn(error),
+      );
     });
   };
+
+  // A tap on the lineup picks the rocket in that column; pointing at one marks it (the buttons do the same by keyboard).
+  const columnAt = (event: MouseEvent): number => {
+    const box = canvas.getBoundingClientRect();
+    const column = Math.floor(((event.clientX - box.left) / Math.max(1, box.width)) * CHOICES.length);
+    return Math.min(CHOICES.length - 1, Math.max(0, column));
+  };
+  canvas.addEventListener(
+    "click",
+    (event) => {
+      const id = CHOICES[columnAt(event)];
+      if (screen === "choose" && id) openRocket(id);
+    },
+    { signal: context.signal },
+  );
+  canvas.addEventListener("pointermove", (event) => screen === "choose" && view?.highlight(columnAt(event)), { signal: context.signal });
+  canvas.addEventListener("pointerleave", () => screen === "choose" && view?.highlight(null), { signal: context.signal });
 
   const showMissing = (name: string, why: "noSequence" | "notLoaded"): void => {
     stop();

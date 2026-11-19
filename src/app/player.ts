@@ -1,7 +1,12 @@
-import type { Player, StoryMap } from './contract';
+import type { Player, StoryMap } from './contract.ts';
 
-/** The longest step one frame may advance, so a stalled tab does not leap ahead. */
-const MAX_FRAME_SECONDS = 0.1;
+/**
+ * The longest step one frame may advance, so a stalled tab does not leap
+ * ahead. It is long enough that a slow device drawing only 4 frames a second
+ * still plays at the right pace (at 0.1 it fell behind below 10 frames a
+ * second, which made the tour's run-up to each stop drag on).
+ */
+const MAX_FRAME_SECONDS = 0.25;
 
 /**
  * The mission clock. It advances in story time on each animation frame while
