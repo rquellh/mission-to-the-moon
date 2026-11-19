@@ -320,6 +320,7 @@ export const story: Mission = {
     },
     {
       id: "liftoff",
+      handsOn: "stages",
       title: "Liftoff",
       chapter: "launch",
       elapsed: "000:00:00",
@@ -351,6 +352,7 @@ export const story: Mission = {
     /* ----------------------- Caught on the first orbit ---------------------- */
     {
       id: "rendezvous",
+      handsOn: "docking",
       title: "Caught on the first orbit",
       chapter: "first-orbit",
       elapsed: "001:25:00",

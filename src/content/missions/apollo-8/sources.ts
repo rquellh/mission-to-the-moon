@@ -45,4 +45,12 @@ export const sources = {
     checked: "2026-11-19",
     use: "Where Apollo 8 was over the Moon when the Earthrise photograph was taken, on its fourth pass, and the black-and-white photograph taken about a minute before the first color one.",
   },
+  "apollo-8-technical-transcript": {
+    title: "Apollo 8 Technical Air-to-Ground Voice Transcription, December 1968",
+    publisher:
+      "NASA Manned Spacecraft Center (a scan with a text layer, listed on NASA's Mission Transcripts page, https://www.nasa.gov/history/mission-transcripts-mercury-gemini-and-apollo/)",
+    url: "https://www.nasa.gov/wp-content/uploads/2026/01/as08-tec.pdf",
+    checked: "2026-11-19",
+    use: "The words of Borman's close to the Christmas Eve broadcast, heard in NASA's recording of it. Its times are days, hours, minutes and seconds from range zero: 03 14 08 07 is 86:08:07.",
+  },
 } as const satisfies Record<string, Source>;

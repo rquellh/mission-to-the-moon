@@ -71,9 +71,30 @@ export type VehiclePart =
    * ("alone" or "docked" layouts), or by the service module of an Apollo
    * command and service module ("alone", for the film-retrieval spacewalks).
    * It fades in and out at its changes and does not change the model's
-   * size on screen. How far out it floats is an illustration.
+   * size on screen. How far out it floats is an illustration. The hatch
+   * stands open while it is listed. In the ship view the craft is drawn
+   * close up while a spacewalker is listed.
    */
   | "spacewalker"
+  /**
+   * A "standup" spacewalk: an astronaut standing in the open hatch, head
+   * and shoulders outside, not floating free and with no tether: the
+   * Gemini pilot in the right-hand hatch ("alone" or "docked" layouts), or
+   * an Apollo crewmate in the command module's side hatch ("alone" or
+   * "docked"). The hatch is drawn open. Like "spacewalker", it fades in and
+   * out, does not change the model's size, and the ship view draws the craft
+   * close up while it is listed.
+   */
+  | "standup-spacewalker"
+  /**
+   * The crew hatch standing open with no one outside: the Gemini
+   * spacecraft's right-hand hatch, or the Apollo command module's side
+   * hatch. List it with the spacecraft's parts from the cited moment the
+   * hatch opened (before a spacewalker goes out, or after one comes back in
+   * and before it closes); "spacewalker" opens the hatch by itself. It does
+   * not change the model's size.
+   */
+  | "open-hatch"
   /* Gemini and its Titan II launch vehicle. */
   /** The Titan II's first stage. */
   | "titan-first-stage"

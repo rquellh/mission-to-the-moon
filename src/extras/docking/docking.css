@@ -1,0 +1,328 @@
+/* "Dock two spacecraft". Phone first: the 3D view on top, filling what the
+   controls leave; side by side on wide screens. */
+
+[data-extra="docking"].extra-host {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-extra="docking"] .docking {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+
+[data-extra="docking"] .docking__view {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 220px;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-bg);
+}
+
+[data-extra="docking"] .docking__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* No WebGL: a short note and a distance bar instead of the picture. */
+[data-extra="docking"] .docking__view--flat {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 14px 16px;
+  background: var(--color-raised);
+}
+
+[data-extra="docking"] .docking__fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-extra="docking"] .docking__track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: var(--color-line);
+}
+
+[data-extra="docking"] .docking__track-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--color-accent);
+}
+
+[data-extra="docking"] .docking__side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+[data-extra="docking"] .docking__intro,
+[data-extra="docking"] .docking__fly,
+[data-extra="docking"] .docking__after {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+[data-extra="docking"] .docking__intro .extra-heading,
+[data-extra="docking"] .docking__after .extra-heading {
+  margin: 0;
+}
+
+[data-extra="docking"] .docking__intro .sources,
+[data-extra="docking"] .docking__after .sources {
+  margin-top: 0;
+}
+
+[data-extra="docking"] .docking__start {
+  align-self: flex-start;
+  min-width: 140px;
+}
+
+/* Read-outs. */
+[data-extra="docking"] .docking__readouts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+[data-extra="docking"] .docking__readout {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-raised);
+  transition: border-color 200ms var(--ease-out);
+}
+
+[data-extra="docking"] .docking__readout.is-good {
+  border-color: var(--color-accent-line);
+}
+
+[data-extra="docking"] .docking__readout.is-warn {
+  border-style: dashed;
+  border-color: var(--color-text-muted);
+}
+
+[data-extra="docking"] .docking__label {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+[data-extra="docking"] .docking__value {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+[data-extra="docking"] .docking__readout-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+[data-extra="docking"] .docking__sight {
+  flex: none;
+  width: 56px;
+  height: 56px;
+}
+
+[data-extra="docking"] .docking__cross {
+  stroke: var(--color-line-strong);
+  stroke-width: 1;
+}
+
+[data-extra="docking"] .docking__zone {
+  fill: var(--color-accent-soft);
+  stroke: var(--color-accent-line);
+  stroke-width: 1.5;
+}
+
+[data-extra="docking"] .docking__nose {
+  fill: var(--color-csm);
+}
+
+[data-extra="docking"] .docking__drift {
+  stroke: var(--color-csm);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  opacity: 0.6;
+}
+
+[data-extra="docking"] .docking__pips {
+  display: flex;
+  gap: 4px;
+  margin: 10px 0 8px;
+}
+
+[data-extra="docking"] .docking__pip {
+  flex: 1 1 0;
+  height: 12px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 3px;
+}
+
+[data-extra="docking"] .docking__pip.is-on {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+/* The too-fast pips: dashed when empty, striped when lit, and set apart. */
+[data-extra="docking"] .docking__pip--fast {
+  border-style: dashed;
+}
+
+[data-extra="docking"] .docking__pip:not(.docking__pip--fast) + .docking__pip--fast {
+  margin-left: 6px;
+}
+
+[data-extra="docking"] .docking__pip--fast.is-on {
+  border-style: solid;
+  background: repeating-linear-gradient(135deg, var(--color-accent) 0 3px, transparent 3px 6px);
+}
+
+[data-extra="docking"] .docking__coach {
+  min-height: 1.5em;
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+/* The thrusters: a direction pad for thumbs, with forward and back beside it. */
+[data-extra="docking"] .docking__pad {
+  display: grid;
+  grid-template-columns: repeat(3, 60px) minmax(0, 1fr);
+  grid-template-rows: repeat(3, 56px);
+  gap: 8px;
+}
+
+[data-extra="docking"] .docking__thrust {
+  min-height: 0;
+  height: 100%;
+  padding: 0 10px;
+  border-radius: 14px;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+[data-extra="docking"] .docking__thrust--up {
+  grid-area: 1 / 2;
+}
+
+[data-extra="docking"] .docking__thrust--left {
+  grid-area: 2 / 1;
+}
+
+[data-extra="docking"] .docking__thrust--right {
+  grid-area: 2 / 3;
+}
+
+[data-extra="docking"] .docking__thrust--down {
+  grid-area: 3 / 2;
+}
+
+[data-extra="docking"] .docking__thrust--forward {
+  grid-area: 1 / 4;
+}
+
+[data-extra="docking"] .docking__thrust--back {
+  grid-area: 2 / 4;
+}
+
+[data-extra="docking"] .docking__over {
+  grid-area: 3 / 4;
+  min-height: 0;
+  height: 100%;
+}
+
+[data-extra="docking"] .docking__thrust.is-firing {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+[data-extra="docking"] .docking__arrow {
+  width: 26px;
+  height: 26px;
+}
+
+[data-extra="docking"] .docking__key {
+  padding: 1px 6px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 5px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Key hints only where there is likely a keyboard. */
+@media (hover: none), (pointer: coarse) {
+  [data-extra="docking"] .docking__key,
+  [data-extra="docking"] .docking__keys {
+    display: none;
+  }
+}
+
+[data-extra="docking"] .docking__docked {
+  margin: 0;
+  color: var(--color-accent);
+  font-size: 1.0625rem;
+  font-weight: 700;
+}
+
+[data-extra="docking"] .docking__after-actions {
+  margin-top: 4px;
+}
+
+[data-extra="docking"] .docking__simple {
+  font-size: 0.8125rem;
+  color: var(--color-text-faint);
+}
+
+@media (min-width: 860px), (min-width: 600px) and (orientation: landscape) {
+  [data-extra="docking"] .docking {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 20px;
+  }
+
+  [data-extra="docking"] .docking__view {
+    min-height: 300px;
+  }
+
+  [data-extra="docking"] .docking__view--flat {
+    flex: 1 1 auto;
+    align-self: flex-start;
+  }
+
+  [data-extra="docking"] .docking__side {
+    flex: 0 0 min(380px, 42%);
+  }
+
+  [data-extra="docking"] .docking__pad {
+    grid-template-columns: repeat(3, 64px) minmax(0, 1fr);
+    grid-template-rows: repeat(3, 60px);
+  }
+}
+
+/* The sections above set their own display, so `hidden` needs saying again. */
+[data-extra="docking"] [hidden] {
+  display: none !important;
+}

@@ -291,6 +291,7 @@ export const story: Mission = {
     /* --------------------------- To the Moon -------------------------- */
     {
       id: "liftoff",
+      handsOn: "stages",
       title: "Liftoff",
       chapter: "outbound",
       elapsed: "000:00:00.57",

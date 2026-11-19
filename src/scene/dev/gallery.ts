@@ -22,6 +22,12 @@
  *   gallery.html?flight=pair&main=gemini&target=atda&t=06:10:00&view=spacecraft
  *   keys: space plays or pauses; 1-4 Earth, Moon, Ship, Journey views; +/- rate
  *   &reduced=1 asks for reduced motion
+ *
+ * The extras' kit (src/scene/kit.ts): gallery.html?kit=1 shows two small
+ * views made with it, a Saturn IB dropping its first stage over and over,
+ * and the Moon with a marker at Tranquility Base turned toward the camera.
+ * &cycles=20 first opens and disposes a view (with a vehicle and the Moon)
+ * that many times, to check that nothing is left behind.
  */
 import {
   AmbientLight,
@@ -44,6 +50,7 @@ import { buildFlightPath, createStoryTime } from '../../sim';
 import { SHIP_AMBIENT_INTENSITY, SHIP_COLORS, SHIP_SUN_INTENSITY } from '../config';
 import { Stage } from '../stage';
 import { buildFleet, type PoseContext } from '../vehicles';
+import { COLORS, createMiniView, createMoon, createVehicle, stackHeights } from '../kit';
 import { fixture } from './fixtures';
 
 const PRESETS: Record<string, string> = {
@@ -58,6 +65,8 @@ const PRESETS: Record<string, string> = {
   'apollo-13':
     'm=alone:service-module-damaged+command-module&m=docked:lm-descent-stage+lm-ascent-stage+command-module&m=alone:service-module-damaged&yaw=15&pitch=10',
   'gemini-targets': 'm=docked:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+agena&m=docked:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+atda&yaw=30&pitch=15',
+  standup:
+    'm=alone:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+standup-spacewalker&m=docked:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+agena+standup-spacewalker&m=alone:service-module+command-module+standup-spacewalker&yaw=-25&pitch=30',
   warnings: 'm=alone:lunar-rover&m=launch:titan-first-stage+titan-second-stage+spacewalker&m=alone:third-stage+gemini-main-parachute',
 };
 
@@ -81,8 +90,82 @@ console.warn = (...args: unknown[]): void => {
 };
 
 const flightName = params.get('flight');
-if (flightName) void showFlight(flightName);
+if (params.get('kit') === '1') showKit();
+else if (flightName) void showFlight(flightName);
 else showModels();
+
+/* ------------------------------------------------------------------ */
+/* The extras' kit.                                                    */
+/* ------------------------------------------------------------------ */
+
+function showKit(): void {
+  canvas.remove();
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;display:flex;flex-direction:' + (window.innerWidth < 700 ? 'column' : 'row') + ';gap:6px;padding:40px 6px 6px;box-sizing:border-box';
+  const make = (): HTMLCanvasElement => {
+    const c = document.createElement('canvas');
+    c.tabIndex = 0;
+    c.style.cssText = 'flex:1;min-width:0;min-height:0;width:100%;height:100%;border-radius:8px';
+    box.append(c);
+    return c;
+  };
+  document.body.append(box);
+  const a = make();
+  const b = make();
+  // Open and close views many times, as the extras sheet does, before the real ones.
+  const cycles = Number(params.get('cycles') ?? 0);
+  for (let i = 0; i < cycles; i += 1) {
+    const scratch = document.createElement('canvas');
+    scratch.style.cssText = 'position:fixed;left:0;top:0;width:200px;height:200px';
+    document.body.append(scratch);
+    const view = createMiniView(scratch, { stars: true });
+    const vehicle = createVehicle({ layout: 'alone', parts: ['service-module', 'command-module'] });
+    const globe = createMoon({ view });
+    view.scene.add(vehicle.object, globe.root);
+    globe.addMarker(10, 20);
+    view.renderer.render(view.scene, view.camera);
+    vehicle.dispose();
+    globe.dispose();
+    view.dispose();
+    scratch.remove();
+  }
+  label.dataset['title'] = `kit: createMiniView + createVehicle (top or left), createMoon + addMarker + turnTo (bottom or right)${cycles ? `; ${cycles} views opened and disposed first` : ''}`;
+  label.textContent = label.dataset['title'];
+
+  // A Saturn IB, its first stage drifting away and coming back.
+  const rocketView = createMiniView(a, { stars: true });
+  const rocket = createVehicle({ layout: 'launch', parts: ['saturn-ib-first-stage', 'third-stage', 'adapter', 'service-module', 'command-module', 'escape-tower'] });
+  rocketView.scene.add(rocket.object);
+  rocketView.frame(new Vector3(0, rocket.top / 2, 0), rocket.top * 0.6);
+  let clock = 0;
+  rocketView.addFrameCallback((seconds) => {
+    if (rocketView.reducedMotion) return false;
+    clock = (clock + seconds) % 4;
+    rocket.drift('saturn-ib-first-stage', clock < 1 ? 0 : 12 * (clock - 1) * (clock - 1));
+    rocket.setPartVisible('saturn-ib-first-stage', clock < 3.5);
+    return true;
+  });
+  const heights = stackHeights();
+  label.textContent = `${label.dataset['title']}\nmodel heights (m): Saturn V ${heights.saturnV}, Saturn IB ${heights.saturnIB}, Titan II ${heights.titanII}, Atlas-Agena ${heights.atlasAgena}`;
+
+  // The Moon, Tranquility Base marked and turned toward the camera.
+  const moonView = createMiniView(b, { stars: true, lighting: 'globes' });
+  const moon = createMoon({ view: moonView });
+  moonView.scene.add(moon.root);
+  const sun = new Vector3(0.4, 0.3, 1).normalize();
+  moonView.setSunDirection(sun);
+  moon.setSunDirection(sun);
+  moonView.frame(new Vector3(), moon.radius);
+  moon.addMarker(0.67, 23.47);
+  void moon.ready.then(() => moon.turnTo(0.67, 23.47, moonView.camera.position.clone(), 1.5));
+  b.addEventListener('click', (event) => {
+    const place = moon.pick(event.offsetX, event.offsetY);
+    if (place) {
+      moon.addMarker(place.latitude, place.longitude, { style: 'dot', color: COLORS.other });
+      label.textContent = `picked ${place.latitude.toFixed(2)}, ${place.longitude.toFixed(2)}`;
+    }
+  });
+}
 
 /* ------------------------------------------------------------------ */
 /* Models side by side.                                                */
@@ -150,6 +233,7 @@ function showModels(): void {
     metersPerPixel: 1,
     opacity: 1,
     glow: 1,
+    focus: 0,
   };
   const site = params.get('site') === '1';
   const poses = changes.map((c) => {

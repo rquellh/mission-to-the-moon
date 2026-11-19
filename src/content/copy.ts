@@ -49,6 +49,22 @@ export const copy = {
       gemini: 'Gemini',
       apollo: 'Apollo',
     },
+    /** The extras, in two small groups under the missions. */
+    extras: {
+      'hands-on': 'Try it yourself',
+      explore: 'More to explore',
+    },
+    open: 'Open',
+    openExtra: (title: string) => `Open ${title}`,
+  },
+
+  /** The full-screen sheet an extra opens in. */
+  extra: {
+    loadingUnnamed: 'Loading…',
+    failed: (title: string) => `${title} did not load. Check your connection and reload the page, or go back to the mission.`,
+    failedUnnamed: 'This did not load. Check your connection and reload the page, or go back to the mission.',
+    reload: 'Reload',
+    back: 'Back to the mission',
   },
 
   /** A page of remembrance, for a crew that did not fly. */
@@ -100,6 +116,7 @@ export const copy = {
     fromLiftoff: (span: string, before: boolean) => `${span} ${before ? 'before' : 'after'} liftoff`,
     /** Added to the time on flights longer than two days. */
     onDay: (day: number) => `day ${day} of the flight`,
+    seconds: (count: number) => `${count} ${count === 1 ? 'second' : 'seconds'}`,
   },
 
   timeline: {
@@ -131,6 +148,25 @@ export const copy = {
     expand: 'Show the whole card',
     collapse: 'Show less of the card',
     nowShowing: (title: string, spokenTime: string) => `${title}, ${spokenTime}.`,
+    /** The button that opens an event's hands-on extra. */
+    tryIt: 'Try it',
+    tryItLabel: (title: string) => `Try it: ${title}`,
+  },
+
+  /** The recording player on an event card. Its words are always shown as text. */
+  audio: {
+    label: 'Recording',
+    play: 'Play',
+    pause: 'Pause',
+    loading: 'Loading…',
+    playLabel: (length: string) => `Play the recording, ${length}`,
+    pauseLabel: 'Pause the recording',
+    playing: 'Playing the recording.',
+    paused: 'Recording paused.',
+    ended: 'The recording has ended.',
+    failed: 'The recording did not load. Press Play to try again.',
+    transcript: 'What they said',
+    credit: 'Recording:',
   },
 
   tour: {
@@ -217,6 +253,8 @@ export const copy = {
     /** Sources that many missions cite. */
     shared: 'Used by many missions',
     otherMissions: 'Other missions',
+    /** The extras' own sources. */
+    extras: 'Things to try and explore',
     sourceCount: (count: number) => `${count} ${count === 1 ? 'source' : 'sources'}`,
     photos: 'Photos',
     photosNote: 'Each mission’s photos are credited on its own cards, and listed here when that mission is open.',

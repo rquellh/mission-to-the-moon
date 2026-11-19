@@ -78,6 +78,12 @@ export interface Director {
   setView(view: EventView): void;
   /** Keep the framed subject clear of the parts of the canvas the interface covers. */
   setViewInsets(insets: ViewInsets): void;
+  /**
+   * Stop drawing (false) while something covers the whole view, such as an
+   * extra's full-screen sheet with its own 3D view, and start again (true).
+   * Optional, so a scene without it still works; it then just keeps drawing.
+   */
+  setDrawing?(drawing: boolean): void;
   /** Hear when the view or the scale mode changes. Returns a function that stops listening. */
   subscribe(listener: (director: Director) => void): () => void;
 }

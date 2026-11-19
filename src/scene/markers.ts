@@ -21,8 +21,11 @@ const vertexShader = /* glsl */ `
   attribute vec3 truePosition;
   attribute vec3 aColor;
   attribute float eventIndex;
+  attribute float aGroup;
+  uniform float uGroupOpacity[MAX_GROUPS];
 
   varying vec3 vColor;
+  varying float vGroupOpacity;
   varying float vKind;
   varying float vAhead;
 
@@ -37,6 +40,7 @@ const vertexShader = /* glsl */ `
     vAhead = eventIndex > uCurrent + 0.5 ? 1.0 : 0.0;
     gl_PointSize = (current ? uCurrentSize : uSize) * uPixelRatio;
     vColor = aColor;
+    vGroupOpacity = aGroup < 0.0 ? 1.0 : uGroupOpacity[int(aGroup + 0.5)];
   }
 `;
 
@@ -46,6 +50,7 @@ const fragmentShader = /* glsl */ `
   varying vec3 vColor;
   varying float vKind;
   varying float vAhead;
+  varying float vGroupOpacity;
 
   void main() {
     vec2 p = gl_PointCoord * 2.0 - 1.0;
@@ -75,7 +80,8 @@ const fragmentShader = /* glsl */ `
       color = mix(rim, vColor, fill);
       alpha = outside * (vAhead > 0.5 ? 0.6 : 1.0);
     }
-    gl_FragColor = vec4(color, alpha * uOpacity);
+    if (vGroupOpacity < 0.01) discard;
+    gl_FragColor = vec4(color, alpha * uOpacity * vGroupOpacity);
     #include <colorspace_fragment>
   }
 `;
@@ -87,6 +93,8 @@ export interface MarkerSet {
   setCurrent(index: number): void;
   /** Fade the whole set (0 hidden, 1 shown). */
   setOpacity(opacity: number): void;
+  /** Fade the markers of one group (a ship's, see MarkerPoint.group). */
+  setGroupOpacity(group: number, opacity: number): void;
   setPixelRatio(ratio: number): void;
   dispose(): void;
 }
@@ -97,7 +105,12 @@ export interface MarkerPoint {
   color: number;
   /** The event's index, or -1 for a site marker. */
   eventIndex: number;
+  /** The group it fades with (the index of the ship it is drawn on), if any. */
+  group?: number;
 }
+
+/** Most groups of markers that fade separately. */
+const MAX_GROUPS = 8;
 
 export function createMarkers(points: readonly MarkerPoint[], site: boolean): MarkerSet {
   const geometry = new BufferGeometry();
@@ -105,6 +118,7 @@ export function createMarkers(points: readonly MarkerPoint[], site: boolean): Ma
   const real: number[] = [];
   const colors: number[] = [];
   const indices: number[] = [];
+  const groups: number[] = [];
   const color = new Color();
   for (const point of points) {
     readable.push(point.readable[0] ?? 0, point.readable[1] ?? 0, point.readable[2] ?? 0);
@@ -112,11 +126,13 @@ export function createMarkers(points: readonly MarkerPoint[], site: boolean): Ma
     color.set(point.color);
     colors.push(color.r, color.g, color.b);
     indices.push(point.eventIndex);
+    groups.push(point.group !== undefined && point.group < MAX_GROUPS ? point.group : -1);
   }
   geometry.setAttribute('position', new Float32BufferAttribute(readable, 3));
   geometry.setAttribute('truePosition', new Float32BufferAttribute(real, 3));
   geometry.setAttribute('aColor', new Float32BufferAttribute(colors, 3));
   geometry.setAttribute('eventIndex', new Float32BufferAttribute(indices, 1));
+  geometry.setAttribute('aGroup', new Float32BufferAttribute(groups, 1));
 
   const material = new ShaderMaterial({
     uniforms: {
@@ -126,7 +142,9 @@ export function createMarkers(points: readonly MarkerPoint[], site: boolean): Ma
       uSize: { value: site ? SITE_MARKER_SIZE_PX : MARKER_SIZE_PX },
       uCurrentSize: { value: MARKER_CURRENT_SIZE_PX },
       uOpacity: { value: 1 },
+      uGroupOpacity: { value: new Array<number>(MAX_GROUPS).fill(1) },
     },
+    defines: { MAX_GROUPS },
     vertexShader,
     fragmentShader,
     transparent: true,
@@ -142,6 +160,7 @@ export function createMarkers(points: readonly MarkerPoint[], site: boolean): Ma
     uPixelRatio: { value: number };
     uCurrent: { value: number };
     uOpacity: { value: number };
+    uGroupOpacity: { value: number[] };
   };
 
   return {
@@ -155,6 +174,9 @@ export function createMarkers(points: readonly MarkerPoint[], site: boolean): Ma
     setOpacity(opacity) {
       uniforms.uOpacity.value = opacity;
       mesh.visible = opacity > 0.01;
+    },
+    setGroupOpacity(group, opacity) {
+      if (group >= 0 && group < MAX_GROUPS) uniforms.uGroupOpacity.value[group] = opacity;
     },
     setPixelRatio(ratio) {
       uniforms.uPixelRatio.value = ratio;

@@ -34,11 +34,21 @@
  *   minutes before (section 5.1.5.2.2). The turn, earlier in that half hour,
  *   is not drawn.
  *
- * The spacewalker is drawn from White's egress to the start of his ingress
- * (section 4.1). The model opens the right-hand hatch only while the
- * spacewalker is out, so the five minutes White stood in the open hatch
- * before he left (from 04:18, Gemini chronology) are drawn with the hatch
- * shut. How far out he floats is the scene's illustration.
+ * The spacewalk follows the mission report's times (egress, start of
+ * ingress, hatch closure, section 4.1), with the moments it does not time
+ * (the hatch opening, White standing up, White back inside) from Table D of
+ * the Gemini chronology's Appendix 1, all to the minute:
+ * - The hatch open with no one outside from 04:18 (Table D, "Hatch
+ *   opening"), White standing in it from 04:20 ("Crewman standing"): he
+ *   spent 4 or 5 minutes mounting a camera outside and a guard on the hatch
+ *   sill and putting the gas gun together (section 7.1.2.4.2).
+ * - White floating on his tether from his egress (04:23) to the start of
+ *   his ingress (04:46). How far out he floats is the scene's illustration.
+ * - White standing in the hatch again while he climbs in, from 04:46 to
+ *   04:50 (Table D, "Crewman inside"), then the hatch open with him inside
+ *   until it closed (05:06).
+ * Table D's own egress and closing times (4:30 and 4:54) are not used; the
+ * story's discrepancy notes say so.
  *
  * Not drawn: the spent rocket stage (not a ship of the flight path), the
  * pilot parachute, and the spacecraft's attitude under the main parachute.
@@ -57,6 +67,20 @@ const MISSION_REPORT = "https://ntrs.nasa.gov/api/citations/19670095754/download
 
 function report(locator: string): Citation {
   return { source: "gemini-4-mission-report", locator, url: MISSION_REPORT };
+}
+
+/** The June 3, 1965 entry of Project Gemini: A Chronology, Part III (A). */
+function chronology(detail: string): Citation {
+  return { source: "gemini-chronology", locator: `Part III (A), June 3, 1965: ${detail}`, url: "https://www.nasa.gov/history/SP-4002/p3a.htm" };
+}
+
+/** Appendix 1, Table D of the Gemini chronology (extravehicular activity), the Gemini IV row. */
+function spacewalks(column: string): Citation {
+  return {
+    source: "gemini-chronology",
+    locator: `Appendix 1, Table D (Extravehicular Activity on Gemini Missions), Gemini IV "Umbilical" row: ${column} (given to the minute; seconds written as 00)`,
+    url: "https://www.nasa.gov/history/SP-4002/app1d.htm",
+  };
 }
 
 /** A row of Table 4-I, quoted as printed, actual time. */
@@ -87,7 +111,9 @@ const BLUNT_END_FORWARD_RETROFIRE = report(
 /* ------------------------------------------------------------------ */
 
 const GEMINI: readonly VehiclePart[] = ["gemini-equipment-section", "gemini-retro-section", "gemini-reentry-module"];
+const STANDING_IN_HATCH: readonly VehiclePart[] = [...GEMINI, "standup-spacewalker"];
 const SPACEWALK: readonly VehiclePart[] = [...GEMINI, "spacewalker"];
+const HATCH_OPEN: readonly VehiclePart[] = [...GEMINI, "open-hatch"];
 
 /* ------------------------------------------------------------------ */
 /* The changes, in time order.                                         */
@@ -147,6 +173,30 @@ export const vehicle: readonly VehicleChange[] = [
   {
     ship: "gemini",
     at: at(
+      "004:18:00",
+      chronology("\"The spacecraft hatch was opened at 4 hours 18 minutes into the flight\" (time given to the minute; seconds written as 00; the mission report prints no time for it)"),
+      spacewalks('"Hatch opening (hr:min)" 4:18 (E, estimated)'),
+    ),
+    label: "White opens the hatch",
+    layout: "alone",
+    parts: HATCH_OPEN,
+    facing: "forward",
+  },
+  {
+    ship: "gemini",
+    at: at(
+      "004:20:00",
+      spacewalks('"Crewman standing (hr:min)" 4:20 (V, from voice transcriptions)'),
+      report('Section 7.1.2.4.2, pilots\' report, "Extravehicular activity" (page 7-19, PDF page 278): "The pilot opened the spacecraft hatch and mounted the outside 16-mm camera, mounted the umbilical guard on the hatch sill, and assembled the maneuvering unit and camera" and "These operations took 4 or 5 minutes"'),
+    ),
+    label: "White stands in the open hatch",
+    layout: "alone",
+    parts: STANDING_IN_HATCH,
+    facing: "forward",
+  },
+  {
+    ship: "gemini",
+    at: at(
       "004:23:00",
       report('Section 4.1, "Actual Mission" (page 4-2, PDF page 80): "The pilot egressed from the spacecraft at approximately 04:23:00 g.e.t."'),
       report('Table 5.1-IV, "Guidance and Control Summary Chart" - Continued (page 5-53, PDF page 169), row "EVA", actual time 04:23:00'),
@@ -162,7 +212,26 @@ export const vehicle: readonly VehicleChange[] = [
       "004:46:00",
       report('Section 4.1, "Actual Mission" (page 4-2, PDF page 80): "Pilot ingress started at about 04:46:00 g.e.t."'),
     ),
-    label: "White back inside",
+    label: "White climbs back in through the hatch",
+    layout: "alone",
+    parts: STANDING_IN_HATCH,
+    facing: "forward",
+  },
+  {
+    ship: "gemini",
+    at: at("004:50:00", spacewalks('"Crewman inside (hr:min)" 4:50 (V, from voice transcriptions)')),
+    label: "White inside; the hatch is still open",
+    layout: "alone",
+    parts: HATCH_OPEN,
+    facing: "forward",
+  },
+  {
+    ship: "gemini",
+    at: at(
+      "005:06:00",
+      report('Section 4.1, "Actual Mission" (page 4-2, PDF page 80): "final hatch closure and repressurization were not completed until 05:06 g.e.t." (time given to the minute; seconds written as 00)'),
+    ),
+    label: "The hatch is closed",
     layout: "alone",
     parts: GEMINI,
     facing: "forward",

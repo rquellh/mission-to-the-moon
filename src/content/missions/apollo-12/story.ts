@@ -283,6 +283,7 @@ export const story: Mission = {
     /* ---------------------------- Launch ---------------------------- */
     {
       id: "liftoff",
+      handsOn: "stages",
       title: "Liftoff",
       chapter: "launch",
       elapsed: "000:00:00.68",
@@ -331,9 +332,30 @@ export const story: Mission = {
         report("14.1.3, Electrical Potential Discharges", "14-4", 221, '"attributes the lightning to the presence of the vehicle, as it passed through electric fields sufficient in intensity and energy to trigger each discharge"'),
         nmc("csm", 'Spacecraft and Subsystems, Service Module: "The six sections of the SM held three 31-cell hydrogen oxygen fuel cells which provided 28 volts"'),
         report("14.1.3, Electrical Potential Discharges", "14-6", 223, '"the main bus loads of 75 amperes were being supplied totally by entry batteries A and B"; "At 2 minutes 22 seconds into the flight, the crew restored fuel cell power to the buses"'),
+        {
+          source: "apollo-12-technical-transcript",
+          locator:
+            'Tape 1/2, page 2 (PDF page 5): CDR, "Think we need to do a little more all-weather testing." at 00 00 03 17, and CC, "Amen." at 00 00 03 19',
+        },
       ],
       discrepancy:
         "Apollo by the Numbers' mission summary (Ascent Phase) says the first discharge was triggered by the vehicle and that the second \"may have been due to a lesser lightning discharge.\" We follow the Mission Report (Section 14.1.3, page 14-4), which attributes both discharges to the vehicle's presence.",
+      // NASA's file "Apollo 12: All Weather Testing"
+      // (584852main_Apollo-12_All-Weather-Testing.mp3), all of it, 0 to 4.44
+      // seconds, shipped unchanged. afinfo only estimates its length (4.49
+      // seconds); decoded, by afconvert and by Chrome, it is 4.44. The
+      // transcript times Conrad's words at 00 00 03 17, once the power was
+      // back after the lightning.
+      audio: {
+        src: "media/apollo-12/all-weather-testing.mp3",
+        seconds: 4.44,
+        transcript: [
+          { speaker: "Pete Conrad", words: "Think we need to do a little more all-weather testing." },
+          { speaker: "Mission Control", words: "Amen." },
+        ],
+        credit: "NASA",
+        sourceUrl: "https://www.nasa.gov/historical-sounds/",
+      },
       view: "earth",
       inTour: true,
     },

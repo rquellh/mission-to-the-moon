@@ -3,14 +3,19 @@ import type { FlightOutline } from '../app/outline';
 import { Tour } from '../app/tour';
 import { copy } from '../content/copy';
 import { credits } from '../content/credits';
+import type { MissionBundle } from '../content/missions/bundle';
 import type { Memorial, Mission, MissionSummary } from '../content/types';
+import type { Extra, ExtraMeta } from '../extras/types';
 import { renderAbout, renderHowDrawn } from './about-dialog';
+import { pauseAllAudio } from './audio-player';
 import { renderCredits } from './credits-dialog';
+import { recordVisit } from './device-store';
 import { setUpDialog } from './dialogs';
 import { byId, hiddenText, reducedMotionQuery } from './dom';
 import { setUpEventCard } from './event-card';
+import { setUpExtraSheet } from './extra-sheet';
 import { missionDates, speakMissionTime } from './format';
-import { setUpHub } from './hub';
+import { setUpHub, type HubTarget } from './hub';
 import { icon } from './icons';
 import { watchViewInsets } from './layout';
 import { setUpMemorial } from './memorial-dialog';
@@ -36,6 +41,16 @@ export interface InterfaceOptions {
   loadMemorial(id: string): Promise<Memorial>;
   /** The address of a mission or memorial by id. */
   addressOf(id: string): string;
+  /** Load any mission's bundle (for extras). */
+  loadBundle(id: string): Promise<MissionBundle>;
+  /** The extras list: hands-on first, each group in order. */
+  extras: readonly ExtraMeta[];
+  /** Any extra's title by id, including one the list leaves out (a draft opened by its address). */
+  extraTitleOf(id: string): string | undefined;
+  /** True for an unfinished extra (only the dev server lists one). */
+  isExtraDraft(meta: ExtraMeta): boolean;
+  /** Load an extra's code when it is opened. */
+  loadExtra(id: string): Promise<Extra>;
   player: Player;
   director: Director;
   /** False when there is no 3D view (for example, without WebGL). */
@@ -44,13 +59,15 @@ export interface InterfaceOptions {
 
 export interface MissionInterface {
   /** Show the mission picker over the 3D view, as the first thing a visitor sees, scrolled to an entry if one is named. */
-  welcome(revealId?: string): void;
+  welcome(reveal?: HubTarget): void;
   /** Skip the picker and start exploring. */
   explore(): void;
   /** Skip the picker and start the guided tour (or explore, if the mission has no tour). */
   tour(): void;
   /** Open a memorial page, over the picker when it is showing. */
   memorial(id: string): void;
+  /** Open an extra in its full-screen sheet, with the address's other values as its params. */
+  extra(id: string, params: URLSearchParams): void;
 }
 
 export interface MissionListOptions {
@@ -75,6 +92,10 @@ export function setUpMissionList({ summaries, nameOf, isDraft, loadMemorial, add
     summaries,
     isDraft,
     onMemorial: (id, from) => memorials.open(id, from),
+    // Extras open over a mission, so the list on its own leaves them out.
+    extras: [],
+    isExtraDraft: () => false,
+    onExtra() {},
     // With no mission loaded there is nothing to do in place.
     onTour() {},
     onExplore() {},
@@ -101,6 +122,7 @@ function makeAnnouncer(): (text: string) => void {
 /** Build the whole interface for one mission and connect it to the clock and the camera. */
 export function mountInterface(options: InterfaceOptions): MissionInterface {
   const { mission, flight, cited, summaries, nameOf, isDraft, loadMemorial, addressOf, player, director, has3D } = options;
+  const { extras, extraTitleOf, isExtraDraft, loadExtra, loadBundle } = options;
   const index = new MissionIndex(mission);
   const motion = reducedMotionQuery();
   const announce = makeAnnouncer();
@@ -118,7 +140,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   hubButton.append(icon('chevron-down', 'icon masthead__chevron'), hiddenText(`, ${copy.header.missions}`));
   renderAbout(mission);
   renderHowDrawn(mission, flight);
-  renderCredits(credits, { mission, cited, summaries });
+  renderCredits(credits, { mission, cited, summaries, extras });
   const about = setUpDialog(byId('about-dialog', HTMLDialogElement));
   const drawn = setUpDialog(byId('drawn-dialog', HTMLDialogElement));
   const sources = setUpDialog(byId('credits-dialog', HTMLDialogElement));
@@ -156,6 +178,10 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
       card.show(target);
       announce(describe(target));
     },
+    // "Try it" only for an extra the list shows, so a draft stays hidden in a published build.
+    extraTitle: (id) => extras.find((meta) => meta.id === id)?.title,
+    onTryIt: (extraId, event, from) =>
+      extraSheet.open(extraId, new URLSearchParams({ mission: mission.id, event: event.id }), from),
   });
   const timeline = setUpTimeline(player, index);
 
@@ -188,6 +214,9 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     timeline.setLocked(tour.active);
     card.setTourMode(tour.active);
     card.setHidden(tour.phase === 'finished');
+    // Opening an extra pauses the clock, which would end a tour's travel early, so
+    // "Try it" waits for the stop. At a stop the clock is already still.
+    card.setTryItAllowed(tour.phase !== 'traveling');
     const stop = tour.stop;
     // On the way to a stop, the card follows the clock again.
     if (tour.phase === 'traveling') card.show(index.eventAt(player.time));
@@ -205,7 +234,9 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   });
 
   /* The mission picker ------------------------------------------------ */
+  // Starting a tour or exploring counts as a visit (the patch book reads it); the list alone does not.
   const startTour = (): void => {
+    recordVisit(mission.id);
     if (tour.total === 0) {
       explore();
     } else {
@@ -216,9 +247,33 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     remeasure();
   };
   const startExploring = (): void => {
+    recordVisit(mission.id);
     explore();
     remeasure();
   };
+
+  /* Extras ----------------------------------------------------------- */
+  // While an extra is open the clock and the 3D view rest; closing puts them back.
+  let resumeAfterExtra = false;
+  const extraSheet = setUpExtraSheet({
+    load: loadExtra,
+    titleOf: extraTitleOf,
+    summaries,
+    missionId: mission.id,
+    loadBundle,
+    announce,
+    onOpen: () => {
+      pauseAllAudio();
+      resumeAfterExtra = player.playing && !tour.active;
+      player.pause();
+      director.setDrawing?.(false);
+    },
+    onClose: () => {
+      director.setDrawing?.(true);
+      if (resumeAfterExtra) player.play();
+      resumeAfterExtra = false;
+    },
+  });
 
   // Reopening the picker pauses the clock; closing it without a choice plays on.
   let resumeAfterHub = false;
@@ -229,6 +284,9 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     summaries,
     isDraft,
     onMemorial: (id, from) => memorials.open(id, from),
+    extras,
+    isExtraDraft,
+    onExtra: (id, from) => extraSheet.open(id, new URLSearchParams(), from),
     onTour: startTour,
     onExplore: startExploring,
     onReturn: () => {
@@ -240,6 +298,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     // A tour on its way to a stop arrives there when the clock pauses.
     resumeAfterHub = player.playing && !tour.active;
     player.pause();
+    pauseAllAudio();
     hub.open(hubButton);
   });
 
@@ -260,16 +319,21 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   );
 
   return {
-    welcome(revealId) {
-      hub.welcome(revealId);
+    welcome(reveal) {
+      hub.welcome(reveal);
       remeasure();
     },
     explore: startExploring,
     tour: startTour,
     memorial(id) {
       // Over the picker, focus goes back to the entry's Read button when the page closes.
-      const from = hub.mode ? hub.actionFor(id) : null;
+      const from = hub.mode ? hub.actionFor({ mission: id }) : null;
       memorials.open(id, from);
+    },
+    extra(id, params) {
+      // Over the picker, focus goes back to the entry's Open button when the sheet closes.
+      const from = hub.mode ? hub.actionFor({ extra: id }) : null;
+      extraSheet.open(id, params, from);
     },
   };
 }

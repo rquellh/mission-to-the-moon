@@ -113,6 +113,7 @@ const fragmentShader = /* glsl */ `
   uniform vec3 diffuse;
   uniform float uNow;
   uniform float uFutureOpacity;
+  uniform float uOpacity;
   uniform vec2 uHidden[MAX_HIDDEN];
   uniform float uRevNow;
   uniform vec2 uRunBounds[MAX_RUNS];
@@ -140,7 +141,7 @@ const fragmentShader = /* glsl */ `
       if (a * a + b * b > 1.0) discard;
     }
 
-    float alpha = vSample <= uNow ? 1.0 : uFutureOpacity;
+    float alpha = (vSample <= uNow ? 1.0 : uFutureOpacity) * uOpacity;
     // In a stretch that goes around and around, loops still to come fade
     // out, and older ones dim and then go (see PathFade). Counted in
     // revolutions from now, held to the stretch's ends.
@@ -222,6 +223,8 @@ export interface PathLine {
   setMix(mix: number): void;
   /** Light the line up to mission time t. */
   setTime(t: number): void;
+  /** Fade the whole line (0 hidden, 1 shown): a ship's line goes once its path has ended. */
+  setOpacity(opacity: number): void;
   setResolution(width: number, height: number): void;
   dispose(): void;
 }
@@ -324,6 +327,7 @@ export function createPathLine(
       uMix: { value: 0 },
       uNow: { value: -1 },
       uFutureOpacity: { value: PATH_FUTURE_OPACITY },
+      uOpacity: { value: 1 },
       uHidden: { value: gaps },
       uRevNow: { value: 0 },
       uRunBounds: { value: bounds },
@@ -350,12 +354,17 @@ export function createPathLine(
     uMix: { value: number };
     uNow: { value: number };
     uRevNow: { value: number };
+    uOpacity: { value: number };
     resolution: { value: Vector2 };
   };
 
   return {
     mesh,
     times,
+    setOpacity(opacity) {
+      uniforms.uOpacity.value = opacity;
+      mesh.visible = opacity > 0.005;
+    },
     setMix(mix) {
       uniforms.uMix.value = mix;
     },

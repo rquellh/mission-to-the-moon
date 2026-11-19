@@ -240,6 +240,7 @@ export const story: Mission = {
     /* ----------------------------- Launch ---------------------------- */
     {
       id: "liftoff",
+      handsOn: "stages",
       title: "Liftoff for two weeks",
       chapter: "launch",
       elapsed: "000:00:00",

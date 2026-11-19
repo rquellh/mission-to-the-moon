@@ -1,0 +1,314 @@
+/* "Drop the stages". Phone first: the rocket above, the controls below; side by side on wide screens. */
+
+[data-extra="stages"] .stages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+[data-extra="stages"] .stages__stage {
+  position: relative;
+  flex: 0 0 auto;
+  height: min(40svh, 400px);
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: #000;
+}
+
+[data-extra="stages"] .stages__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Without WebGL: a note in place of the picture. */
+[data-extra="stages"] .stages__stage--flat {
+  height: auto;
+  padding: 14px 16px;
+  background: var(--color-raised);
+}
+
+[data-extra="stages"] .stages[data-screen="loading"] .stages__stage,
+[data-extra="stages"] .stages[data-screen="choose"] .stages__stage,
+[data-extra="stages"] .stages[data-screen="missing"] .stages__stage {
+  display: none;
+}
+
+/* On a phone the summary needs the room; the picture comes back with Try again. */
+[data-extra="stages"] .stages[data-screen="done"] .stages__stage {
+  display: none;
+}
+
+[data-extra="stages"] .stages__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+[data-extra="stages"] .stages__panel > .extra-heading {
+  margin: 0;
+}
+
+[data-extra="stages"] .stages__panel > .sources {
+  margin-top: 0;
+}
+
+[data-extra="stages"] .stages__flight {
+  margin: 0 0 -8px;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+[data-extra="stages"] .stages__actions {
+  margin-top: 4px;
+}
+
+/* Picking a rocket. */
+[data-extra="stages"] .stages__choices {
+  display: grid;
+  gap: 10px;
+  max-width: 520px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-extra="stages"] .stages__choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 12px;
+  background: var(--color-raised);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease-out,
+    border-color 160ms ease-out;
+}
+
+[data-extra="stages"] .stages__choice:hover {
+  border-color: var(--color-accent-line);
+  background: var(--color-hover);
+}
+
+[data-extra="stages"] .stages__choice-name {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+[data-extra="stages"] .stages__choice-flight {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+/* The climb. */
+[data-extra="stages"] .stages__readout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+[data-extra="stages"] .stages__label {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+[data-extra="stages"] .stages__part {
+  margin: 2px 0 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+[data-extra="stages"] .stages__clock {
+  text-align: right;
+}
+
+[data-extra="stages"] .stages__clock-value {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+[data-extra="stages"] .stages__units {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-faint);
+}
+
+[data-extra="stages"] .stages__gauge {
+  display: grid;
+  gap: 6px;
+}
+
+[data-extra="stages"] .stages__gauge-bar {
+  height: 14px;
+  overflow: hidden;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 7px;
+  background: var(--color-raised);
+}
+
+[data-extra="stages"] .stages__gauge-fill {
+  height: 100%;
+  background: var(--color-accent);
+  transform-origin: left center;
+}
+
+[data-extra="stages"] .stages__drop {
+  width: 100%;
+  min-height: 60px;
+  font-size: 1.125rem;
+}
+
+[data-extra="stages"] .stages__drop[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+[data-extra="stages"] .stages__result {
+  min-height: 4.4em;
+}
+
+[data-extra="stages"] .stages__line {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+[data-extra="stages"] .stages__line[data-tone="early"] {
+  color: var(--color-text-muted);
+}
+
+[data-extra="stages"] .stages__line-sources .sources {
+  margin-top: 4px;
+  border-top: 0;
+}
+
+/* The summary. */
+[data-extra="stages"] .stages__summary {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * The name with the Sources fold beside it, the two times below. The fold
+ * comes last in the page (after the times it cites) and is only moved up
+ * on screen; open, it drops below the times at full width.
+ */
+[data-extra="stages"] .stages__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 12px;
+  padding: 2px 0 10px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+[data-extra="stages"] .stages__row-name {
+  flex: 1 1 0;
+  min-width: 0;
+  order: 1;
+}
+
+[data-extra="stages"] .stages__row-times {
+  flex: 1 0 100%;
+  order: 3;
+}
+
+[data-extra="stages"] .stages__row .sources {
+  flex: 0 0 auto;
+  order: 2;
+  margin: 0;
+  border-top: 0;
+}
+
+[data-extra="stages"] .stages__row .sources[open] {
+  flex-basis: 100%;
+  order: 4;
+}
+
+[data-extra="stages"] .stages__row p {
+  margin: 0;
+}
+
+[data-extra="stages"] .stages__row-name {
+  font-weight: 700;
+}
+
+[data-extra="stages"] .stages__row-time,
+[data-extra="stages"] .stages__row-yours {
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+[data-extra="stages"] .stages__row-time {
+  color: var(--color-text);
+}
+
+@media (min-width: 860px), (min-width: 600px) and (orientation: landscape) {
+  [data-extra="stages"] .stages {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 24px;
+    height: calc(100svh - 128px);
+    min-height: 360px;
+  }
+
+  [data-extra="stages"] .stages__stage,
+  [data-extra="stages"] .stages[data-screen="done"] .stages__stage {
+    display: block;
+    flex: 1 1 auto;
+    height: auto;
+  }
+
+  [data-extra="stages"] .stages__stage--flat {
+    flex: 0 0 240px;
+    align-self: flex-start;
+  }
+
+  [data-extra="stages"] .stages__panel {
+    flex: 0 0 min(440px, 44%);
+    overflow-y: auto;
+    padding: 2px 4px 2px 2px;
+  }
+
+  /* The summary gets more of the width, so it fits beside the picture without scrolling. */
+  [data-extra="stages"] .stages[data-screen="done"] .stages__panel {
+    flex-basis: min(560px, 52%);
+  }
+
+  [data-extra="stages"] .stages__row-times {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 16px;
+  }
+
+  [data-extra="stages"] .stages[data-screen="loading"] .stages__panel,
+  [data-extra="stages"] .stages[data-screen="choose"] .stages__panel,
+  [data-extra="stages"] .stages[data-screen="missing"] .stages__panel {
+    flex: 1 1 auto;
+    max-width: 62ch;
+  }
+}

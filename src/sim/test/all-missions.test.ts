@@ -327,6 +327,23 @@ for (const folder of flights) {
       assert.equal(problems.length, 0, report(problems));
     });
 
+    it("every recording exists under public/ and has its words written out", () => {
+      if (!story) return assert.fail("no story");
+      // The words are always shown beside the player, so a recording without
+      // them would leave out anyone who cannot hear it.
+      const problems: string[] = [];
+      for (const event of story.events) {
+        const audio = event.audio;
+        if (!audio) continue;
+        if (!existsSync(new URL(audio.src, PUBLIC))) problems.push(`"${event.id}": public/${audio.src} does not exist`);
+        const said = audio.transcript.filter((line) => line.speaker.trim() && line.words.trim());
+        if (said.length === 0 || said.length !== audio.transcript.length) {
+          problems.push(`"${event.id}": the transcript is empty or has a line with no speaker or no words`);
+        }
+      }
+      assert.equal(problems.length, 0, report(problems));
+    });
+
     it("reader text writes durations of a minute or more in minutes and seconds", () => {
       const problems = rawDurations(story, "story");
       assert.equal(problems.length, 0, report(problems));

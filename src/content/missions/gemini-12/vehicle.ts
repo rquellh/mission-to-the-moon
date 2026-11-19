@@ -8,19 +8,25 @@
  * Times are copied from the Gemini Program Mission Report for Gemini XII
  * (MSC-G-R-67-1): the launch from Table 4.2-I, the orbital and reentry events
  * from Table 4.2-II, the Agena's launch from Table 4.2-III, and the rest from
- * the report's text, named in each citation. Table 4.2-III prints the
+ * the report's text, named in each citation, except four moments of the
+ * spacewalks that the report does not time (see below). Table 4.2-III prints the
  * Agena's times in seconds from its own lift-off; on the mission clock they
  * are those seconds minus 5914.731, our arithmetic (see flight.ts). Page
  * numbers are the report's printed pages, then the scan's PDF pages.
  *
- * Aldrin outside: the "spacewalker" part is listed during each of his three
- * periods outside, from the hatch opening to the hatch closing. During the
- * two standup periods (the first and the third) he stood on his seat with
- * his upper body out of the open hatch; the model draws a figure on a tether
- * beside the hatch, so for those two periods it is the closest picture the
- * scene has, an illustration. During the umbilical spacewalk he moved along
- * the spacecraft and the Agena; where the model floats him is an
- * illustration too.
+ * Aldrin outside, in three hatch-open periods. The hatch openings and
+ * closings are the report's; the report prints no time for when Aldrin
+ * stood up, went out, or came back in, so those come from Table D of the
+ * Gemini chronology's Appendix 1 (to the minute, from voice transcriptions):
+ * - The two standup periods (the first and the third): the hatch is drawn
+ *   open with no one outside from its opening until Table D has Aldrin
+ *   standing (19:30; 66:08), then Aldrin standing on his seat with his upper
+ *   body out of the open hatch until it closed.
+ * - The umbilical spacewalk: the hatch open from 42:48:26, Aldrin standing
+ *   in it from 42:51, floating outside from 42:52, and inside again from
+ *   44:47 with the hatch open until it closed (44:55). Where the model
+ *   floats him, beside the hatch, is an illustration: he moved along the
+ *   spacecraft and the Agena.
  *
  * Which way the craft point:
  * - From separation the spacecraft is drawn nose forward: it made its
@@ -123,6 +129,15 @@ const BLUNT_END_FORWARD = report(
   'Section 7.1.2.10, "Reentry" (page 7-31, PDF page 416): "Because of the degraded OAMS thrusters, spacecraft alignment blunt end forward (BEF) was started early to assure adequate time for the alignment."',
 );
 
+/** A cell of Appendix 1, Table D of the Gemini chronology (extravehicular activity), a Gemini XII row. */
+function spacewalks(row: string, column: string): Citation {
+  return {
+    source: "gemini-chronology",
+    locator: `Appendix 1, Table D (Extravehicular Activity on Gemini Missions), Gemini XII "${row}" row: ${column} (V, from voice transcriptions; given to the minute, seconds written as 00)`,
+    url: "https://www.nasa.gov/history/SP-4002/app1d.htm",
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /* Parts lists.                                                        */
 /* ------------------------------------------------------------------ */
@@ -221,9 +236,17 @@ export const vehicle: readonly VehicleChange[] = [
       "019:29:00",
       report('Section 4.1, "Actual Mission" (page 4-2, PDF page 76): the standup EVA, "with hatch opening at 19 hours 29 minutes g.e.t" (given to the minute; seconds written as 00)'),
     ),
+    label: "Aldrin opens his hatch",
+    layout: "docked",
+    parts: [...DOCKED, "open-hatch"],
+    facing: "backward",
+  },
+  {
+    ship: "gemini",
+    at: at("019:30:00", spacewalks("Standup I", '"Crewman standing (hr:min)" 19:30')),
     label: "Aldrin stands up in the open hatch",
     layout: "docked",
-    parts: [...DOCKED, "spacewalker"],
+    parts: [...DOCKED, "standup-spacewalker"],
     facing: "backward",
   },
   {
@@ -244,9 +267,33 @@ export const vehicle: readonly VehicleChange[] = [
   {
     ship: "gemini",
     at: at("042:48:26", report('Section 4.1, "Actual Mission" (page 4-2, PDF page 76): "The hatch was opened at 42:48:26 g.e.t."')),
+    label: "The hatch opens for the umbilical spacewalk",
+    layout: "docked",
+    parts: [...DOCKED, "open-hatch"],
+    facing: "backward",
+  },
+  {
+    ship: "gemini",
+    at: at("042:51:00", spacewalks("Umbilical", '"Crewman standing (hr:min)" 42:51')),
+    label: "Aldrin stands in the open hatch",
+    layout: "docked",
+    parts: [...DOCKED, "standup-spacewalker"],
+    facing: "backward",
+  },
+  {
+    ship: "gemini",
+    at: at("042:52:00", spacewalks("Umbilical", '"Crewman outside (hr:min)" 42:52')),
     label: "Aldrin goes outside on his umbilical",
     layout: "docked",
     parts: [...DOCKED, "spacewalker"],
+    facing: "backward",
+  },
+  {
+    ship: "gemini",
+    at: at("044:47:00", spacewalks("Umbilical", '"Crewman inside (hr:min)" 44:47')),
+    label: "Aldrin back inside; the hatch is still open",
+    layout: "docked",
+    parts: [...DOCKED, "open-hatch"],
     facing: "backward",
   },
   {
@@ -255,7 +302,7 @@ export const vehicle: readonly VehicleChange[] = [
       "044:55:00",
       report('Section 4.1, "Actual Mission" (page 4-2, PDF page 76): "The spacecraft hatch was closed at 44 hours 55 minutes g.e.t." (given to the minute; seconds written as 00)'),
     ),
-    label: "Back inside",
+    label: "The hatch is closed",
     layout: "docked",
     parts: DOCKED,
     facing: "backward",
@@ -282,9 +329,17 @@ export const vehicle: readonly VehicleChange[] = [
       discrepancy:
         "Section 4.1 (page 4-3, PDF page 77) gives cabin depressurization at 66:05:55, and section 7.1.1.4 (page 7-4, PDF page 389) gives the hatch opening as 66 hours 8 minutes. We follow section 1.0.",
     },
+    label: "The hatch opens a third time",
+    layout: "alone",
+    parts: [...GEMINI, "open-hatch"],
+    facing: "forward",
+  },
+  {
+    ship: "gemini",
+    at: at("066:08:00", spacewalks("Standup II", '"Crewman standing (hr:min)" 66:08'), SMALL_END_FORWARD),
     label: "Aldrin stands up in the open hatch again",
     layout: "alone",
-    parts: [...GEMINI, "spacewalker"],
+    parts: [...GEMINI, "standup-spacewalker"],
     facing: "forward",
   },
   {

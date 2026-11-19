@@ -2,6 +2,7 @@ import { copy } from '../content/copy';
 import type { CreditEntry } from '../content/credits';
 import { SOURCE_GROUPS, SOURCES, type SourceId } from '../content/sources';
 import type { Mission, MissionSummary } from '../content/types';
+import type { ExtraMeta } from '../extras/types';
 import { externalLink } from './citations';
 import { byId, el } from './dom';
 import { formatIsoDay } from './format';
@@ -14,6 +15,8 @@ export interface CreditsOptions {
   cited: ReadonlySet<string>;
   /** The mission list, to name the other missions whose sources are folded away. */
   summaries: readonly MissionSummary[];
+  /** The extras list, to name each extra's own sources, folded the same way. */
+  extras: readonly ExtraMeta[];
 }
 
 function details(rows: Array<[string, string | Node]>): HTMLDListElement {
@@ -83,7 +86,7 @@ function mediaItem(entry: CreditEntry): HTMLLIElement {
  * many missions share, then every other mission's own, each folded away
  * under its name. Each source is listed once.
  */
-function sourceGroups({ mission, cited, summaries }: CreditsOptions): HTMLElement {
+function sourceGroups({ mission, cited, summaries, extras }: CreditsOptions): HTMLElement {
   const listed = new Set<string>();
   const take = (ids: readonly string[]): HTMLLIElement[] =>
     ids
@@ -103,23 +106,37 @@ function sourceGroups({ mission, cited, summaries }: CreditsOptions): HTMLElemen
   const shared = take(sharedIds);
   if (shared.length) parts.push(el('h4', 'credits__subgroup-title', copy.credits.shared), list(shared));
 
-  const folds: HTMLElement[] = [];
-  for (const [id, sources] of Object.entries(SOURCE_GROUPS.missions)) {
-    const name = summaries.find((summary) => summary.id === id)?.name;
-    if (id === mission.id || !name) continue;
-    const items = take(Object.keys(sources));
-    if (!items.length) continue;
-    const fold = el('details', 'credits__fold');
+  /** A group of sources folded away under a name, or null when all of them are listed already. */
+  const fold = (name: string, ids: readonly string[]): HTMLElement | null => {
+    const items = take(ids);
+    if (!items.length) return null;
+    const details = el('details', 'credits__fold');
     const summary = el('summary', 'credits__fold-summary');
     summary.append(
       el('span', 'credits__fold-name', name),
       el('span', 'credits__fold-count', copy.credits.sourceCount(items.length)),
       icon('chevron-down', 'icon credits__fold-icon'),
     );
-    fold.append(summary, list(items));
-    folds.push(fold);
+    details.append(summary, list(items));
+    return details;
+  };
+
+  const missionFolds: HTMLElement[] = [];
+  for (const [id, sources] of Object.entries(SOURCE_GROUPS.missions)) {
+    const name = summaries.find((summary) => summary.id === id)?.name;
+    if (id === mission.id || !name) continue;
+    const folded = fold(name, Object.keys(sources));
+    if (folded) missionFolds.push(folded);
   }
-  if (folds.length) parts.push(el('h4', 'credits__subgroup-title', copy.credits.otherMissions), ...folds);
+  if (missionFolds.length) parts.push(el('h4', 'credits__subgroup-title', copy.credits.otherMissions), ...missionFolds);
+
+  // Each listed extra's own sources, in the list's order, named with its title.
+  const extraFolds: HTMLElement[] = [];
+  for (const meta of extras) {
+    const folded = fold(meta.title, Object.keys(SOURCE_GROUPS.extras[meta.id] ?? {}));
+    if (folded) extraFolds.push(folded);
+  }
+  if (extraFolds.length) parts.push(el('h4', 'credits__subgroup-title', copy.credits.extras), ...extraFolds);
 
   return group(copy.credits.sources, ...parts);
 }

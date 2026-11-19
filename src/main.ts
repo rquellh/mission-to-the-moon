@@ -6,6 +6,7 @@ import { copy } from './content/copy';
 import { homeView, nearestView } from './app/views';
 import { flightIdFor, hasMemorial, isReady, loadBundle, loadMemorial, summaries, summaryFor } from './content/missions';
 import { elapsedToSeconds, type ElapsedTime, type EventView, type MissionSummary } from './content/types';
+import { extraFor, extras, hasExtra, isExtraReady, loadExtra } from './extras';
 import type { Stage } from './scene/stage';
 import { buildFlightPath, createStoryTime } from './sim';
 import { byId, reducedMotionQuery } from './ui/dom';
@@ -40,6 +41,12 @@ interface DeepLink {
   time: number | null;
   view: EventView | null;
   start: 'tour' | 'explore' | null;
+  /** An event id of the mission, to open paused at it. */
+  event: string | null;
+  /** An extra's id, to open it over the mission. */
+  extra: string | null;
+  /** Every value but `extra`, passed on to the extra. */
+  extraParams: URLSearchParams;
 }
 
 /**
@@ -53,6 +60,10 @@ interface DeepLink {
  * - `?view=` picks the view (journey, earth, moon, or spacecraft; "both"
  *   and "ship" also work, as the buttons name them).
  * - `?start=tour` or `?start=explore` skips the welcome and begins that way.
+ * - `?event=landing` opens paused at that event of the mission, as `t` does.
+ * - `?extra=stages` opens that extra over the mission (over the mission
+ *   list, when the address names nothing else). Every other value in the
+ *   address reaches the extra as its params.
  */
 function readDeepLink(): DeepLink {
   const params = new URLSearchParams(window.location.search);
@@ -77,7 +88,17 @@ function readDeepLink(): DeepLink {
   const view = names[params.get('view')?.trim().toLowerCase() ?? ''] ?? null;
   const startParam = params.get('start')?.trim().toLowerCase();
   const start = startParam === 'tour' || startParam === 'explore' ? startParam : null;
-  return { mission: params.get('mission')?.trim().toLowerCase() || null, time, view, start };
+  const extraParams = new URLSearchParams(params);
+  extraParams.delete('extra');
+  return {
+    mission: params.get('mission')?.trim().toLowerCase() || null,
+    time,
+    view,
+    start,
+    event: params.get('event')?.trim() || null,
+    extra: params.get('extra')?.trim().toLowerCase() || null,
+    extraParams,
+  };
 }
 
 /**
@@ -167,13 +188,23 @@ async function main(): Promise<void> {
   const keys = storyTime.keyTimes;
   const player = new MissionPlayer(keys[0] ?? path.start, keys[keys.length - 1] ?? path.end, story);
 
+  // A time in the address wins over an event.
+  const atEvent = link.time === null ? mission.events.find((event) => event.id === link.event) : undefined;
   if (link.time !== null) player.seek(link.time);
+  else if (atEvent) player.seek(elapsedToSeconds(atEvent.elapsed));
+  const seeked = link.time !== null || atEvent !== undefined;
+  const extraId = memorialId ? null : hasExtra(link.extra) ? link.extra : null;
 
   const shared = {
     ...listOptions,
     mission,
     flight: outlineOf(bundle),
     cited: sourcesCitedBy(bundle),
+    loadBundle,
+    extras,
+    extraTitleOf: (id: string) => extraFor(id)?.title,
+    isExtraDraft: (meta: (typeof extras)[number]) => !isExtraReady(meta),
+    loadExtra,
     player,
   };
 
@@ -192,6 +223,7 @@ async function main(): Promise<void> {
     const ui = mountInterface({ ...shared, director: noDirector(homeView(mission)), has3D: false });
     ui.explore();
     if (memorialId) ui.memorial(memorialId);
+    else if (extraId) ui.extra(extraId, link.extraParams);
     status.reveal();
     status.showMessage(made.problem, made.offerReload);
     return;
@@ -216,11 +248,16 @@ async function main(): Promise<void> {
   stage.start();
   status.reveal();
   if (memorialId) {
-    ui.welcome(memorialId);
+    ui.welcome({ mission: memorialId });
     ui.memorial(memorialId);
-  } else if (link.start === 'tour') ui.tour();
-  else if (link.time !== null || link.start === 'explore') ui.explore();
-  else ui.welcome();
+    return;
+  }
+  // An extra opens over the mission list, unless the address names a mission or a place in one.
+  const namesPlace = link.mission !== null || seeked || link.start !== null;
+  if (link.start === 'tour') ui.tour();
+  else if (seeked || link.start === 'explore' || (extraId && namesPlace)) ui.explore();
+  else ui.welcome(extraId ? { extra: extraId } : undefined);
+  if (extraId) ui.extra(extraId, link.extraParams);
 }
 
 void main();

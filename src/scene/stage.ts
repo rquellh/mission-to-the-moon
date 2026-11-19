@@ -139,6 +139,8 @@ const ORBIT_FADE = {
   past: [1.0, 2.0, 0.28],
   gone: [3.0, 5.0],
 } as const;
+/** Story seconds over which a ship's line fades out once its path has ended (see fadeEndedPaths). */
+const PATH_END_FADE_STORY_SECONDS = 1.5;
 /** A stay in lunar orbit of more revolutions than this fades loop by loop. */
 const LONG_LUNAR_STAY_REVOLUTIONS = 40;
 /*
@@ -168,6 +170,8 @@ const RING_POINTS = 192;
  * horizon stays in frame.
  */
 const SPACEWALK_REACH_SHARE = 0.4;
+/** The ship view's camera during a spacewalk, in the ship's frame (as CHASE_OFFSET): a little behind and above, mostly to the side. */
+const SPACEWALK_VIEW = new Vector3(-0.3, 0.32, 0.9).normalize();
 /** How quickly the close-up comes and goes, in seconds of real time (at once on a jump or under reduced motion). */
 const SPACEWALK_SECONDS = 0.7;
 /** The Earth view of an Earth-orbit flight looks at the orbit from this many degrees off its axis, toward the ship. */
@@ -212,6 +216,18 @@ const PAIR_GAP_MAX_PX = 84;
 const PAIR_GAP_DISTANCE_M = 2000;
 /** Story seconds over which the target swings to its docking side before station keeping. */
 const PAIR_ARRANGE_STORY_SECONDS = 1.5;
+/**
+ * Keeping station without docking, the two are drawn this many lengths of
+ * the shorter craft apart (at least PAIR_GAP_MIN_PX), so they read as two
+ * spacecraft, not one about to dock; and the pair is drawn small enough to
+ * reach no farther than this share of the clear area's smaller side from
+ * the ship that stays put. Both are illustration (the real gaps were tens
+ * of feet).
+ */
+const STATION_GAP_LENGTHS = 0.9;
+/** Mission seconds over which that gap opens after undocking, or closes before docking, at most. */
+const STATION_OPEN_MISSION_SECONDS = 120;
+const STATION_FIT_SHARE = 0.45;
 const PAIR_CLOSE_STORY_SECONDS = 1.5;
 
 /** Vertical field of view for a screen shape; wider on tall screens. */
@@ -270,6 +286,9 @@ interface StationSpan {
   readonly mover: ShipState;
   readonly from: number;
   readonly to: number;
+  /** True when the two were docked just before (they part from docked) or dock just after (they close in). */
+  readonly opens: boolean;
+  readonly closes: boolean;
 }
 
 /** The pair of ships drawn apart this frame, if any. */
@@ -281,6 +300,8 @@ interface PairNow {
   readonly gapPixels: number;
   /** A docking or undocking with the main ship (drawn as before docking), or station keeping (face to face). */
   readonly moment: PairMoment | null;
+  /** Station keeping: how much of the full gap is drawn, 0 to 1 (less just after undocking and just before docking). */
+  readonly opening: number;
 }
 
 /** A docking or an undocking of a target ship with the main ship. */
@@ -332,6 +353,8 @@ export class Stage implements Director {
   private moon: Moon | null = null;
   private stars: Starfield | null = null;
   private lines: PathLine[] = [];
+  /** Each ship's line. */
+  private readonly lineOf = new Map<ShipState, PathLine>();
   private eventMarkers: MarkerSet | null = null;
   private earthSites: MarkerSet | null = null;
   private moonSites: MarkerSet | null = null;
@@ -425,6 +448,8 @@ export class Stage implements Director {
   /* Loop. */
   private reducedMotion = false;
   private running = false;
+  /** False while something covers the whole view (see setDrawing). */
+  private drawing = true;
   private needsRender = true;
   private lastFrameMs: number | null = null;
   private readonly listeners = new Set<(director: Director) => void>();
@@ -479,6 +504,7 @@ export class Stage implements Director {
     metersPerPixel: 0,
     opacity: 1,
     glow: 1,
+    focus: 0,
   };
 
   private constructor(
@@ -731,6 +757,7 @@ export class Stage implements Director {
       ship.times = polyline.times;
       const fade: PathFade | null = runs.length > 0 ? { ...ORBIT_FADE, revolutions, runs } : null;
       const line = createPathLine(polyline, ship.color, i + 1, hidden, fade);
+      this.lineOf.set(ship, line);
       line.mesh.renderOrder = 1 + i;
       line.setResolution(this.cssWidth, this.cssHeight);
       this.lines.push(line);
@@ -750,7 +777,7 @@ export class Stage implements Director {
         const readable = [0, 0, 0];
         const real = [0, 0, 0];
         if (!this.path.position(ship.id, t, 0, readable) || !this.path.position(ship.id, t, 1, real)) continue;
-        points.push({ readable, true: real, color: ship.color, eventIndex: index });
+        points.push({ readable, true: real, color: ship.color, eventIndex: index, group: this.ships.indexOf(ship) });
         break;
       }
     });
@@ -877,6 +904,8 @@ export class Stage implements Director {
       phases.forEach((phase, k) => {
         let from: number;
         let target: string;
+        const before = phases[k - 1];
+        const after = phases[k + 1];
         if (phase.kind === 'station') {
           from = phaseStart(phase);
           target = phase.target;
@@ -896,7 +925,14 @@ export class Stage implements Director {
         const middle = (from + to) / 2;
         const followed = this.followedAt(middle);
         const anchor = followed === chaser || followed === other ? followed : chaser === this.main || other !== this.main ? chaser : other;
-        spans.push({ anchor, mover: anchor === chaser ? other : chaser, from, to });
+        spans.push({
+          anchor,
+          mover: anchor === chaser ? other : chaser,
+          from,
+          to,
+          opens: before?.kind === 'docked' && before.target === target,
+          closes: after?.kind === 'docked' && after.target === target,
+        });
       });
     }
     return spans;
@@ -1054,6 +1090,7 @@ export class Stage implements Director {
       this.earth?.setSunDirection(this.sunDirection);
       this.moon?.setSunDirection(this.sunDirection);
       for (let i = 0; i < this.lines.length; i += 1) (this.lines[i] as PathLine).setTime(t);
+      this.fadeEndedPaths();
       const current = this.eventIndexAt(t);
       if (current !== this.currentEvent) {
         this.currentEvent = current;
@@ -1071,6 +1108,25 @@ export class Stage implements Director {
       this.shownMix = this.mix;
     }
     return true;
+  }
+
+  /**
+   * A ship whose path ends before the flight does (Apollo 7's spent stage,
+   * a lunar module cast off) does not leave its line behind: the line and
+   * the event markers on it fade out just after the path ends. The main
+   * ship's line stays.
+   */
+  private fadeEndedPaths(): void {
+    const story = this.player.storyTime;
+    this.ships.forEach((ship, i) => {
+      let opacity = 1;
+      if (ship !== this.main && ship.track.end < this.path.end - 1) {
+        const end = this.player.story.toStory(ship.track.end);
+        opacity = 1 - smoothstep(end, end + PATH_END_FADE_STORY_SECONDS, story);
+      }
+      this.lineOf.get(ship)?.setOpacity(opacity);
+      this.eventMarkers?.setGroupOpacity(i, opacity);
+    });
   }
 
   /** The last event at or before t (a little tolerance so a seek to an event lands on it), or -1. */
@@ -1422,7 +1478,10 @@ export class Stage implements Director {
   /** The settled offset for the view now (the ship view's follows the ship). */
   private destinationOffset(out: Vector3): Vector3 {
     if (this.viewNow === 'spacecraft' && this.chaseReady) {
-      return out.copy(this.chaseDirection).applyQuaternion(this.chaseFrame).multiplyScalar(this.chaseDistance * this.chaseZoom);
+      out.copy(this.chaseDirection);
+      // During a spacewalk, from more to the side, so a figure standing along the craft is seen whole.
+      if (this.walkLevel > 0) out.lerp(SPACEWALK_VIEW, easeInOutCubic(this.walkLevel)).normalize();
+      return out.applyQuaternion(this.chaseFrame).multiplyScalar(this.chaseDistance * this.chaseZoom);
     }
     return out.copy(this.settledOffset);
   }
@@ -1754,7 +1813,7 @@ export class Stage implements Director {
     for (const set of [this.eventMarkers, this.earthSites, this.moonSites]) set?.setPixelRatio(ratio);
     this.reframeAfterLayout();
     // Draw right away so the canvas never shows a stretched frame.
-    if (this.earth) this.renderFrame(0);
+    if (this.earth && this.drawing) this.renderFrame(0);
   }
 
   /* ---------------------------------------------------------------- */
@@ -1763,8 +1822,28 @@ export class Stage implements Director {
 
   private nowMs = 0;
 
+  /**
+   * Stop drawing while something covers the whole view (an extra's sheet
+   * with a 3D view of its own), and start again: the frame loop stops, and
+   * on resuming one fresh frame is drawn with the camera and the clock
+   * where they are.
+   */
+  setDrawing(drawing: boolean): void {
+    if (drawing === this.drawing) return;
+    this.drawing = drawing;
+    if (drawing) {
+      this.needsRender = true;
+      if (this.earth) {
+        this.updateWorld(true);
+        this.updateShips();
+        this.renderFrame(0, true);
+      }
+    }
+    this.syncLoop();
+  }
+
   private syncLoop(): void {
-    const shouldRun = this.running && document.visibilityState === 'visible';
+    const shouldRun = this.running && this.drawing && document.visibilityState === 'visible';
     if (shouldRun) {
       this.lastFrameMs = null;
       this.renderer.setAnimationLoop(this.tick);
@@ -1849,11 +1928,14 @@ export class Stage implements Director {
     const toStory = (time: number): number => this.player.story.toStory(time);
     let best: PairNow | null = null;
     let bestMeters = Infinity;
+    // Station keeping wins a tie with a docking, so two ships tied together after undocking are drawn apart.
     const consider = (pair: PairNow, meters: number): void => {
+      const tie = best !== null && Math.abs(pair.arranged - best.arranged) <= 1e-6;
       const better =
         best === null ||
         pair.arranged > best.arranged + 1e-6 ||
-        (Math.abs(pair.arranged - best.arranged) <= 1e-6 && meters < bestMeters);
+        (tie && pair.moment === null && best?.moment !== null) ||
+        (tie && meters < bestMeters);
       if (!better) return;
       best = pair;
       bestMeters = meters;
@@ -1882,7 +1964,7 @@ export class Stage implements Director {
           arranged = 1 - smoothstep(PAIR_CLOSE_STORY_SECONDS, PAIR_CLOSE_STORY_SECONDS + PAIR_ARRANGE_STORY_SECONDS, storyApart);
         }
         const closing = smoothstep(0, PAIR_CLOSE_STORY_SECONDS, storyApart);
-        consider({ anchor: this.main, mover: target, arranged, gapPixels: closing * this.roomFor(meters), moment }, meters);
+        consider({ anchor: this.main, mover: target, arranged, gapPixels: closing * this.roomFor(meters), moment, opening: 1 }, meters);
       }
     }
     for (const span of this.stations) {
@@ -1896,7 +1978,12 @@ export class Stage implements Director {
       if (arranged <= 0) continue;
       const meters = this.metersApart(span.anchor, span.mover, t);
       if (!Number.isFinite(meters)) continue;
-      consider({ anchor: span.anchor, mover: span.mover, arranged, gapPixels: this.roomFor(meters), moment: null }, meters);
+      // Parting from docked, the gap opens; closing in to dock, it closes.
+      // Timed by story time or by mission time, whichever is further along, so it reads at any playback pace.
+      const since = Math.max((story - from) / PAIR_CLOSE_STORY_SECONDS, (t - span.from) / STATION_OPEN_MISSION_SECONDS);
+      const until = Math.max((to - story) / PAIR_CLOSE_STORY_SECONDS, (span.to - t) / STATION_OPEN_MISSION_SECONDS);
+      const opening = (span.opens ? smoothstep(0, 1, since) : 1) * (span.closes ? smoothstep(0, 1, until) : 1);
+      consider({ anchor: span.anchor, mover: span.mover, arranged, gapPixels: this.roomFor(meters), moment: null, opening }, meters);
     }
     return best;
   }
@@ -2027,14 +2114,18 @@ export class Stage implements Director {
      */
     const closeUp = (ship: ShipState, model: ShipModel, pose: ShipPose): ShipPose => {
       context.glow = 1;
+      context.focus = 0;
       if (ship !== this.followed || this.walkLevel <= 0) return pose;
       const index = model.shapeAt(t);
-      const near = model.closeUpMetersPerPixel(index, SPACEWALK_REACH_SHARE * clearPixels);
+      let near = model.closeUpMetersPerPixel(index, SPACEWALK_REACH_SHARE * clearPixels);
+      // Beside another craft (Gemini 10 at the old Agena), keep that one in frame too.
+      if (stationReach > 0 && ship === pair?.anchor) near = Math.max(near, (stationReach * pair.arranged) / (STATION_FIT_SHARE * clearPixels));
       const base = context.metersPerPixel > 0 ? context.metersPerPixel : model.metersPerPixelOf(index, context);
       const e = easeInOutCubic(this.walkLevel);
       if (near > 0 && base > 0 && near < base) context.metersPerPixel = MathUtils.lerp(base, near, e);
-      // A close-up model needs no glow to be found.
+      // A close-up model needs no glow to be found; it centers on the spacewalk.
       context.glow = 1 - 0.85 * e;
+      context.focus = e;
       const walk = this.walkPose;
       walk.exists = pose.exists;
       walk.position.copy(pose.position);
@@ -2045,9 +2136,13 @@ export class Stage implements Director {
       if (top.lengthSq() < 1e-10 || toCamera.lengthSq() < 1e-10) return pose;
       top.normalize();
       toCamera.normalize();
-      // Roll the top toward the camera by most of the way, the short way around.
+      // Roll the side the spacewalker is on toward the camera by most of the way, the short way around.
       const axis = this.f3.copy(pose.forward).normalize();
-      const angle = Math.atan2(this.f4.crossVectors(top, toCamera).dot(axis), top.dot(toCamera));
+      const side = model.walkerSide(index);
+      const walkerDirection = this.f5.copy(top);
+      // +X of the model is forward x top (see ShipModel.update); the walker is `side` from the top toward it.
+      if (Number.isFinite(side)) walkerDirection.applyAxisAngle(axis, side);
+      const angle = Math.atan2(this.f4.crossVectors(walkerDirection, toCamera).dot(axis), walkerDirection.dot(toCamera));
       walk.up.copy(top).applyAxisAngle(axis, 0.8 * e * angle);
       return walk;
     };
@@ -2058,6 +2153,15 @@ export class Stage implements Director {
     const anchorModel = models[anchorIndex];
     const moverModel = moverIndex >= 0 ? models[moverIndex] : undefined;
 
+    // Two ships keeping station: the gap drawn between them (meters at their shared scale), and how far the pair reaches from the anchor.
+    let stationGap = 0;
+    let stationReach = 0;
+    if (pair && !pair.moment && anchorModel && moverModel) {
+      const a = anchorModel.shapeAt(t);
+      const m = moverModel.shapeAt(t);
+      stationGap = STATION_GAP_LENGTHS * Math.min(anchorModel.shapeLength(a), moverModel.shapeLength(m));
+      stationReach = anchorModel.faceOf(a).distance + stationGap + moverModel.shapeLength(m);
+    }
     let anchorUnits = 0;
     let anchorSizeScale = 1;
     if (anchorModel) {
@@ -2071,7 +2175,7 @@ export class Stage implements Director {
         const own = anchorModel.metersPerPixelOf(anchorModel.shapeAt(t), context);
         const together = pair.moment
           ? anchorModel.metersPerPixelOf(pair.moment.docked, context)
-          : Math.max(own, moverModel.metersPerPixelOf(moverModel.shapeAt(t), context));
+          : Math.max(own, moverModel.metersPerPixelOf(moverModel.shapeAt(t), context), stationReach / (STATION_FIT_SHARE * clearPixels));
         if (own > 0 && together > 0) context.metersPerPixel = MathUtils.lerp(own, together, pair.arranged);
       }
       anchorModel.update(closeUp(ship, anchorModel, ship), context);
@@ -2105,7 +2209,7 @@ export class Stage implements Director {
           const anchorFace = anchorModel.faceOf(anchorModel.shapeAt(t));
           const moverFace = model.faceOf(model.shapeAt(t));
           this.faceDirection(anchor, anchorFace, this.dockDirection);
-          const minPixels = (anchorFace.distance + moverFace.distance) / anchorScale + pair.gapPixels;
+          const minPixels = (anchorFace.distance + moverFace.distance) / anchorScale + Math.max(pair.gapPixels, stationGap / anchorScale) * pair.opening;
           this.besideAnchor(anchor, ship, this.dockDirection, minPixels, w, anchorUnits, this.sitePosition);
           this.facingPose(anchor, ship, this.dockDirection, moverFace, w, drawn);
         }
@@ -2121,6 +2225,7 @@ export class Stage implements Director {
       model.update(closeUp(ship, model, pose), context);
     }
     context.glow = 1;
+    context.focus = 0;
 
     // Parts left behind stand at their ship's landing site from their cited moment on.
     context.opacity = 1;

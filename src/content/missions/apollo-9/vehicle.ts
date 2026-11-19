@@ -17,11 +17,12 @@
  *   as for Apollo 11.
  * - Spider's landing legs were unfolded at about 45 hours (Apollo by the
  *   Numbers' Timeline); the model draws them unfolded throughout.
- * - The spacewalk: the scene's spacewalker floats by the command and
- *   service module, not on Spider's porch where Schweickart stood, and
- *   only one figure is drawn, though Scott also leaned out of the command
- *   module's hatch. It is shown from the start of Schweickart's egress to
- *   the end of his ingress.
+ * - The spacewalk (section 4.2): Schweickart is drawn on Spider's porch
+ *   from the start of his egress to the end of his ingress, and Scott
+ *   standing in Gumdrop's open side hatch, head and shoulders out, from the
+ *   hatch opening to its closing. Spider's forward hatch, open from before
+ *   Schweickart's egress until after his ingress, is drawn shut: the model
+ *   has no open lunar module hatch.
  * - The S-IVB is not a ship of the flight plan: after the docked spacecraft
  *   were ejected from it, it is not drawn.
  * - Spider's ascent stage, cast off after the second docking, is not drawn
@@ -69,6 +70,15 @@ const PANELS_JETTISONED: Citation = {
 
 const SPACEWALK = report(
   'Section 4.2, "Actual Timeline" (page 4-2, PDF page 29): the Lunar Module Pilot "began his egress to the forward platform at 72:59:02" and "began his ingress at 73:45:00 and completed it at 73:46:03"',
+);
+const CM_HATCH_OPEN = report(
+  'Section 4.2, "Actual Timeline" (page 4-2, PDF page 29): "The command module was depressurized and the side hatch opened at 73:02:00."',
+);
+const SCOTT_IN_HATCH = report(
+  'Section 3.0, "Mission Description" (page 3-2, PDF page 12): "the Command Module Pilot, dependent on spacecraft life support, partially exited through the command module hatch for observation, photography, and retrieval of thermal samples"',
+);
+const CM_HATCH_CLOSED = report(
+  'Section 4.2, "Actual Timeline" (page 4-2, PDF page 29): "The command module hatch was closed and locked at 73:49:00"',
 );
 
 const PARACHUTES: Citation = {
@@ -162,8 +172,25 @@ export const vehicle: readonly VehicleChange[] = [
   },
   {
     ship: "csm",
+    at: at("073:02:00", CM_HATCH_OPEN, SCOTT_IN_HATCH, timeline("CM side hatch open.")),
+    label: "Scott opens Gumdrop's side hatch and leans out",
+    layout: "docked",
+    parts: [...LUNAR_MODULE, ...CSM, "spacewalker", "standup-spacewalker"],
+  },
+  {
+    ship: "csm",
     at: at("073:46:03", SPACEWALK, timeline("LMP ingress completed.")),
-    label: "Schweickart is back inside Spider",
+    label: "Schweickart is back inside Spider; Scott is still in Gumdrop's hatch",
+    layout: "docked",
+    parts: [...LUNAR_MODULE, ...CSM, "standup-spacewalker"],
+  },
+  {
+    ship: "csm",
+    at: {
+      ...at("073:49:00", CM_HATCH_CLOSED),
+      discrepancy: 'Apollo by the Numbers (Timeline, "CM side hatch reported closed and locked.") gives 073:49:23. We follow the mission report.',
+    },
+    label: "Gumdrop's hatch is closed",
     layout: "docked",
     parts: [...LUNAR_MODULE, ...CSM],
   },

@@ -20,6 +20,15 @@
  *   the moment it was unloaded, and stays on the Moon. Its drives (three
  *   traverses of 5.6, 6.7, and 2.7 nautical miles) are not drawn, and where
  *   it stands beside Falcon is an illustration.
+ * - The spacewalk on the way home: Worden is drawn floating by the service
+ *   module and Irwin standing in the open side hatch, both from the
+ *   spacewalk's start (241:57:12) until "Ingress and hatch closed" (242:33).
+ *   The sources print no time for the hatch opening or for Worden's egress
+ *   (he went out after the television camera was mounted on the hatch; the
+ *   Timeline's row "Transearth EVA - TV and data acquisition cameras
+ *   installed and adjusted." is at 242:02), so for those first minutes he
+ *   is drawn outside before he was. The model shows him beside the service module,
+ *   not in the foot restraints at the instrument bay.
  * - The main parachutes: one of the three collapsed at about 6,000 feet,
  *   but the model always draws three open main parachutes. The story says
  *   so in the splashdown event.
@@ -74,6 +83,12 @@ const SPACEWALK: Citation = {
   locator:
     'Apollo 15 mission summary, "Transearth Phase" section: "At 241:57:12, the command module pilot began a transearth coast extravehicular activity", retrieving film cassettes "from the scientific instrument module bay"; "The EVA was completed at 242:36:19"',
   url: `${ABN}Apollo_15a_Summary.htm`,
+};
+
+const IRWIN_IN_THE_HATCH: Citation = {
+  source: "nasa-apollo-15-heads-home",
+  locator:
+    'Paragraph on the cislunar spacewalk: "Scott depressurized the cabin and opened the side hatch", Worden "handed it to Irwin standing in the open hatch", and "His tasks completed, Worden reentered the CM and closed the hatch"',
 };
 
 /* ------------------------------------------------------------------ */
@@ -168,15 +183,23 @@ export const vehicle: readonly VehicleChange[] = [
   },
   {
     ship: "csm",
-    at: at("241:57:12", timeline("Transearth EVA started (Worden)."), SPACEWALK),
-    label: "Worden goes outside to bring in the camera film",
+    at: at("241:57:12", timeline("Transearth EVA started (Worden)."), SPACEWALK, IRWIN_IN_THE_HATCH),
+    label: "Worden goes outside to bring in the camera film; Irwin stands in the open hatch",
     layout: "alone",
-    parts: [...CSM, "spacewalker"],
+    parts: [...CSM, "spacewalker", "standup-spacewalker"],
   },
   {
     ship: "csm",
-    at: at("242:36:19", timeline("Transearth EVA ended."), SPACEWALK),
-    label: "Worden is back inside",
+    at: at(
+      "242:33:00",
+      {
+        source: "apollo-by-the-numbers",
+        locator:
+          'Apollo 15 Timeline, row "Transearth EVA - Ingress and hatch closed.", 242:33 (given to the minute; seconds written as 00; the row "Transearth EVA ended." follows at 242:36:19)',
+        url: `${ABN}Apollo_15i_Timeline.htm`,
+      },
+    ),
+    label: "Worden is back inside and the hatch is closed",
     layout: "alone",
     parts: CSM,
   },

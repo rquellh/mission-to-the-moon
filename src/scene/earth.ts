@@ -30,6 +30,8 @@ export interface Earth {
   setOrientation(axisAngle: number, spinAngle: number): void;
   /** Point the day side (and the atmosphere's glow) toward the Sun. */
   setSunDirection(direction: Vector3): void;
+  /** Move Earth's center (the main scene keeps it at the origin; the extras' kit may move it). */
+  setCenter(position: Vector3): void;
   dispose(): void;
 }
 
@@ -131,6 +133,10 @@ export function createEarth(texture: Texture, detail: 'low' | 'high'): Earth {
     setSunDirection(direction) {
       (atmosphereMaterial.uniforms.uSunDirection!.value as Vector3).copy(direction).normalize();
       nightSide.setSunDirection(direction);
+    },
+    setCenter(position) {
+      root.position.copy(position);
+      (atmosphereMaterial.uniforms.uCenter!.value as Vector3).copy(position);
     },
     dispose() {
       globe.geometry.dispose();

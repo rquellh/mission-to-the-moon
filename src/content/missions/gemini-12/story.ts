@@ -331,6 +331,7 @@ export const story: Mission = {
     },
     {
       id: "liftoff",
+      handsOn: "stages",
       title: "Liftoff",
       chapter: "launch",
       elapsed: "000:00:00",
@@ -391,6 +392,7 @@ export const story: Mission = {
     },
     {
       id: "docking",
+      handsOn: "docking",
       title: "Docked",
       chapter: "agena",
       elapsed: "004:13:52",

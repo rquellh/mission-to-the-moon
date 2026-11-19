@@ -42,10 +42,14 @@
  * - The docking practice on the first day (the crew undocked and docked
  *   again several times) is not drawn: the pair stays docked from the first
  *   docking.
- * - The spacewalker figure is drawn for both times Gordon was outside:
- *   the umbilical spacewalk, and the standup spacewalk, when he stood on his
- *   seat in the open hatch. The scene has no standing figure, so the same
- *   floating figure stands for both.
+ * - The hatch, from Table D's minutes: for the umbilical spacewalk, open
+ *   with no one outside from 24:02, Gordon standing in it from 24:03,
+ *   floating outside from 24:09, and inside with the hatch still open from
+ *   24:30 (estimated in Table D) until it closed at 24:35; open again with no
+ *   one outside from 25:37 to 25:39 to throw out equipment; and for the
+ *   standup spacewalk, Gordon standing on his seat in the open hatch from
+ *   46:07 to 48:15. When he climbed back in from the nose is not timed, so
+ *   he is drawn floating until he was inside.
  * - The equipment section is drawn off at 70:41:06, when the commentator,
  *   having just reported it separated, called "30 seconds from retrofire";
  *   it came off at or before then.
@@ -157,6 +161,8 @@ const UNDOCKED = at(
 
 const GEMINI: readonly VehiclePart[] = ["gemini-equipment-section", "gemini-retro-section", "gemini-reentry-module"];
 const DOCKED: readonly VehiclePart[] = [...GEMINI, "agena"];
+const DOCKED_HATCH_OPEN: readonly VehiclePart[] = [...DOCKED, "open-hatch"];
+const DOCKED_WITH_GORDON_STANDING: readonly VehiclePart[] = [...DOCKED, "standup-spacewalker"];
 const DOCKED_WITH_GORDON_OUTSIDE: readonly VehiclePart[] = [...DOCKED, "spacewalker"];
 
 /* ------------------------------------------------------------------ */
@@ -235,6 +241,22 @@ export const vehicle: readonly VehicleChange[] = [
       spacewalks('"Umbilical" row, "Hatch opening (hr:min)": 24:02 (V, from voice transcriptions; given to the minute, seconds written as 00)'),
       voice("24:02:47", "the pilot", "Hatch is open.", 83),
     ),
+    label: "Gordon opens his hatch",
+    layout: "docked",
+    parts: DOCKED_HATCH_OPEN,
+    facing: "forward",
+  },
+  {
+    ship: "gemini",
+    at: at("024:03:00", spacewalks('"Umbilical" row, "Crewman standing (hr:min)": 24:03 (V, from voice transcriptions; given to the minute, seconds written as 00)')),
+    label: "Gordon stands in the open hatch",
+    layout: "docked",
+    parts: DOCKED_WITH_GORDON_STANDING,
+    facing: "forward",
+  },
+  {
+    ship: "gemini",
+    at: at("024:09:00", spacewalks('"Umbilical" row, "Crewman outside (hr:min)": 24:09 (V, from voice transcriptions; given to the minute, seconds written as 00)')),
     label: "Gordon outside",
     layout: "docked",
     parts: DOCKED_WITH_GORDON_OUTSIDE,
@@ -242,8 +264,35 @@ export const vehicle: readonly VehicleChange[] = [
   },
   {
     ship: "gemini",
+    at: at(
+      "024:30:00",
+      spacewalks('"Umbilical" row, "Crewman inside (hr:min)": 24:30 (E, "Estimated from comment on tape that the pilot rested for about five minutes"; given to the minute, seconds written as 00)'),
+    ),
+    label: "Gordon back inside; the hatch is still open",
+    layout: "docked",
+    parts: DOCKED_HATCH_OPEN,
+    facing: "forward",
+  },
+  {
+    ship: "gemini",
     at: at("024:35:00", spacewalks('"Umbilical" row, "Hatch closing (hr:min)": 24:35 (E, estimated; given to the minute, seconds written as 00)')),
-    label: "Gordon back inside",
+    label: "The hatch is closed",
+    layout: "docked",
+    parts: DOCKED,
+    facing: "forward",
+  },
+  {
+    ship: "gemini",
+    at: at("025:37:00", spacewalks('"Equipment jettison" row, "Hatch opening (hr:min)": 25:37 (E, estimated; given to the minute, seconds written as 00)')),
+    label: "The hatch opens to throw out equipment",
+    layout: "docked",
+    parts: DOCKED_HATCH_OPEN,
+    facing: "forward",
+  },
+  {
+    ship: "gemini",
+    at: at("025:39:00", spacewalks('"Equipment jettison" row, "Hatch closing (hr:min)": 25:39 (V, from voice transcriptions; given to the minute, seconds written as 00)')),
+    label: "The hatch is closed",
     layout: "docked",
     parts: DOCKED,
     facing: "forward",
@@ -285,7 +334,7 @@ export const vehicle: readonly VehicleChange[] = [
     ),
     label: "Gordon stands up in the open hatch",
     layout: "docked",
-    parts: DOCKED_WITH_GORDON_OUTSIDE,
+    parts: DOCKED_WITH_GORDON_STANDING,
     facing: "forward",
   },
   {

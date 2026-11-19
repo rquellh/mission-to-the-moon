@@ -1,7 +1,8 @@
 import { copy } from '../content/copy';
 import type { MissionEvent } from '../content/types';
+import { createAudioPlayer, type AudioPlayer } from './audio-player';
 import { sourcesBlock } from './citations';
-import { button, byId, el } from './dom';
+import { button, byId, el, wideLayoutQuery } from './dom';
 import { formatElapsed, formatUtc, isBeforeLiftoff, missionDates } from './format';
 import { icon } from './icons';
 import type { MissionIndex } from './mission-index';
@@ -16,6 +17,10 @@ export interface EventCard {
   setTourMode(touring: boolean): void;
   /** Hide the card (for the end of the tour) or show it again. */
   setHidden(hidden: boolean): void;
+  /** Allow "Try it" or hide it (it is hidden while the tour travels between stops). */
+  setTryItAllowed(allowed: boolean): void;
+  /** The "Try it" button, while it is showing, so focus can come back to it. */
+  readonly tryItButton: HTMLButtonElement | null;
 }
 
 export interface EventCardOptions {
@@ -23,13 +28,18 @@ export interface EventCardOptions {
   /** Asked to step to the previous (-1) or next (+1) event. */
   onStep(step: 1 | -1): void;
   reducedMotion(): boolean;
+  /** The title of a listed extra by id, or undefined when it is not listed (so no "Try it"). */
+  extraTitle(id: string): string | undefined;
+  /** "Try it" was pressed on an event. */
+  onTryIt(extraId: string, event: MissionEvent, from: HTMLButtonElement): void;
 }
 
 /**
  * The event card: the most recent event's title and time, its short text,
- * "Tell me more", its photo, and its sources.
+ * "Try it" when the event has a hands-on extra, its recording, "Tell me
+ * more", its photo, and its sources.
  */
-export function setUpEventCard({ index, onStep, reducedMotion }: EventCardOptions): EventCard {
+export function setUpEventCard({ index, onStep, reducedMotion, extraTitle, onTryIt }: EventCardOptions): EventCard {
   const card = byId('card', HTMLElement);
 
   // Built once; the content changes with each event.
@@ -64,8 +74,21 @@ export function setUpEventCard({ index, onStep, reducedMotion }: EventCardOption
   more.id = 'card-more';
   more.hidden = true;
   const sources = el('div', 'card__sources');
-  body.append(short, moreToggle, more, figure, sources);
+  const sound = el('div', 'card__audio');
+  sound.hidden = true;
+  body.append(short, sound, moreToggle, more, figure, sources);
+
+  const tryRow = el('div', 'card__try');
+  tryRow.hidden = true;
+  const tryButton = button('button card__try-button');
+  tryRow.append(tryButton);
   card.append(head, line, body);
+  // "Try it" follows the event's text in the side panel. On a phone it sits
+  // under the one-line text instead, outside the body, so the compact card shows it too.
+  const wide = wideLayoutQuery();
+  const placeTryIt = (): void => (wide.matches ? short.after(tryRow) : line.after(tryRow));
+  wide.addEventListener('change', placeTryIt);
+  placeTryIt();
 
   let moreOpen = false;
   const setMoreOpen = (open: boolean): void => {
@@ -77,6 +100,28 @@ export function setUpEventCard({ index, onStep, reducedMotion }: EventCardOption
   moreToggle.addEventListener('click', () => setMoreOpen(!moreOpen));
   previous.addEventListener('click', () => onStep(-1));
   next.addEventListener('click', () => onStep(1));
+
+  // One recording player at a time, for the event on show.
+  let player: AudioPlayer | null = null;
+  const renderAudio = (event: MissionEvent | undefined): void => {
+    player?.dispose();
+    player = event?.audio ? createAudioPlayer(event.audio) : null;
+    sound.replaceChildren(...(player ? [player.element] : []));
+    sound.hidden = !player;
+  };
+
+  let tryAllowed = true;
+  let tryTarget: { extra: string; event: MissionEvent } | null = null;
+  const renderTryIt = (event: MissionEvent | undefined): void => {
+    const id = event?.handsOn;
+    const name = id ? extraTitle(id) : undefined;
+    tryTarget = event && id && name ? { extra: id, event } : null;
+    if (name) tryButton.textContent = copy.card.tryItLabel(name);
+    tryRow.hidden = !tryTarget || !tryAllowed;
+  };
+  tryButton.addEventListener('click', () => {
+    if (tryTarget) onTryIt(tryTarget.extra, tryTarget.event, tryButton);
+  });
 
   const renderPhoto = (event: MissionEvent | undefined): void => {
     const photo = event?.photo;
@@ -109,6 +154,8 @@ export function setUpEventCard({ index, onStep, reducedMotion }: EventCardOption
       line.textContent = event.text.short;
       short.textContent = event.text.short;
       renderPhoto(event);
+      renderAudio(event);
+      renderTryIt(event);
 
       const moreParts: HTMLElement[] = [];
       if (event.text.more) moreParts.push(el('p', 'card__more-text', event.text.more));
@@ -124,6 +171,8 @@ export function setUpEventCard({ index, onStep, reducedMotion }: EventCardOption
       line.textContent = mission.summary.text.short;
       short.textContent = mission.summary.text.short;
       renderPhoto(undefined);
+      renderAudio(undefined);
+      renderTryIt(undefined);
       more.replaceChildren();
       moreToggle.hidden = true;
       more.hidden = true;
@@ -154,6 +203,14 @@ export function setUpEventCard({ index, onStep, reducedMotion }: EventCardOption
     },
     setHidden(hidden) {
       card.hidden = hidden;
+      if (hidden) player?.stop();
+    },
+    setTryItAllowed(allowed) {
+      tryAllowed = allowed;
+      tryRow.hidden = !tryTarget || !tryAllowed;
+    },
+    get tryItButton() {
+      return tryRow.hidden ? null : tryButton;
     },
   };
 }

@@ -6,10 +6,11 @@
  * scene draws simplified models from these; it does not show any of this as
  * text.
  *
- * Every time is copied from the Gemini Program Mission Report for Gemini X
- * (MSC-G-R-66-7): the spacecraft's from Tables 4-I and 4-II, the Agena's
- * launch from Table 4-III, and a few from the report's text, named in each
- * citation. Table 4-III prints the Agena's times in seconds from its own
+ * Every time but one is copied from the Gemini Program Mission Report for
+ * Gemini X (MSC-G-R-66-7): the spacecraft's from Tables 4-I and 4-II, the
+ * Agena's launch from Table 4-III, and a few from the report's text, named
+ * in each citation. The one other, when Collins stood up in the hatch, is
+ * from the Gemini chronology (see below). Table 4-III prints the Agena's times in seconds from its own
  * lift-off; on the mission clock they are those seconds minus 6040.517, our
  * arithmetic (see flight.ts). Times printed in seconds from lift-off are
  * written as hours:minutes:seconds.
@@ -29,13 +30,22 @@
  *   is not published), and from the equipment section's separation blunt end
  *   forward, the attitude the crew aligned for retrofire (section 7.1.1.8).
  *
- * Collins outside:
- * - The standup spacewalk, from 23:24:00 to 24:13:00, and the umbilical
- *   spacewalk, from about 48:42 to 49:20, add the spacewalker. During the
- *   standup spacewalk Collins stood in his seat in the open hatch; the scene's
- *   figure floats beside the hatch instead, an illustration. The third hatch
- *   opening (50:30 to 50:34), to throw out used equipment, is not drawn: no
- *   one went outside.
+ * Collins outside, in the report's three open-hatch periods (section
+ * 5.1.10.5):
+ * - The standup spacewalk, from 23:24:00 to 24:13:00: the hatch is drawn
+ *   open with no one outside until 23:27, when Table D of the Gemini
+ *   chronology's Appendix 1 has Collins standing (the report gives no time
+ *   for it), then Collins standing in his seat in the open hatch.
+ * - The umbilical spacewalk, from about 48:42 to 49:20: he is drawn floating
+ *   on his tether for the whole time the hatch was open, because the report
+ *   gives hatch opening and egress as one time (48:42) and ingress and hatch
+ *   closure as another (49:20), both to the minute. Table D splits them
+ *   (standing 48:42, outside 48:47, inside 49:12), and the report says he
+ *   deployed the handrails "while standing in the seat" first, so he is
+ *   drawn floating for a few minutes when he stood in the hatch; we follow
+ *   the report.
+ * - The hatch opening to throw out used equipment, from 50:30 to 50:34: the
+ *   hatch is drawn open with no one outside.
  *
  * Gaps in the sources, and how they are handled:
  * - The retrograde section: the report says the crew jettisoned it after
@@ -110,12 +120,28 @@ const BLUNT_END_FORWARD_DOCKED: [Citation, ...Citation[]] = [
 const STANDUP = report(
   'Section 7.1.1.5.1, "Standup EVA" (page 7-5, PDF page 386): "The EVA started at 23:24:00 g.e.t. (sunset) after the spacecraft was depressurized and the hatch was opened" and the crew "terminated the EVA six minutes early at 24:13:00 g.e.t."',
 );
+const STANDUP_STANDING = {
+  source: "gemini-chronology",
+  locator:
+    'Appendix 1, Table D (Extravehicular Activity on Gemini Missions), Gemini X "Standup" row: "Crewman standing (hr:min)" 23:27 (V, from voice transcriptions; given to the minute, seconds written as 00)',
+  url: "https://www.nasa.gov/history/SP-4002/app1d.htm",
+} as const satisfies Citation;
 const STANDUP_PERIOD = report('Section 5.1.10.5, "Extravehicular equipment" (page 5-101, PDF page 253): "standup EVA from 23 hours 24 minutes to 24 hours 13 minutes g.e.t."');
 const UMBILICAL_PERIOD = report(
   'Section 5.1.10.5, "Extravehicular equipment" (page 5-101, PDF page 253): "umbilical EVA from 48 hours 42 minutes to 49 hours 20 minutes g.e.t" (given to the minute; seconds written as 00)',
 );
 const UMBILICAL_START = report('Section 7.1.1.5.2, "Umbilical EVA" (page 7-6, PDF page 387): "the hatch was opened at sunrise at about 48 hours 42 minutes g.e.t."');
+const UMBILICAL_EGRESS = report(
+  'Section 5.1.10.5.1, "Extravehicular Life Support System" (page 5-102, PDF page 254): "At the time of hatch opening and egress (48 hours 42 minutes g.e.t.)"',
+);
 const UMBILICAL_END = report('Section 7.1.1.5.2, "Umbilical EVA" (page 7-6, PDF page 387): "The pilot ingressed at 49 hours 20 minutes g.e.t"');
+const UMBILICAL_HATCH_CLOSED = report(
+  'Section 5.1.10.5.1, "Extravehicular Life Support System" (page 5-102, PDF page 254): "After ingress and hatch closure at 49 hours 20 minutes g.e.t"',
+);
+const JETTISON_PERIOD = report(
+  'Section 5.1.10.5, "Extravehicular equipment" (page 5-101, PDF page 253): "a hatch-open period to jettison used equipment from 50 hours 30 minutes to 50 hours 34 minutes g.e.t." (given to the minute; seconds written as 00)',
+);
+const JETTISON = report('Section 7.1.1.5.2, "Umbilical EVA" (page 7-7, PDF page 388): "The equipment was jettisoned at 50 hours 30 minutes g.e.t, in two bundles"');
 const RETROFIRE_ATTITUDE = report(
   'Section 7.1.1.8, "Retrofire and reentry" (pages 7-9 and 7-10, PDF pages 390 and 391): "The platform was aligned blunt end forward (BEF) using the Orbital Attitude and Maneuver System (OAMS) in the platform mode during the last revolution."',
 );
@@ -224,9 +250,17 @@ export const vehicle: readonly VehicleChange[] = [
   {
     ship: "gemini",
     at: at("023:24:00", STANDUP, STANDUP_PERIOD),
-    label: "Standup spacewalk: Collins in the open hatch",
+    label: "The hatch opens for the standup spacewalk",
     layout: "docked",
-    parts: [...DOCKED, "spacewalker"],
+    parts: [...DOCKED, "open-hatch"],
+    facing: "backward",
+  },
+  {
+    ship: "gemini",
+    at: at("023:27:00", STANDUP_STANDING),
+    label: "Standup spacewalk: Collins stands in the open hatch",
+    layout: "docked",
+    parts: [...DOCKED, "standup-spacewalker"],
     facing: "backward",
   },
   {
@@ -247,7 +281,7 @@ export const vehicle: readonly VehicleChange[] = [
   },
   {
     ship: "gemini",
-    at: at("048:42:00", UMBILICAL_START, UMBILICAL_PERIOD),
+    at: at("048:42:00", UMBILICAL_START, UMBILICAL_EGRESS, UMBILICAL_PERIOD),
     label: "Umbilical spacewalk: Collins goes to the old Agena",
     layout: "alone",
     parts: [...GEMINI, "spacewalker"],
@@ -255,8 +289,24 @@ export const vehicle: readonly VehicleChange[] = [
   },
   {
     ship: "gemini",
-    at: at("049:20:00", UMBILICAL_END, UMBILICAL_PERIOD),
-    label: "Collins back inside",
+    at: at("049:20:00", UMBILICAL_END, UMBILICAL_HATCH_CLOSED, UMBILICAL_PERIOD),
+    label: "Collins back inside, hatch closed",
+    layout: "alone",
+    parts: GEMINI,
+    facing: "forward",
+  },
+  {
+    ship: "gemini",
+    at: at("050:30:00", JETTISON_PERIOD, JETTISON),
+    label: "Hatch open to throw out used equipment",
+    layout: "alone",
+    parts: [...GEMINI, "open-hatch"],
+    facing: "forward",
+  },
+  {
+    ship: "gemini",
+    at: at("050:34:00", JETTISON_PERIOD),
+    label: "Hatch closed",
     layout: "alone",
     parts: GEMINI,
     facing: "forward",

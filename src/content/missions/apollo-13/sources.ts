@@ -21,6 +21,6 @@ export const sources = {
     publisher: "NASA Manned Spacecraft Center (hosted on NASA's Mission Transcripts page)",
     url: "https://www.nasa.gov/history/mission-transcripts-mercury-gemini-and-apollo/",
     checked: "2026-11-19",
-    use: "The radio calls reporting the drogue and main parachutes open, which NASA's statistical timeline does not time. These are reported times, not measured ones.",
+    use: "The radio calls reporting the drogue and main parachutes open, which NASA's statistical timeline does not time. These are reported times, not measured ones. Also the calls that reported the accident (\"we've had a problem\"), whose words are heard in NASA's recording of them.",
   },
 } as const satisfies Record<string, Source>;

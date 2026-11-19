@@ -23,6 +23,14 @@
  * - The lunar rover: it is drawn parked beside Orion's descent stage from
  *   the moment it was unloaded, and stays on the Moon. Its drives are not
  *   drawn, and where it stands beside Orion is an illustration.
+ * - The spacewalk on the way home: Mattingly is drawn floating by the
+ *   service module and Duke in the open side hatch from the spacewalk's
+ *   start (218:39:46) until "Ingress and hatch closing started" (219:50),
+ *   then the hatch open with no one outside until the spacewalk's end
+ *   (220:03:28). The sources print no time for the hatch opening or for
+ *   when the hatch was shut, so the hatch is drawn open from the start and
+ *   until the end of the spacewalk. The model shows Mattingly beside the
+ *   service module, not in the foot restraints at the instrument bay.
  * - The ascent stage: after it was let go at 195:00:12 it tumbled, at about
  *   3 degrees per second (Apollo by the Numbers mission summary), but its
  *   path ends there, so the tumble is not drawn.
@@ -78,6 +86,12 @@ const SPACEWALK: Citation = {
   locator:
     'Apollo 16 mission summary, "Transearth Phase" section: "At 218:39:46, the command module pilot began a transearth coast EVA", during which he "retrieved film cassettes from the scientific instrument module cameras"',
   url: `${ABN}Apollo_16a_Summary.htm`,
+};
+
+const DUKE_IN_THE_HATCH: Citation = {
+  source: "nasa-apollo-16-heads-home",
+  locator:
+    'Paragraph on the spacewalk: "They depressurized Casper, opened the hatch, and Mattingly floated out, installing a TV camera" and "handed them to Duke, floating in the open hatch"',
 };
 
 /* ------------------------------------------------------------------ */
@@ -172,15 +186,29 @@ export const vehicle: readonly VehicleChange[] = [
   },
   {
     ship: "csm",
-    at: at("218:39:46", timeline("Transearth EVA started (Mattingly)."), SPACEWALK),
-    label: "Mattingly goes outside to bring in the camera film",
+    at: at("218:39:46", timeline("Transearth EVA started (Mattingly)."), SPACEWALK, DUKE_IN_THE_HATCH),
+    label: "Mattingly goes outside to bring in the camera film; Duke is in the open hatch",
     layout: "alone",
-    parts: [...CSM, "spacewalker"],
+    parts: [...CSM, "spacewalker", "standup-spacewalker"],
+  },
+  {
+    ship: "csm",
+    at: at(
+      "219:50:00",
+      {
+        source: "apollo-by-the-numbers",
+        locator: 'Apollo 16 Timeline, row "Ingress and hatch closing started.", 219:50 (given to the minute; seconds written as 00)',
+        url: `${ABN}Apollo_16i_Timeline.htm`,
+      },
+    ),
+    label: "Mattingly comes back in; the hatch is still open",
+    layout: "alone",
+    parts: [...CSM, "open-hatch"],
   },
   {
     ship: "csm",
     at: at("220:03:28", timeline("Transearth EVA ended.")),
-    label: "Mattingly is back inside",
+    label: "The spacewalk is over",
     layout: "alone",
     parts: CSM,
   },

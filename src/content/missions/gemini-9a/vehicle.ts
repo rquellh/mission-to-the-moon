@@ -34,12 +34,20 @@
  *   and the spacecraft on its own at the command pilot's call of
  *   second-stage cutoff (00:05:42): it separated from the stage soon after,
  *   at a time not found.
- * - The spacewalker is drawn from "We're opening the hatch now" (49:22:01) to
- *   "We've got the hatch closed" (51:30:23). Cernan stood in the open hatch
- *   at first and was back in it from about 51:09, so the figure floating
- *   outside is drawn longer than he was out. The Astronaut Maneuvering Unit
- *   he prepared at the back of the adapter is not drawn (there is no model
- *   for it).
+ * - The spacewalk, from the crew's calls, each matching the minute that
+ *   Table D of the Gemini chronology's Appendix 1 gives for it: the hatch is
+ *   drawn open with no one outside from "We're opening the hatch now"
+ *   (49:22:01); Cernan standing in the hatch from "Standing in the seat now"
+ *   (49:24:03; Table D, 49:24); floating outside from "Okay. Let it go now"
+ *   (49:40:06; Table D, 49:40), when Stafford let go of his foot (our
+ *   reading of the calls around it); standing in the hatch again from "We
+ *   got Gene back in the hatch" (51:09:03); inside with the hatch still
+ *   open from 51:26 (Table D, "Crewman inside"; no call marks it); and the
+ *   hatch shut at "We've got the hatch closed" (51:30:23). The minutes about
+ *   49:30 to 49:33 when Stafford held him down in the seat to fit the
+ *   outside camera are drawn with him standing. The Astronaut Maneuvering
+ *   Unit he prepared at the back of the adapter is not drawn (there is no
+ *   model for it).
  * - The main parachute is drawn from the pilot's "We're on the main chute at
  *   this time" (72:17:22), and let go at touchdown; its release time is not
  *   printed.
@@ -67,6 +75,15 @@ function transcript(time: string, words: string, page: number): Citation {
     source: "gemini-9a-voice-transcript",
     locator: `Page ${page} (PDF page ${page + 1}), ${time}: "${words}"`,
     url: TRANSCRIPT,
+  };
+}
+
+/** Appendix 1, Table D of the Gemini chronology (extravehicular activity), the Gemini IX-A row. */
+function spacewalks(column: string): Citation {
+  return {
+    source: "gemini-chronology",
+    locator: `Appendix 1, Table D (Extravehicular Activity on Gemini Missions), Gemini IX-A "Umbilical" row: ${column} (V, from voice transcriptions; given to the minute)`,
+    url: "https://www.nasa.gov/history/SP-4002/app1d.htm",
   };
 }
 
@@ -134,10 +151,56 @@ export const vehicle: readonly VehicleChange[] = [
   },
   {
     ship: "gemini",
-    at: at("049:22:01", transcript("49:22:01, pilot", "Okay. We're opening the hatch now.", 192)),
-    label: "Cernan outside",
+    at: at(
+      "049:22:01",
+      transcript("49:22:01, pilot", "Okay. We're opening the hatch now.", 192),
+      transcript("49:22:53 or 49:22:54, pilot (the last digit is unclear in the scan's text; the line falls between 49:22:52 and 49:22:55)", "Hatches open.", 193),
+    ),
+    label: "Cernan opens his hatch",
+    layout: "alone",
+    parts: [...GEMINI, "open-hatch"],
+  },
+  {
+    ship: "gemini",
+    at: at(
+      "049:24:03",
+      transcript("49:24:03, pilot", "Yes. Standing in the seat now.", 194),
+      spacewalks('"Crewman standing (hr:min)" 49:24'),
+      transcript("49:35:04, command pilot", "Gene's taking a couple of pictures, standing on the seat.", 203),
+    ),
+    label: "Cernan stands in the open hatch",
+    layout: "alone",
+    parts: [...GEMINI, "standup-spacewalker"],
+  },
+  {
+    ship: "gemini",
+    at: at(
+      "049:40:06",
+      transcript("49:39:59, command pilot, then 49:40:06, pilot (Stafford lets go of Cernan's foot and he floats out: our reading)", "Give me your foot.\" / \"Okay. Let it go now.", 207),
+      spacewalks('"Crewman outside (hr:min)" 49:40'),
+      transcript("49:40:30, command pilot", "Now we've got the docking bar mirror. Looks like you're upside down and have all kinds of snake around you.", 207),
+    ),
+    label: "Cernan floats outside",
     layout: "alone",
     parts: [...GEMINI, "spacewalker"],
+  },
+  {
+    ship: "gemini",
+    at: at(
+      "051:09:03",
+      transcript("51:09:03, command pilot", "... Houston. We got Gene back in the hatch. He's still completely fogged up.", 237),
+      transcript("51:09:24, command pilot", "Okay. Why don't you just stand there and relax for awhile, Gene?", 237),
+    ),
+    label: "Cernan back in the hatch, standing",
+    layout: "alone",
+    parts: [...GEMINI, "standup-spacewalker"],
+  },
+  {
+    ship: "gemini",
+    at: at("051:26:00", spacewalks('"Crewman inside (hr:min)" 51:26 (seconds written as 00)')),
+    label: "Cernan inside; the hatch is still open",
+    layout: "alone",
+    parts: [...GEMINI, "open-hatch"],
   },
   {
     ship: "gemini",

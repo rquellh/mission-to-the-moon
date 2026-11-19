@@ -49,6 +49,30 @@ export function chooseTextureTier(maxTextureSize: number): TextureTier {
 }
 
 /**
+ * Load one of the site's textures ("earth", "moon", or "stars") for a tier,
+ * prepared as the main scene prepares it. The texture is returned at once
+ * and fills in when its image arrives (`onLoad`); `onError` hears a failure.
+ */
+export function loadTexture(
+  name: 'earth' | 'moon' | 'stars',
+  tier: TextureTier,
+  maxAnisotropy: number,
+  onLoad: () => void = () => undefined,
+  onError: (error: unknown) => void = () => undefined,
+): Texture {
+  const texture = new TextureLoader().load(`${import.meta.env.BASE_URL}textures/${name}-${tier}.jpg`, onLoad, undefined, onError);
+  texture.colorSpace = SRGBColorSpace;
+  if (name === 'stars') {
+    // Mirrored as in loadStageTextures, for drawing on the inside of a sphere.
+    texture.wrapS = RepeatWrapping;
+    texture.repeat.x = -1;
+  } else {
+    texture.anisotropy = Math.min(maxAnisotropy, 8);
+  }
+  return texture;
+}
+
+/**
  * Load the Earth, Moon, and star textures for a tier.
  * `onProgress` receives the number of files loaded so far and the total.
  */

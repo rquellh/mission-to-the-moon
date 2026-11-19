@@ -326,6 +326,7 @@ export const story: Mission = {
     /* ---------------------------- Launch ---------------------------- */
     {
       id: "liftoff",
+      handsOn: "stages",
       title: "Liftoff",
       chapter: "launch",
       elapsed: "000:00:00.63",
@@ -610,15 +611,34 @@ export const story: Mission = {
         transcript(
           'Tape 66/12, page 317 (PDF page 319): CDR, "Houston, Tranquility Base here." at 04 06 45 59, and CDR, "THE EAGLE HAS LANDED." at 04 06 46 04',
         ),
+        transcript(
+          'Tape 66/12, page 317 (PDF page 319): CC, "Roger, Tranquility. We copy you on the ground. You got a bunch of guys about to turn blue. We\'re breathing again. Thanks a lot." at 04 06 46 06',
+        ),
       ],
       discrepancy:
-        "NSSDCA gives the landing time as 20:17:40 UT (4:17:40 p.m. EDT), on its Apollo 11 page (nssdc.gsfc.nasa.gov/planetary/lunar/apollo11info.html) and its Master Catalog pages. Apollo by the Numbers gives 102:45:39.9 elapsed, 20:17:39 GMT, which we follow. The radio call is quoted as NSSDCA's Master Catalog prints it, with a dash. NASA's Apollo 11 mission page has \"Houston, Tranquility Base here, the Eagle has landed.\" NASA's technical air-to-ground transcript has \"Houston, Tranquility Base here.\" and \"THE EAGLE HAS LANDED.\" as two lines, at 04 06 45 59 and 04 06 46 04 (102:45:59 and 102:46:04).",
+        "NSSDCA gives the landing time as 20:17:40 UT (4:17:40 p.m. EDT), on its Apollo 11 page (nssdc.gsfc.nasa.gov/planetary/lunar/apollo11info.html) and its Master Catalog pages. Apollo by the Numbers gives 102:45:39.9 elapsed, 20:17:39 GMT, which we follow. The radio call is quoted as NSSDCA's Master Catalog prints it, with a dash. NASA's Apollo 11 mission page has \"Houston, Tranquility Base here, the Eagle has landed.\" NASA's technical air-to-ground transcript has \"Houston, Tranquility Base here.\" and \"THE EAGLE HAS LANDED.\" as two lines, at 04 06 45 59 and 04 06 46 04 (102:45:59 and 102:46:04). In NASA's recording, Mission Control's answer begins \"Roger, Twan - Tranquility\"; the transcript writes it \"Roger, Tranquility.\"",
       photo: nasaPhoto(
         "as11-37-5458",
         1600,
         1600,
         "The flat, gray surface of the Moon, scattered with small rocks and shallow craters, stretching to a sharp horizon under a black sky, seen from Eagle's window.",
       ),
+      // NASA's file "Apollo 11: Eagle Has Landed Extended"
+      // (590333main_ringtone_eagleHasLanded_extended.mp3), all of it, 0 to
+      // 14.78 seconds, shipped unchanged.
+      audio: {
+        src: "media/apollo-11/the-eagle-has-landed.mp3",
+        seconds: 14.78,
+        transcript: [
+          { speaker: "Neil Armstrong", words: "Houston, Tranquility Base here. The Eagle has landed." },
+          {
+            speaker: "Mission Control",
+            words: "Roger, Twan - Tranquility. We copy you on the ground. You got a bunch of guys about to turn blue. We're breathing again. Thanks a lot.",
+          },
+        ],
+        credit: "NASA",
+        sourceUrl: "https://www.nasa.gov/historical-sounds/",
+      },
       view: "moon",
       inTour: true,
     },
@@ -645,13 +665,26 @@ export const story: Mission = {
         ),
       ],
       discrepancy:
-        "Apollo by the Numbers' mission summary, NSSDCA's Master Catalog, and NASA's technical air-to-ground transcript have \"one small step for man\"; the Apollo by the Numbers timeline has \"one small step for a man\"; NASA's Apollo 11 mission page has \"one small step for [a] man.\" We quote the Apollo by the Numbers summary. NSSDCA agrees on the time, 02:56:15 UT. The transcript stamps the words at 04 13 24 48, that is 109:24:48, 33 seconds after the 109:24:15 that Apollo by the Numbers gives for the foot touching the surface.",
+        "Apollo by the Numbers' mission summary, NSSDCA's Master Catalog, and NASA's technical air-to-ground transcript have \"one small step for man\"; the Apollo by the Numbers timeline has \"one small step for a man\"; NASA's Apollo 11 mission page has \"one small step for [a] man.\" We quote the Apollo by the Numbers summary. NSSDCA agrees on the time, 02:56:15 UT. The transcript stamps the words at 04 13 24 48, that is 109:24:48, 33 seconds after the 109:24:15 that Apollo by the Numbers gives for the foot touching the surface. In NASA's recording the words are heard as \"one small step for man,\" as the technical transcript has them; NASA's Historical Sounds page titles the recording \"That's One Small Step for (a) Man.\"",
       photo: nasaPhoto(
         "s69-42583",
         1600,
         1215,
         "Grainy black-and-white television picture of Neil Armstrong in his spacesuit on Eagle's ladder, just before his first step onto the bright lunar surface. A dark band crosses the image.",
       ),
+      // NASA's file "Apollo 11: That's One Small Step for (a) Man"
+      // (590331main_ringtone_smallStep.mp3, 12.98 seconds once decoded), from
+      // 3.00 seconds to its end, encoded as AAC. NASA's file opens with an
+      // earlier line joined to this one ("I'm going to step off the LM now.",
+      // which the transcript places about a minute before), so the clip starts
+      // after it and holds only this moment.
+      audio: {
+        src: "media/apollo-11/one-small-step.m4a",
+        seconds: 9.98,
+        transcript: [{ speaker: "Neil Armstrong", words: "That's one small step for man, one giant leap for mankind." }],
+        credit: "NASA",
+        sourceUrl: "https://www.nasa.gov/historical-sounds/",
+      },
       view: "moon",
       inTour: true,
     },

@@ -248,6 +248,7 @@ export const story: Mission = {
     /* ---------------------------- Launch ---------------------------- */
     {
       id: "liftoff",
+      handsOn: "stages",
       title: "Liftoff",
       chapter: "launch",
       elapsed: "000:00:00.65",
@@ -397,7 +398,31 @@ export const story: Mission = {
         summary("How the Problem Occurred"),
         report('Section 8.7.3, "Cryogenic Oxygen Tank Incident" (printed page 8-8, PDF page 63)'),
         report(SEQUENCE_OF_EVENTS + ', "Cryogenic oxygen tank incident" row, 55:54:53'),
+        {
+          source: "apollo-13-air-to-ground-transcript",
+          locator:
+            'Tape 36/13, page 160 (PDF page 167): LMP, "Okay, Houston - -" at 02 07 55 19; CDR, "I believe we\'ve had a problem here." at 02 07 55 20; CC, "This is Houston. Say again, please." at 02 07 55 28; CDR, "Houston, we\'ve had a problem. We\'ve had a MAIN B BUS UNDERVOLT." at 02 07 55 35; CC, "Roger. MAIN B UNDERVOLT." at 02 07 55 42; CC, "Okay, stand by, 13. We\'re looking at it." at 02 07 55 58; and the handwritten note in the left margin, "Swigert first transmission, Lovell second"',
+          url: "https://www.nasa.gov/wp-content/uploads/2026/01/as13-tec.pdf",
+        },
       ],
+      discrepancy:
+        "NASA's technical air-to-ground transcript gives the first call as two lines, the lunar module pilot's \"Okay, Houston - -\" and the commander's \"I believe we've had a problem here.\", though a handwritten note in its margin says Swigert made the first transmission and Lovell the second. In NASA's recording the words are heard as \"Okay, Houston, we've had a problem here,\" the way Apollo by the Numbers' timeline gives them for the command module pilot, Swigert, which we follow. NASA's recording also shortens the pauses between the calls: the transcript times them from 02 07 55 19 to 02 07 55 58 (55:55:19 to 55:55:58), 39 seconds, and the recording lasts 17 seconds.",
+      // NASA's file "Apollo 13: Houston, We've Had a Problem"
+      // (574928main_houston_problem.mp3), all of it, 0 to 17.04 seconds,
+      // encoded as AAC to make it smaller (NASA's MP3 is 413 kB). Nothing is cut.
+      audio: {
+        src: "media/apollo-13/we-ve-had-a-problem.m4a",
+        seconds: 17.04,
+        transcript: [
+          { speaker: "Jack Swigert", words: "Okay, Houston, we've had a problem here." },
+          { speaker: "Mission Control", words: "This is Houston. Say again, please." },
+          { speaker: "Jim Lovell", words: "Houston, we've had a problem. We've had a main B bus undervolt." },
+          { speaker: "Mission Control", words: "Roger. Main B undervolt." },
+          { speaker: "Mission Control", words: "Okay, stand by, 13. We're looking at it." },
+        ],
+        credit: "NASA",
+        sourceUrl: "https://www.nasa.gov/historical-sounds/",
+      },
       view: "spacecraft",
       inTour: true,
     },

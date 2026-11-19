@@ -23,6 +23,15 @@
  * - The scientific instrument module bay: its door was cast off at
  *   081:32:40. The model has no separate part for the bay or its door, so
  *   that moment does not change the drawing.
+ * - The spacewalk on the way home: Evans is drawn floating by the service
+ *   module and Schmitt standing in the open side hatch from the spacewalk's
+ *   start (254:54:40) until "CM hatch closed" (255:40). The sources print
+ *   no time for the hatch opening or for Evans's egress (he first let go of
+ *   a trash bag and mounted a TV camera outside the hatch; the Timeline's
+ *   row "Installation of television camera and data acquisition camera
+ *   started." is at 255:00), so for those first minutes he is drawn outside
+ *   before he was. The model shows him beside the service module, not at
+ *   the instrument bay.
  * - The lunar rover: it is drawn parked beside Challenger's descent stage
  *   from the moment it was unloaded, and stays on the Moon. Its three
  *   drives are not drawn, and where it stands beside Challenger is an
@@ -92,6 +101,12 @@ const SPACEWALK: Citation = {
   locator:
     'Apollo 17 mission summary, "Transearth Phase" section: "At 254:54:40, the command module pilot began a 1-hour 5-minute 44-second transearth coast extravehicular activity", retrieving film cassettes "in three trips to the scientific instrument module bay"',
   url: `${ABN}Apollo_17a_Summary.htm`,
+};
+
+const SCHMITT_IN_THE_HATCH: Citation = {
+  source: "nasa-apollo-17-heads-home",
+  locator:
+    'Paragraph on Evans\' spacewalk: the center couch was removed "to allow Evans to exit the side hatch and for Schmitt to stand in the hatch to take the cassettes as Evans passed them in", and "Evans then climbed back into America and closed the hatch"',
 };
 
 /* ------------------------------------------------------------------ */
@@ -186,15 +201,22 @@ export const vehicle: readonly VehicleChange[] = [
   },
   {
     ship: "csm",
-    at: at("254:54:40", timeline("Transearth EVA started (Evans)."), SPACEWALK),
-    label: "Evans goes outside to bring in the camera film",
+    at: at("254:54:40", timeline("Transearth EVA started (Evans)."), SPACEWALK, SCHMITT_IN_THE_HATCH),
+    label: "Evans goes outside to bring in the camera film; Schmitt stands in the open hatch",
     layout: "alone",
-    parts: [...CSM, "spacewalker"],
+    parts: [...CSM, "spacewalker", "standup-spacewalker"],
   },
   {
     ship: "csm",
-    at: at("256:00:24", timeline("Transearth EVA ended."), SPACEWALK),
-    label: "Evans is back inside",
+    at: at(
+      "255:40:00",
+      {
+        source: "apollo-by-the-numbers",
+        locator: 'Apollo 17 Timeline, row "CM hatch closed.", 255:40 (given to the minute; seconds written as 00; the row "Transearth EVA ended." follows at 256:00:24)',
+        url: `${ABN}Apollo_17i_Timeline.htm`,
+      },
+    ),
+    label: "Evans is back inside and the hatch is closed",
     layout: "alone",
     parts: CSM,
   },

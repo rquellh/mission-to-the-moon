@@ -863,6 +863,100 @@ body.is-welcome .hud {
   color: var(--color-text-faint);
 }
 
+/* "Try it": the event's hands-on extra. It sits outside the card body, so a
+   phone's compact card shows it too. A long title wraps inside the button. */
+.card__try {
+  margin-top: 10px;
+}
+
+.card__try-button {
+  max-width: 100%;
+  padding: 8px 16px;
+  white-space: normal;
+  text-align: left;
+}
+
+/* A recording: Play with its length, the words written out, and the credit. */
+.card__audio {
+  margin-top: 16px;
+}
+
+.audio {
+  padding: 10px 14px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-raised);
+}
+
+.audio__controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.audio__toggle {
+  flex: none;
+  padding: 0 14px 0 10px;
+}
+
+.audio__toggle .icon--pause,
+.audio--on .audio__toggle .icon--play {
+  display: none;
+}
+
+.audio--on .audio__toggle .icon--pause {
+  display: block;
+}
+
+.audio__time {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.audio__bar {
+  --progress: 0;
+  flex: 1 1 auto;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.16);
+}
+
+.audio__played {
+  display: block;
+  width: calc(var(--progress) * 100%);
+  height: 100%;
+  background: var(--color-accent);
+}
+
+.audio__transcript {
+  display: grid;
+  gap: 8px;
+  max-width: 62ch;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.audio__speaker {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+}
+
+.audio__credit {
+  margin: 10px 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-faint);
+}
+
 .disclosure {
   display: inline-flex;
   align-items: center;
@@ -1599,6 +1693,29 @@ body.is-welcome .hud {
   line-clamp: none;
 }
 
+/* Extras: smaller, quieter rows under the missions, so the missions stay the main thing. */
+.hub__extras {
+  margin-top: 10px;
+}
+
+.hub__entry--extra {
+  padding: 10px 0;
+}
+
+.hub__entry--extra .hub__name {
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+
+.hub__entry--extra .hub__summary {
+  margin-top: 2px;
+  font-size: 0.8125rem;
+}
+
+.hub__open {
+  min-width: 5.5rem;
+}
+
 @keyframes rise {
   from {
     opacity: 0;
@@ -1863,6 +1980,109 @@ body.is-welcome .hud {
   flex-direction: column;
   align-items: flex-start;
   gap: 14px;
+}
+
+/* An extra's full-screen sheet. The extra fills .extra-host. */
+.dialog.dialog--full {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.dialog--full::backdrop {
+  background: var(--color-bg);
+}
+
+.dialog--full .dialog__head {
+  padding: var(--safe-top) var(--safe-right) 10px var(--safe-left);
+}
+
+.dialog--full .dialog__body {
+  flex: 1 1 auto;
+  padding: 0;
+}
+
+.extra-host {
+  --extra-gutter: var(--gutter);
+  min-height: 100%;
+  padding: 18px max(var(--extra-gutter), env(safe-area-inset-right)) calc(var(--safe-bottom) + 18px)
+    max(var(--extra-gutter), env(safe-area-inset-left));
+}
+
+.extra-sheet__status {
+  max-width: 46ch;
+  margin: 22px 0 0;
+  color: var(--color-text-muted);
+}
+
+.extra-sheet__failed,
+.dialog--full .dialog__body > .extra-sheet__status {
+  padding: 0 var(--safe-right) 0 var(--safe-left);
+}
+
+.extra-sheet__failed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+/* Shared by the extras (listed in src/extras/types.ts), so they read as one site. */
+.extra-heading {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.extra-text {
+  max-width: 62ch;
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.extra-note {
+  max-width: 62ch;
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.extra-panel {
+  padding: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-raised);
+}
+
+.extra-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (min-width: 860px), (min-width: 600px) and (orientation: landscape) {
+  .dialog--full .dialog__head {
+    padding-left: max(24px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+
+  .extra-host {
+    --extra-gutter: 24px;
+  }
+
+  .extra-sheet__failed,
+  .dialog--full .dialog__body > .extra-sheet__status {
+    padding: 0 24px;
+  }
 }
 
 .memorial__photo {

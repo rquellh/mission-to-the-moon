@@ -262,6 +262,7 @@ export const story: Mission = {
     /* ---------------------------- Launch ---------------------------- */
     {
       id: "liftoff",
+      handsOn: "stages",
       title: "Liftoff",
       chapter: "launch",
       elapsed: "000:00:00.67",
@@ -584,7 +585,29 @@ export const story: Mission = {
         timeline('CDR: "And from the crew of Apollo 8, we close with good night, good luck, a merry Christmas, and God bless all of you, all of you on the good Earth."'),
         timeline("4 th television transmission ended."),
         summary("Lunar Orbit Phase"),
+        {
+          source: "apollo-8-technical-transcript",
+          locator:
+            'Tape 58, page 4 (PDF page 463): CDR, "... And from the crew of Apollo 8, we close with good night, good luck, a Merry Christmas and God bless all of you - all of you on the good Earth.", the end of the transmission that starts at 03 14 08 07',
+        },
       ],
+      // NASA's file "Apollo 8: Merry Christmas"
+      // (581549main_Apollo-8_Merry-Christmas.mp3), all of it, 0 to 13.48
+      // seconds, shipped unchanged. It holds only Borman's closing words, not
+      // the reading before them. afinfo only estimates its length (13.53
+      // seconds); decoded, by afconvert and by Chrome, it is 13.48.
+      audio: {
+        src: "media/apollo-8/merry-christmas.mp3",
+        seconds: 13.48,
+        transcript: [
+          {
+            speaker: "Frank Borman",
+            words: "And from the crew of Apollo 8, we close with good night, good luck, a Merry Christmas, and God bless all of you - all of you on the good Earth.",
+          },
+        ],
+        credit: "NASA",
+        sourceUrl: "https://www.nasa.gov/historical-sounds/",
+      },
       view: "moon",
       inTour: true,
     },

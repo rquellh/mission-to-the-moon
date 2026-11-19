@@ -24,4 +24,12 @@ export const sources = {
     checked: "2026-11-19",
     use: "The Apollo 12 command module as the Smithsonian's object (transferred from NASA in 1973), on loan or in storage rather than on display at the museum itself.",
   },
+  "apollo-12-technical-transcript": {
+    title: "Apollo 12 Technical Air-to-Ground Voice Transcription, November 1969",
+    publisher:
+      "NASA Manned Spacecraft Center, prepared for the Apollo Spacecraft Program Office (a scan with a text layer, listed on NASA's Mission Transcripts page, https://www.nasa.gov/history/mission-transcripts-mercury-gemini-and-apollo/)",
+    url: "https://www.nasa.gov/wp-content/uploads/2026/01/as12-tec.pdf",
+    checked: "2026-11-19",
+    use: "The words of Conrad's remark about the lightning and Mission Control's answer, heard in NASA's recording of them. Its times are days, hours, minutes and seconds from range zero: 00 00 03 17 is 0:03:17.",
+  },
 } as const satisfies Record<string, Source>;

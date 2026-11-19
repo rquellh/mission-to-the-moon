@@ -329,6 +329,7 @@ export const story: Mission = {
     },
     {
       id: "liftoff",
+      handsOn: "stages",
       title: "Liftoff",
       chapter: "launch",
       elapsed: "000:00:00",
@@ -357,6 +358,7 @@ export const story: Mission = {
     /* ------------------------- Catching the Agena ------------------------ */
     {
       id: "docking",
+      handsOn: "docking",
       title: "Closing in and docking",
       chapter: "first-agena",
       elapsed: "005:52:37.1",

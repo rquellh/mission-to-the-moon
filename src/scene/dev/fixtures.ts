@@ -62,7 +62,7 @@ function ship(plan: FlightPlan, id: string): ShipPlan {
  * Ten days in Earth orbit (INVENTED): Gemini 8's launch and first orbit,
  * with that orbit stretched to 240 hours, then a retrofire and an entry at
  * invented times and place. Events every 12 hours, so the story clock runs
- * many orbits a second. A spacewalk from 48 to 49 hours (INVENTED).
+ * many orbits a second. A spacewalk from 48 to 49 hours and a standup one from 50 to 51 (INVENTED).
  */
 function longOrbit(): MissionBundle {
   const plan = gemini8.flight;
@@ -89,6 +89,8 @@ function longOrbit(): MissionBundle {
     change('gemini', firstOrbit.start, 'In orbit', 'alone', GEMINI, { facing: 'forward' }),
     change('gemini', invented(clock(48)), 'Spacewalk (INVENTED)', 'alone', [...GEMINI, 'spacewalker'], { facing: 'forward' }),
     change('gemini', invented(clock(49)), 'Back inside (INVENTED)', 'alone', GEMINI, { facing: 'forward' }),
+    change('gemini', invented(clock(50)), 'Standing in the hatch (INVENTED)', 'alone', [...GEMINI, 'standup-spacewalker'], { facing: 'forward' }),
+    change('gemini', invented(clock(51)), 'Hatch closed (INVENTED)', 'alone', GEMINI, { facing: 'forward' }),
     change('gemini', invented('240:00:45' as ElapsedTime), 'Entry', 'alone', ['gemini-reentry-module']),
   ];
   return { mission: story('dev-long-orbit', 'earth-orbit', hours), flight, vehicle, leftBehind: [] };

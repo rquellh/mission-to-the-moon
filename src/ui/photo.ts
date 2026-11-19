@@ -3,8 +3,8 @@ import type { Photo } from '../content/types';
 import { externalLink } from './citations';
 import { el } from './dom';
 
-/** Resolve a photo path under public/ against the site's base address. */
-function mediaUrl(src: string): string {
+/** Resolve a path under public/ (a photo, a recording) against the site's base address. */
+export function mediaUrl(src: string): string {
   if (/^[a-z]+:/i.test(src)) return src;
   return `${import.meta.env.BASE_URL}${src.replace(/^\//, '')}`;
 }

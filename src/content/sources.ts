@@ -6,7 +6,8 @@
  * need. `checked` is the date the URL was last confirmed to work.
  *
  * A source cited by one mission only lives in that mission's folder
- * (missions/<id>/sources.ts). A document cited by three or more missions is
+ * (missions/<id>/sources.ts), and a source cited by one extra only in
+ * extras/<id>.ts. A document cited by three or more missions is
  * registered once below, as a shared source. A document two missions cite is
  * registered once, in the earlier flight's folder, and the later mission
  * cites it by that id (Gemini 7 cites some of Gemini 6A's).
@@ -33,6 +34,11 @@ import { sources as apollo14 } from "./missions/apollo-14/sources.ts";
 import { sources as apollo15 } from "./missions/apollo-15/sources.ts";
 import { sources as apollo16 } from "./missions/apollo-16/sources.ts";
 import { sources as apollo17 } from "./missions/apollo-17/sources.ts";
+import { sources as extraStages } from "./extras/stages.ts";
+import { sources as extraDocking } from "./extras/docking.ts";
+import { sources as extraLandingSites } from "./extras/landing-sites.ts";
+import { sources as extraRockets } from "./extras/rockets.ts";
+import { sources as extraPatches } from "./extras/patches.ts";
 import type { Source } from "./source-types.ts";
 
 export type { Source } from "./source-types.ts";
@@ -136,6 +142,11 @@ export const SOURCES = {
   ...apollo15,
   ...apollo16,
   ...apollo17,
+  ...extraStages,
+  ...extraDocking,
+  ...extraLandingSites,
+  ...extraRockets,
+  ...extraPatches,
 } as const satisfies Record<string, Source>;
 
 /** The id of a registered source. */
@@ -145,6 +156,8 @@ export type SourceId = keyof typeof SOURCES;
 export const SOURCE_GROUPS: {
   readonly shared: Readonly<Record<string, Source>>;
   readonly missions: Readonly<Record<string, Readonly<Record<string, Source>>>>;
+  /** Each extra’s own sources, under the extra’s id (a folder under src/extras). */
+  readonly extras: Readonly<Record<string, Readonly<Record<string, Source>>>>;
 } = {
   shared: SHARED,
   missions: {
@@ -170,5 +183,12 @@ export const SOURCE_GROUPS: {
     "apollo-15": apollo15,
     "apollo-16": apollo16,
     "apollo-17": apollo17,
+  },
+  extras: {
+    "stages": extraStages,
+    "docking": extraDocking,
+    "landing-sites": extraLandingSites,
+    "rockets": extraRockets,
+    "patches": extraPatches,
   },
 };

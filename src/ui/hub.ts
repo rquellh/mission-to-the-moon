@@ -1,9 +1,15 @@
 import { copy } from '../content/copy';
 import type { MissionSummary, Program } from '../content/types';
+import type { ExtraMeta } from '../extras/types';
 import { button, byId, el, hiddenText } from './dom';
 import { formatYears, summaryDates, yearOf } from './format';
 
 export type HubMode = 'welcome' | 'return';
+
+/** An entry in the list: a mission (or memorial) or an extra. */
+export type HubTarget = { mission: string } | { extra: string };
+
+const keyOf = (target: HubTarget): string => ('mission' in target ? `mission:${target.mission}` : `extra:${target.extra}`);
 
 export interface HubOptions {
   /** The flight whose scene is loaded behind the hub, or null when none could be loaded. */
@@ -22,6 +28,12 @@ export interface HubOptions {
   onReturn(): void;
   /** Open a memorial page over the hub; focus goes back to `from` when it closes. */
   onMemorial(id: string, from: HTMLElement): void;
+  /** The extras, listed under the missions: hands-on first, each group in order. */
+  extras: readonly ExtraMeta[];
+  /** True for an unfinished extra (only the dev server lists one). */
+  isExtraDraft(meta: ExtraMeta): boolean;
+  /** Open an extra over the hub; focus goes back to `from` when it closes. */
+  onExtra(id: string, from: HTMLElement): void;
 }
 
 export interface Hub {
@@ -29,9 +41,9 @@ export interface Hub {
    * The first thing a visitor sees, over the bare 3D view. The rest of the
    * interface is hidden; the 3D view can still be turned. Leaving without a
    * choice (Escape) explores the loaded mission. The list scrolls to the
-   * entry `revealId` names, or to the loaded mission.
+   * entry `reveal` names, or to the loaded mission.
    */
-  welcome(revealId?: string): void;
+  welcome(reveal?: HubTarget): void;
   /**
    * Reopen over the interface as a modal dialog. Leaving without a choice
    * (Close, Escape, or a click outside) returns to where the visitor was.
@@ -39,8 +51,8 @@ export interface Hub {
   open(returnTo: HTMLElement): void;
   /** How the hub is open now, or null when it is closed. */
   readonly mode: HubMode | null;
-  /** The button that opens an entry (Read, for a memorial), so focus can come back to it. */
-  actionFor(id: string): HTMLButtonElement | null;
+  /** The button that opens an entry (Explore, Read, or Open), so focus can come back to it. */
+  actionFor(target: HubTarget): HTMLButtonElement | null;
 }
 
 /**
@@ -88,10 +100,12 @@ function programHeading(program: Program, group: readonly MissionSummary[]): HTM
  * The mission picker. Missions are grouped by program, each a compact row:
  * name, dates, a one-line summary, and the ways in (the guided tour and
  * exploring freely, or Read for a memorial). Choosing the loaded mission
- * acts in place; choosing another one loads that mission's page.
+ * acts in place; choosing another one loads that mission's page. The extras
+ * follow in two small, quieter groups and open over the page in place.
  */
 export function setUpHub(options: HubOptions): Hub {
   const { currentId, currentName, summaries, isDraft, onTour, onExplore, onReturn, onMemorial } = options;
+  const { extras, isExtraDraft, onExtra } = options;
   const dialog = byId('hub', HTMLDialogElement);
   const title = byId('hub-title', HTMLHeadingElement);
   const list = byId('hub-list', HTMLDivElement);
@@ -166,7 +180,7 @@ export function setUpHub(options: HubOptions): Hub {
     const item = el('li', memorial ? 'hub__entry hub__entry--memorial' : 'hub__entry');
     const isCurrent = shown.id === currentId;
     if (isCurrent) item.setAttribute('aria-current', 'true');
-    entries.set(shown.id, item);
+    entries.set(keyOf({ mission: shown.id }), item);
 
     // The name (with any mark) over the dates, and the actions beside them.
     const heading = el('div', 'hub__heading');
@@ -184,7 +198,7 @@ export function setUpHub(options: HubOptions): Hub {
       read.setAttribute('aria-haspopup', 'dialog');
       read.addEventListener('click', () => onMemorial(shown.id, read));
       buttons.append(read);
-      actions.set(shown.id, read);
+      actions.set(keyOf({ mission: shown.id }), read);
     } else {
       const go = (start: 'tour' | 'explore'): void => {
         if (isCurrent) choose(start === 'tour' ? onTour : onExplore);
@@ -202,7 +216,7 @@ export function setUpHub(options: HubOptions): Hub {
       explore.setAttribute('aria-label', copy.hub.exploreMission(shown.name));
       explore.addEventListener('click', () => go('explore'));
       buttons.append(explore);
-      actions.set(shown.id, explore);
+      actions.set(keyOf({ mission: shown.id }), explore);
     }
 
     const top = el('div', 'hub__top');
@@ -221,12 +235,47 @@ export function setUpHub(options: HubOptions): Hub {
     section.append(heading, items);
     sections.push(section);
   }
+
+  // The extras: quieter rows under the missions, one small group per kind.
+  const extraEntry = (meta: ExtraMeta): HTMLLIElement => {
+    const item = el('li', 'hub__entry hub__entry--extra');
+    const key = keyOf({ extra: meta.id });
+    entries.set(key, item);
+    const heading = el('div', 'hub__heading');
+    const name = el('h4', 'hub__name', meta.title);
+    if (isExtraDraft(meta)) name.append(' ', el('span', 'hub__mark hub__mark--draft', copy.hub.draft));
+    heading.append(name, el('p', 'hub__summary', meta.blurb));
+    const open = button('button hub__open', copy.hub.open);
+    open.setAttribute('aria-label', copy.hub.openExtra(meta.title));
+    open.setAttribute('aria-haspopup', 'dialog');
+    open.addEventListener('click', () => onExtra(meta.id, open));
+    actions.set(key, open);
+    const buttons = el('div', 'hub__actions');
+    buttons.append(open);
+    const top = el('div', 'hub__top');
+    top.append(heading, buttons);
+    item.append(top);
+    return item;
+  };
+  for (const kind of ['hands-on', 'explore'] as const) {
+    const group = extras.filter((meta) => meta.kind === kind);
+    if (!group.length) continue;
+    const section = el('section', 'hub__program hub__extras');
+    const heading = el('h3', 'hub__program-title', copy.hub.extras[kind]);
+    heading.id = `hub-extras-${kind}`;
+    section.setAttribute('aria-labelledby', heading.id);
+    const items = el('ul', 'hub__entries');
+    items.append(...group.map(extraEntry));
+    section.append(heading, items);
+    sections.push(section);
+  }
   list.replaceChildren(...sections);
 
   /** Scroll the list so an entry (the loaded mission, unless another is named) sits in the middle. */
-  const reveal = (id?: string): void => {
+  const reveal = (to?: HubTarget): void => {
     list.scrollTop = 0;
-    const target = entries.get(id ?? currentId ?? '') ?? entries.get(currentId ?? '');
+    const loaded = currentId ? entries.get(keyOf({ mission: currentId })) : undefined;
+    const target = (to ? entries.get(keyOf(to)) : undefined) ?? loaded;
     if (!target) return;
     const box = target.getBoundingClientRect();
     const frame = list.getBoundingClientRect();
@@ -265,13 +314,13 @@ export function setUpHub(options: HubOptions): Hub {
   };
 
   return {
-    welcome(revealId) {
+    welcome(to) {
       if (dialog.open) return;
       show('welcome');
       document.body.classList.add('is-welcome');
       document.addEventListener('keydown', onKey);
       dialog.show();
-      reveal(revealId);
+      reveal(to);
       title.focus({ preventScroll: true });
     },
     open(from) {
@@ -285,8 +334,8 @@ export function setUpHub(options: HubOptions): Hub {
     get mode() {
       return mode;
     },
-    actionFor(id) {
-      return actions.get(id) ?? null;
+    actionFor(target) {
+      return actions.get(keyOf(target)) ?? null;
     },
   };
 }
