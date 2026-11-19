@@ -73,7 +73,10 @@
             <span class="clock__met" id="clock-met">00:00:00</span>
             <span class="clock__since" id="clock-since">since liftoff</span>
           </span>
-          <span class="clock__date" id="clock-utc"></span>
+          <span class="clock__date">
+            <span class="clock__day" id="clock-day" hidden></span>
+            <span class="clock__utc" id="clock-utc"></span>
+          </span>
         </p>
         <label class="pick pick--chapter">
           <span class="visually-hidden">Jump to a chapter</span>
@@ -111,7 +114,10 @@
 
     <div class="message" id="message" role="alert" hidden>
       <p class="message__text" id="message-text"></p>
-      <button type="button" class="button" id="message-reload" hidden>Reload</button>
+      <div class="message__actions">
+        <button type="button" class="button" id="message-reload" hidden>Reload</button>
+        <button type="button" class="button" id="message-action" hidden></button>
+      </div>
     </div>
 
     <p class="visually-hidden" id="announcer" aria-live="polite"></p>
@@ -130,6 +136,15 @@
         <button type="button" class="button button--quiet dialog__close">Close</button>
       </div>
       <div class="dialog__body" id="drawn-body"></div>
+    </dialog>
+
+    <!-- A page of remembrance, for a crew that did not fly. Its content loads when it opens. -->
+    <dialog class="dialog" id="memorial-dialog" aria-labelledby="memorial-title">
+      <div class="dialog__head">
+        <h2 class="dialog__title" id="memorial-title"></h2>
+        <button type="button" class="button button--quiet dialog__close">Close</button>
+      </div>
+      <div class="dialog__body" id="memorial-body"></div>
     </dialog>
 
     <dialog class="dialog" id="credits-dialog" aria-labelledby="credits-title">

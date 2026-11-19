@@ -4,6 +4,7 @@ import {
   type Mission,
   type MissionEvent,
 } from '../content/types';
+import { countsDays } from './format';
 
 /** A chapter with where it starts on the mission clock. */
 export interface ChapterStart {
@@ -29,6 +30,8 @@ export class MissionIndex {
   /** Mission elapsed seconds at the start and end of the mission. */
   readonly start: number;
   readonly end: number;
+  /** True for a flight long enough to show the day of the flight beside the clock. */
+  readonly countsDays: boolean;
 
   constructor(mission: Mission) {
     this.mission = mission;
@@ -52,6 +55,7 @@ export class MissionIndex {
     const last = this.seconds[this.seconds.length - 1] ?? 0;
     this.start = Math.min(0, first);
     this.end = Math.max(duration, last, this.start + 1);
+    this.countsDays = countsDays(this.end);
   }
 
   /**

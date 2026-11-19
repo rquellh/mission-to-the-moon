@@ -1,3 +1,4 @@
+import type { FlightOutline } from '../app/outline';
 import { copy } from '../content/copy';
 import type { Fact, Mission } from '../content/types';
 import type { Citation } from '../content/types';
@@ -87,7 +88,7 @@ export function renderAbout(mission: Mission): void {
 
   // Where the spacecraft are now.
   if (mission.whereNow && mission.whereNow.length) {
-    const now = section(copy.about.whereNow);
+    const now = section(copy.about.whereNow(mission.whereNow.length));
     const list = el('ul', 'about__list');
     for (const exhibit of mission.whereNow) {
       const item = el('li', 'about__item');
@@ -106,10 +107,31 @@ export function renderAbout(mission: Mission): void {
   body.replaceChildren(...parts);
 }
 
-/** Fill the "How this is drawn" note, which differs for Moon flights and Earth-orbit flights. */
-export function renderHowDrawn(mission: Mission): void {
+/**
+ * The "How this is drawn" paragraphs that are true of this flight: they
+ * depend on how far it went and on what its flight plan holds.
+ */
+export function howDrawnParagraphs(mission: Mission, flight: FlightOutline): string[] {
+  const text = copy.howDrawn;
+  const where = mission.destination;
+  const moon = where === 'moon';
+  const exact = flight.landsOnMoon ? text.exact.moonLanding : flight.splashdown ? text.exact.splashdown : text.exact.other;
+  return [
+    ...(moon ? [text.heldStill] : []),
+    exact,
+    text.path[where],
+    text.scale[where],
+    flight.ships > 1 ? text.models.many : text.models.one,
+    ...(!moon && flight.ships > 1 ? [text.closeTogether] : []),
+    ...(flight.turns ? [text.turning] : []),
+    ...(!moon ? [text.loops] : []),
+    text.sunlight[where],
+  ];
+}
+
+/** Fill the "How this is drawn" note. */
+export function renderHowDrawn(mission: Mission, flight: FlightOutline): void {
   byId('drawn-title', HTMLHeadingElement).textContent = copy.howDrawn.title;
   const body = byId('drawn-body', HTMLDivElement);
-  const paragraphs = copy.howDrawn.paragraphs[mission.destination];
-  body.replaceChildren(...paragraphs.map((text) => el('p', 'note__paragraph', text)));
+  body.replaceChildren(...howDrawnParagraphs(mission, flight).map((line) => el('p', 'note__paragraph', line)));
 }

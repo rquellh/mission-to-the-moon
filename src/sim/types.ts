@@ -22,6 +22,24 @@
  *
  * Latitudes on Earth are geodetic (as on a map) unless `latitudeKind` says
  * the source printed a geocentric one.
+ *
+ * Common shapes of a ship's phase list (each kind's comment says more):
+ * - Earth orbit: ascent, orbit, [burn, orbit]..., burn (retrofire), entry,
+ *   [surface (floating until pickup)]. The orbit after the ascent can be
+ *   placed from the launch site and inclination, and the end needs no
+ *   retrofire position or entry state (see OrbitPhase and EntryPhase).
+ * - Rendezvous: ... orbit (endRange to the target), burn, rendezvous,
+ *   station and/or docked, then orbit (it starts from the target) or burn.
+ *   A target already in orbit starts with an orbit placed by
+ *   `startRelative`.
+ * - To the Moon: ascent, orbit, burn, transfer, burn, orbit (lunar)...,
+ *   burn, transfer (to Earth), entry. A lander: orbit (from the main ship),
+ *   burn, orbit, descent, surface, ascent, orbit..., rendezvous, docked.
+ * - Around the Moon without orbiting it (Apollo 13): see TransferPhase.
+ *
+ * The all-missions test (src/sim/test/all-missions.test.ts) builds every
+ * mission folder's plan and checks it; tools/sky.mjs prints the `sky`
+ * samples.
  */
 import type { Cited, ElapsedTime } from "../content/types.ts";
 
@@ -41,8 +59,11 @@ export interface Fix {
 }
 
 /**
- * A place over the Moon whose latitude was not used. The model draws lunar
- * orbits in the Moon's equatorial plane, so only longitude and altitude matter.
+ * A place over the Moon whose latitude is not used. The model draws lunar
+ * orbits in one plane (the Moon's equator, or the plane over the landing
+ * site that `FlightPlan.lunarOrbitPlane` sets), so only longitude and
+ * altitude matter: the point is placed where that plane crosses the
+ * longitude at the fix's time.
  */
 export interface LunarFix {
   longitude: Cited<number>;
@@ -92,29 +113,94 @@ export interface AscentPhase extends PhaseBase {
   site: Fix;
   /** Published points along the way, each with its own time and altitude. */
   track?: StateFix[];
+  /**
+   * The published launch (flight) azimuth, degrees east of north, measured
+   * on the ground. Used only when the orbit after an Earth ascent has no
+   * start fix with a heading: it says whether the orbit leaves the launch
+   * site toward the northeast or the southeast, and, when the orbit gives
+   * no inclination, it sets the orbit's plane.
+   */
+  azimuth?: Cited<number>;
 }
+
+/** A published orbit size at a moment of an orbit phase (see `OrbitPhase.sizes`). */
+export interface OrbitSize {
+  time: Cited<ElapsedTime>;
+  /** Highest and lowest points, nautical miles. */
+  apoapsis: Cited<number>;
+  periapsis: Cited<number>;
+}
+
+/**
+ * Where a ship that was already in orbit when the plan begins is placed,
+ * instead of a start fix: its distance ahead of, or behind, another ship
+ * of the plan at a published moment. See `OrbitPhase.startRelative`.
+ */
+export type RelativeStart =
+  | { ship: string; time: Cited<ElapsedTime>; ahead: Cited<number> }
+  | { ship: string; time: Cited<ElapsedTime>; behind: Cited<number> };
 
 /**
  * Coasting in orbit. Its size is published (apoapsis and periapsis); its
  * position at the start and end is pinned to published fixes when given.
  * Earth orbits also turn slowly with Earth's equatorial bulge (J2).
+ *
+ * How the orbit starts, in order of preference:
+ * - `from`: at another ship's position (undocking). An orbit right after a
+ *   `docked` or `station` phase starts from that phase's target anyway.
+ * - `startFix`: a published place. Earth orbits need a heading, or an
+ *   `inclination` (the plane through the fix at that inclination that
+ *   passes nearest the launch site is used).
+ * - `startRelative`: a ship already in orbit when the plan begins (a
+ *   target launched days or months before the crew).
+ * - Right after an Earth `ascent`, with none of the above: the plane comes
+ *   from the launch site, `inclination`, and the ascent's `azimuth`, and
+ *   the insertion point is placed downrange by an illustrative distance
+ *   (see build.ts). A published insertion fix with a heading always wins.
+ * - Otherwise it continues from the previous phase (after a burn, from the
+ *   orbit before the burn).
+ *
+ * How it ends: at `endFix` or `endRange` when given. An orbit followed by
+ * the retrofire burn and the entry needs neither: the engine ends it where
+ * a natural fall from retrofire reaches the published splashdown point at
+ * the published time, however many revolutions came before (see
+ * `EntryPhase`).
  */
 export interface OrbitPhase extends PhaseBase {
   kind: "orbit";
   body: BodyId;
-  /** Highest and lowest points, nautical miles. */
+  /** Highest and lowest points at the start of the phase, nautical miles. */
   apoapsis: Cited<number>;
   periapsis: Cited<number>;
-  /** Inclination to the body's equator, degrees (informational for Earth orbits). */
+  /**
+   * Inclination to the body's equator, degrees. For an Earth orbit with no
+   * start fix heading, it sets the orbit's plane (see above); otherwise it
+   * is informational. When the launch site or fix lies up to a degree
+   * farther from the equator than this (latitude conventions differ), the
+   * orbit is drawn at the lowest inclination that passes over it.
+   */
   inclination?: Cited<number>;
   /** Direction of travel. */
   sense: Cited<Sense>;
   /**
-   * Where the orbit starts. Earth orbits need a full fix with a heading;
-   * lunar orbits a longitude (and altitude and flight-path angle when
-   * published). Omit to continue from the previous phase.
+   * Where the orbit starts. Earth orbits need a heading or an
+   * `inclination`; lunar orbits a longitude (and altitude and flight-path
+   * angle when published). Omit to continue from the previous phase or to
+   * start from the launch (see above).
    */
   startFix?: StateFix | LunarStateFix;
+  /**
+   * Instead of a start fix, for a ship that was already in orbit when the
+   * plan begins (Gemini 7 for Gemini 6A, an old Agena for Gemini 10): at
+   * `time`, the craft is `ahead` (or `behind`) nautical miles from `ship`,
+   * measured in a straight line, in `ship`'s orbit plane. Start the phase
+   * shortly before the main launch: its orbit then needs no published fix
+   * of its own, and the long time it spent in orbit before is not drawn.
+   * `time` must fall in an orbit phase of `ship` that does not itself
+   * depend on this craft (its first orbit, for example at insertion). The
+   * craft is drawn at its own orbit's low point at `time` (an illustration).
+   */
+  startRelative?: RelativeStart;
   /** Where the craft is at the end of the phase. */
   endFix?: Fix | LunarFix;
   /**
@@ -126,11 +212,26 @@ export interface OrbitPhase extends PhaseBase {
   endRange?: { target: string; range: Cited<number> };
   /** Start from another ship's position at the phase start (undocking). */
   from?: string;
+  /**
+   * Published sizes later in the phase, in time order, for an orbit whose
+   * size changed slowly (air drag over days) or in small steps that are not
+   * drawn one by one (trim burns). `apoapsis` and `periapsis` above are the
+   * size at the phase start; the orbit then passes through each size here
+   * at its time, changing smoothly in between, and keeps the last one to
+   * the phase end. For a step, give the size before it at the step's start
+   * and the size after it a short time later (the burn's end). Times must
+   * fall inside the phase. A big maneuver is still a `burn` phase between
+   * two orbit phases.
+   */
+  sizes?: OrbitSize[];
 }
 
 /**
  * An engine firing that changes one orbit into the next. The path blends
- * smoothly from the orbit before to the orbit after.
+ * smoothly from the phase before to the phase after: orbits, coasts,
+ * transfers, station keeping, or a rendezvous after it. Retrofire may also
+ * lead straight into the entry (see EntryPhase). Small trims over a long
+ * flight need no burn phase of their own (see `OrbitPhase.sizes`).
  */
 export interface BurnPhase extends PhaseBase {
   kind: "burn";
@@ -143,6 +244,24 @@ export interface BurnPhase extends PhaseBase {
  * The coast between Earth and the Moon, either way. Near Earth the path is
  * a Kepler conic about Earth through `earthFix`; near the Moon a conic about
  * the Moon through `moonFix`; the two are joined in between.
+ *
+ * A coast split by a midcourse burn is two transfer phases with a `burn`
+ * between them, each with one fix:
+ * - Outbound, before the burn: `earthFix` only, a full state (translunar
+ *   injection with speed, flight-path angle, and heading); the path is the
+ *   conic about Earth through it. It must end well short of the Moon.
+ * - Outbound, after the burn: `moonFix` only; the path leaves from where
+ *   the burn was and arrives at the lunar fix.
+ * - Return, before the burn: `moonFix` only; the path is the conic about the
+ *   Moon through it, carried on about Earth with the same velocity.
+ * - Return, after the burn: `earthFix` only (the entry interface); the path
+ *   leaves from where the burn was. The Moon's pull is left out of this
+ *   leg, so put the burn well away from the Moon.
+ *
+ * A flyby with no lunar orbit (Apollo 13): give the outbound transfer the
+ * closest approach as its `moonFix`, with that moment's `time`, and let the
+ * phase run past it to the next burn; the path swings around the Moon on
+ * the conic through the fix.
  */
 export interface TransferPhase extends PhaseBase {
   kind: "transfer";
@@ -150,12 +269,19 @@ export interface TransferPhase extends PhaseBase {
   to: BodyId;
   /**
    * Translunar injection, or the entry interface. Must have a time and
-   * altitude. Its speed and angles are kept for checking: the path through
-   * it is computed (a Lambert arc), and lands close to them.
+   * altitude. Its speed and angles are kept for checking when there is a
+   * `moonFix`: the path through it is computed (a Lambert arc), and lands
+   * close to them. Without a `moonFix` it must be a full state, and the
+   * path goes through it exactly. Omit it only right after a burn (see
+   * above).
    */
-  earthFix: StateFix;
-  /** Arrival in lunar orbit, or departure from it. Must have altitude, speed, flight-path angle. */
-  moonFix: LunarStateFix;
+  earthFix?: StateFix;
+  /**
+   * Arrival in lunar orbit (or the closest approach of a flyby), or
+   * departure from it. Must have altitude, speed, flight-path angle. Omit
+   * it only around a midcourse burn (see above).
+   */
+  moonFix?: LunarStateFix;
   /** Direction of travel around the Moon. */
   lunarSense: Cited<Sense>;
   /** Direction of travel around Earth. */
@@ -174,12 +300,20 @@ export interface TransferPhase extends PhaseBase {
  * (altitude, speed, flight-path angle, and heading, about Earth), the coast
  * is the conic through that state, run back to the phase start, and an orbit
  * before the burn that leads into it is pinned to end where it begins.
+ *
+ * Without an end fix:
+ * - After retrofire and before the entry: the fall to the entry interface
+ *   at the phase end (a published time without a published place). The
+ *   engine places it so the entry reaches the splashdown point; see
+ *   `EntryPhase`.
+ * - After any phase but a burn (for example a lunar module set loose after
+ *   `docked`): a free coast on the conic the craft was on.
  */
 export interface CoastPhase extends PhaseBase {
   kind: "coast";
   body: BodyId;
   /** Where the coast ends, at the phase end (or at its own time). */
-  endFix: StateFix;
+  endFix?: StateFix;
   sense: Cited<Sense>;
 }
 
@@ -197,7 +331,23 @@ export interface SurfacePhase extends PhaseBase {
   site: Fix;
 }
 
-/** Atmospheric entry and parachute descent to splashdown. */
+/**
+ * Atmospheric entry and parachute descent to splashdown. It ends at the
+ * published splashdown point at the published time.
+ *
+ * From Earth orbit, when no entry state is published, write the end of the
+ * flight as `orbit`, `burn` (retrofire), `entry`: the entry then starts at
+ * the end of retrofire and includes the fall to the entry interface. The
+ * engine works back from the splashdown: the entry interface (400,000 feet)
+ * is an illustrative distance before the splashdown point along the ground
+ * track and an illustrative time before landing (or before the drogue, when
+ * published), and retrofire is placed where a fall of that length begins,
+ * in a plane through the splashdown point. The orbit before is pinned to
+ * end there, with a correction too small to see. With a published entry
+ * interface time but no place, use `orbit`, `burn`, `coast` (no end fix),
+ * `entry` instead. A published retrofire position (the orbit's `endFix`)
+ * is kept.
+ */
 export interface EntryPhase extends PhaseBase {
   kind: "entry";
   splashdown: Fix;
@@ -215,7 +365,11 @@ export interface EntryPhase extends PhaseBase {
  * craft flies its own orbit (the published size after its last burn),
  * blended around the body into the target's position. The blend is complete
  * at `alongside` when given (the craft had reached the target and was
- * keeping station beside it), otherwise at the phase end.
+ * keeping station beside it), otherwise at the phase end. Follow it with
+ * `docked` or `station` (the craft is then at the target's place); when
+ * station keeping is a story of its own, prefer ending the rendezvous when
+ * the craft arrived and following it with a `station` phase over
+ * `alongside`, so the scene can draw the two apart.
  */
 export interface RendezvousPhase extends PhaseBase {
   kind: "rendezvous";
@@ -228,10 +382,34 @@ export interface RendezvousPhase extends PhaseBase {
   alongside?: Cited<ElapsedTime>;
 }
 
-/** Attached to another ship. */
+/**
+ * Attached to another ship: the craft is drawn at the target's position.
+ * A ship can start docked (a lunar module riding on the command module, a
+ * spent stage still carrying the spacecraft). After it, an orbit starts
+ * from the target (undocking), and a coast with no end fix flies on freely
+ * from the target's path (a lunar module set loose before entry).
+ */
 export interface DockedPhase extends PhaseBase {
   kind: "docked";
   target: string;
+}
+
+/**
+ * Flying beside another ship without being attached to it (station keeping).
+ * The craft holds the target's place in orbit; the scene draws the two a
+ * little apart.
+ *
+ * It may follow a `rendezvous` (or start a ship's flight beside another),
+ * and be followed by `rendezvous` or `docked` (closing in again), by a
+ * `burn` (a separation maneuver), or by an `orbit`, which then starts
+ * from the target's position and velocity (on the target's own orbit when
+ * it has the same published size).
+ */
+export interface StationPhase extends PhaseBase {
+  kind: "station";
+  target: string;
+  /** The published distance between the two, nautical miles (informational). */
+  range?: Cited<number>;
 }
 
 export type Phase =
@@ -244,7 +422,8 @@ export type Phase =
   | SurfacePhase
   | EntryPhase
   | RendezvousPhase
-  | DockedPhase;
+  | DockedPhase
+  | StationPhase;
 
 export type PhaseKind = Phase["kind"];
 
@@ -282,11 +461,41 @@ export interface SkySample {
   sunEclipticLongitude: Cited<number>;
 }
 
+/**
+ * The plane the lunar orbits are drawn in, when it is not the Moon's
+ * equator: the plane through the Moon's center that passes over `site`,
+ * heading `heading` there, at `time`. The plane stays fixed among the stars
+ * while the Moon turns under it (about 13 degrees a day), as real orbits
+ * did, so the site lies exactly under it only at `time`; the default time,
+ * the middle of the stay on the surface, keeps it close at both landing and
+ * liftoff (about 1 degree for a three-day stay at 26 degrees north).
+ * Published plane changes are not drawn.
+ */
+export interface LunarOrbitPlane {
+  /** The site the orbits pass over, usually the landing site (selenographic latitude and east longitude). */
+  site: { latitude: Cited<number>; longitude: Cited<number> };
+  /**
+   * Direction of travel over the site, degrees east of north (Apollo's
+   * "approach azimuth"; -91 and 269 mean the same). Defaults to due west for
+   * retrograde orbits, which puts the site at the orbit's farthest point
+   * from the equator: the lowest inclination that reaches it.
+   */
+  heading?: Cited<number>;
+  /** When the orbit passes over the site. Defaults to the middle of the first stay on the lunar surface. */
+  time?: Cited<ElapsedTime>;
+}
+
 export interface FlightPlan {
   /** For example "apollo-11". */
   missionId: string;
   /** Radius that lunar altitudes are measured from, nautical miles. */
   moonReferenceRadius?: Cited<number>;
+  /**
+   * Draw the lunar orbits over the landing site instead of over the Moon's
+   * equator (Apollo 15 landed at 26 degrees north, Apollo 17 at 20). Omit it
+   * for orbits near the equator; Apollo 11 omits it.
+   */
+  lunarOrbitPlane?: LunarOrbitPlane;
   sky: [SkySample, ...SkySample[]];
   ships: [ShipPlan, ...ShipPlan[]];
 }

@@ -109,6 +109,34 @@ describe("readable warp", () => {
     }
   });
 
+  it("keeps Earth orbits from 85 to 750 nautical miles in order and apart", () => {
+    // Gemini and Apollo Earth orbits reached from about 85 n mi (perigees)
+    // to 739 (Gemini 11's apogee). Readable height above the globe, Earth radii.
+    const read = (nm: number) => readableRadius(1 + (nm * NAUTICAL_MILE_KM) / EARTH_MEAN_RADIUS_KM, EARTH_LIFT) - 1;
+    let previous = 0;
+    for (let nm = 85; nm <= 750; nm += 5) {
+      const h = read(nm);
+      assert.ok(h > previous, `${nm} n mi must read higher than ${nm - 5}`);
+      previous = h;
+    }
+    assert.ok(read(85) > 0.15, `an 85 n mi perigee reads ${read(85).toFixed(3)} Earth radii up`);
+    // A high apogee reads clearly above the usual orbits, and stays near Earth.
+    assert.ok(read(739) - read(160) > 0.2, `739 n mi reads ${read(739).toFixed(3)}, 160 n mi ${read(160).toFixed(3)}`);
+    assert.ok(read(750) < 0.7, `750 n mi reads ${read(750).toFixed(3)} Earth radii up`);
+    // Gemini's rendezvous orbits, about 15 n mi apart: spread by the band up
+    // to about 200 n mi; above it (Gemini 10's second target was near 210)
+    // they read about half as far apart, still apart.
+    for (const nm of [100, 130, 145, 160, 170]) assert.ok(read(nm + 15) - read(nm) > 0.02, `15 n mi above ${nm}: ${(read(nm + 15) - read(nm)).toFixed(4)}`);
+    for (const nm of [185, 200, 215]) assert.ok(read(nm + 15) - read(nm) > 0.01, `15 n mi above ${nm}: ${(read(nm + 15) - read(nm)).toFixed(4)}`);
+  });
+
+  it("shows a lunar module dipping to 8 nautical miles clearly above the Moon and below the orbit it left", () => {
+    // Apollo 10's lunar module came within about 8.4 n mi of the Moon without landing.
+    const read = (nm: number) => (readableRadius(MOON_RADIUS + (nm * NAUTICAL_MILE_KM) / EARTH_MEAN_RADIUS_KM, MOON_LIFT) - MOON_RADIUS) / MOON_RADIUS;
+    assert.ok(read(8.4) > 0.05, `8.4 n mi reads ${read(8.4).toFixed(3)} Moon radii up`);
+    assert.ok(read(60) - read(8.4) > 0.2, `60 n mi reads ${read(60).toFixed(3)}, 8.4 n mi ${read(8.4).toFixed(3)}`);
+  });
+
   it("lifts low orbits so they read clearly", () => {
     const earthOrbit = 100 * NAUTICAL_MILE_KM / EARTH_MEAN_RADIUS_KM;
     const lifted = readableRadius(1 + earthOrbit, EARTH_LIFT) - 1;

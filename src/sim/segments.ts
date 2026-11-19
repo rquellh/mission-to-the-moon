@@ -5,7 +5,7 @@
  * phase, which burns use to blend one orbit into the next.
  */
 import type { BodyId } from "./types.ts";
-import { Conic } from "./kepler.ts";
+import { Conic, ellipticMeanFromTrue, ellipticTrueFromMean } from "./kepler.ts";
 import { MOON_CENTER_KM, type Sky } from "./frames.ts";
 import {
   addScaled,
@@ -146,6 +146,113 @@ export interface Oblateness {
   radius: number;
 }
 
+/** A published orbit size at a moment: periapsis and apoapsis radii, km. */
+export interface SizeKnot {
+  t: number;
+  rp: number;
+  ra: number;
+}
+
+/**
+ * An orbit size that changes slowly over a phase (air drag, or small trims
+ * not drawn one by one): it passes through each published size at its
+ * time, changing linearly in semi-major axis and eccentricity in between,
+ * and holds the first and last sizes before and after them. The craft's
+ * place in its orbit follows the changing period exactly (the mean motion
+ * is integrated), so a shrinking orbit runs ahead as it should. Linear
+ * change between published sizes is a modeling choice, not a published
+ * value.
+ */
+export class SizeSchedule {
+  readonly mu: number;
+  private readonly t: number[];
+  private readonly a: number[];
+  private readonly e: number[];
+  /** Mean motion integrated from the first knot to each knot, radians. */
+  private readonly sums: number[];
+
+  constructor(mu: number, knots: readonly SizeKnot[]) {
+    if (knots.length === 0) throw new Error("A size schedule needs at least one size");
+    this.mu = mu;
+    this.t = knots.map((k) => k.t);
+    this.a = knots.map((k) => (Math.min(k.rp, k.ra) + Math.max(k.rp, k.ra)) / 2);
+    this.e = knots.map((k) => Math.abs(k.ra - k.rp) / (k.ra + k.rp));
+    this.sums = [0];
+    for (let j = 1; j < knots.length; j++) {
+      if (!(this.t[j]! > this.t[j - 1]!)) throw new Error("Orbit sizes must be listed in time order");
+      this.sums.push(this.sums[j - 1]! + this.pieceIntegral(j - 1, this.t[j]!));
+    }
+  }
+
+  private piece(t: number): number {
+    let j = 0;
+    while (j < this.t.length - 2 && t > this.t[j + 1]!) j++;
+    return j;
+  }
+
+  private fraction(j: number, t: number): number {
+    if (this.t.length === 1) return 0;
+    return Math.min(1, Math.max(0, (t - this.t[j]!) / (this.t[j + 1]! - this.t[j]!)));
+  }
+
+  /** Semi-major axis at t, km. */
+  aAt(t: number): number {
+    const j = this.piece(t);
+    if (this.t.length === 1) return this.a[0]!;
+    return this.a[j]! + (this.a[j + 1]! - this.a[j]!) * this.fraction(j, t);
+  }
+
+  eAt(t: number): number {
+    const j = this.piece(t);
+    if (this.t.length === 1) return this.e[0]!;
+    return this.e[j]! + (this.e[j + 1]! - this.e[j]!) * this.fraction(j, t);
+  }
+
+  /** Semilatus rectum at t, km. */
+  pAt(t: number): number {
+    const e = this.eAt(t);
+    return this.aAt(t) * (1 - e * e);
+  }
+
+  /** Mean motion at t, radians per second. */
+  nAt(t: number): number {
+    return Math.sqrt(this.mu / this.aAt(t) ** 3);
+  }
+
+  /** The integral of the mean motion over piece j from its start to t (inside the piece). */
+  private pieceIntegral(j: number, t: number): number {
+    const t0 = this.t[j]!;
+    const a0 = this.a[j]!;
+    if (this.t.length === 1 || t <= t0) return Math.sqrt(this.mu / a0 ** 3) * (t - t0);
+    const slope = (this.a[j + 1]! - a0) / (this.t[j + 1]! - t0);
+    const a = a0 + slope * (t - t0);
+    if (Math.abs(slope * (t - t0)) < 1e-9 * a0) return Math.sqrt(this.mu / a0 ** 3) * (t - t0);
+    // n = sqrt(mu) a^(-3/2) with a linear in time integrates exactly.
+    return ((2 * Math.sqrt(this.mu)) / slope) * (1 / Math.sqrt(a0) - 1 / Math.sqrt(a));
+  }
+
+  /** The mean motion integrated from the first knot to t, radians (negative before it). */
+  meanIntegral(t: number): number {
+    const first = this.t[0]!;
+    const last = this.t.length - 1;
+    if (t <= first) return this.nAt(first) * (t - first);
+    if (t >= this.t[last]!) return this.sums[last]! + this.nAt(this.t[last]!) * (t - this.t[last]!);
+    const j = this.piece(t);
+    return this.sums[j]! + this.pieceIntegral(j, t);
+  }
+
+  /** Time-averaged value of f over the knots' span (f at the only knot when there is one). */
+  average(f: (a: number, e: number) => number): number {
+    if (this.t.length === 1) return f(this.a[0]!, this.e[0]!);
+    let sum = 0;
+    for (let j = 0; j < this.t.length - 1; j++) {
+      const dt = this.t[j + 1]! - this.t[j]!;
+      sum += f((this.a[j]! + this.a[j + 1]!) / 2, (this.e[j]! + this.e[j + 1]!) / 2) * dt;
+    }
+    return sum / (this.t[this.t.length - 1]! - this.t[0]!);
+  }
+}
+
 /**
  * An orbit of published size (periapsis and apoapsis radii) whose position
  * is pinned to a reference point and, optionally, to a published direction
@@ -153,7 +260,9 @@ export interface Oblateness {
  * to the mean anomaly and a smooth rotation of the orbit, both zero at the
  * phase start and complete at the phase end (and zero rate at both ends).
  * With `oblateness`, the orbit also turns steadily from the reference time
- * as the body's bulge turns it (see Oblateness).
+ * as the body's bulge turns it (see Oblateness). With `schedule`, its size
+ * changes over the phase (see SizeSchedule); `conic` is then its size at
+ * the reference time.
  */
 export class AnchoredOrbit implements Segment {
   readonly extendable = true;
@@ -169,10 +278,13 @@ export class AnchoredOrbit implements Segment {
   readonly body: BodyId;
   readonly t0: number;
   readonly t1: number;
+  readonly schedule: SizeSchedule | undefined;
   private readonly sky: Sky;
   private readonly planeAxis: Vec3 = vec3(0, 1, 0);
   private readonly pole: Vec3 = vec3(0, 1, 0);
   private readonly tmp = vec3();
+  /** The schedule's mean-motion integral at the reference time. */
+  private readonly integralAtReference: number;
 
   constructor(
     sky: Sky,
@@ -185,13 +297,21 @@ export class AnchoredOrbit implements Segment {
     reference: OrbitReference,
     endDirection?: Readonly<Vec3>,
     oblateness?: Oblateness,
+    schedule?: SizeSchedule,
   ) {
     this.sky = sky;
     this.body = body;
     this.t0 = t0;
     this.t1 = t1;
-    const rp = Math.min(periapsisRadius, apoapsisRadius);
-    const ra = Math.max(periapsisRadius, apoapsisRadius);
+    this.schedule = schedule;
+    let rp = Math.min(periapsisRadius, apoapsisRadius);
+    let ra = Math.max(periapsisRadius, apoapsisRadius);
+    if (schedule) {
+      const a = schedule.aAt(reference.t);
+      const ecc = schedule.eAt(reference.t);
+      rp = a * (1 - ecc);
+      ra = a * (1 + ecc);
+    }
     const e = (ra - rp) / (ra + rp);
     const p = (2 * ra * rp) / (ra + rp);
     const pHat = rotateAxis(vec3(), reference.direction, reference.normal, -reference.trueAnomaly);
@@ -205,16 +325,22 @@ export class AnchoredOrbit implements Segment {
       t0: reference.t,
       M0: base.meanFromTrue(reference.trueAnomaly),
     });
+    this.integralAtReference = schedule ? schedule.meanIntegral(reference.t) : 0;
 
     let nodeRate = 0;
     let periapsisRate = 0;
     let meanAnomalyRate = 0;
     if (oblateness) {
       const c = dot(this.conic.normal, oblateness.pole);
-      const k = 0.75 * oblateness.j2 * (oblateness.radius / p) ** 2 * this.conic.n;
+      // Over a changing size, the bulge's rates are averaged over the
+      // published sizes (a simplification: they change by a few percent).
+      const rate = (aa: number, ee: number) =>
+        0.75 * oblateness.j2 * (oblateness.radius / (aa * (1 - ee * ee))) ** 2 * Math.sqrt(mu / aa ** 3);
+      const k = schedule ? schedule.average(rate) : 0.75 * oblateness.j2 * (oblateness.radius / p) ** 2 * this.conic.n;
+      const root = schedule ? schedule.average((_, ee) => Math.sqrt(1 - ee * ee)) : Math.sqrt(1 - e * e);
       nodeRate = -2 * k * c;
       periapsisRate = k * (5 * c * c - 1);
-      meanAnomalyRate = k * Math.sqrt(1 - e * e) * (3 * c * c - 1);
+      meanAnomalyRate = k * root * (3 * c * c - 1);
       normalize(this.pole, oblateness.pole);
     }
     this.nodeRate = nodeRate;
@@ -229,14 +355,14 @@ export class AnchoredOrbit implements Segment {
       // be compared with the orbit as the conic describes it.
       const local = rotateAxis(vec3(), endDirection, this.pole, -this.drift(t1).node);
       const { periapsis } = this.drift(t1);
-      const Mnat = conic.meanAt(t1) + this.drift(t1).mean;
-      const nuNat = conic.trueFromMean(Mnat);
+      const Mnat = this.naturalMean(t1) + this.drift(t1).mean;
+      const nuNat = this.trueFromMean(Mnat, t1);
       const nuEnd = Math.atan2(dot(local, conic.qHat), dot(local, conic.pHat)) - periapsis;
       const turns = Math.round((nuNat - nuEnd) / (2 * Math.PI));
       const nuTarget = nuEnd + turns * 2 * Math.PI;
-      phaseCorrection = conic.meanFromTrue(nuTarget) - Mnat;
+      phaseCorrection = this.meanFromTrue(nuTarget, t1) - Mnat;
       // Remaining out-of-plane offset: rotate the orbit about an axis in its plane.
-      const d1 = conic.positionAtTrue(nuTarget, vec3());
+      const d1 = this.positionAtTrue(nuTarget, t1, vec3());
       rotateAxis(d1, d1, conic.normal, periapsis);
       normalize(d1, d1);
       const axis = cross(vec3(), d1, local);
@@ -248,6 +374,39 @@ export class AnchoredOrbit implements Segment {
     }
     this.phaseCorrection = phaseCorrection;
     this.planeCorrection = planeCorrection;
+  }
+
+  /** The mean anomaly from orbit size alone (no bulge, no correction). */
+  private naturalMean(t: number): number {
+    if (!this.schedule) return this.conic.meanAt(t);
+    return this.conic.M0 + this.schedule.meanIntegral(t) - this.integralAtReference;
+  }
+
+  private trueFromMean(M: number, t: number): number {
+    return this.schedule ? ellipticTrueFromMean(M, this.schedule.eAt(t)) : this.conic.trueFromMean(M);
+  }
+
+  private meanFromTrue(nu: number, t: number): number {
+    return this.schedule ? ellipticMeanFromTrue(nu, this.schedule.eAt(t)) : this.conic.meanFromTrue(nu);
+  }
+
+  /** Position in the orbit's own plane, before the bulge's turning and the corrections. */
+  private positionAtTrue(nu: number, t: number, out: Vec3): Vec3 {
+    if (!this.schedule) return this.conic.positionAtTrue(nu, out);
+    const e = this.schedule.eAt(t);
+    const r = this.schedule.pAt(t) / (1 + e * Math.cos(nu));
+    const c = Math.cos(nu) * r;
+    const s = Math.sin(nu) * r;
+    const { pHat, qHat } = this.conic;
+    out[0] = pHat[0] * c + qHat[0] * s;
+    out[1] = pHat[1] * c + qHat[1] * s;
+    out[2] = pHat[2] * c + qHat[2] * s;
+    return out;
+  }
+
+  /** Semilatus rectum and eccentricity at t (they change only with a schedule). */
+  shapeAt(t: number): { p: number; e: number } {
+    return this.schedule ? { p: this.schedule.pAt(t), e: this.schedule.eAt(t) } : { p: this.conic.p, e: this.conic.e };
   }
 
   /** The oblateness drift since the reference time: node, periapsis, and mean anomaly, radians. */
@@ -263,13 +422,13 @@ export class AnchoredOrbit implements Segment {
 
   /** Mean anomaly at t, with the drift and the phase correction. */
   private meanAt(t: number): number {
-    return this.conic.meanAt(t) + this.meanAnomalyRate * (t - this.conic.t0) + this.phaseCorrection * this.progress(t);
+    return this.naturalMean(t) + this.meanAnomalyRate * (t - this.conic.t0) + this.phaseCorrection * this.progress(t);
   }
 
   /** Position in the body's inertial frame, km. */
   inertialPosition(t: number, out: Vec3): Vec3 {
     const s = this.progress(t);
-    this.conic.positionAtTrue(this.conic.trueFromMean(this.meanAt(t)), out);
+    this.positionAtTrue(this.trueFromMean(this.meanAt(t), t), t, out);
     if (this.periapsisRate !== 0) rotateAxis(out, out, this.conic.normal, this.periapsisRate * (t - this.conic.t0));
     if (this.planeCorrection !== 0) rotateAxis(out, out, this.planeAxis, this.planeCorrection * s);
     if (this.nodeRate !== 0) rotateAxis(out, out, this.pole, this.nodeRate * (t - this.conic.t0));
@@ -278,7 +437,7 @@ export class AnchoredOrbit implements Segment {
 
   /** True anomaly (unwrapped) at t, including the drift and the phase correction. */
   trueAnomalyAt(t: number): number {
-    return this.conic.trueFromMean(this.meanAt(t));
+    return this.trueFromMean(this.meanAt(t), t);
   }
 
   evaluate(t: number, out: Vec3): Vec3 {
@@ -543,9 +702,13 @@ export class SurfacePoint implements Segment {
   }
 }
 
-/** Following another ship's position (docked). */
+/** Following another ship's position (docked, or keeping station). */
 export class Follow implements Segment {
-  readonly extendable = false;
+  /**
+   * It gives a position whenever the other ship exists, so a burn can lead
+   * out of station keeping (or into it) like out of an orbit.
+   */
+  readonly extendable = true;
   readonly body = null;
   readonly t0: number;
   readonly t1: number;

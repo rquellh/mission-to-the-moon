@@ -31,16 +31,32 @@ export const copy = {
 
   /** The mission picker: the first thing a visitor sees, and reachable from the header. */
   hub: {
-    lede: 'Choose a mission and ride along in 3D, from liftoff to splashdown.',
-    tour: 'Take the tour',
+    lede: 'Choose a flight and ride along in 3D, from liftoff to splashdown.',
+    /** Added to the lede when the list has a memorial page, for a crew that never flew. */
+    ledeMemorial: (names: string, count: number) => `${names} ${count === 1 ? 'is' : 'are'} remembered here too.`,
+    tour: 'Tour',
     tourOf: (missionName: string) => `Take the tour of ${missionName}`,
     explore: 'Explore',
     exploreMission: (missionName: string) => `Explore ${missionName}`,
+    read: 'Read',
+    readAbout: (missionName: string) => `Read about ${missionName}`,
     current: 'Now showing',
+    /** Marks an unfinished mission, which only the dev server lists. */
+    draft: 'Draft',
+    /** The years a program's listed missions span, read out. */
+    yearsSpoken: (first: number, last: number) => (first === last ? String(first) : `${first} to ${last}`),
     programs: {
       gemini: 'Gemini',
       apollo: 'Apollo',
     },
+  },
+
+  /** A page of remembrance, for a crew that did not fly. */
+  memorial: {
+    crew: 'The crew',
+    loadingUnnamed: 'Loading…',
+    failed: 'This page did not load. Check your connection and reload the page.',
+    reload: 'Reload',
   },
 
   header: {
@@ -82,6 +98,8 @@ export const copy = {
     hours: (count: number) => `${count} ${count === 1 ? 'hour' : 'hours'}`,
     minutes: (count: number) => `${count} ${count === 1 ? 'minute' : 'minutes'}`,
     fromLiftoff: (span: string, before: boolean) => `${span} ${before ? 'before' : 'after'} liftoff`,
+    /** Added to the time on flights longer than two days. */
+    onDay: (day: number) => `day ${day} of the flight`,
   },
 
   timeline: {
@@ -93,6 +111,8 @@ export const copy = {
     chapter: 'Jump to a chapter',
     sinceLiftoff: 'since liftoff',
     beforeLiftoff: 'before liftoff',
+    /** Beside the clock on flights longer than two days. Day 1 is the first 24 hours. */
+    day: (day: number) => `Day ${day}`,
     lockedDuringTour: 'The timeline follows the tour. Exit the tour to use it.',
   },
 
@@ -138,40 +158,68 @@ export const copy = {
     crew: 'The crew',
     callSigns: 'Spacecraft names',
     accomplishments: 'What they did',
-    whereNow: 'Where the spacecraft are now',
+    whereNow: (count: number) => (count === 1 ? 'Where the spacecraft is now' : 'Where the spacecraft are now'),
     sources: 'Sources',
   },
 
-  /** What in the 3D view is exact and what is drawn for clarity, by destination. */
+  /**
+   * What in the 3D view is exact and what is drawn for clarity. Each
+   * paragraph is shown only for flights it is true of: some depend on how
+   * far the flight went, others on what its flight plan holds (a Moon
+   * landing, a splashdown, a second ship, a published spin).
+   */
   howDrawn: {
     title: 'How this is drawn',
-    paragraphs: {
-      moon: [
-        'Earth and the Moon are held still in this view, the way NASA’s mission diagrams show them. In real life, the Moon keeps moving along its orbit while the spacecraft travels.',
+    /** Moon flights. */
+    heldStill:
+      'Earth and the Moon are held still in this view, the way NASA’s mission diagrams show them. In real life, the Moon keeps moving along its orbit while the spacecraft travels.',
+    exact: {
+      /** A lander touched down on the Moon. */
+      moonLanding:
         'The times and places NASA published, like when the engines fired and where the lunar module landed, are exact.',
-        'The path drawn between those points is an illustration. It shows the shape of the trip, not every turn the spacecraft made.',
-        'In the normal view, the distance between Earth and the Moon is squeezed so both fit on your screen, and orbits are drawn higher above the ground so you can see them. Turn on True scale to see the real distance.',
-        'The spacecraft are simple models, drawn far bigger than they really are. At their real size they would be too small to see.',
-        'Sunlight comes from the direction it really did. The night side of Earth and the Moon is drawn brighter than it really is, so you can still see where you are.',
-      ],
-      'earth-orbit': [
+      /** No landing on the Moon, but the flight plan ends in a splashdown. */
+      splashdown:
         'The times and places NASA published, like when the engines fired and where the spacecraft came down, are exact.',
+      other: 'The times and places NASA published, like when the engines fired, are exact.',
+    },
+    path: {
+      moon: 'The path drawn between those points is an illustration. It shows the shape of the trip, not every turn the spacecraft made.',
+      'earth-orbit':
         'The path drawn between those points is an illustration. It shows the shape of the flight, not every turn the spacecraft made.',
+    },
+    scale: {
+      moon: 'In the normal view, the distance between Earth and the Moon is squeezed so both fit on your screen, and orbits are drawn higher above the ground so you can see them. Turn on True scale to see the real distance.',
+      'earth-orbit':
         'In the normal view, orbits are drawn higher above the ground than they really were, so you can see them. Turn on True scale to see their real height.',
-        'The spacecraft are simple models, drawn far bigger than they really are. At their real size they would be too small to see.',
-        'When two spacecraft fly close together, the gap between them is not to scale. They are placed so you can see both.',
-        'How a spacecraft turns and spins is an illustration too. It follows the speeds NASA published, but not every wobble.',
-        'Each trip around Earth is one loop of the line. Older loops are dimmed so the newest one stands out.',
+    },
+    models: {
+      one: 'The spacecraft is a simple model, drawn far bigger than it really is. At its real size it would be too small to see.',
+      many: 'The spacecraft are simple models, drawn far bigger than they really are. At their real size they would be too small to see.',
+    },
+    /** Earth-orbit flights with a second ship. */
+    closeTogether:
+      'When two spacecraft fly close together, the gap between them is not to scale. They are placed so you can see both.',
+    /** Flights whose vehicle file gives a published turning speed. */
+    turning: 'How a spacecraft turns and spins is an illustration too. It follows the speeds NASA published, but not every wobble.',
+    /** Earth-orbit flights. */
+    loops: 'Each trip around Earth is one loop of the line. Older loops are dimmed so the newest one stands out.',
+    sunlight: {
+      moon: 'Sunlight comes from the direction it really did. The night side of Earth and the Moon is drawn brighter than it really is, so you can still see where you are.',
+      'earth-orbit':
         'Sunlight comes from the direction it really did. The night side of Earth is drawn brighter than it really is, so you can still see where you are.',
-      ],
     },
   },
 
   credits: {
-    intro:
-      'Every fact on this site comes from one of the sources below. The images and software are credited after them.',
+    intro: (missionName: string) =>
+      `Every fact on this site comes from one of the sources below. The ones for ${missionName} come first. Photos, images, and software are credited after them.`,
     sources: 'Sources',
+    /** Sources that many missions cite. */
+    shared: 'Used by many missions',
+    otherMissions: 'Other missions',
+    sourceCount: (count: number) => `${count} ${count === 1 ? 'source' : 'sources'}`,
     photos: 'Photos',
+    photosNote: 'Each mission’s photos are credited on its own cards, and listed here when that mission is open.',
     media: 'Images, data, and software',
     checked: (date: string) => `Link checked ${date}`,
     usedFor: 'Used for',
@@ -190,5 +238,10 @@ export const copy = {
       'The 3D view stopped because the graphics processor reset. It should recover on its own; if it does not, reload the page.',
     textures:
       'Some images for the 3D view did not load. Check your connection and reload the page.',
+    scene: 'The 3D view did not load. You can still read about the mission below. To see the 3D view, check your connection and reload the page.',
+    mission: (missionName: string) =>
+      `${missionName} did not load. Check your connection and reload the page, or choose another mission.`,
+    missionUnnamed: 'This mission did not load. Check your connection and reload the page, or choose another mission.',
+    allMissions: 'All missions',
   },
 } as const;

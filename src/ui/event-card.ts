@@ -1,10 +1,11 @@
 import { copy } from '../content/copy';
 import type { MissionEvent } from '../content/types';
-import { externalLink, sourcesBlock } from './citations';
+import { sourcesBlock } from './citations';
 import { button, byId, el } from './dom';
 import { formatElapsed, formatUtc, isBeforeLiftoff, missionDates } from './format';
 import { icon } from './icons';
 import type { MissionIndex } from './mission-index';
+import { fillPhoto } from './photo';
 
 export interface EventCard {
   /** Show an event by its index in the mission, or the mission summary for -1. */
@@ -22,12 +23,6 @@ export interface EventCardOptions {
   /** Asked to step to the previous (-1) or next (+1) event. */
   onStep(step: 1 | -1): void;
   reducedMotion(): boolean;
-}
-
-/** Resolve a photo path under public/ against the site's base address. */
-function mediaUrl(src: string): string {
-  if (/^[a-z]+:/i.test(src)) return src;
-  return `${import.meta.env.BASE_URL}${src.replace(/^\//, '')}`;
 }
 
 /**
@@ -90,19 +85,7 @@ export function setUpEventCard({ index, onStep, reducedMotion }: EventCardOption
       figure.replaceChildren();
       return;
     }
-    const image = el('img', 'card__image');
-    image.src = mediaUrl(photo.src);
-    image.alt = photo.alt;
-    image.width = photo.width;
-    image.height = photo.height;
-    image.decoding = 'async';
-    image.addEventListener('error', () => {
-      figure.hidden = true;
-    });
-    const caption = el('figcaption', 'card__credit');
-    caption.append(`${copy.card.photoCredit} ${photo.credit}. `, externalLink(photo.sourceUrl, copy.card.original));
-    figure.replaceChildren(image, caption);
-    figure.hidden = false;
+    fillPhoto(figure, photo);
   };
 
   let shown = -2;

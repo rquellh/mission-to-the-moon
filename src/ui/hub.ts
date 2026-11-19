@@ -1,30 +1,37 @@
 import { copy } from '../content/copy';
-import type { Mission, Program } from '../content/types';
-import { button, byId, el } from './dom';
-import { missionDates } from './format';
+import type { MissionSummary, Program } from '../content/types';
+import { button, byId, el, hiddenText } from './dom';
+import { formatYears, summaryDates, yearOf } from './format';
 
 export type HubMode = 'welcome' | 'return';
 
 export interface HubOptions {
-  /** The mission whose scene is loaded behind the hub. */
-  mission: Mission;
-  /** Every mission on the site, in flight order. */
-  missions: readonly Mission[];
+  /** The flight whose scene is loaded behind the hub, or null when none could be loaded. */
+  currentId: string | null;
+  /** Its name, for the page title once the hub closes. */
+  currentName?: string;
+  /** The mission list, in date order. */
+  summaries: readonly MissionSummary[];
+  /** True for an unfinished mission (only the dev server lists one). */
+  isDraft(summary: MissionSummary): boolean;
   /** Start the tour of the loaded mission, in place. */
   onTour(): void;
   /** Explore the loaded mission, in place. */
   onExplore(): void;
   /** The hub closed without a choice after being reopened: carry on where the visitor was. */
   onReturn(): void;
+  /** Open a memorial page over the hub; focus goes back to `from` when it closes. */
+  onMemorial(id: string, from: HTMLElement): void;
 }
 
 export interface Hub {
   /**
    * The first thing a visitor sees, over the bare 3D view. The rest of the
    * interface is hidden; the 3D view can still be turned. Leaving without a
-   * choice (Escape) explores the loaded mission.
+   * choice (Escape) explores the loaded mission. The list scrolls to the
+   * entry `revealId` names, or to the loaded mission.
    */
-  welcome(): void;
+  welcome(revealId?: string): void;
   /**
    * Reopen over the interface as a modal dialog. Leaving without a choice
    * (Close, Escape, or a click outside) returns to where the visitor was.
@@ -32,6 +39,8 @@ export interface Hub {
   open(returnTo: HTMLElement): void;
   /** How the hub is open now, or null when it is closed. */
   readonly mode: HubMode | null;
+  /** The button that opens an entry (Read, for a memorial), so focus can come back to it. */
+  actionFor(id: string): HTMLButtonElement | null;
 }
 
 /**
@@ -47,31 +56,53 @@ function missionAddress(id: string, start: 'tour' | 'explore'): string {
   return url.href;
 }
 
-/** Missions grouped by program, each group and each mission in flight order. */
-function byProgram(missions: readonly Mission[]): Map<Program, Mission[]> {
-  const groups = new Map<Program, Mission[]>();
-  for (const mission of missions) {
-    const group = groups.get(mission.program);
-    if (group) group.push(mission);
-    else groups.set(mission.program, [mission]);
+/** Missions grouped by program, in the order the list gives them (by date). */
+function byProgram(summaries: readonly MissionSummary[]): Map<Program, MissionSummary[]> {
+  const groups = new Map<Program, MissionSummary[]>();
+  for (const summary of summaries) {
+    const group = groups.get(summary.program);
+    if (group) group.push(summary);
+    else groups.set(summary.program, [summary]);
   }
   return groups;
 }
 
+/** A program's name with the years its listed missions span, worked out from their dates. */
+function programHeading(program: Program, group: readonly MissionSummary[]): HTMLHeadingElement {
+  const heading = el('h3', 'hub__program-title');
+  heading.id = `hub-program-${program}`;
+  heading.append(el('span', 'hub__program-name', copy.hub.programs[program]));
+  const years = group.map((summary) => yearOf(summary.date)).filter((year): year is number => year !== null);
+  if (years.length) {
+    const first = Math.min(...years);
+    const last = Math.max(...years);
+    const shown = el('span', 'hub__years', formatYears(first, last));
+    // An en dash is read out unevenly, so screen readers hear "1965 to 1966".
+    shown.setAttribute('aria-hidden', 'true');
+    heading.append(' ', shown, hiddenText(`, ${copy.hub.yearsSpoken(first, last)}`));
+  }
+  return heading;
+}
+
 /**
- * The mission picker. It lists every mission under its program, with its
- * dates, its summary, and two ways in: the guided tour and exploring freely.
- * Choosing the loaded mission acts in place; choosing another one loads that
- * mission's page.
+ * The mission picker. Missions are grouped by program, each a compact row:
+ * name, dates, a one-line summary, and the ways in (the guided tour and
+ * exploring freely, or Read for a memorial). Choosing the loaded mission
+ * acts in place; choosing another one loads that mission's page.
  */
-export function setUpHub({ mission, missions, onTour, onExplore, onReturn }: HubOptions): Hub {
+export function setUpHub(options: HubOptions): Hub {
+  const { currentId, currentName, summaries, isDraft, onTour, onExplore, onReturn, onMemorial } = options;
   const dialog = byId('hub', HTMLDialogElement);
   const title = byId('hub-title', HTMLHeadingElement);
   const list = byId('hub-list', HTMLDivElement);
   const closeButton = byId('hub-close', HTMLButtonElement);
 
   title.textContent = copy.siteTitle;
-  byId('hub-lede', HTMLParagraphElement).textContent = copy.hub.lede;
+  const memorials = summaries.filter((summary) => summary.kind === 'memorial').map((summary) => summary.name);
+  const lede = memorials.length
+    ? `${copy.hub.lede} ${copy.hub.ledeMemorial(new Intl.ListFormat('en-US').format(memorials), memorials.length)}`
+    : copy.hub.lede;
+  byId('hub-lede', HTMLParagraphElement).textContent = lede;
   closeButton.textContent = copy.close;
 
   let mode: HubMode | null = null;
@@ -91,7 +122,7 @@ export function setUpHub({ mission, missions, onTour, onExplore, onReturn }: Hub
     dialog.dataset['mode'] = '';
     document.body.classList.remove('is-welcome');
     document.removeEventListener('keydown', onKey);
-    document.title = copy.pageTitle(mission.name);
+    document.title = currentName ? copy.pageTitle(currentName) : copy.siteTitle;
 
     if (action) {
       action();
@@ -118,71 +149,88 @@ export function setUpHub({ mission, missions, onTour, onExplore, onReturn }: Hub
   };
 
   const onKey = (event: KeyboardEvent): void => {
-    // The welcome is not modal, so Escape is handled here rather than by the browser.
-    if (event.key === 'Escape' && mode === 'welcome') {
-      event.preventDefault();
-      close();
-    }
+    // The welcome is not modal, so Escape is handled here rather than by the
+    // browser. A dialog open over it (a memorial page) takes Escape for itself.
+    if (event.key !== 'Escape' || mode !== 'welcome') return;
+    if (document.querySelector('dialog.dialog[open]')) return;
+    event.preventDefault();
+    close();
   };
 
   /* The list ---------------------------------------------------------- */
-  let current: HTMLLIElement | null = null;
-  const entry = (shown: Mission): HTMLLIElement => {
-    const item = el('li', 'hub__entry');
-    const isCurrent = shown.id === mission.id;
-    if (isCurrent) {
-      item.setAttribute('aria-current', 'true');
-      current = item;
-    }
+  const entries = new Map<string, HTMLLIElement>();
+  const actions = new Map<string, HTMLButtonElement>();
 
-    // Name, dates, and the "now showing" mark share a line, wrapping when it is narrow.
-    const line = el('div', 'hub__line');
-    line.append(el('h4', 'hub__name', shown.name));
-    const dates = missionDates(shown);
-    if (dates) line.append(el('p', 'hub__dates', dates));
-    if (isCurrent) line.append(el('p', 'hub__current', copy.hub.current));
-    const text = el('div', 'hub__text');
-    text.append(line, el('p', 'hub__summary', shown.summary.text.short));
-    item.append(text);
+  const entry = (shown: MissionSummary): HTMLLIElement => {
+    const memorial = shown.kind === 'memorial';
+    const item = el('li', memorial ? 'hub__entry hub__entry--memorial' : 'hub__entry');
+    const isCurrent = shown.id === currentId;
+    if (isCurrent) item.setAttribute('aria-current', 'true');
+    entries.set(shown.id, item);
 
-    const go = (start: 'tour' | 'explore'): void => {
-      if (isCurrent) choose(start === 'tour' ? onTour : onExplore);
-      else window.location.assign(missionAddress(shown.id, start));
-    };
-    const actions = el('div', 'hub__actions');
-    if (shown.events.some((event) => event.inTour)) {
-      const tour = button('button button--primary hub__tour', copy.hub.tour);
-      tour.setAttribute('aria-label', copy.hub.tourOf(shown.name));
-      tour.addEventListener('click', () => go('tour'));
-      actions.append(tour);
-    }
-    if (shown.kind === 'flight') {
-      const explore = button('button hub__explore', copy.hub.explore);
+    // The name (with any mark) over the dates, and the actions beside them.
+    const heading = el('div', 'hub__heading');
+    const name = el('h4', 'hub__name', shown.name);
+    if (isCurrent) name.append(' ', el('span', 'hub__mark hub__mark--current', copy.hub.current));
+    if (isDraft(shown)) name.append(' ', el('span', 'hub__mark hub__mark--draft', copy.hub.draft));
+    heading.append(name);
+    const dates = summaryDates(shown);
+    if (dates) heading.append(el('p', 'hub__dates', dates));
+
+    const buttons = el('div', 'hub__actions');
+    if (memorial) {
+      const read = button('button hub__read', copy.hub.read);
+      read.setAttribute('aria-label', copy.hub.readAbout(shown.name));
+      read.setAttribute('aria-haspopup', 'dialog');
+      read.addEventListener('click', () => onMemorial(shown.id, read));
+      buttons.append(read);
+      actions.set(shown.id, read);
+    } else {
+      const go = (start: 'tour' | 'explore'): void => {
+        if (isCurrent) choose(start === 'tour' ? onTour : onExplore);
+        else window.location.assign(missionAddress(shown.id, start));
+      };
+      // One amber button in the list: the first way into the loaded mission.
+      const primary = (first: boolean): string => (isCurrent && first ? ' button--primary' : '');
+      if (shown.hasTour) {
+        const tour = button(`button${primary(true)} hub__tour`, copy.hub.tour);
+        tour.setAttribute('aria-label', copy.hub.tourOf(shown.name));
+        tour.addEventListener('click', () => go('tour'));
+        buttons.append(tour);
+      }
+      const explore = button(`button${primary(!shown.hasTour)} hub__explore`, copy.hub.explore);
       explore.setAttribute('aria-label', copy.hub.exploreMission(shown.name));
       explore.addEventListener('click', () => go('explore'));
-      actions.append(explore);
+      buttons.append(explore);
+      actions.set(shown.id, explore);
     }
-    if (actions.childElementCount) item.append(actions);
+
+    const top = el('div', 'hub__top');
+    top.append(heading, buttons);
+    item.append(top, el('p', 'hub__summary', shown.blurb));
     return item;
   };
 
   const sections: HTMLElement[] = [];
-  for (const [program, group] of byProgram(missions)) {
+  for (const [program, group] of byProgram(summaries)) {
     const section = el('section', 'hub__program');
-    const heading = el('h3', 'hub__program-title', copy.hub.programs[program]);
-    heading.id = `hub-program-${program}`;
+    const heading = programHeading(program, group);
     section.setAttribute('aria-labelledby', heading.id);
-    const entries = el('ul', 'hub__entries');
-    entries.append(...group.map(entry));
-    section.append(heading, entries);
+    const items = el('ul', 'hub__entries');
+    items.append(...group.map(entry));
+    section.append(heading, items);
     sections.push(section);
   }
   list.replaceChildren(...sections);
 
-  /** Scroll the list so the loaded mission is in sight. */
-  const revealCurrent = (): void => {
+  /** Scroll the list so an entry (the loaded mission, unless another is named) sits in the middle. */
+  const reveal = (id?: string): void => {
     list.scrollTop = 0;
-    current?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+    const target = entries.get(id ?? currentId ?? '') ?? entries.get(currentId ?? '');
+    if (!target) return;
+    const box = target.getBoundingClientRect();
+    const frame = list.getBoundingClientRect();
+    list.scrollTop = Math.max(0, box.top - frame.top - (list.clientHeight - box.height) / 2);
   };
 
   /* Opening and closing ------------------------------------------------ */
@@ -217,13 +265,13 @@ export function setUpHub({ mission, missions, onTour, onExplore, onReturn }: Hub
   };
 
   return {
-    welcome() {
+    welcome(revealId) {
       if (dialog.open) return;
       show('welcome');
       document.body.classList.add('is-welcome');
       document.addEventListener('keydown', onKey);
       dialog.show();
-      revealCurrent();
+      reveal(revealId);
       title.focus({ preventScroll: true });
     },
     open(from) {
@@ -231,11 +279,14 @@ export function setUpHub({ mission, missions, onTour, onExplore, onReturn }: Hub
       show('return');
       returnTo = from;
       dialog.showModal();
-      revealCurrent();
+      reveal();
       closeButton.focus({ preventScroll: true });
     },
     get mode() {
       return mode;
+    },
+    actionFor(id) {
+      return actions.get(id) ?? null;
     },
   };
 }

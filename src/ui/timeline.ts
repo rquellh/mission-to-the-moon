@@ -1,7 +1,7 @@
 import type { Player } from '../app/contract';
 import { copy } from '../content/copy';
 import { button, byId, el, setText } from './dom';
-import { formatDate, formatElapsed, formatTimeOfDay, isBeforeLiftoff, speakElapsed } from './format';
+import { flightDay, formatElapsed, formatMonthDay, formatTimeOfDay, isBeforeLiftoff, speakMissionTime } from './format';
 import { icon } from './icons';
 import type { MissionIndex } from './mission-index';
 
@@ -29,7 +29,9 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
   const play = byId('play', HTMLButtonElement);
   const met = byId('clock-met', HTMLSpanElement);
   const since = byId('clock-since', HTMLSpanElement);
+  const day = byId('clock-day', HTMLSpanElement);
   const utc = byId('clock-utc', HTMLSpanElement);
+  let shownUtc = '';
   const scrubber = byId('scrubber', HTMLDivElement);
   const ticks = byId('scrubber-ticks', HTMLDivElement);
   const input = byId('scrubber-input', HTMLInputElement);
@@ -198,8 +200,26 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
 
     setText(met, formatElapsed(time));
     setText(since, isBeforeLiftoff(time) ? copy.timeline.beforeLiftoff : copy.timeline.sinceLiftoff);
+    // On a long flight, which day it is means more than the hours alone.
+    const dayNumber = index.countsDays ? flightDay(time) : null;
+    day.hidden = dayNumber === null;
+    setText(day, dayNumber === null ? '' : copy.timeline.day(dayNumber));
+    // "Jul 20, 1969 20:17:39 UTC". The year has its own span so a phone can
+    // leave it out to make room for the day (the header shows the year).
     const date = index.utcAt(time);
-    setText(utc, date ? `${formatDate(date, 'short')} ${formatTimeOfDay(date)} UTC` : '');
+    const utcKey = date ? `${formatMonthDay(date)}|${date.getUTCFullYear()}|${formatTimeOfDay(date)}` : '';
+    if (utcKey !== shownUtc) {
+      shownUtc = utcKey;
+      if (date) {
+        utc.replaceChildren(
+          formatMonthDay(date),
+          el('span', 'clock__year', `, ${date.getUTCFullYear()}`),
+          ` ${formatTimeOfDay(date)} UTC`,
+        );
+      } else {
+        utc.replaceChildren();
+      }
+    }
 
     const current = index.eventAt(time);
     if (current !== shownEvent) {
@@ -221,7 +241,8 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
     const now = performance.now();
     if (!player.playing || now - lastValueTextAt > 1000) {
       const event = index.events[current];
-      const text = event ? `${speakElapsed(time)}. ${event.title}` : speakElapsed(time);
+      const spoken = speakMissionTime(time, index.countsDays);
+      const text = event ? `${spoken}. ${event.title}` : spoken;
       if (text !== lastValueText) {
         input.setAttribute('aria-valuetext', text);
         lastValueText = text;

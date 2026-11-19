@@ -1,5 +1,5 @@
 import { copy } from '../content/copy';
-import { elapsedToSeconds, type Mission } from '../content/types';
+import { elapsedToSeconds, type ElapsedTime, type Mission, type MissionSummary } from '../content/types';
 
 const pad = (value: number): string => String(value).padStart(2, '0');
 
@@ -46,6 +46,30 @@ export function speakElapsed(seconds: number): string {
   return copy.time.fromLiftoff(parts.join(' '), before);
 }
 
+/** Flights longer than this show the day of the flight beside the clock. */
+const DAY_COUNT_FROM_SECONDS = 48 * 3600;
+
+/** True when a flight is long enough that the day of the flight helps more than the hours alone. */
+export function countsDays(durationSeconds: number): boolean {
+  return durationSeconds > DAY_COUNT_FROM_SECONDS;
+}
+
+/**
+ * The day of the flight the clock is in: day 1 is the first 24 hours after
+ * liftoff. Null before liftoff, when there is no flight day yet.
+ */
+export function flightDay(seconds: number): number | null {
+  const whole = clockSecond(seconds);
+  return whole < 0 ? null : Math.floor(whole / 86400) + 1;
+}
+
+/** The time read out in words, with the day of the flight when `withDay` is true. */
+export function speakMissionTime(seconds: number, withDay: boolean): string {
+  const spoken = speakElapsed(seconds);
+  const day = withDay ? flightDay(seconds) : null;
+  return day === null ? spoken : `${spoken}, ${copy.time.onDay(day)}`;
+}
+
 const longDate = new Intl.DateTimeFormat('en-US', {
   timeZone: 'UTC',
   month: 'long',
@@ -71,6 +95,13 @@ export function formatDate(date: Date, style: 'long' | 'short' = 'long'): string
   return (style === 'long' ? longDate : shortDate).format(date);
 }
 
+const monthDay = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
+
+/** "Jul 20", in UTC. */
+export function formatMonthDay(date: Date): string {
+  return monthDay.format(date);
+}
+
 /** "20:17:39", in UTC. */
 export function formatTimeOfDay(date: Date): string {
   return timeOfDay.format(date);
@@ -83,11 +114,32 @@ export function formatUtc(date: Date, style: 'long' | 'short' = 'long'): string 
 
 /** The mission's dates, for example "July 16–24, 1969". Empty without a launch time. */
 export function missionDates(mission: Mission): string {
-  if (!mission.launch) return '';
-  const start = new Date(mission.launch.value.utc);
+  return datesFrom(mission.launch?.value.utc, mission.duration?.value);
+}
+
+/** The dates a summary covers: a flight's from launch to splashdown, a memorial's one day. */
+export function summaryDates(summary: MissionSummary): string {
+  return datesFrom(summary.date, summary.kind === 'flight' ? summary.duration : undefined);
+}
+
+/** The year of an ISO 8601 date, in UTC, or null when it does not read as a date. */
+export function yearOf(iso: string): number | null {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date.getUTCFullYear();
+}
+
+/** "1965–1966", or "1969" for one year. */
+export function formatYears(first: number, last: number): string {
+  return first === last ? String(first) : `${first}–${last}`;
+}
+
+/** Dates from a start time and a length on the mission clock. */
+function datesFrom(utc: string | undefined, duration: ElapsedTime | undefined): string {
+  if (!utc) return '';
+  const start = new Date(utc);
   if (Number.isNaN(start.getTime())) return '';
-  if (!mission.duration) return formatDate(start);
-  const end = new Date(start.getTime() + elapsedToSeconds(mission.duration.value) * 1000);
+  if (!duration) return formatDate(start);
+  const end = new Date(start.getTime() + elapsedToSeconds(duration) * 1000);
 
   const month = (d: Date): string => d.toLocaleString('en-US', { timeZone: 'UTC', month: 'long' });
   const day = (d: Date): number => d.getUTCDate();

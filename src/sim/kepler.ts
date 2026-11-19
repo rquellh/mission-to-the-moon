@@ -32,6 +32,23 @@ function solveElliptic(M: number, e: number): number {
   return E;
 }
 
+/** True anomaly of an ellipse (e < 1) for a mean anomaly. Unwrapped: whole turns carry over. */
+export function ellipticTrueFromMean(M: number, e: number): number {
+  const k = Math.round(M / TWO_PI);
+  const Mw = M - k * TWO_PI;
+  const E = solveElliptic(Mw, e);
+  const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
+  return nu + k * TWO_PI;
+}
+
+/** Mean anomaly of an ellipse (e < 1) for a true anomaly. Unwrapped: whole turns carry over. */
+export function ellipticMeanFromTrue(nu: number, e: number): number {
+  const k = Math.round(nu / TWO_PI);
+  const nw = nu - k * TWO_PI;
+  const E = 2 * Math.atan2(Math.sqrt(1 - e) * Math.sin(nw / 2), Math.sqrt(1 + e) * Math.cos(nw / 2));
+  return E - e * Math.sin(E) + k * TWO_PI;
+}
+
 function solveHyperbolic(M: number, e: number): number {
   if (M === 0) return 0;
   let F = Math.sign(M) * Math.log((2 * Math.abs(M)) / e + 1.8);
@@ -124,31 +141,14 @@ export class Conic {
 
   /** True anomaly for a mean anomaly. Unwrapped: whole turns carry over. */
   trueFromMean(M: number): number {
-    if (this.e < 1) {
-      const k = Math.round(M / TWO_PI);
-      const Mw = M - k * TWO_PI;
-      const E = solveElliptic(Mw, this.e);
-      const nu = 2 * Math.atan2(
-        Math.sqrt(1 + this.e) * Math.sin(E / 2),
-        Math.sqrt(1 - this.e) * Math.cos(E / 2),
-      );
-      return nu + k * TWO_PI;
-    }
+    if (this.e < 1) return ellipticTrueFromMean(M, this.e);
     const F = solveHyperbolic(M, this.e);
     return 2 * Math.atan(Math.sqrt((this.e + 1) / (this.e - 1)) * Math.tanh(F / 2));
   }
 
   /** Mean anomaly for a true anomaly. Unwrapped: whole turns carry over. */
   meanFromTrue(nu: number): number {
-    if (this.e < 1) {
-      const k = Math.round(nu / TWO_PI);
-      const nw = nu - k * TWO_PI;
-      const E = 2 * Math.atan2(
-        Math.sqrt(1 - this.e) * Math.sin(nw / 2),
-        Math.sqrt(1 + this.e) * Math.cos(nw / 2),
-      );
-      return E - this.e * Math.sin(E) + k * TWO_PI;
-    }
+    if (this.e < 1) return ellipticMeanFromTrue(nu, this.e);
     const F = 2 * Math.atanh(Math.sqrt((this.e - 1) / (this.e + 1)) * Math.tan(nu / 2));
     return this.e * Math.sinh(F) - F;
   }

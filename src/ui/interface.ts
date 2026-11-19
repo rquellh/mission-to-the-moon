@@ -1,17 +1,19 @@
 import type { Director, Player } from '../app/contract';
+import type { FlightOutline } from '../app/outline';
 import { Tour } from '../app/tour';
 import { copy } from '../content/copy';
 import { credits } from '../content/credits';
-import type { Mission } from '../content/types';
+import type { Memorial, Mission, MissionSummary } from '../content/types';
 import { renderAbout, renderHowDrawn } from './about-dialog';
 import { renderCredits } from './credits-dialog';
 import { setUpDialog } from './dialogs';
 import { byId, hiddenText, reducedMotionQuery } from './dom';
 import { setUpEventCard } from './event-card';
-import { missionDates, speakElapsed } from './format';
+import { missionDates, speakMissionTime } from './format';
 import { setUpHub } from './hub';
 import { icon } from './icons';
 import { watchViewInsets } from './layout';
+import { setUpMemorial } from './memorial-dialog';
 import { MissionIndex } from './mission-index';
 import { setUpSheet } from './sheet';
 import { setUpTimeline } from './timeline';
@@ -20,8 +22,20 @@ import { setUpViewControls } from './view-controls';
 
 export interface InterfaceOptions {
   mission: Mission;
-  /** Every mission on the site, in flight order: for the mission picker and the photo credits. */
-  missions: readonly Mission[];
+  /** What the flight plan holds, so the notes say only what is true of this flight. */
+  flight: FlightOutline;
+  /** Every source id the flight cites, for the Sources dialog. */
+  cited: ReadonlySet<string>;
+  /** The mission list, in date order. */
+  summaries: readonly MissionSummary[];
+  /** Any mission's name by id, including one the list leaves out (a draft opened by its address). */
+  nameOf(id: string): string | undefined;
+  /** True for an unfinished mission (only the dev server lists one). */
+  isDraft(summary: MissionSummary): boolean;
+  /** Load a memorial page's content when it is opened. */
+  loadMemorial(id: string): Promise<Memorial>;
+  /** The address of a mission or memorial by id. */
+  addressOf(id: string): string;
   player: Player;
   director: Director;
   /** False when there is no 3D view (for example, without WebGL). */
@@ -29,12 +43,44 @@ export interface InterfaceOptions {
 }
 
 export interface MissionInterface {
-  /** Show the mission picker over the 3D view, as the first thing a visitor sees. */
-  welcome(): void;
+  /** Show the mission picker over the 3D view, as the first thing a visitor sees, scrolled to an entry if one is named. */
+  welcome(revealId?: string): void;
   /** Skip the picker and start exploring. */
   explore(): void;
   /** Skip the picker and start the guided tour (or explore, if the mission has no tour). */
   tour(): void;
+  /** Open a memorial page, over the picker when it is showing. */
+  memorial(id: string): void;
+}
+
+export interface MissionListOptions {
+  summaries: readonly MissionSummary[];
+  /** Any mission's name by id, including one the list leaves out (a draft opened by its address). */
+  nameOf(id: string): string | undefined;
+  isDraft(summary: MissionSummary): boolean;
+  loadMemorial(id: string): Promise<Memorial>;
+  addressOf(id: string): string;
+}
+
+/**
+ * The mission list on its own, with no mission behind it: the way on when a
+ * mission could not be loaded. Every entry opens its own page.
+ */
+export function setUpMissionList({ summaries, nameOf, isDraft, loadMemorial, addressOf }: MissionListOptions): {
+  open(returnTo: HTMLElement): void;
+} {
+  const memorials = setUpMemorial({ load: loadMemorial, nameOf, addressOf });
+  const hub = setUpHub({
+    currentId: null,
+    summaries,
+    isDraft,
+    onMemorial: (id, from) => memorials.open(id, from),
+    // With no mission loaded there is nothing to do in place.
+    onTour() {},
+    onExplore() {},
+    onReturn() {},
+  });
+  return { open: (returnTo) => hub.open(returnTo) };
 }
 
 /** A polite screen reader announcement that waits for things to settle. */
@@ -53,7 +99,8 @@ function makeAnnouncer(): (text: string) => void {
 }
 
 /** Build the whole interface for one mission and connect it to the clock and the camera. */
-export function mountInterface({ mission, missions, player, director, has3D }: InterfaceOptions): MissionInterface {
+export function mountInterface(options: InterfaceOptions): MissionInterface {
+  const { mission, flight, cited, summaries, nameOf, isDraft, loadMemorial, addressOf, player, director, has3D } = options;
   const index = new MissionIndex(mission);
   const motion = reducedMotionQuery();
   const announce = makeAnnouncer();
@@ -70,8 +117,8 @@ export function mountInterface({ mission, missions, player, director, has3D }: I
   hubButton.title = copy.header.missionsHint;
   hubButton.append(icon('chevron-down', 'icon masthead__chevron'), hiddenText(`, ${copy.header.missions}`));
   renderAbout(mission);
-  renderHowDrawn(mission);
-  renderCredits(credits, missions);
+  renderHowDrawn(mission, flight);
+  renderCredits(credits, { mission, cited, summaries });
   const about = setUpDialog(byId('about-dialog', HTMLDialogElement));
   const drawn = setUpDialog(byId('drawn-dialog', HTMLDialogElement));
   const sources = setUpDialog(byId('credits-dialog', HTMLDialogElement));
@@ -92,7 +139,9 @@ export function mountInterface({ mission, missions, player, director, has3D }: I
 
   const describe = (eventIndex: number): string => {
     const event = index.events[eventIndex];
-    return event ? copy.card.nowShowing(event.title, speakElapsed(index.seconds[eventIndex] ?? 0)) : mission.name;
+    return event
+      ? copy.card.nowShowing(event.title, speakMissionTime(index.seconds[eventIndex] ?? 0, index.countsDays))
+      : mission.name;
   };
 
   const card = setUpEventCard({
@@ -173,9 +222,13 @@ export function mountInterface({ mission, missions, player, director, has3D }: I
 
   // Reopening the picker pauses the clock; closing it without a choice plays on.
   let resumeAfterHub = false;
+  const memorials = setUpMemorial({ load: loadMemorial, nameOf, addressOf });
   const hub = setUpHub({
-    mission,
-    missions,
+    currentId: mission.id,
+    currentName: mission.name,
+    summaries,
+    isDraft,
+    onMemorial: (id, from) => memorials.open(id, from),
     onTour: startTour,
     onExplore: startExploring,
     onReturn: () => {
@@ -207,11 +260,16 @@ export function mountInterface({ mission, missions, player, director, has3D }: I
   );
 
   return {
-    welcome() {
-      hub.welcome();
+    welcome(revealId) {
+      hub.welcome(revealId);
       remeasure();
     },
     explore: startExploring,
     tour: startTour,
+    memorial(id) {
+      // Over the picker, focus goes back to the entry's Read button when the page closes.
+      const from = hub.mode ? hub.actionFor(id) : null;
+      memorials.open(id, from);
+    },
   };
 }

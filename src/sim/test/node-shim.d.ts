@@ -17,7 +17,8 @@ declare module "node:assert/strict" {
     ok(value: unknown, message?: string): asserts value;
     equal<T>(actual: T, expected: T, message?: string): void;
     deepEqual<T>(actual: T, expected: T, message?: string): void;
-    throws(fn: () => unknown, message?: string): void;
+    throws(fn: () => unknown, message?: string | RegExp): void;
+    fail(message?: string): never;
   }
   const assert: Assert;
   export default assert;
@@ -25,4 +26,11 @@ declare module "node:assert/strict" {
 
 declare module "node:fs" {
   export function readFileSync(path: URL | string, encoding: "utf8"): string;
+  export function existsSync(path: URL | string): boolean;
+  export interface Dirent {
+    name: string;
+    isDirectory(): boolean;
+    isFile(): boolean;
+  }
+  export function readdirSync(path: URL | string, options: { withFileTypes: true }): Dirent[];
 }
