@@ -251,3 +251,47 @@ describe("The Apollo 13 pattern: a lunar flyby with no lunar orbit", () => {
     assert.ok(height > 60, `the lunar module ends ${height.toFixed(1)} n mi up`);
   });
 });
+
+describe("A midcourse burn inside the Earth-Moon cross-fade", () => {
+  // Apollo 13's second midcourse correction came about 16 hours before
+  // closest approach, where the path is fading from its Earth conic to its
+  // lunar conic. The leg after the burn must start from the burn, not part
+  // way toward its lunar conic (which once drew a 366 km sideways jog).
+  const MCC2 = "061:29:43.49";
+  const MCC2_END = "061:30:17.72";
+  const flight = plan();
+  const csm = flight.ships[0];
+  const k = csm.phases.findIndex((p) => p.label === "Around the Moon");
+  const around = csm.phases[k] as TransferPhase;
+  const phases = [...csm.phases] as Phase[];
+  phases.splice(
+    k,
+    1,
+    { ...around, label: "Hybrid coast", end: at(MCC2), moonFix: FREE_RETURN_ARRIVAL },
+    { kind: "burn", label: "Second midcourse correction", body: "earth", start: at(MCC2), end: at(MCC2_END) },
+    { ...around, start: at(MCC2_END) },
+  );
+  csm.phases = phases as [Phase, ...Phase[]];
+  const path = buildFlightPath(flight);
+
+  it("is inside the cross-fade (between 3 and 18 Earth radii from the Moon)", () => {
+    const p = pos(path, "csm", seconds(MCC2));
+    const c = [0, 0, 0];
+    path.moonPosition(1, c);
+    const d = Math.hypot(p[0]! - c[0]!, p[1]! - c[1]!, p[2]! - c[2]!);
+    assert.ok(d > 3 && d < 18, `${d.toFixed(1)} Earth radii from the Moon`);
+  });
+
+  it("builds into a sound path, with no sideways jog at the burn", () => {
+    const problems = pathProblems(flight, path);
+    assert.equal(problems.length, 0, problems.slice(0, 8).join("\n"));
+    for (const mix of [0, 1]) {
+      const a = pos(path, "csm", seconds(MCC2), mix);
+      const b = pos(path, "csm", seconds(MCC2_END), mix);
+      const c = pos(path, "csm", seconds(MCC2) - 34.23, mix);
+      const during = Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
+      const before = Math.hypot(a[0]! - c[0]!, a[1]! - c[1]!, a[2]! - c[2]!);
+      assert.ok(during < 1.5 * before, `moves ${(during / before).toFixed(2)} times as far during the burn as in the same time before it, mix ${mix}`);
+    }
+  });
+});

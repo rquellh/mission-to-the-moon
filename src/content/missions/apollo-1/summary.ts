@@ -13,5 +13,5 @@ export const summary: MissionSummary = {
     "Gus Grissom, Ed White, and Roger Chaffee were getting ready to fly the first Apollo mission with a crew. On January 27, 1967, during a practice countdown on the launch pad, a fire broke out inside their spacecraft, and all three astronauts died.",
   date: "1967-01-27",
   hasTour: false,
-  status: "draft",
+  status: "ready",
 };

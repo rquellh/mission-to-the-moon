@@ -4,7 +4,11 @@
  * these few calls. Node 24 runs the tests directly: `npm test`.
  */
 declare module "node:test" {
-  type TestFn = () => void | Promise<void>;
+  interface TestContext {
+    /** A note printed under the test in the report. */
+    diagnostic(message: string): void;
+  }
+  type TestFn = (t: TestContext) => void | Promise<void>;
   export function test(name: string, fn: TestFn): Promise<void>;
   export function describe(name: string, fn: () => void): void;
   export function it(name: string, fn: TestFn): void;

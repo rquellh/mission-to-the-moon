@@ -17,8 +17,9 @@ import { SOURCE_GROUPS, SOURCES } from "../../content/sources.ts";
 import { elapsedToSeconds, type ElapsedTime, type Mission, type MissionSummary } from "../../content/types.ts";
 import type { LeftBehind, VehicleChange } from "../../content/vehicle-types.ts";
 import { buildFlightPath } from "../build.ts";
-import type { FlightPath, FlightPlan } from "../types.ts";
-import { continuityProblems, endProblems, phaseProblems, surfaceProblems } from "./path-checks.ts";
+import { AnchoredOrbit } from "../segments.ts";
+import type { FlightPlan } from "../types.ts";
+import { continuityProblems, endProblems, phaseProblems, stretchProblems, surfaceProblems } from "./path-checks.ts";
 
 const MISSIONS = new URL("../../content/missions/", import.meta.url);
 const PUBLIC = new URL("../../../public/", import.meta.url);
@@ -42,7 +43,7 @@ interface FlightFolder {
   sources: Exports | undefined;
   /** Set when the plan does not build. */
   error?: unknown;
-  path?: FlightPath;
+  path?: ReturnType<typeof buildFlightPath>;
 }
 
 interface MemorialFolder {
@@ -148,6 +149,33 @@ function rawDurations(root: unknown, where: string): string[] {
   return problems;
 }
 
+/**
+ * How hard an orbit may be bent to meet its published fixes (see
+ * AnchoredOrbit in src/sim/segments.ts). Each test lists every orbit
+ * corrected by 0.1% of its rate or 0.1 degree or more.
+ *
+ * The phase correction makes the craft run around its orbit faster or
+ * slower than its published size implies: a correction of r of the orbital
+ * rate is the same as an error of two thirds of r in the orbit's size (at
+ * 1%, about 6 nautical miles of a low lunar orbit, 22 of an Earth orbit).
+ * Published values need up to about 1.1% today: Apollo 11's lunar orbits
+ * reach 0.6% (its times and places come from two tables), and Apollo 15's
+ * 1.08% comes from drawing all its lunar orbits in one fixed plane while
+ * the real orbit changed plane (on the equator the same phase needs 0.53%).
+ * Mistakes move it more: a time a minute off in an hour-long phase gives
+ * 1.7%, a longitude five degrees off over half a revolution 2.8%. So the
+ * limit sits above every value the published data give and below those.
+ *
+ * The plane correction tilts the orbit to reach an end fix off its plane.
+ * The bulge's turning is drawn, so what remains comes from inclinations and
+ * places published at different moments: 0.75 degrees at most today
+ * (Gemini 6A, nine revolutions after leaving Gemini 7). A latitude a couple
+ * of degrees off, or a fix from the wrong pass, shows as several degrees.
+ */
+const MAX_RATE_CORRECTION = 0.015;
+const MAX_PLANE_CORRECTION_DEG = 2;
+const DEG_PER_RAD = 180 / Math.PI;
+
 function report(problems: string[]): string {
   const shown = problems.slice(0, 12).join("\n  ");
   return problems.length > 12 ? `${shown}\n  ... and ${problems.length - 12} more` : shown;
@@ -210,6 +238,12 @@ for (const folder of flights) {
       assert.equal(problems.length, 0, report(problems));
     });
 
+    it("has no sideways jog: no phase where the ship travels several times farther than its speed allows", () => {
+      if (!folder.path) return assert.fail("the plan does not build");
+      const problems = stretchProblems(flight, folder.path);
+      assert.equal(problems.length, 0, report(problems));
+    });
+
     it("never goes below the surface of Earth or the Moon", () => {
       if (!folder.path) return assert.fail("the plan does not build");
       const problems = surfaceProblems(flight, folder.path);
@@ -225,6 +259,25 @@ for (const folder of flights) {
     it("every flight-plan citation names a registered source", () => {
       const problems = unknownSources(flight, "flight");
       assert.equal(problems.length, 0, report(problems));
+    });
+
+    it("bends no orbit hard to meet its published fixes", (t) => {
+      const path = folder.path;
+      if (!path) return assert.fail("the plan does not build");
+      const problems: string[] = [];
+      for (const ship of flight.ships) {
+        ship.phases.forEach((phase, i) => {
+          const seg = path.report.segment(ship.id, i);
+          if (!(seg instanceof AnchoredOrbit)) return;
+          const rate = Math.abs(seg.phaseCorrection) / (seg.conic.n * (seg.t1 - seg.t0));
+          const plane = seg.planeCorrection * DEG_PER_RAD;
+          const end = phase.kind === "orbit" && phase.endFix ? "its endFix" : phase.kind === "orbit" && phase.endRange ? "its endRange" : "where the next phase starts";
+          const line = `${ship.id} "${phase.label}" (${phase.start.value} to ${phase.end.value}): ${(rate * 100).toFixed(2)}% of its orbital rate, plane turned ${plane.toFixed(2)} degrees, to end at ${end}`;
+          if (rate >= 0.001 || plane >= 0.1) t.diagnostic(line);
+          if (rate > MAX_RATE_CORRECTION || plane > MAX_PLANE_CORRECTION_DEG) problems.push(line);
+        });
+      }
+      assert.equal(problems.length, 0, `check the published size, times, and end of\n  ${report(problems)}`);
     });
   });
 

@@ -159,6 +159,17 @@ const FAST_FORWARD_TILT_DEG = 52;
 const FAST_FORWARD_RING_PX = 4;
 /** Points along the ring. */
 const RING_POINTS = 192;
+/*
+ * A spacewalk: the ship view draws the followed craft close up while its
+ * parts include a spacewalker, so the figure, its tether, and the open
+ * hatch can be seen, and eases back when the walk ends. The craft and the
+ * figure then reach this share of the clear area's smaller side from the
+ * middle of the view. The camera stays where it is, so near Earth the
+ * horizon stays in frame.
+ */
+const SPACEWALK_REACH_SHARE = 0.4;
+/** How quickly the close-up comes and goes, in seconds of real time (at once on a jump or under reduced motion). */
+const SPACEWALK_SECONDS = 0.7;
 /** The Earth view of an Earth-orbit flight looks at the orbit from this many degrees off its axis, toward the ship. */
 const ORBIT_VIEW_TILT_DEG = 70;
 /** A ship this many body radii up (or less) counts as near that body for the Earth and Moon views. */
@@ -437,6 +448,11 @@ export class Stage implements Director {
   private readonly white = new Color(0xffffff);
   /** The farthest the ring reaches from its body's center (scene units). */
   private ringRadius = 0;
+  /** How far the ship view is drawn close up for a spacewalk, 0 to 1, and where it is heading. */
+  private walkLevel = 0;
+  private walkWanted = 0;
+  private walkPrimed = false;
+  private readonly walkPose: ShipPose = { exists: false, position: new Vector3(), forward: new Vector3(1, 0, 0), up: new Vector3(0, 1, 0) };
   private readonly fastFrom: CameraPose = { position: new Vector3(), target: new Vector3() };
   private readonly fastTo: CameraPose = { position: new Vector3(), target: new Vector3() };
   private readonly fastPose: CameraPose = { position: new Vector3(), target: new Vector3() };
@@ -460,6 +476,7 @@ export class Stage implements Director {
     reducedMotion: false,
     metersPerPixel: 0,
     opacity: 1,
+    glow: 1,
   };
 
   private constructor(
@@ -547,6 +564,8 @@ export class Stage implements Director {
     }));
 
     this.handleResize();
+    // While developing, the stage can be looked at from the browser console (for checking the scene).
+    if (import.meta.env.DEV) (window as unknown as { stage?: Stage }).stage = this;
   }
 
   /** Create the stage. Throws WebGLUnavailableError if WebGL 2 is missing. */
@@ -1758,6 +1777,7 @@ export class Stage implements Director {
 
   /** True while a spacecraft keeps turning with the clock stopped (see ShipModel.idleTurning). */
   private shipsTurning(): boolean {
+    if (this.walkLevel !== this.walkWanted) return true;
     const ships = this.fleet?.ships ?? [];
     for (let i = 0; i < ships.length; i += 1) {
       if ((ships[i] as ShipModel).idleTurning) return true;
@@ -1956,6 +1976,51 @@ export class Stage implements Director {
       screenScale * (this.viewNow === 'spacecraft' && ship === this.followed ? subjectScale : 1);
 
     const models = this.fleet.ships;
+    // A spacewalk under way on the followed craft: draw it close up in the ship view.
+    const followedModel = models[this.ships.indexOf(this.followed)];
+    const walking =
+      this.viewNow === 'spacecraft' &&
+      followedModel !== undefined &&
+      this.followed.exists &&
+      this.followed.fastForward < 0.5 &&
+      followedModel.hasWalker(followedModel.shapeAt(t));
+    this.walkWanted = walking ? 1 : 0;
+    // At once on a jump, under reduced motion, and on the first frame (a link that opens during a spacewalk).
+    if (snap || this.reducedMotion || !this.walkPrimed) this.walkLevel = this.walkWanted;
+    else this.walkLevel += (this.walkWanted - this.walkLevel) * (1 - Math.exp(-dt / SPACEWALK_SECONDS));
+    this.walkPrimed = true;
+    if (Math.abs(this.walkLevel - this.walkWanted) < 0.002) this.walkLevel = this.walkWanted;
+    /**
+     * The followed craft during a spacewalk: larger (see SPACEWALK_REACH_SHARE),
+     * and rolled about its long axis so its top, where the spacewalker
+     * floats, turns toward the camera (an illustration).
+     */
+    const closeUp = (ship: ShipState, model: ShipModel, pose: ShipPose): ShipPose => {
+      context.glow = 1;
+      if (ship !== this.followed || this.walkLevel <= 0) return pose;
+      const index = model.shapeAt(t);
+      const near = model.closeUpMetersPerPixel(index, SPACEWALK_REACH_SHARE * clearPixels);
+      const base = context.metersPerPixel > 0 ? context.metersPerPixel : model.metersPerPixelOf(index, context);
+      const e = easeInOutCubic(this.walkLevel);
+      if (near > 0 && base > 0 && near < base) context.metersPerPixel = MathUtils.lerp(base, near, e);
+      // A close-up model needs no glow to be found.
+      context.glow = 1 - 0.85 * e;
+      const walk = this.walkPose;
+      walk.exists = pose.exists;
+      walk.position.copy(pose.position);
+      walk.forward.copy(pose.forward);
+      const top = this.f1.copy(pose.up).addScaledVector(pose.forward, -pose.up.dot(pose.forward));
+      const toCamera = this.f2.subVectors(this.camera.position, pose.position);
+      toCamera.addScaledVector(pose.forward, -toCamera.dot(pose.forward));
+      if (top.lengthSq() < 1e-10 || toCamera.lengthSq() < 1e-10) return pose;
+      top.normalize();
+      toCamera.normalize();
+      // Roll the top toward the camera by most of the way, the short way around.
+      const axis = this.f3.copy(pose.forward).normalize();
+      const angle = Math.atan2(this.f4.crossVectors(top, toCamera).dot(axis), top.dot(toCamera));
+      walk.up.copy(top).applyAxisAngle(axis, 0.8 * e * angle);
+      return walk;
+    };
     const pair = this.pairNow();
     // The ship that stays put (the main ship, or one of a pair) first, so the one drawn beside it can share its scale.
     const anchorIndex = this.ships.indexOf(pair ? pair.anchor : this.main);
@@ -1979,7 +2044,7 @@ export class Stage implements Director {
           : Math.max(own, moverModel.metersPerPixelOf(moverModel.shapeAt(t), context));
         if (own > 0 && together > 0) context.metersPerPixel = MathUtils.lerp(own, together, pair.arranged);
       }
-      anchorModel.update(ship, context);
+      anchorModel.update(closeUp(ship, anchorModel, ship), context);
     }
 
     for (let i = 0; i < models.length; i += 1) {
@@ -2023,8 +2088,9 @@ export class Stage implements Director {
         const own = model.metersPerPixelOf(model.shapeAt(t), context);
         if (own > 0) context.metersPerPixel = MathUtils.lerp(own, anchorScale, w);
       }
-      model.update(pose, context);
+      model.update(closeUp(ship, model, pose), context);
     }
+    context.glow = 1;
 
     // Parts left behind stand at their ship's landing site from their cited moment on.
     context.opacity = 1;
@@ -2095,6 +2161,8 @@ export class Stage implements Director {
       if (ship.fastForward !== before) changed = true;
     }
     const level = this.followed.fastForward;
+    // The event markers would stand still on the ring while the ship goes around many times: they fade with the model.
+    if (changed) this.eventMarkers?.setOpacity(1 - level);
     if (this.ring) {
       if (level > 0.001 && this.writeRing(this.followed, t)) {
         this.ring.setOpacity(0.9 * level);

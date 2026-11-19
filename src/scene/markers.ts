@@ -41,6 +41,8 @@ const vertexShader = /* glsl */ `
 `;
 
 const fragmentShader = /* glsl */ `
+  uniform float uOpacity;
+
   varying vec3 vColor;
   varying float vKind;
   varying float vAhead;
@@ -73,7 +75,7 @@ const fragmentShader = /* glsl */ `
       color = mix(rim, vColor, fill);
       alpha = outside * (vAhead > 0.5 ? 0.6 : 1.0);
     }
-    gl_FragColor = vec4(color, alpha);
+    gl_FragColor = vec4(color, alpha * uOpacity);
     #include <colorspace_fragment>
   }
 `;
@@ -83,6 +85,8 @@ export interface MarkerSet {
   setMix(mix: number): void;
   /** Emphasize the event at this index (-1 for none). */
   setCurrent(index: number): void;
+  /** Fade the whole set (0 hidden, 1 shown). */
+  setOpacity(opacity: number): void;
   setPixelRatio(ratio: number): void;
   dispose(): void;
 }
@@ -121,6 +125,7 @@ export function createMarkers(points: readonly MarkerPoint[], site: boolean): Ma
       uCurrent: { value: -10 },
       uSize: { value: site ? SITE_MARKER_SIZE_PX : MARKER_SIZE_PX },
       uCurrentSize: { value: MARKER_CURRENT_SIZE_PX },
+      uOpacity: { value: 1 },
     },
     vertexShader,
     fragmentShader,
@@ -136,6 +141,7 @@ export function createMarkers(points: readonly MarkerPoint[], site: boolean): Ma
     uMix: { value: number };
     uPixelRatio: { value: number };
     uCurrent: { value: number };
+    uOpacity: { value: number };
   };
 
   return {
@@ -145,6 +151,10 @@ export function createMarkers(points: readonly MarkerPoint[], site: boolean): Ma
     },
     setCurrent(index) {
       uniforms.uCurrent.value = index;
+    },
+    setOpacity(opacity) {
+      uniforms.uOpacity.value = opacity;
+      mesh.visible = opacity > 0.01;
     },
     setPixelRatio(ratio) {
       uniforms.uPixelRatio.value = ratio;

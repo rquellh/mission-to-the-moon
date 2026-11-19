@@ -14,7 +14,9 @@
  * GMT times (Part IV, page 4-5: "23:31:04.7 GMT (6:31:04.7 P.M. EST)").
  *
  * Counting Grissom's two earlier flights is our arithmetic on Apollo by the
- * Numbers, which names both.
+ * Numbers, which names both. So is the 14.7 seconds from the crew's first
+ * report of fire (23:31:04.7 GMT) to the cabin's rupture (23:31:19.4 GMT),
+ * both from the Apollo by the Numbers fire timeline and the Board's report.
  */
 import type { Citation, Memorial } from "../../types.ts";
 
@@ -187,7 +189,7 @@ export const memorial: Memorial = {
         {
           text: {
             short:
-              "Ed White, the senior pilot, had flown once before, on Gemini 4. On that flight he became the first American to walk in space.",
+              "Ed White, the senior pilot, had flown in space on Gemini 4. On that flight he became the first American to walk in space.",
             more:
               "White graduated from the U.S. Military Academy at West Point and was chosen as an astronaut in 1962. He enjoyed his spacewalk so much that he had to be told several times to come back to his spacecraft, and he stayed outside nearly twice as long as planned. Spacewalks like his were meant to help prepare astronauts for Apollo. Born in San Antonio, Texas, on November 14, 1930, he was a lieutenant colonel in the U.S. Air Force and 36 years old on the day of the fire.",
           },
@@ -244,7 +246,7 @@ export const memorial: Memorial = {
             short:
               "At 6:31 in the evening, the crew reported a fire in the cabin, and in the pure oxygen it spread very fast. The astronauts quickly lost consciousness from the poisonous gases the fire made, and died soon after.",
             more:
-              "No one could tell for certain what started the fire. The Review Board decided that the most likely cause was an electrical arc, a spark from wiring near the floor on Grissom's side of the cabin. The cabin held many things that could burn, and in pure oxygen the fire spread very quickly. About 15 seconds after the crew's first report, the rising heat and pressure broke the cabin open. The Board found that the crew died from breathing poisonous gases from the fire, and that they lost consciousness quickly.",
+              "No one could tell for certain what started the fire. The Review Board decided that the most likely cause was an electrical arc, a spark from wiring near the floor on Grissom's side of the cabin. The cabin held many things that could burn, and in pure oxygen the fire spread very quickly. 14.7 seconds after the crew's first report, the rising heat and pressure broke the cabin open. The Board found that the crew died from breathing poisonous gases from the fire, and that they lost consciousness quickly.",
           },
           citations: [
             board(`${PART_IV_FIRE}: "Beginning at 23:31:04.7 GMT (6:31:04.7 P.M. EST), the crew gave the first verbal indication of an emergency"`, "4-5", "123"),
@@ -262,7 +264,7 @@ export const memorial: Memorial = {
             short:
               "The spacecraft's inner hatch opened inward, and the rising pressure in the cabin held it shut, so it could not be opened. Ed White, whose job in an emergency was to open the hatch, had started to do it the way he was trained.",
             more:
-              "There were three hatches, one outside another: two on the spacecraft itself and one in a cover that protected it during launch. Even in ideal conditions, opening them took at least 1 minute 30 seconds. In an escape, the crew had to open the inner hatch first by pulling it into the cabin, and with the pressure inside higher than outside, that was impossible. The Review Board found that, because of the pressure before the cabin split open and how quickly the astronauts lost consciousness after, the crew never had a chance to get out.",
+              "There were three hatches, one outside another: two on the spacecraft itself and one in a cover that protected it during launch. The emergency escape procedure called for at least 1 minute 30 seconds, and in practice the crew had never managed it that fast. In an escape, the crew had to open the inner hatch first by pulling it into the cabin, and with the pressure inside higher than outside, that was impossible. The Review Board found that, because of the pressure before the cabin split open and how quickly the astronauts lost consciousness after, the crew never had a chance to get out.",
           },
           citations: [
             finding("Finding 4 and its Determination", "6-1", "194"),
@@ -280,10 +282,10 @@ export const memorial: Memorial = {
             short:
               "Workers on the launch tower rushed through thick smoke and heat to open the hatches from outside. It took them about five minutes, and by then it was too late to save the astronauts.",
             more:
-              "Five people took turns opening the three hatches. The smoke was so thick that they worked mostly by touch, and they kept going back out for air. Many of them breathed in smoke or were burned. Because the rocket had no fuel, the test had not been treated as dangerous, so no fire, rescue, or medical teams were standing by, and the gas masks at hand were not made for thick smoke. The Review Board found that \"adequate safety precautions were neither established nor observed for this test.\"",
+              "Five people took turns opening the three hatches. The pad leader reported that all of them were open 5 minutes 27 seconds after the crew's first report of fire, and the Review Board concluded they had been opened about five minutes after it. The smoke was so thick that they worked mostly by touch, and they kept going back out for air. Many of them breathed in smoke or were burned. Because the rocket had no fuel, the test had not been treated as dangerous, so no fire, rescue, or medical teams were standing by, and the gas masks at hand were not made for thick smoke. The Review Board found that \"adequate safety precautions were neither established nor observed for this test.\"",
           },
           citations: [
-            board(`${PART_IV_FIRE}: the work to open the hatches`, "4-6", "124"),
+            board(`${PART_IV_FIRE}: the work to open the hatches, the pad leader's report "approximately five minutes, twenty-seven seconds after the first report of the fire", and "all hatches were opened ... approximately five minutes after the report of fire"`, "4-6", "124"),
             finding("Finding 5, its Determination, and its Recommendations", "6-1 to 6-2", "194 to 195"),
             numbers("\"The Accident\", paragraphs on the rescue"),
             fireTimeline("rows 23:32:04 (\"Attempts to remove hatches\") and 23:36 (\"Hatches opened, outer hatches removed. Resuscitation of crew impossible.\")"),
@@ -311,7 +313,7 @@ export const memorial: Memorial = {
             finding("Finding 2, Determination: \"The test conditions were extremely hazardous.\"", "6-1", "194"),
             numbers("\"The Investigation\" and \"Cause of the Apollo 1 Fire\", first and second paragraphs"),
             history204("Second paragraph: the board under Dr. Floyd L. Thompson, and the final report completed in April 1967"),
-            aftermath("Paragraphs beginning \"In March 7-9\" (disassembly completed March 27) and \"Among the management changes\""),
+            aftermath("Paragraphs beginning \"On March 7-9\" (disassembly completed March 27) and \"Among the management changes\""),
           ],
         },
         {
@@ -411,7 +413,7 @@ export const memorial: Memorial = {
             short:
               "Every year, NASA holds a Day of Remembrance for the crew of Apollo 1 and the other astronauts who lost their lives exploring space.",
             more:
-              "NASA centers across the country take part in the agency's yearly memorial event, which also honors the crews of the space shuttles Challenger and Columbia. At Kennedy Space Center the 2021 ceremony was held at the Space Mirror Memorial in the Visitor Complex. The mirror was dedicated in 1991 to honor all astronauts who lost their lives on missions or in training, and Congress has named it a National Memorial.",
+              "NASA centers across the country take part in the agency's yearly memorial event, which also honors the crews of the space shuttles Challenger and Columbia. At the Kennedy Space Center Visitor Complex stands the Space Mirror Memorial, which was dedicated in 1991 to honor all astronauts who lost their lives on missions or in training, and Congress has named it a National Memorial.",
           },
           citations: [
             {

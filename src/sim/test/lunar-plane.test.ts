@@ -107,3 +107,44 @@ describe("Lunar orbits over a site far from the equator", () => {
     assert.ok(count > 10);
   });
 });
+
+describe("Lunar orbits tilted through a published point, on a flight that never lands", () => {
+  /** Apollo 11's command module alone, its orbits drawn through an invented point 11.66 degrees south. */
+  function orbitOnly(withTime: boolean): FlightPlan {
+    const copy = structuredClone(apollo11) as FlightPlan;
+    copy.ships = [copy.ships.find((s) => s.id === "csm")!];
+    copy.lunarOrbitPlane = {
+      site: { latitude: fake(-11.66), longitude: fake(169.16) },
+      ...(withTime ? { time: fake("080:11:53.63" as ElapsedTime) } : {}),
+    };
+    return copy;
+  }
+  const flight = orbitOnly(true);
+  const path = buildFlightPath(flight);
+  const t = seconds("080:11:53.63");
+
+  it("builds into a sound path", () => {
+    const problems = pathProblems(flight, path);
+    assert.equal(problems.length, 0, problems.slice(0, 8).join("\n"));
+  });
+
+  it("passes through the point at its time: the lunar fix there lands on it", () => {
+    // Circularization cutoff: the published longitude, 169.16 E, at this time.
+    const at = overMoon(pos(path, "csm", t));
+    assert.ok(Math.abs(at.latitude + 11.66) < 1e-6 && Math.abs(at.longitude - 169.16) < 1e-6, `at ${at.latitude}, ${at.longitude}`);
+  });
+
+  it("is inclined just enough to reach it (the default heading)", () => {
+    const a = pos(path, "csm", t);
+    const b = pos(path, "csm", t + 2);
+    const r = [a[0]! - EARTH_MOON_DISTANCE, a[1]!, a[2]!];
+    const v = [b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!];
+    const n = [r[1]! * v[2]! - r[2]! * v[1]!, r[2]! * v[0]! - r[0]! * v[2]!, r[0]! * v[1]! - r[1]! * v[0]!];
+    const inclination = Math.acos(Math.abs(n[1]!) / Math.hypot(...n)) / DEG;
+    assert.ok(Math.abs(inclination - 11.66) < 0.05, `inclination ${inclination.toFixed(3)}`);
+  });
+
+  it("needs a time when there is no stay on the surface", () => {
+    assert.throws(() => buildFlightPath(orbitOnly(false)), /needs a time/);
+  });
+});

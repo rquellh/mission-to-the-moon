@@ -161,6 +161,23 @@ const LATITUDE_EASE_KM = 40;
 const DOWNRANGE_FRACTION = 0.5;
 
 /**
+ * The same for a lunar module's ascent from the Moon. An illustration, fit
+ * to the one published lunar insertion point in our sources: Apollo 11's
+ * ascent stage reached orbit 10.48 degrees west of Tranquility Base
+ * (Mission Report Table 7-II), 0.44 of the way an orbit-speed craft would
+ * have gone in its 7 minutes 15 seconds.
+ */
+const LUNAR_DOWNRANGE_FRACTION = 0.44;
+
+/**
+ * A lunar orbit after liftoff with a published end fix but no start fix is
+ * started where its published size carries it to that end fix on time,
+ * unless that is more than this far (radians) from the illustrative
+ * insertion point: then the fix is reached with a correction instead.
+ */
+const LIFTOFF_SHIFT_LIMIT = 30 * DEG;
+
+/**
  * Entry interface, the conventional top of the atmosphere for entry:
  * 400,000 feet above the ellipsoid. Used only when the plan gives no entry
  * state (an assumption, though the usual one in the sources).
@@ -253,8 +270,21 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     reference: OrbitReference,
     endDirection?: Readonly<Vec3>,
     schedule?: SizeSchedule,
+    gm: number = mu(body),
   ): AnchoredOrbit {
-    return new AnchoredOrbit(sky, body, mu(body), rp, ra, t0, t1, reference, endDirection, body === "earth" ? earthBulge : undefined, schedule);
+    return new AnchoredOrbit(sky, body, gm, rp, ra, t0, t1, reference, endDirection, body === "earth" ? earthBulge : undefined, schedule);
+  }
+
+  /**
+   * The gravitational parameter an orbit phase is drawn with: the body's,
+   * or, with a published period (OrbitPhase.period), the one that gives an
+   * orbit of the published size that period. The size keeps its shape; only
+   * the timing follows the period.
+   */
+  function phaseMu(phase: OrbitPhase, rp: number, ra: number): number {
+    if (!phase.period) return mu(phase.body);
+    const n = (2 * Math.PI) / (phase.period.value * 60);
+    return n * n * ((rp + ra) / 2) ** 3;
   }
 
   const ships: ShipState[] = plan.ships.map((shipPlan) => {
@@ -550,7 +580,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
       const [p, a] = apsides(phase.body, size);
       knots.push({ t, rp: p, ra: a });
     }
-    return new SizeSchedule(mu(phase.body), knots);
+    return new SizeSchedule(phaseMu(phase, rp, ra), knots);
   }
 
   /** Where and how an orbit phase starts (see OrbitPhase in types.ts for the order of preference). */
@@ -583,6 +613,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     if (phase.startRelative) return relativeReference(ship, i, phase, rp);
     if (previous?.kind === "burn") return referenceAcrossBurn(ship, i, body, rp, ra);
     if (previous?.kind === "ascent" && body === "earth") return launchReference(ship, i, phase, rp);
+    if (previous?.kind === "ascent" && body === "moon") return lunarLiftoffReference(ship, i, phase, rp, ra);
     if (previous) {
       const prevSeg = segment(ship, i - 1);
       if (prevSeg instanceof AnchoredOrbit) {
@@ -620,7 +651,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     } else if (deorbitAfter(ship, i)) {
       return orbitIntoFall(ship, i, rp, ra, reference, schedule);
     }
-    const orbit = anchoredOrbit(body, rp, ra, t0, t1, reference, endDirection, schedule);
+    const orbit = anchoredOrbit(body, rp, ra, t0, t1, reference, endDirection, schedule, phaseMu(phase, rp, ra));
     // A published retrofire position: the fall starts there.
     if (phase.endFix && deorbitAfter(ship, i)) planFallFrom(ship, i, orbit);
     return orbit;
@@ -635,7 +666,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     if (phase.kind !== "orbit") return undefined;
     const [rp, ra] = apsides(phase.body, phase);
     const reference = orbitReference(ship, k, phase, rp, ra);
-    return anchoredOrbit(phase.body, rp, ra, ship.starts[k]!, ship.ends[k]!, reference, undefined, sizeSchedule(ship, k, phase));
+    return anchoredOrbit(phase.body, rp, ra, ship.starts[k]!, ship.ends[k]!, reference, undefined, sizeSchedule(ship, k, phase), phaseMu(phase, rp, ra));
   }
 
   /**
@@ -675,6 +706,35 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     }
     const direction = rotateAxis(vec3(), normalize(vec3(), rOther), normal, (ahead ? 1 : -1) * Math.acos(c));
     return { t, direction, normal, trueAnomaly: 0 };
+  }
+
+  /**
+   * A lunar orbit after liftoff with no published insertion fix: in the
+   * lunar orbit plane, at the orbit's low point, an illustrative distance
+   * downrange of the site (LUNAR_DOWNRANGE_FRACTION). When the phase has a
+   * published end fix, the start is then moved along the orbit so that an
+   * orbit of the published size reaches that fix on time (as far as
+   * LIFTOFF_SHIFT_LIMIT), which keeps the orbit's own speed: where it
+   * starts is still our illustration, not a published place.
+   */
+  function lunarLiftoffReference(ship: ShipState, i: number, phase: OrbitPhase, rp: number, ra: number): OrbitReference {
+    const ascent = ship.plan.phases[i - 1] as AscentPhase;
+    const liftoff = ship.starts[i - 1]!;
+    const t0 = ship.starts[i]!;
+    const t1 = ship.ends[i]!;
+    const normal = lunarNormal(phase.sense.value);
+    const site = siteDirection("moon", ascent.site);
+    rotateY(site, site, sky.moonLongitude(liftoff));
+    const onPlane = normalize(vec3(), addScaled(vec3(), site, normal, -dot(site, normal)));
+    const speed = Math.sqrt(MOON_GM_KM3_PER_S2 / rp);
+    const downrange = (LUNAR_DOWNRANGE_FRACTION * speed * (t0 - liftoff)) / rp;
+    const reference: OrbitReference = { t: t0, direction: rotateAxis(vec3(), onPlane, normal, downrange), normal, trueAnomaly: 0 };
+    if (!phase.endFix) return reference;
+    const natural = anchoredOrbit("moon", rp, ra, t0, t1, reference, undefined, sizeSchedule(ship, i, phase), phaseMu(phase, rp, ra)).inertialPosition(t1, vec3());
+    const wanted = moonFixDirection(phase.endFix, t1);
+    const shift = Math.atan2(dot(cross(vec3(), natural, wanted), normal), dot(natural, wanted));
+    if (Math.abs(shift) > LIFTOFF_SHIFT_LIMIT) return reference;
+    return { ...reference, direction: rotateAxis(vec3(), reference.direction, normal, shift) };
   }
 
   /* ---------------- orbit planes from the launch site ---------------- */
@@ -773,6 +833,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     schedule: SizeSchedule | undefined,
   ): Vec3 {
     const { target: targetId, range } = phase.endRange!;
+    const ahead = phase.endRange!.side === "ahead";
     const body = phase.body;
     const target = shipById(targetId);
     const k = phaseIndexAt(target, t1);
@@ -782,15 +843,16 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const up = normalize(vec3(), rt);
     const normal = normalize(vec3(), cross(vec3(), rt, vt));
     const d = range.value * NM;
-    let radius = length(anchoredOrbit(body, rp, ra, t0, t1, reference, undefined, schedule).inertialPosition(t1, vec3()));
+    const gm = phaseMu(phase, rp, ra);
+    let radius = length(anchoredOrbit(body, rp, ra, t0, t1, reference, undefined, schedule, gm).inertialPosition(t1, vec3()));
     const direction = vec3();
     for (let pass = 0; pass < 4; pass++) {
       const c = (radius * radius + targetRadius * targetRadius - d * d) / (2 * radius * targetRadius);
       if (!(c <= 1 && c >= -1)) {
         throw new Error(`${ship.plan.id} phase ${i} (${phase.label}): the end range cannot be reached`);
       }
-      rotateAxis(direction, up, normal, -Math.acos(c));
-      const aimed = anchoredOrbit(body, rp, ra, t0, t1, reference, direction, schedule);
+      rotateAxis(direction, up, normal, (ahead ? 1 : -1) * Math.acos(c));
+      const aimed = anchoredOrbit(body, rp, ra, t0, t1, reference, direction, schedule, gm);
       radius = length(aimed.inertialPosition(t1, vec3()));
     }
     return direction;
@@ -888,15 +950,58 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
    * Where the previous phase leaves off, in Earth's inertial frame: after a
    * burn, the position before the burn at its middle (as coasts do).
    */
-  function departure(ship: ShipState, i: number): { r: Vec3; t: number } {
+  function departure(ship: ShipState, i: number): { r: Vec3; v: Vec3; t: number } {
     const phases = ship.plan.phases;
     if (i >= 2 && phases[i - 1]!.kind === "burn") {
       const t = (ship.starts[i - 1]! + ship.ends[i - 1]!) / 2;
-      return { r: bodyInertialState(sky, "earth", segment(ship, i - 2), t).r, t };
+      return { ...bodyInertialState(sky, "earth", segment(ship, i - 2), t), t };
     }
     if (i === 0) throw new Error(`${where(ship, i)}: a transfer without an Earth fix needs a phase before it`);
     const t = ship.starts[i]!;
-    return { r: bodyInertialState(sky, "earth", segment(ship, i - 1), t).r, t };
+    return { ...bodyInertialState(sky, "earth", segment(ship, i - 1), t), t };
+  }
+
+  /**
+   * The time in (t0, end) at which to join a leg that leaves a burn at
+   * `start` (with the velocity it had before the burn) to the lunar conic
+   * (`pointAt`), so that its Lambert arc needs the least change of velocity.
+   * A coarse scan, then a golden-section search around the best.
+   */
+  function leastChangeJoin(
+    start: { r: Vec3; v: Vec3; t: number },
+    t0: number,
+    end: number,
+    pointAt: (t: number) => Vec3,
+    sense: Sense,
+  ): number {
+    const change = (tj: number): number => {
+      const r2 = pointAt(tj);
+      const { v1 } = solveLambert(start.r, r2, tj - start.t, EARTH_GM_KM3_PER_S2, earthShortWay(start.r, r2, sense));
+      const d = length(sub(vec3(), v1, start.v));
+      return Number.isFinite(d) ? d : Infinity;
+    };
+    const lo = t0 + 0.02 * (end - t0);
+    const hi = end - 0.02 * (end - t0);
+    const n = 24;
+    let best = 0;
+    let bestValue = Infinity;
+    for (let k = 0; k <= n; k++) {
+      const value = change(lo + ((hi - lo) * k) / n);
+      if (value < bestValue) {
+        bestValue = value;
+        best = k;
+      }
+    }
+    let a = lo + ((hi - lo) * Math.max(0, best - 1)) / n;
+    let b = lo + ((hi - lo) * Math.min(n, best + 1)) / n;
+    const g = (Math.sqrt(5) - 1) / 2;
+    for (let k = 0; k < 30; k++) {
+      const c = b - g * (b - a);
+      const d = a + g * (b - a);
+      if (change(c) < change(d)) b = d;
+      else a = c;
+    }
+    return (a + b) / 2;
   }
 
   /** Lambert's short or long way for a coast about Earth in the given direction of travel. */
@@ -949,23 +1054,43 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     if (!Number.isFinite(patchTime) || !Number.isFinite(farTime) || !Number.isFinite(nearTime)) {
       throw new Error(`${where(ship, i)}: the lunar conic does not reach the patch distance`);
     }
-    const patch = add(vec3(), sky.moonCenterInertial(patchTime, vec3()), moonConic.position(patchTime, vec3()));
+
+    // A transfer that starts at a burn inside the cross-fade (a midcourse
+    // burn between FAR and NEAR) starts wholly on the conic that leaves
+    // from the burn, its Earth conic outbound or its lunar conic home, and
+    // fades from there into the other. Otherwise it would start part way
+    // toward the other conic, away from where the burn was, and the burn
+    // would bridge the gap with a sideways jog. The patch point may then be
+    // just ahead of the burn or behind it, so the conics are joined
+    // elsewhere in the shorter fade: outbound, where the Earth conic leaves
+    // the burn with the least change of velocity (the burn then looks no
+    // bigger than the two published paths need); home, at the patch point
+    // when it is still ahead, otherwise halfway through the fade.
+    const afterBurn = ship.plan.phases[i - 1]?.kind === "burn";
+    const inFade = afterBurn && (outbound ? t0 > farTime && t0 < nearTime : t0 > nearTime && t0 < farTime);
+    const fadeFar = inFade && outbound ? t0 : farTime;
+    const fadeNear = inFade && !outbound ? t0 : nearTime;
+    const pointAt = (t: number) => add(vec3(), sky.moonCenterInertial(t, vec3()), moonConic.position(t, vec3()));
+    let joinTime = patchTime;
+    if (inFade && outbound && !earthFix) joinTime = leastChangeJoin(departure(ship, i), t0, nearTime, pointAt, phase.earthSense.value);
+    else if (inFade && !outbound && patchTime <= t0) joinTime = (t0 + farTime) / 2;
+    const join = pointAt(joinTime);
 
     let earthConic: Conic;
     if (earthFix || outbound) {
       // The Earth conic: Lambert arc between the Earth fix (or, after a
       // midcourse burn, where the burn was) and the patch point.
       const start = earthFix ? { r: earthFixInertial(earthFix, tE), t: tE } : departure(ship, i);
-      const [r1, r2, ta, tb] = outbound ? [start.r, patch, start.t, patchTime] : [patch, start.r, patchTime, start.t];
+      const [r1, r2, ta, tb] = outbound ? [start.r, join, start.t, joinTime] : [join, start.r, joinTime, start.t];
       const { v1 } = solveLambert(r1, r2, tb - ta, EARTH_GM_KM3_PER_S2, earthShortWay(r1, r2, phase.earthSense.value));
       earthConic = Conic.fromState(r1, v1, EARTH_GM_KM3_PER_S2, ta);
     } else {
       // Leaving the Moon before a midcourse burn: carried on about Earth
       // from the patch point with the lunar conic's velocity there.
-      const v = add(vec3(), moonVelocity(patchTime), moonConic.velocity(patchTime, vec3()));
-      earthConic = Conic.fromState(patch, v, EARTH_GM_KM3_PER_S2, patchTime);
+      const v = add(vec3(), moonVelocity(joinTime), moonConic.velocity(joinTime, vec3()));
+      earthConic = Conic.fromState(join, v, EARTH_GM_KM3_PER_S2, joinTime);
     }
-    return new TransferBlend(sky, earthConic, moonConic, t0, t1, farTime, nearTime);
+    return new TransferBlend(sky, earthConic, moonConic, t0, t1, fadeFar, fadeNear);
   }
 
   /** True when phase i is followed by a burn and then a coast that ends at a full published Earth state. */
@@ -1181,7 +1306,8 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const t1 = ship.ends[i]!;
     const tMid = (ship.starts[i + 1]! + ship.ends[i + 1]!) / 2;
     const target = fallTarget(ship, i);
-    let orbit = anchoredOrbit("earth", rp, ra, t0, t1, reference, undefined, schedule);
+    const gm = phaseMu(ship.plan.phases[i] as OrbitPhase, rp, ra);
+    let orbit = anchoredOrbit("earth", rp, ra, t0, t1, reference, undefined, schedule, gm);
     for (let pass = 0; pass < 3; pass++) {
       const r = orbit.inertialPosition(tMid, vec3());
       const normal = orbit.normalAt(tMid, vec3());
@@ -1189,7 +1315,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
       const entry = rotateAxis(vec3(), target.splash, plane, -ENTRY_ARC_RAD);
       const fall = planFall(ship, i, target, length(r), plane, { entry });
       const start = fall.conic.position(t1, vec3());
-      orbit = anchoredOrbit("earth", rp, ra, t0, t1, reference, normalize(start, start), schedule);
+      orbit = anchoredOrbit("earth", rp, ra, t0, t1, reference, normalize(start, start), schedule, gm);
     }
     return orbit;
   }

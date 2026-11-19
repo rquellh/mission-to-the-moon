@@ -231,3 +231,61 @@ describe("A spent stage set loose and kept on station (the Apollo 7 pattern)", (
     assert.ok((Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!) * EARTH_MEAN_RADIUS_KM) / NAUTICAL_MILE_KM > 5);
   });
 });
+
+describe("Two ships that stay near each other for hours (Gemini 6A and 7 overnight)", () => {
+  // After station keeping the chaser drifts off on an orbit 2 n mi higher
+  // at apogee than the target's. Run on the periods their sizes imply, the
+  // pair would be far apart by morning. A radar range at a published time
+  // (endRange, ahead) and the published periods keep them together.
+  const RADAR = 50_000;
+  const MORNING = END;
+  function night(pinned: boolean): FlightPlan {
+    const flight = plan({ latitude: fake(0), longitude: fake(0) });
+    const chaser = flight.ships[0];
+    const upToStation = chaser.phases.slice(0, 7) as Phase[];
+    const apart = { kind: "orbit" as const, body: "earth" as const, apoapsis: fake(164), periapsis: fake(160), sense: fake<"prograde">("prograde") };
+    const period = pinned ? { period: fake(90.57) } : {};
+    const night: Phase[] = [
+      ...upToStation,
+      pinned
+        ? { ...apart, ...period, label: "Apart", start: clock(DEPART), end: clock(RADAR), endRange: { target: "target", range: fake(17.63), side: "ahead" as const } }
+        : { ...apart, label: "Apart", start: clock(DEPART), end: clock(RADAR) },
+      { ...apart, ...period, label: "Apart, later", start: clock(RADAR), end: clock(MORNING) },
+    ];
+    chaser.phases = night as [Phase, ...Phase[]];
+    const targetShip = flight.ships[1]!;
+    const target = targetShip.phases[0] as Extract<Phase, { kind: "orbit" }>;
+    targetShip.phases = [{ ...target, ...period }];
+    return flight;
+  }
+
+  it("drift far apart when each runs on the period its own size implies", () => {
+    const path = buildFlightPath(night(false));
+    assert.ok(rangeNm(path, MORNING) > 60, `${rangeNm(path, MORNING).toFixed(0)} n mi apart by morning`);
+  });
+
+  it("stay together with a published range and published periods", () => {
+    const flight = night(true);
+    const path = buildFlightPath(flight);
+    const problems = pathProblems(flight, path);
+    assert.equal(problems.length, 0, problems.slice(0, 8).join("\n"));
+    assert.ok(Math.abs(rangeNm(path, RADAR) - 17.63) < 0.05, `range ${rangeNm(path, RADAR).toFixed(2)} n mi at the radar time`);
+    for (let t = RADAR; t <= MORNING; t += 600) {
+      const r = rangeNm(path, t);
+      assert.ok(r > 10 && r < 30, `${r.toFixed(1)} n mi apart at ${t}`);
+    }
+    // Ahead: along the target's direction of travel.
+    const dir = [0, 0, 0];
+    path.direction("target", RADAR, 1, dir);
+    const c = pos(path, "chaser", RADAR);
+    const t = pos(path, "target", RADAR);
+    assert.ok((c[0]! - t[0]!) * dir[0]! + (c[1]! - t[1]!) * dir[1]! + (c[2]! - t[2]!) * dir[2]! > 0);
+  });
+
+  it("goes around in the published period", () => {
+    const path = buildFlightPath(night(true));
+    const k = night(true).ships[0].phases.findIndex((p) => p.label === "Apart, later");
+    const seg = path.report.segment("chaser", k) as AnchoredOrbit;
+    assert.ok(Math.abs(seg.conic.period / 60 - 90.57) < 1e-9, `period ${(seg.conic.period / 60).toFixed(4)} min`);
+  });
+});

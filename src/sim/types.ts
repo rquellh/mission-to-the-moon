@@ -157,6 +157,11 @@ export type RelativeStart =
  *   from the launch site, `inclination`, and the ascent's `azimuth`, and
  *   the insertion point is placed downrange by an illustrative distance
  *   (see build.ts). A published insertion fix with a heading always wins.
+ * - Right after a lunar `ascent`, with no start fix: insertion at the
+ *   orbit's low point in the lunar orbit plane, placed so that an orbit of
+ *   the published size reaches the phase's `endFix` on time (or, with no
+ *   end fix, an illustrative distance downrange of the site). Where it
+ *   starts is an illustration; a published insertion fix always wins.
  * - Otherwise it continues from the previous phase (after a burn, from the
  *   orbit before the burn).
  *
@@ -204,12 +209,32 @@ export interface OrbitPhase extends PhaseBase {
   /** Where the craft is at the end of the phase. */
   endFix?: Fix | LunarFix;
   /**
-   * Instead of `endFix`: the craft's distance (nautical miles) to another
-   * ship at the phase end, trailing it along its orbit, as published for a
-   * rendezvous at terminal phase initiation. The end of the phase is pinned
-   * to that point in the other ship's orbit plane.
+   * Instead of `endFix`: the craft's distance (nautical miles, in a
+   * straight line) to another ship at the phase end, trailing it along its
+   * orbit (`side: "ahead"` for leading it), as published for a rendezvous at
+   * terminal phase initiation or by radar while two ships flew near each
+   * other. The end of the phase is pinned to that point in the other ship's
+   * orbit plane. For a distance published in the middle of a long stretch,
+   * split the orbit phase at that moment (two phases of the same size
+   * follow on with no burn) and give the first one the `endRange`.
+   *
+   * Two ships that stayed near each other for hours (Gemini 6A and 7
+   * overnight, Apollo 7 and its spent stage) drift apart when each runs at
+   * the period its own published size implies, since a small error in size
+   * adds up revolution after revolution. Pin them with `endRange` wherever
+   * a distance is published, and give both ships their published `period`.
    */
-  endRange?: { target: string; range: Cited<number> };
+  endRange?: { target: string; range: Cited<number>; side?: "behind" | "ahead" };
+  /**
+   * The published orbital period, minutes. The craft then goes around in
+   * that time instead of the time its published size implies (the shape
+   * stays the published size); Earth's bulge adds its small, steady effect
+   * on top, the same for every orbit of about that size and inclination.
+   * Give it to both of two ships flying near each other, so that what pulls
+   * them apart is the published difference in period, not a rounding of
+   * their heights. With `sizes`, it applies to the size at the phase start.
+   */
+  period?: Cited<number>;
   /** Start from another ship's position at the phase start (undocking). */
   from?: string;
   /**
@@ -469,10 +494,25 @@ export interface SkySample {
  * did, so the site lies exactly under it only at `time`; the default time,
  * the middle of the stay on the surface, keeps it close at both landing and
  * liftoff (about 1 degree for a three-day stay at 26 degrees north).
- * Published plane changes are not drawn.
+ * Published plane changes are not drawn, so over a long stay in lunar orbit
+ * the published longitudes can need larger corrections than on the equator.
+ *
+ * A flight that never lands (Apollo 8, Apollo 10) can use it too: give as
+ * `site` a published point the spacecraft passed over (the latitude and
+ * longitude of a trajectory table row) and as `time` the moment it was
+ * there (required when there is no stay on the surface). Only the point's
+ * direction is used, not its altitude. Give `heading` only if the source
+ * measures it from lunar north; headings measured from a space-fixed north
+ * do not apply. Without one, the plane is the one in which that point is
+ * the orbit's farthest from the equator, the lowest inclination that
+ * reaches it: an illustration, so say so in the plan.
  */
 export interface LunarOrbitPlane {
-  /** The site the orbits pass over, usually the landing site (selenographic latitude and east longitude). */
+  /**
+   * The site the orbits pass over (selenographic latitude and east
+   * longitude): usually the landing site, or for a flight that never lands
+   * a published point under the orbit.
+   */
   site: { latitude: Cited<number>; longitude: Cited<number> };
   /**
    * Direction of travel over the site, degrees east of north (Apollo's
@@ -481,7 +521,10 @@ export interface LunarOrbitPlane {
    * from the equator: the lowest inclination that reaches it.
    */
   heading?: Cited<number>;
-  /** When the orbit passes over the site. Defaults to the middle of the first stay on the lunar surface. */
+  /**
+   * When the orbit passes over the site. Defaults to the middle of the first
+   * stay on the lunar surface; required for a flight that never lands.
+   */
   time?: Cited<ElapsedTime>;
 }
 

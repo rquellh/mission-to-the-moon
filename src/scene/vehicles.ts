@@ -5,6 +5,7 @@ import {
   CanvasTexture,
   CircleGeometry,
   Color,
+  CatmullRomCurve3,
   CylinderGeometry,
   DoubleSide,
   Float32BufferAttribute,
@@ -19,6 +20,7 @@ import {
   SphereGeometry,
   Sprite,
   SpriteMaterial,
+  TubeGeometry,
   Vector3,
   BoxGeometry,
   type Material,
@@ -651,7 +653,10 @@ function parachutes(kit: Kit, name: 'drogue-parachutes' | 'main-parachutes'): Gr
 interface WalkerLook {
   suit: MeshStandardMaterial;
   visor: MeshStandardMaterial;
-  tether: LineBasicMaterial;
+  tether: MeshStandardMaterial;
+  /** The open hatchway, dark, and the hatch door standing open (Apollo). */
+  opening: MeshStandardMaterial;
+  door: MeshStandardMaterial;
 }
 
 /**
@@ -685,35 +690,36 @@ function walkerFigure(kit: Kit, look: WalkerLook): Group {
  * `hatch`. The gap is an illustration: far less than a real tether's
  * length, so the figure stays near the craft on screen.
  */
-function spacewalker(kit: Kit, at: Vector3, hatch: Vector3, lean: number): Group {
-  const look: WalkerLook = {
-    suit: new MeshStandardMaterial({ color: 0xf1f1ee, roughness: 0.7, transparent: true }),
-    visor: new MeshStandardMaterial({ color: 0xd8a63a, roughness: 0.25, metalness: 0.6, transparent: true }),
-    tether: new LineBasicMaterial({ color: 0xe0c27a, transparent: true, opacity: 0.9 }),
-  };
+function spacewalker(kit: Kit, at: Vector3, hatch: Vector3, lean: number, extra: (look: WalkerLook) => Object3D[] = () => []): Group {
+  const look = walkerLook();
   const figure = walkerFigure(kit, look);
   figure.position.copy(at);
   figure.rotation.set(lean, 0.6, -lean * 0.5);
-  // The tether: a gentle curve from the hatch to the waist.
+  // The tether: a gentle curve from the hatch to the waist, as a thin tube
+  // (several times thicker than the real one, so it reads when the ship
+  // view draws the craft close up).
   const waist = at.clone();
   const middle = hatch.clone().add(waist).multiplyScalar(0.5).add(new Vector3(0, -0.5, 0.4));
-  const points: number[] = [];
-  let last = hatch.clone();
-  for (let i = 1; i <= 16; i += 1) {
-    const u = i / 16;
-    const p = hatch
-      .clone()
-      .multiplyScalar((1 - u) * (1 - u))
-      .addScaledVector(middle, 2 * u * (1 - u))
-      .addScaledVector(waist, u * u);
-    points.push(last.x, last.y, last.z, p.x, p.y, p.z);
-    last = p;
+  const key = `tether:${hatch.toArray().join(',')}:${at.toArray().join(',')}`;
+  let tube = kit.geometries.get(key);
+  if (!tube) {
+    tube = new TubeGeometry(new CatmullRomCurve3([hatch.clone(), middle, waist]), 24, 0.045, 6, false);
+    kit.geometries.set(key, tube);
   }
-  const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new Float32BufferAttribute(points, 3));
-  const group = part('spacewalker', figure, new LineSegments(geometry, look.tether));
+  const group = part('spacewalker', figure, mesh(tube, look.tether), ...extra(look));
   group.userData['look'] = look;
   return group;
+}
+
+/** A spacewalker's own materials (they fade in and out with it). */
+function walkerLook(): WalkerLook {
+  return {
+    suit: new MeshStandardMaterial({ color: 0xf1f1ee, roughness: 0.7, transparent: true }),
+    visor: new MeshStandardMaterial({ color: 0xd8a63a, roughness: 0.25, metalness: 0.6, transparent: true }),
+    tether: new MeshStandardMaterial({ color: 0xe6cf8e, roughness: 0.6, transparent: true }),
+    opening: new MeshStandardMaterial({ color: 0x15171b, roughness: 0.9, transparent: true }),
+    door: new MeshStandardMaterial({ color: 0xc9ced5, roughness: 0.5, metalness: 0.2, transparent: true, side: DoubleSide }),
+  };
 }
 
 /* ---------------- Gemini, origin at the adapter's aft face, nose toward +Y ---------------- */
@@ -792,17 +798,22 @@ function geminiHatch(kit: Kit, side: -1 | 1): Group {
   const center = side * HATCH.offset;
   const { half, y0, y1 } = HATCH;
   const rim = 0.04;
+  const frame = mesh(
+    conePatch(kit, cabinRadius(y0 - rim) + 0.012, cabinRadius(y1 + rim) + 0.012, y0 - rim, y1 + rim, center - half - rim, 2 * (half + rim)),
+    kit.hatchRim,
+  );
   const panel = new Group();
   panel.add(
-    mesh(
-      conePatch(kit, cabinRadius(y0 - rim) + 0.012, cabinRadius(y1 + rim) + 0.012, y0 - rim, y1 + rim, center - half - rim, 2 * (half + rim)),
-      kit.hatchRim,
-    ),
     mesh(conePatch(kit, cabinRadius(y0) + 0.022, cabinRadius(y1) + 0.022, y0, y1, center - half, 2 * half), kit.hatch),
     // The window, toward the nose.
     mesh(conePatch(kit, cabinRadius(3.0) + 0.03, cabinRadius(3.85) + 0.03, 3.0, 3.85, center - 0.17, 0.34), kit.window),
   );
-  if (side < 0) return panel;
+  if (side < 0) {
+    panel.add(frame);
+    return panel;
+  }
+  // The hatchway, dark, seen when the hatch stands open.
+  const opening = mesh(conePatch(kit, cabinRadius(y0) + 0.017, cabinRadius(y1) + 0.017, y0, y1, center - half, 2 * half), kit.dark);
   // The hinge: the hatch's outer edge, from its aft corner to its forward corner.
   const edge = center + half + rim;
   const from = new Vector3(Math.sin(edge) * cabinRadius(y0), y0, Math.cos(edge) * cabinRadius(y0));
@@ -812,7 +823,9 @@ function geminiHatch(kit: Kit, side: -1 | 1): Group {
   panel.position.copy(from).negate();
   hinge.add(panel);
   hinge.userData['axis'] = to.sub(from).normalize();
-  return hinge;
+  const group = new Group();
+  group.add(frame, opening, hinge);
+  return group;
 }
 
 function geminiReentryModule(kit: Kit): Group {
@@ -1099,7 +1112,19 @@ function stackAssembly(kit: Kit): Group {
 
 /** A spacewalker by an Apollo service module, on a tether from the command module's side hatch (service module coordinates). */
 function apolloSpacewalker(kit: Kit): Group {
-  return spacewalker(kit, new Vector3(0.6, 2.4, 3.6), new Vector3(0, CSM.smTop + 1.2, 1.4), 0.25);
+  // The side hatch: a dark opening on the command module's cone, and the
+  // door swung open beside it (NASA photo S71-43202 shows the open hatch
+  // with the tether coming out of it). Size and place are approximate.
+  const y0 = CSM.smTop + 0.75;
+  const y1 = CSM.smTop + 1.6;
+  const radius = (y: number): number => 1.95 - ((y - CSM.smTop - 0.25) / (CSM.cmTop - CSM.smTop - 0.25)) * (1.95 - 0.42);
+  const hatch = (look: WalkerLook): Object3D[] => {
+    const opening = mesh(conePatch(kit, radius(y0) + 0.02, radius(y1) + 0.02, y0, y1, -0.3, 0.6), look.opening);
+    const door = mesh(box(kit, 0.04, 0.85, 0.75), look.door, Math.sin(0.3) * radius(y0) + 0.38, (y0 + y1) / 2, Math.cos(0.3) * radius(y0) + 0.32);
+    door.rotation.set(0.45, 0.8, 0);
+    return [opening, door];
+  };
+  return spacewalker(kit, new Vector3(0.6, 2.4, 3.6), new Vector3(0, (y0 + y1) / 2, radius((y0 + y1) / 2)), 0.25, hatch);
 }
 
 /** Both service modules (whole and damaged; the change's parts pick one), the command module, and a spacewalker. */
@@ -1346,6 +1371,8 @@ interface Shape {
   largest: number;
   /** Farthest the model reaches from the pivot, in meters. */
   reach: number;
+  /** The same with a spacewalker included, for drawing the craft close up. */
+  fullReach: number;
   /** Parts of the shape before that are not dropped at this change, because another ship takes them over or they are left behind. */
   keptElsewhere: ReadonlySet<VehiclePart>;
   /** Which end its dropped parts drift away from, once known (see ShipModel.dropSide). */
@@ -1398,6 +1425,11 @@ function kindOf(layout: VehicleLayout, parts: readonly VehiclePart[]): Kind {
   if (serviceModule) return 'sm';
   if (has('third-stage')) return 'stage';
   return 'none';
+}
+
+/** True when a change lists any part of the lunar module. */
+function hasLunarModule(change: VehicleChange): boolean {
+  return change.parts.some((name) => LUNAR_MODULE_PARTS.has(name));
 }
 
 /** Report a vehicle file problem once, while developing (it does not stop the scene). */
@@ -1517,6 +1549,8 @@ export interface PoseContext {
   metersPerPixel: number;
   /** How visible the model is, 0 to 1 (it fades out while many orbits pass in a moment; see stage.ts). */
   opacity: number;
+  /** How bright the glow behind it is, 0 to 1 (dimmed when the model is drawn close up). */
+  glow: number;
 }
 
 /**
@@ -1707,6 +1741,9 @@ export class ShipModel {
           child.userData['restScale'] = child.scale.x;
         }
       });
+      if (kind === 'stack' && change.layout === 'docked-on-stage' && !hasLunarModule(change)) {
+        warnOnce(`${shipId} at "${change.label}": "docked-on-stage" needs the lunar module's parts; for a flight without one, use "transposition".`);
+      }
       for (const name of change.parts) {
         if (kind !== 'none' && !parts.has(name)) {
           warnOnce(`${shipId} at "${change.label}": the ${kind} shape (layout "${change.layout}") cannot show "${name}"; it is left out.`);
@@ -1785,6 +1822,7 @@ export class ShipModel {
         high: max - pivot,
         keptElsewhere,
         ...this.capSizes(group, change, kind, pivot),
+        fullReach: sizeOf(group, this.visibleParts(kind, change), pivot).reach,
       });
     }
   }
@@ -1833,7 +1871,7 @@ export class ShipModel {
   private anchorOf(kind: Kind, change: VehicleChange, group: Group, pivot: number): number | undefined {
     const has = (name: VehiclePart): boolean => change.parts.includes(name);
     if (has('command-module')) {
-      if (kind === 'stack') return this.stackCmBase(change.layout, 1) - pivot;
+      if (kind === 'stack') return this.stackCmBase(change.layout, 1, hasLunarModule(change)) - pivot;
       if (kind === 'cm') return 0;
       return (axisPoint(group, 'command-module', CSM.smTop) ?? CSM.smTop) - pivot;
     }
@@ -1863,20 +1901,26 @@ export class ShipModel {
   }
 
   /** Where the command module's base is in stack coordinates, for a layout at transposition progress p. */
-  private stackCmBase(layout: VehicleLayout, p: number): number {
+  private stackCmBase(layout: VehicleLayout, p: number, docks = true): number {
     if (layout === 'launch') return STACK.csmBase + CSM.smTop;
-    const { center, angle } = this.transposition(layout === 'transposition' ? p : 1);
+    const { center, angle } = this.transposition(layout === 'transposition' ? p : 1, docks);
     return center + Math.cos(angle) * (CSM.smTop - CSM.center);
   }
 
-  /** The command and service module's middle (stack coordinates) and pitch during transposition, for progress p. */
-  private transposition(p: number): { center: number; angle: number } {
+  /**
+   * The command and service module's middle (stack coordinates) and pitch
+   * during transposition, for progress p: it backs off, turns around, and
+   * closes in to dock with the lunar module. With nothing to dock to
+   * (`docks` false: Apollo 8, which carried no lunar module), it stays
+   * backed off, turned to face the stage.
+   */
+  private transposition(p: number, docks = true): { center: number; angle: number } {
     const start = STACK.csmBase + CSM.center;
     const apart = start + TRANSPOSITION_APART;
     const docked = STACK.lmBase + LM.tunnelTop + (CSM.tunnelTop - CSM.center);
     let center: number;
     if (p < 0.3) center = start + (apart - start) * ease(p / 0.3);
-    else if (p < 0.7) center = apart;
+    else if (p < 0.7 || !docks) center = apart;
     else center = apart + (docked - apart) * ease((p - 0.7) / 0.3);
     return { center, angle: Math.PI * ease((p - 0.3) / 0.4) };
   }
@@ -1942,6 +1986,17 @@ export class ShipModel {
     if (shape.kind === 'lm') return { axis: 'up', sign: 1, distance: Math.max(0, shape.high) };
     const sign = shape.facingEnd;
     return { axis: 'forward', sign, distance: Math.max(0, sign > 0 ? shape.high : -shape.low) };
+  }
+
+  /** True when a shape has a spacewalker out. */
+  hasWalker(index: number): boolean {
+    return this.shapes[index]?.change.parts.includes('spacewalker') ?? false;
+  }
+
+  /** Meters per CSS pixel at which a shape, spacewalker included, reaches `pixels` from its point on the path. */
+  closeUpMetersPerPixel(index: number, pixels: number): number {
+    const shape = this.shapes[index];
+    return shape && pixels > 0 ? shape.fullReach / pixels : 0;
   }
 
   /** Meters per CSS pixel that shape would be drawn at in this context (0 when it cannot be drawn). */
@@ -2106,7 +2161,7 @@ export class ShipModel {
     this.halo.visible = true;
     this.fader.set(context.opacity);
     this.fade = Math.min(1, context.opacity);
-    (this.halo.material as SpriteMaterial).opacity = this.haloOpacity * Math.min(1, context.opacity);
+    (this.halo.material as SpriteMaterial).opacity = this.haloOpacity * Math.min(1, context.opacity) * context.glow;
 
     const previous = index > 0 ? this.shapes[index - 1] : undefined;
     const since = (context.storyTime - context.toStory(shape.time)) / DROP_STORY_SECONDS;
@@ -2244,7 +2299,7 @@ export class ShipModel {
           const b = context.toStory(next.time);
           p = b > a ? (context.storyTime - a) / (b - a) : 1;
         }
-        const { center, angle } = this.transposition(Math.min(1, Math.max(0, p)));
+        const { center, angle } = this.transposition(Math.min(1, Math.max(0, p)), hasLunarModule(shape.change));
         csm.position.y = center;
         csm.rotation.x = angle;
       }
@@ -2278,11 +2333,9 @@ export class ShipModel {
       walker.visible = level > 0.01;
       const look = walker.userData['look'] as WalkerLook | undefined;
       if (look) {
-        look.suit.opacity = level;
-        look.visor.opacity = level;
-        look.tether.opacity = 0.9 * level;
         const opaque = level > 0.995;
-        for (const material of [look.suit, look.visor]) {
+        for (const material of [look.suit, look.visor, look.tether, look.opening, look.door]) {
+          material.opacity = level;
           if (material.depthWrite !== opaque) material.depthWrite = opaque;
         }
       }
@@ -2376,9 +2429,7 @@ export class ShipModel {
     (this.halo.material as SpriteMaterial).dispose();
     for (const group of this.groups) {
       for (const look of this.walkerLooks(group)) {
-        look.suit.dispose();
-        look.visor.dispose();
-        look.tether.dispose();
+        for (const material of [look.suit, look.visor, look.tether, look.opening, look.door]) material.dispose();
       }
     }
   }

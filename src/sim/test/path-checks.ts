@@ -220,7 +220,55 @@ export function endProblems(plan: FlightPlan, path: FlightPath): string[] {
   return problems;
 }
 
+/**
+ * No phase where the ship travels several times farther than its speed on
+ * either side allows. A blend between two paths that do not meet (a burn
+ * bridging a gap) stays continuous, so the continuity checks miss it, but
+ * the ship then jogs sideways: Apollo 13's second midcourse burn once moved
+ * it 366 km in 34 seconds at about 1 km/s. The ship's speed just before and
+ * just after a phase bounds how far it can go in it, give or take changes
+ * of speed inside the phase: a factor of 3 leaves room for those (a lunar
+ * orbit's low point, a flyby between two midcourse burns) and catches jogs.
+ */
+export function stretchProblems(plan: FlightPlan, path: FlightPath, factor = 3): string[] {
+  const problems: string[] = [];
+  for (const ship of plan.ships) {
+    const track = path.ships.find((s) => s.id === ship.id);
+    if (!track) continue;
+    for (const mix of [0, 1]) {
+      const speed = (a: number, b: number) => dist(pos(path, ship.id, a, mix), pos(path, ship.id, b, mix)) / (b - a);
+      for (const phase of ship.phases) {
+        const t0 = elapsedToSeconds(phase.start.value);
+        const t1 = elapsedToSeconds(phase.end.value);
+        const before = t0 - 1 >= track.start ? speed(t0 - 1, t0) : speed(t0, t0 + 1);
+        const after = t1 + 1 <= track.end ? speed(t1, t1 + 1) : speed(t1 - 1, t1);
+        const steps = Math.max(50, Math.min(2000, Math.ceil((t1 - t0) / 10)));
+        let traveled = 0;
+        let prev = pos(path, ship.id, t0, mix);
+        for (let k = 1; k <= steps; k++) {
+          const p = pos(path, ship.id, t0 + ((t1 - t0) * k) / steps, mix);
+          traveled += dist(prev, p);
+          prev = p;
+        }
+        const allowed = factor * Math.max(before, after) * (t1 - t0) + 1e-6;
+        if (traveled > allowed) {
+          problems.push(
+            `${ship.id} travels ${(traveled / allowed * factor).toFixed(1)} times as far as its speed allows in ${phase.label} (${phase.start.value} to ${phase.end.value}), mix ${mix}`,
+          );
+        }
+      }
+    }
+  }
+  return problems;
+}
+
 /** All of the above. */
 export function pathProblems(plan: FlightPlan, path: FlightPath): string[] {
-  return [...phaseProblems(plan, path), ...continuityProblems(plan, path), ...surfaceProblems(plan, path), ...endProblems(plan, path)];
+  return [
+    ...phaseProblems(plan, path),
+    ...continuityProblems(plan, path),
+    ...surfaceProblems(plan, path),
+    ...endProblems(plan, path),
+    ...stretchProblems(plan, path),
+  ];
 }

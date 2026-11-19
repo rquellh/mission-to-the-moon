@@ -149,6 +149,7 @@ function showModels(): void {
     reducedMotion: false,
     metersPerPixel: 1,
     opacity: 1,
+    glow: 1,
   };
   const site = params.get('site') === '1';
   const poses = changes.map((c) => {
