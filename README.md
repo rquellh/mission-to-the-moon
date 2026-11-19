@@ -13,7 +13,7 @@ How it works:
 - **Tour** steps through a mission's key moments, or **Explore** lets you roam.
 - Press play, or drag the timeline, to fly the mission. The clock shows real mission time. The trip is paced so every stretch between events is watchable, instead of days of coasting. When a spacecraft circles many times between two events, the view switches to a calm fast forward: the model fades and its orbit shows as a bright ring.
 - Each event has a short card, a longer "Tell me more", a NASA photo where there is one, and its sources. A few cards carry a real NASA recording of the moment, with every word written out beside the player.
-- Under the missions are things to try and explore: drop a rocket's stages at the right moment, dock a Gemini with its Agena target, turn the Moon to find the six landing sites, and stand the three rockets side by side. A liftoff or docking card offers the matching one with a "Try it" button.
+- Under the missions are things to try and explore: drop a rocket's stages at the right moment, dock a Gemini with its Agena target, turn the Moon to find the six landing sites, stand the three rockets side by side, and fill a book of the crews' mission patches, which appear in color as you open each flight (the book is kept on your own device). A liftoff or docking card offers the matching one with a "Try it" button.
 - The view buttons choose what the camera follows: **Earth** and **Ship** for every mission, plus **Moon** and **Both** for flights to the Moon. **True scale** shows real distances and orbit heights.
 - Drag (or swipe) to turn the view, and scroll (or pinch) to zoom. With the 3D view focused, the arrow keys turn the view and + and - zoom.
 
@@ -24,7 +24,7 @@ A link can open a mission at a moment and a view, for example `?mission=apollo-1
 - `view` is `earth`, `moon`, `spacecraft`, or `journey`.
 - `start=tour` or `start=explore` skips the mission list.
 - `event` opens a mission paused at one of its events, by the event's id.
-- `extra` opens one of the extras: `stages`, `docking`, `landing-sites`, or `rockets`.
+- `extra` opens one of the extras: `stages`, `docking`, `patches`, `landing-sites`, or `rockets`.
 
 ### What is real and what is drawn
 
