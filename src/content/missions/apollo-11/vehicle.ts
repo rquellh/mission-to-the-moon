@@ -1,7 +1,7 @@
 /**
  * How the Apollo 11 vehicle changed shape during the flight, for the 3D
  * models. Each entry is a cited moment from which one ship of the flight
- * path ("csm" or "lm", see apollo-11-flight.ts) is made of the listed
+ * path ("csm" or "lm", see flight.ts) is made of the listed
  * parts, until that ship's next entry. The scene draws simplified models
  * from these; it does not show any of this as text.
  *
@@ -23,8 +23,8 @@
  *   model switches from the drogues to the main parachutes there, and the
  *   site does not state it as a fact.
  */
-import type { Citation, Cited, ElapsedTime } from "../types";
-import type { LeftBehind, VehicleChange, VehiclePart } from "../vehicle-types";
+import type { Citation, Cited, ElapsedTime } from "../../types.ts";
+import type { LeftBehind, VehicleChange, VehiclePart } from "../../vehicle-types.ts";
 
 /* ------------------------------------------------------------------ */
 /* Citation helpers.                                                   */
@@ -80,7 +80,7 @@ const SPACECRAFT: readonly VehiclePart[] = ["adapter", ...LUNAR_MODULE, ...CSM];
 /* The changes, in time order for each ship.                           */
 /* ------------------------------------------------------------------ */
 
-export const apollo11Vehicle: readonly VehicleChange[] = [
+export const vehicle: readonly VehicleChange[] = [
   {
     ship: "csm",
     at: at("000:00:00.63", timeline("Liftoff (umbilical disconnected) (1.07 g).")),
@@ -219,7 +219,7 @@ export const apollo11Vehicle: readonly VehicleChange[] = [
 ];
 
 /** Parts that stay behind. */
-export const apollo11LeftBehind: readonly LeftBehind[] = [
+export const leftBehind: readonly LeftBehind[] = [
   {
     part: "lm-descent-stage",
     ship: "lm",

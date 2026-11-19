@@ -5,7 +5,7 @@
  */
 import { it } from "node:test";
 import assert from "node:assert/strict";
-import { apollo11Flight } from "../../content/missions/apollo-11-flight.ts";
+import { flight as apollo11Flight } from "../../content/missions/apollo-11/flight.ts";
 import {
   EARTH_MEAN_RADIUS_KM,
   EARTH_MOON_DISTANCE,

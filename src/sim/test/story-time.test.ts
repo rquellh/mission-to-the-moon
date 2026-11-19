@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { apollo11Flight } from "../../content/missions/apollo-11-flight.ts";
+import { flight as apollo11Flight } from "../../content/missions/apollo-11/flight.ts";
 import { elapsedToSeconds } from "../../content/types.ts";
 import { createStoryTime, storyIntervalLength } from "../story-time.ts";
 

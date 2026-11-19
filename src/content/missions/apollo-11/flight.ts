@@ -17,8 +17,8 @@
  * degrees of the lunar equator) are not used: the model draws lunar orbits
  * in the Moon's equatorial plane.
  */
-import type { Citation, Cited, ElapsedTime } from "../types";
-import type { FlightPlan } from "../../sim/types";
+import type { Citation, Cited, ElapsedTime } from "../../types.ts";
+import type { FlightPlan } from "../../../sim/types.ts";
 
 /* ------------------------------------------------------------------ */
 /* Citation helpers.                                                   */
@@ -139,7 +139,7 @@ const CSM_ORBIT_AFTER_SEPARATION = {
   periapsis: cite(56.0, lunarOrbitTable("CSM/LM separation cutoff")),
 };
 
-export const apollo11Flight: FlightPlan = {
+export const flight: FlightPlan = {
   missionId: "apollo-11",
 
   moonReferenceRadius: cite(937.14, {

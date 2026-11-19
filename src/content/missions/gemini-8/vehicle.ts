@@ -1,7 +1,7 @@
 /**
  * How the Gemini VIII vehicles changed shape and turned during the flight,
  * for the 3D models. Each entry is a cited moment from which one ship of
- * the flight path ("gemini" or "agena", see gemini-8-flight.ts) is made of
+ * the flight path ("gemini" or "agena", see flight.ts) is made of
  * the listed parts, faces the listed way, and turns as listed, until that
  * ship's next entry. The scene draws simplified models from these; it does
  * not show any of this as text (no time, rate, or attitude here is shown
@@ -13,7 +13,7 @@
  * Atlas-Agena Target Vehicle Sequence of Events"), and a few from the
  * report's text, named in each citation. Table 4.2-II prints the Agena's
  * times in seconds from its own lift-off; on the mission clock they are
- * those seconds minus 6059.262, our arithmetic (see gemini-8-flight.ts).
+ * those seconds minus 6059.262, our arithmetic (see flight.ts).
  *
  * Which way the craft point:
  * - The Agena is drawn with its docking cone forward throughout. The report
@@ -34,7 +34,7 @@
  * - The retrograde section: the report says it was jettisoned after
  *   retrofire (section 7.1.2.11, page 7-22) but prints no time. The model
  *   drops it at 010:05:38.9, thirty seconds after the last retrorocket
- *   burned out (gemini-8-flight.ts, RETROFIRE_END). That time is ours.
+ *   burned out (flight.ts, RETROFIRE_END). That time is ours.
  * - The roll while docked: the report gives bounds, not a rate (section
  *   5.1.5, page 5-26: above 10 degrees per second for about 100 seconds in
  *   all, never above 20). The model turns the docked pair at a steady 10
@@ -56,8 +56,8 @@
  * Sizes and shapes (src/scene/vehicles.ts) are approximate and for drawing
  * only; the site does not state any of them.
  */
-import type { Citation, Cited, ElapsedTime } from "../types";
-import type { LeftBehind, VehicleChange, VehicleMotion, VehiclePart } from "../vehicle-types";
+import type { Citation, Cited, ElapsedTime } from "../../types.ts";
+import type { LeftBehind, VehicleChange, VehicleMotion, VehiclePart } from "../../vehicle-types.ts";
 
 /* ------------------------------------------------------------------ */
 /* Citation helpers.                                                   */
@@ -157,7 +157,7 @@ const DOCKED: readonly VehiclePart[] = [...GEMINI, "agena"];
 /* The changes, in time order for each ship.                           */
 /* ------------------------------------------------------------------ */
 
-export const gemini8Vehicle: readonly VehicleChange[] = [
+export const vehicle: readonly VehicleChange[] = [
   /* The Agena on its Atlas. */
   {
     ship: "agena",
@@ -337,4 +337,4 @@ export const gemini8Vehicle: readonly VehicleChange[] = [
 ];
 
 /** Nothing of Gemini VIII stays anywhere the scene draws. */
-export const gemini8LeftBehind: readonly LeftBehind[] = [];
+export const leftBehind: readonly LeftBehind[] = [];

@@ -91,8 +91,8 @@
  * - After landing, the spacecraft is drawn floating at the landing point
  *   until the crew boarded the recovery ship; its drift is not drawn.
  */
-import type { Citation, Cited, ElapsedTime } from "../types";
-import type { FlightPlan, StateFix } from "../../sim/types";
+import type { Citation, Cited, ElapsedTime } from "../../types.ts";
+import type { FlightPlan, StateFix } from "../../../sim/types.ts";
 
 /* ------------------------------------------------------------------ */
 /* Citation helpers.                                                   */
@@ -324,7 +324,7 @@ function padEstimate(vehicle: "Gemini" | "Agena", pad: string): [Citation, ...Ci
 /* The plan.                                                           */
 /* ------------------------------------------------------------------ */
 
-export const gemini8Flight: FlightPlan = {
+export const flight: FlightPlan = {
   missionId: "gemini-8",
 
   // The sky is fit at the Agena's lift-off, Gemini VIII's lift-off, and

@@ -1,15 +1,16 @@
 /**
  * The shape of the site's mission content.
  *
- * Each mission is one file that exports a `Mission`. Because the content is
- * type-checked, the build fails if a fact has no citation or cites a source
- * that is not in the registry (sources.ts). That is how the site keeps its
- * first rule: every fact is cited.
+ * Each mission is a folder under missions/. Its story.ts exports a
+ * `Mission`, and its summary.ts a `MissionSummary` for the mission list.
+ * Because the content is type-checked, the build fails if a fact has no
+ * citation or cites a source that is not in the registry (sources.ts). That
+ * is how the site keeps its first rule: every fact is cited.
  *
  * The flight path (orbits, burns, landing and splashdown points) is described
  * separately, by the flight plan types in src/sim/.
  */
-import type { SourceId } from "./sources";
+import type { SourceId } from "./sources.ts";
 
 /** Where a fact comes from: a registered source and the exact place in it. */
 export interface Citation {
@@ -167,4 +168,47 @@ export interface Mission {
   /** In order of elapsed time. Empty for a memorial. */
   events: MissionEvent[];
   whereNow?: Cited<Exhibit>[];
+}
+
+/**
+ * What the mission list shows before a mission is opened. It loads with the
+ * page, so it stays small; everything else about a mission loads on demand.
+ * Each value repeats one from the mission's story (a test checks they match).
+ */
+export interface MissionSummary {
+  /** The mission's folder name, for example "apollo-11". */
+  id: string;
+  program: Program;
+  /** For example "Apollo 11". */
+  name: string;
+  /** "memorial" is for Apollo 1, which has a page of remembrance and no flight. */
+  kind: "flight" | "memorial";
+  /** Flights only: the same as the story's destination. */
+  destination?: "earth-orbit" | "moon";
+  /** The short level of the story's summary, word for word. */
+  blurb: string;
+  /** Launch, universal time as ISO 8601. For a memorial, the day it remembers. */
+  date: string;
+  /** Flights only: the same as the story's duration. */
+  duration?: ElapsedTime;
+  /** True when the story has tour stops. */
+  hasTour: boolean;
+  /** "draft" keeps an unfinished mission out of the published list. */
+  status: "ready" | "draft";
+}
+
+/** A page of remembrance for a crew that did not fly (Apollo 1). */
+export interface Memorial {
+  /** The folder name, for example "apollo-1". */
+  id: string;
+  program: Program;
+  /** For example "Apollo 1". */
+  name: string;
+  summary: Fact;
+  crew: Cited<CrewMember[]>;
+  /** The day it remembers, as an ISO 8601 date. */
+  date: Cited<string>;
+  /** The story in reading order, for example what happened and what changed afterward. */
+  sections: { title: string; facts: Fact[] }[];
+  photo?: Photo;
 }

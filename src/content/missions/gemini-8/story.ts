@@ -39,7 +39,7 @@
  * The flight path itself (orbits, burns, splashdown point) is described in
  * src/sim/, not here.
  */
-import type { Citation, Mission, Photo } from "../types";
+import type { Citation, Mission, Photo } from "../../types.ts";
 
 /* ------------------------------------------------------------------ */
 /* Source pages                                                        */
@@ -142,7 +142,7 @@ const NMC_HOUR_EARLY =
 /* The mission                                                         */
 /* ------------------------------------------------------------------ */
 
-export const gemini8: Mission = {
+export const story: Mission = {
   id: "gemini-8",
   program: "gemini",
   name: "Gemini 8",

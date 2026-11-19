@@ -21,7 +21,7 @@
  * The flight path itself (orbits, burns, landing and splashdown points) is
  * described in src/sim/, not here.
  */
-import type { Citation, Mission, Photo } from "../types";
+import type { Citation, Mission, Photo } from "../../types.ts";
 
 /* ------------------------------------------------------------------ */
 /* Source pages                                                        */
@@ -114,7 +114,7 @@ const NMC_DIFFERS = "NSSDCA's Master Catalog page for the Apollo 11";
 /* The mission                                                         */
 /* ------------------------------------------------------------------ */
 
-export const apollo11: Mission = {
+export const story: Mission = {
   id: "apollo-11",
   program: "apollo",
   name: "Apollo 11",

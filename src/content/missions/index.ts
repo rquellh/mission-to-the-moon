@@ -1,34 +1,19 @@
 /**
  * Every mission on the site, in flight order. Add each new mission here.
  *
- * A mission is made of three files: its story (events, crew, sources), its
- * flight plan (the published points the path is computed from), and its
- * spacecraft shapes. A bundle holds the three together.
+ * A mission is a folder: its story (events, crew, sources), its flight plan
+ * (the published points the path is computed from), its spacecraft shapes,
+ * and its own sources. Its index.ts bundles the first three together.
  */
-import type { FlightPlan } from "../../sim/types";
-import type { Mission } from "../types";
-import { apollo11 } from "./apollo-11";
-import { apollo11Flight } from "./apollo-11-flight";
-import { apollo11LeftBehind, apollo11Vehicle } from "./apollo-11-vehicle";
-import { gemini8 } from "./gemini-8";
-import { gemini8Flight } from "./gemini-8-flight";
-import { gemini8LeftBehind, gemini8Vehicle } from "./gemini-8-vehicle";
-import type { LeftBehind, VehicleChange } from "../vehicle-types";
+import type { Mission } from "../types.ts";
+import { bundle as apollo11Bundle } from "./apollo-11/index.ts";
+import { bundle as gemini8Bundle } from "./gemini-8/index.ts";
+import type { MissionBundle } from "./bundle.ts";
 
-export interface MissionBundle {
-  mission: Mission;
-  flight: FlightPlan;
-  /** Cited moments at which each ship changes shape. */
-  vehicle: readonly VehicleChange[];
-  /** Cited parts that stay where they came to rest. */
-  leftBehind: readonly LeftBehind[];
-}
+export type { MissionBundle } from "./bundle.ts";
 
 /** In flight order. */
-export const bundles: readonly MissionBundle[] = [
-  { mission: gemini8, flight: gemini8Flight, vehicle: gemini8Vehicle, leftBehind: gemini8LeftBehind },
-  { mission: apollo11, flight: apollo11Flight, vehicle: apollo11Vehicle, leftBehind: apollo11LeftBehind },
-];
+export const bundles: readonly MissionBundle[] = [gemini8Bundle, apollo11Bundle];
 
 /** Every mission's story, in flight order. */
 export const missions: readonly Mission[] = bundles.map((bundle) => bundle.mission);
@@ -43,5 +28,3 @@ export function bundleFor(id: string | null | undefined): MissionBundle {
   if (!found && !fallback) throw new Error("No missions are registered");
   return (found ?? fallback)!;
 }
-
-export { apollo11 };

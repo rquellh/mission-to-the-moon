@@ -7,7 +7,7 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { gemini8Flight } from "../../content/missions/gemini-8-flight.ts";
+import { flight as gemini8Flight } from "../../content/missions/gemini-8/flight.ts";
 import {
   EARTH_AXIAL_TILT_RAD,
   EARTH_EQUATORIAL_RADIUS_KM,

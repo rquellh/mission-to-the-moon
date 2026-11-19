@@ -5,7 +5,7 @@
  * vehicle turns. The 3D scene draws simplified models from these.
  *
  * Every time is `Cited`, so the type checker rejects an uncited change. A
- * mission's file (for example missions/apollo-11-vehicle.ts) says which
+ * mission's file (for example missions/apollo-11/vehicle.ts) says which
  * sources it follows.
  */
 import type { Cited, ElapsedTime } from "./types";
