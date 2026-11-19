@@ -25,8 +25,8 @@
  * Universal times are given only where a source states them. The report's
  * own summary prints the two lift-offs an hour earlier in e.s.t. than its
  * G.m.t. times allow; we use the G.m.t. times (see the launch discrepancy).
- * The retrofire UTC is NSSDCA's 9:45:49 p.m. EST plus five hours, our
- * arithmetic.
+ * The retrofire UTC is printed in the report itself (section 6.1.4, page
+ * 6-11, "02:45:49 G.m.t.").
  *
  * Unit conversions in the text (nautical miles to miles and kilometers, feet
  * to meters, feet per second to inches and centimeters per second, degrees
@@ -399,18 +399,23 @@ export const story: Mission = {
         short:
           "Over Texas, Armstrong fires the thrusters for the first of nine maneuvers that will bring Gemini 8 to the Agena.",
         more:
-          "This first firing, 1 hour 34 minutes 36 seconds after liftoff, lowered the high point of Gemini 8's orbit slightly, from 147 to 145.5 nautical miles. In the next hour and a half the crew made three more changes: a push to speed up and raise the orbit's low point, a sideways push to move into the same plane as the Agena's orbit, and a small fine-tuning push.",
+          "This first firing, 1 hour 34 minutes 36 seconds after liftoff, lowered the high point of Gemini 8's orbit slightly, from 146.7 to 144.7 nautical miles (about 169 to 167 miles, or 272 to 268 kilometers). In the next hour and a half the crew made three more changes: a push to speed up and raise the orbit's low point, a sideways push to move into the same plane as the Agena's orbit, and a small fine-tuning push.",
       },
       citations: [
         sequence("Height-adjust maneuver", "4-11"),
         sequence("Phase-adjust maneuver", "4-11"),
         sequence("Plane-change maneuver", "4-11"),
         sequence("Vernier-height-adjust maneuver", "4-11"),
+        {
+          source: "gemini-8-mission-report",
+          locator:
+            'Table 4.3-II, "Comparison of Spacecraft Orbital Elements Before and After Maneuvers" (page 4-24), height adjust (NH1), "Apogee, n. mi." row, actual final columns: 146.7 before the maneuver, 144.7 after',
+        },
         report("4.1, \"Actual Mission\"", "4-2"),
         report("1.0, \"Mission Summary\"", "1-2"),
       ],
       discrepancy:
-        "Section 4.1 of the mission report gives this firing as 1:34:37, which is the planned time in Table 4.2-I. We follow the table's actual time, 01:34:36.",
+        "Section 4.1 of the mission report gives this firing as 1:34:37, which is the planned time in Table 4.2-I. We follow the table's actual time, 01:34:36. Section 4.1 also says it lowered the apogee from 147 to 145.5 nautical miles; Table 4.3-II prints 146.4 to 145.5 in its preliminary columns and 146.7 to 144.7 in its final columns. We follow the final values, which the flight path uses too.",
       view: "earth",
     },
     {
@@ -420,7 +425,7 @@ export const story: Mission = {
       elapsed: "003:27:48",
       text: {
         short:
-          "Gemini 8's radar picks up the Agena, still about 208 miles (335 kilometers) ahead. Now the crew can measure how far away it is and how fast they are closing in.",
+          "Gemini 8's radar starts to pick up the Agena, on and off at first. A few minutes later it locks on, about 208 miles (335 kilometers) away, and the crew can measure how far away the Agena is and how fast they are closing in.",
         more:
           "The radar first caught the Agena on and off 3 hours 27 minutes 48 seconds after liftoff, and locked on solidly about three and a half minutes later, at a range of 181 nautical miles. At 3 hours 48 minutes 10 seconds, on the third revolution, the crew fired the thrusters to put Gemini 8 into an orbit that ran almost parallel to the Agena's, 13.5 to 14.7 nautical miles (about 16 to 17 miles, or 25 to 27 kilometers) below it.",
       },
@@ -442,17 +447,17 @@ export const story: Mission = {
     },
     {
       id: "agena-in-sight",
-      title: "The Agena comes into view",
+      title: "No doubt: it is the Agena",
       chapter: "chase",
       elapsed: "004:40:00",
       text: {
         short:
-          "Armstrong spots the Agena shining in the sunlight far ahead. Soon there is no doubt: it is a very bright cylinder.",
+          "The crew has been watching a speck of light far ahead. Now they can tell for sure that it is the Agena, a very bright cylinder shining in the sunlight.",
         more:
-          "Armstrong first saw the Agena in reflected sunlight about 76 nautical miles (about 87 miles, or 141 kilometers) away. By 4 hours 40 minutes after liftoff, he could clearly see it as a very bright, cylinder-shaped object. When Gemini 8 passed into Earth's shadow, the crew kept the Agena in view by its acquisition lights, which looked about as bright as a faint star.",
+          "Armstrong had first seen the Agena earlier, in reflected sunlight, about 76 nautical miles (about 87 miles, or 141 kilometers) away. At 4 hours 40 minutes after liftoff, at a range of 55 nautical miles (about 63 miles, or 102 kilometers), the crew could definitely identify it as a very bright, cylinder-shaped object. When Gemini 8 passed into Earth's shadow, the crew kept the Agena in view by its acquisition lights, which looked about as bright as a faint star.",
       },
       citations: [
-        report("7.2.2.2.5, \"Vision\": \"At 4 hours 40 minutes ground elapsed time (g.e.t.), the GATV was definitely identified\" (time given to the minute; seconds written as 00)", "7-33"),
+        report("7.2.2.2.5, \"Vision\": \"At 4 hours 40 minutes ground elapsed time (g.e.t.), the GATV was definitely identified as a very bright, cylindrical object at a range of 55 miles.\" (time given to the minute; seconds written as 00. This section gives the first sighting as \"approximately 76 miles\", which section 4.1 gives as 76 nautical miles, so we read its miles as nautical miles)", "7-33"),
         report("7.1.2.16, \"Visual sightings\"", "7-25 and 7-26"),
         report("4.1, \"Actual Mission\": \"optical contact at 76 nautical miles\"", "4-3"),
         wildRide("\"OK we've got a visual on the Agena at 76 miles\""),
@@ -506,7 +511,7 @@ export const story: Mission = {
         report("1.0, \"Mission Summary\"", "1-2"),
         titans("311"),
       ],
-      discrepancy: `The mission report's summary and the Gemini chronology's March 16 entry say the rendezvous ended at 5 hours 58 minutes; ${NMC_HOUR_EARLY} gives 4:39 p.m. EST, an hour earlier than the mission report's times allow. We follow section 7.1.1.2.3 of the mission report, which gives 5:56:56.`,
+      discrepancy: `The mission report's summary and the Gemini chronology's March 16 entry say the rendezvous ended at 5 hours 58 minutes; ${NMC_HOUR_EARLY} gives 4:39 p.m. EST, an hour earlier than the mission report's times allow. The report's trajectory section (4.3.1.2.1, page 4-19) says that "By 5:55:00 g.e.t., the spacecraft was about 150 feet from the GATV and the crew was station keeping"; the flight path uses that time for the spacecraft's arrival beside the Agena. We follow section 7.1.1.2.3 of the mission report, which gives 5:56:56 for the start of station keeping, as the spacecraft's drawn turn to blunt end forward does.`,
       photo: nasaPhoto(
         "S66-25782",
         1600,
@@ -539,7 +544,7 @@ export const story: Mission = {
         titans("311 and 312"),
         nasaMission("Photo caption: \"the first-ever linking of two spacecraft together in Earth orbit\""),
       ],
-      discrepancy: `Appendix 1 (Table B) of the Gemini chronology gives docking as 6:33:22, the time the mission report's Table 4.2-I lists for rigidizing; ${NMC_HOUR_EARLY} gives 5:14 p.m. EST, an hour earlier than the mission report's time allows. We follow Table 4.2-I, 06:33:16. For the closing speed, On the Shoulders of Titans gives 8 centimeters (3 inches) per second and NASA's 55-years article one foot per second; we follow the mission report's summary, about three-fourths of a foot per second at contact.`,
+      discrepancy: `Appendix 1 (Table B) of the Gemini chronology gives docking as 6:33:22, the time the mission report's Table 4.2-I lists for rigidizing. The mission report's own section 4.1 (page 4-3: "Docking was successfully completed ... at 6:33:22 g.e.t.") and summary (section 1.0, page 1-2: "The docking sequence was completed at 6:33:22 ground elapsed time, with the two vehicles rigidized together") also give 6:33:22, as the time docking was completed. ${NMC_HOUR_EARLY} gives 5:14 p.m. EST, an hour earlier than the mission report's time allows. We follow Table 4.2-I, 06:33:16. For the closing speed, On the Shoulders of Titans gives 8 centimeters (3 inches) per second and NASA's 55-years article one foot per second; we follow the mission report's summary, about three-fourths of a foot per second at contact.`,
       photo: nasaPhoto(
         "s66-25784",
         1600,
@@ -605,17 +610,19 @@ export const story: Mission = {
         short:
           "Without the heavy Agena attached, Gemini 8 spins faster and faster, close to a full turn every second. The astronauts' vision starts to blur.",
         more:
-          "The stuck thruster kept firing. At 7 hours 15 minutes 44.7 seconds, power to Gemini 8's control electronics was cut by accident, so the hand controllers stopped working, and over the next three minutes the roll rate climbed to 296 degrees per second. When Gemini 8 came within range of the tracking ship Coastal Sentry Quebec, Scott reported, \"We have serious problems here. We're tumbling end over end.\" The astronauts were dizzy and their vision was blurred.",
+          "The stuck thruster kept firing. At 7 hours 15 minutes 44.7 seconds, power to Gemini 8's control electronics was cut by accident, so the hand controllers stopped working, and over the next three minutes the roll rate climbed to 296 degrees per second. When Gemini 8 came within range of the tracking ship Coastal Sentry Quebec, Scott reported, \"We have serious problems here ... we're tumbling end over end up here. We're disengaged from the Agena.\" The astronauts were dizzy and their vision was blurred.",
       },
       citations: [
         report("5.1.5, \"Guidance and Control System\"", "5-26"),
         report("7.1.1.4, \"Control systems\"", "7-8"),
+        titans("314: \"Scott: We have serious problems here ... we're tumbling end over end up here. We're disengaged from the Agena.\" (its note 65 cites the \"Gemini VIII Voice\" transcript and the \"Air-Ground Playback Briefing\")"),
         fiftyFive("\"We have serious problems here. We're tumbling end over end.\""),
+        wildRide("\"We have serious problems here,\" Scott said. \"We're tumbling end over end. We're disengaged from the Agena.\""),
         wildRide("\"As the spin rate approached one revolution per second, the astronauts' vision became blurred.\""),
         titans("314 and 315"),
       ],
       discrepancy:
-        "The mission report's summary gives about 300 degrees per second. NASA's Gemini VIII page and NSSDCA say the rate approached and possibly exceeded one revolution per second, and the Smithsonian's Gemini VIII page, On the Shoulders of Titans, and NASA's 55-years article give one revolution per second (360 degrees per second). We follow the mission report's control system analysis (section 5.1.5), 296 degrees per second.",
+        "The mission report's summary gives about 300 degrees per second. NASA's Gemini VIII page and NSSDCA say the rate approached and possibly exceeded one revolution per second, and the Smithsonian's Gemini VIII page, On the Shoulders of Titans, and NASA's 55-years article give one revolution per second (360 degrees per second). We follow the mission report's control system analysis (section 5.1.5), 296 degrees per second. Scott's call is quoted as On the Shoulders of Titans prints it (page 314; its note cites the Gemini VIII voice transcript). NASA's 55-years article gives \"We have serious problems here. We're tumbling end over end.\", and NASA's \"Wild Ride\" article splits it into two quotes, \"We have serious problems here,\" and \"We're tumbling end over end. We're disengaged from the Agena.\"",
       view: "spacecraft",
       inTour: true,
     },
@@ -685,8 +692,9 @@ export const story: Mission = {
         report("1.0, \"Mission Summary\"", "1-3"),
         report("4.1, \"Actual Mission\"", "4-5"),
         report("7.1.2.11, \"Retrofire\"", "7-22"),
+        report("6.1.4, \"Reentry\": \"Retrofire occurred on time at 02:45:49 G.m.t. (10:04:47 g.e.t.) March 17, 1966.\"", "6-11"),
         chronologyTable("A", "G.E.T. to retrofire row"),
-        nmc("gemini", "Mission Profile (retrofire at 9:45:49 p.m. EST; UTC is our conversion) and Reentry"),
+        nmc("gemini", "Mission Profile (retrofire at 9:45:49 p.m. EST) and Reentry"),
         recovery("02:45 G.m.t. / 10:04 g.e.t.", "Spacecraft retrofire"),
         fiftyFive("\"fired their spacecraft's retrorockets in the darkness over south-central Africa\""),
       ],
@@ -729,24 +737,27 @@ export const story: Mission = {
         short:
           "Gemini 8 lands in the western Pacific Ocean, 10 hours 41 minutes after liftoff. It was supposed to stay up for three days.",
         more:
-          "The spacecraft came down in a backup landing area about 500 miles (800 kilometers) east of Okinawa, less than 7 nautical miles from the planned point. It was 10:22 p.m. Eastern Standard Time, but daytime where Gemini 8 landed. Three Air Force pararescuemen jumped from a rescue plane and, fighting rough seas, attached a flotation collar within 45 minutes while the astronauts waited inside.",
+          "The spacecraft came down in a backup landing area about 500 miles (800 kilometers) east of Okinawa, less than 7 nautical miles from the planned point. It was 10:22 p.m. Eastern Standard Time, but daytime where Gemini 8 landed. Three Air Force pararescuemen jumped from a rescue plane and, fighting rough seas, attached a flotation collar within 45 minutes while the astronauts waited inside with the hatches closed. Only once the collar was on did the crew open the hatches to wait for the recovery ship, as in the photo.",
       },
       citations: [
         sequence("Landing", "4-11"),
         report("1.0, \"Mission Summary\"", "1-1 and 1-3"),
         report("4.1, \"Actual Mission\"", "4-4 and 4-5"),
+        report("7.1.1.6, \"Landing and recovery\": \"Subsequent to attachment of the flotation collar, the hatches were opened and the crew became more comfortable as they awaited pickup by the destroyer\"", "7-11"),
         nasaMission("Mission Facts: \"Landing Date: Mar. 16, 1966, 10:22:28 p.m. EST (Mar. 17, 1966, 03:22:28 UT)\""),
         nmc("gemini", "Mission Profile"),
+        chronologyTable("A", "Landing coordinates (Lat, Long) and Landing accuracy rows"),
         titans("318 and 319"),
         wildRide("\"three U.S. Air Force pararescuers jumped from an aircraft into the sea\""),
+        wildRide("\"Splashdown occurred within two miles of the predicted impact point\""),
       ],
       discrepancy:
-        "The mission report says Gemini 8 landed less than 7 nautical miles from the planned point; Appendix 1 of the Gemini chronology gives 1.1 nautical miles, NSSDCA 2 km, and NASA's 55-years article 1.6 miles. NSSDCA also places the landing about 800 km west of Okinawa, where the mission report and On the Shoulders of Titans say east. The pilots' report (section 7.1.2.13) says the collar was not secured and the hatches opened until about 1 hour 15 minutes after landing. We follow the mission report's sections 1.0 and 4.1.",
+        "The mission report says Gemini 8 landed less than 7 nautical miles from the planned point; Appendix 1 (Table A) of the Gemini chronology gives 1.1 nautical miles, NSSDCA 2 km, NASA's 55-years article 1.6 miles, and NASA's \"Wild Ride\" article \"within two miles of the predicted impact point\". The chronology's Table A gives the landing point as 25 degrees 13'08\" N, 136 degrees E; the flight path uses the mission report's 25 degrees 12 minutes N, 136 degrees 5 minutes E (Table 4.3-I). NSSDCA also places the landing about 800 km west of Okinawa, where the mission report and On the Shoulders of Titans say east. The pilots' report (section 7.1.2.13, page 7-23) says the collar was not secured and the hatches opened until about 1 hour 15 minutes after landing. We follow the mission report's sections 1.0 and 4.1.",
       photo: nasaPhoto(
         "s66-18602",
         1600,
         1600,
-        "Seen from above, Gemini 8 floats in deep blue water inside a yellow flotation collar with both hatches open. Armstrong and Scott sit inside in white spacesuits while three rescue swimmers hold on to the spacecraft, and a yellow raft floats alongside.",
+        "Some time after splashdown, waiting for the recovery ship: seen from above, Gemini 8 floats in deep blue water inside a yellow flotation collar with both hatches open. Armstrong and Scott sit inside in white spacesuits while three rescue swimmers hold on to the spacecraft, and a yellow raft floats alongside.",
       ),
       view: "earth",
       inTour: true,

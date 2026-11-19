@@ -39,17 +39,18 @@
  *   (1 foot = 0.3048 m, 1 nautical mile = 1852 m).
  * - The landing point is printed in degrees and minutes; we write it in
  *   decimal degrees.
- * - The launch pads: the report does not print where they are, and we found
- *   no NASA or Smithsonian page that does, so each is our estimate from the
- *   report's first-stage cutoff point, its range from the launch site, and
- *   the flight azimuth (see "Launch pads" below). Good to about 2 km.
+ * - The launch pads: we did not find their coordinates in the report, so
+ *   each is our estimate from the report's first-stage cutoff point, its
+ *   range from the launch site, and the flight azimuth. How it was made, and
+ *   its limits, are under "Launch pads" below.
  *
  * Readings of ours (the report does not say):
  * - The reentry state at 400,000 feet (Table 5.1.5-VIII) comes from the
  *   onboard computer. We read its latitude as geocentric: in the same
  *   table, at guidance termination the computer prints latitude 25.08 with
  *   1.39 nautical miles to go to the target, which was at 25 degrees 15
- *   minutes north (page 6-27); only a geocentric 25.08 (25.23 on a map)
+ *   minutes north (Table 4.3-I, page 4-23, planned landing point; section
+ *   6.3.2, page 6-32, the aiming point); only a geocentric 25.08 (25.23 on a map)
  *   fits that, and Figure 5.1.5-16 plots that point at about 25.23. We read
  *   its velocity, flight-path angle, and heading as measured against the
  *   turning Earth: so read, the path through that state peaks at 298 km,
@@ -62,8 +63,10 @@
  *   each burn (a smooth blend from one orbit to the next), the closing-in
  *   after terminal phase initiation (the crew's two corrections and the
  *   braking are not drawn one by one; the path blends from the spacecraft's
- *   own orbit into the Agena's position, arriving when the report says the
- *   crew was keeping station 150 feet away), and the entry (a smooth ground
+ *   own orbit into the Agena's position, arriving at 5:55:00, by which time
+ *   section 4.3.1.2.1 puts the spacecraft about 150 feet from the Agena;
+ *   the start of station keeping, 5:56:56 in section 7.1.1.2.3, is the time
+ *   the story and vehicle.ts use), and the entry (a smooth ground
  *   track to the landing point and a smooth descent to the drogue parachute
  *   height).
  * - Orbits are Kepler ellipses turned slowly by Earth's bulge (J2); air drag
@@ -100,8 +103,10 @@ import type { FlightPlan, StateFix } from "../../../sim/types.ts";
 
 const MISSION_REPORT =
   "https://web.archive.org/web/20250908153858/https://www.nasa.gov/wp-content/uploads/static/history/alsj/43455667-Gemini-Program-Mission-Report-Gemini-Viii.pdf";
-const HORIZONS =
-  "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27&TLIST_TYPE=%27CAL%27&TLIST=%271966-03-16%2015:00:03.127%27,%271966-03-16%2016:41:02.389%27,%271966-03-17%2003:22:28.389%27";
+/** The Horizons query for each sky table, at the times below (printed by tools/sky.mjs). */
+const HORIZONS_TIMES = "&TLIST_TYPE=%27CAL%27&TLIST=%271966-03-16%2015:00:03.127%27,%271966-03-16%2016:41:02.389%27,%271966-03-17%2003:22:28.389%27";
+const HORIZONS_QUERY = (command: string, center: string, quantities: string): string =>
+  `https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27${command}%27&CENTER=%27${center}%27&QUANTITIES=%27${quantities}%27&OBJ_DATA=%27NO%27&CSV_FORMAT=%27YES%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27${HORIZONS_TIMES}`;
 
 function cite<T>(value: T, citation: Citation, ...more: Citation[]): Cited<T> {
   return { value, citations: [citation, ...more] };
@@ -148,11 +153,14 @@ const reentryState = (row: string): Citation =>
 /** Table 5.1.8-V, retrograde rocket system. */
 const retrorockets = (row: string): Citation =>
   report(`Table 5.1.8-V, "Retrograde Rocket System" (page 5-97), ${row}`);
-const horizons = (target: string, quantity: string, time: string): Citation => ({
+const horizons = (target: string, quantity: string, time: string, url: string): Citation => ({
   source: "jpl-horizons",
   locator: `Observer table, ${target}, ${quantity}, ${time} UT`,
-  url: HORIZONS,
+  url,
 });
+const MOON_FROM_EARTH = HORIZONS_QUERY("301", "500@399", "31");
+const EARTH_FROM_MOON = HORIZONS_QUERY("399", "500@301", "14");
+const SUN_FROM_EARTH = HORIZONS_QUERY("10", "500@399", "31");
 
 /* ------------------------------------------------------------------ */
 /* The Agena's clock.                                                  */
@@ -283,13 +291,30 @@ const AGENA_INSERTION = agenaClock(560.4, agenaLaunch("Insertion", "Time from li
 /* ------------------------------------------------------------------ */
 
 /*
- * The report does not print where the pads are, and we found no NASA or
- * Smithsonian page that does. Each pad is our estimate from printed values:
+ * We did not find the pads' coordinates in the mission report (a search of
+ * its text found none), so each pad is our estimate from printed values.
+ *
+ * How it was made: on a sphere (1 nautical mile per arc minute), the pad is
  * the point from which a great circle leaving at the published flight
- * azimuth reaches the first-stage cutoff (BECO) point after its published
- * "range from launch site" (on a sphere, 1 nautical mile per arc minute),
- * rounded to 0.01 degree. Good to about 2 km, which is far below what the
- * scene can show. src/sim/test/gemini-8.test.ts recomputes both.
+ * azimuth (99.9 degrees for Gemini, 84.36 for the Agena, section 4.1)
+ * reaches the published first-stage cutoff (BECO) point after the
+ * published BECO range (Tables 4.3-I and 4.3-V), rounded to 0.01 degree.
+ * src/sim/test/gemini-8.test.ts recomputes both.
+ *
+ * Its limits:
+ * - It assumes the rocket held one heading from the pad to BECO. It did
+ *   not: the tables print a different heading at each point of the climb
+ *   (and those are space-fixed headings, not the Earth-fixed azimuth), so
+ *   the real ground track was not one great circle. How far that moves the
+ *   estimate is not known.
+ * - It reads the tables' "Range" as the distance along the ground from the
+ *   pad, measured on a sphere; the report does not say how range is
+ *   measured.
+ * - Rounding to 0.01 degree alone adds up to about 0.7 km (half of 0.01
+ *   degree is about 0.56 km north-south and 0.49 km east-west at this
+ *   latitude; our arithmetic).
+ * No overall accuracy is claimed. The scene draws Earth far too small for
+ * an error of a few kilometers to show.
  */
 
 /** Launch Complex 19, the Gemini launch vehicle's pad (our estimate; see above). */
@@ -332,21 +357,21 @@ export const flight: FlightPlan = {
   sky: [
     {
       time: AGENA_LIFTOFF,
-      moonEclipticLongitude: cite(294.7489324, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-03-16 15:00:03.127")),
-      subLunarLongitude: cite(258.759473, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-03-16 15:00:03.127")),
-      sunEclipticLongitude: cite(355.5706414, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-03-16 15:00:03.127")),
+      moonEclipticLongitude: cite(294.7489324, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-03-16 15:00:03.127", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(258.759473, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-03-16 15:00:03.127", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(355.5706414, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-03-16 15:00:03.127", SUN_FROM_EARTH)),
     },
     {
       time: LIFTOFF,
-      moonEclipticLongitude: cite(295.5859079, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-03-16 16:41:02.389")),
-      subLunarLongitude: cite(234.35852, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-03-16 16:41:02.389")),
-      sunEclipticLongitude: cite(355.6404726, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-03-16 16:41:02.389")),
+      moonEclipticLongitude: cite(295.5859079, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-03-16 16:41:02.389", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(234.35852, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-03-16 16:41:02.389", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(355.6404726, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-03-16 16:41:02.389", SUN_FROM_EARTH)),
     },
     {
       time: LANDING,
-      moonEclipticLongitude: cite(300.8909455, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-03-17 03:22:28.389")),
-      subLunarLongitude: cite(79.314372, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-03-17 03:22:28.389")),
-      sunEclipticLongitude: cite(356.0839549, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-03-17 03:22:28.389")),
+      moonEclipticLongitude: cite(300.8909455, horizons("Moon (301) from Earth's center", "ObsEcLon", "1966-03-17 03:22:28.389", MOON_FROM_EARTH)),
+      subLunarLongitude: cite(79.314372, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1966-03-17 03:22:28.389", EARTH_FROM_MOON)),
+      sunEclipticLongitude: cite(356.0839549, horizons("Sun (10) from Earth's center", "ObsEcLon", "1966-03-17 03:22:28.389", SUN_FROM_EARTH)),
     },
   ],
 
@@ -514,10 +539,17 @@ export const flight: FlightPlan = {
           apoapsis: cite(159.0, geminiOrbit("terminal phase initiate (TPI)", "after", "Apogee, n. mi.")),
           periapsis: cite(145.9, geminiOrbit("terminal phase initiate (TPI)", "after", "Perigee, n. mi.")),
           sense: PROGRADE_GEMINI,
-          alongside: at(
-            "005:55:00",
-            report('Section 4.3.1.2.1 (page 4-19): "By 5:55:00 g.e.t., the spacecraft was about 150 feet from the GATV and the crew was station keeping."'),
-          ),
+          // When the drawn spacecraft arrives beside the Agena: the time by
+          // which the report puts it about 150 feet away. Station keeping's
+          // start, 5:56:56, is in the story and vehicle.ts (see discrepancy).
+          alongside: {
+            ...at(
+              "005:55:00",
+              report('Section 4.3.1.2.1 (page 4-19): "By 5:55:00 g.e.t., the spacecraft was about 150 feet from the GATV and the crew was station keeping." ("By" gives a latest time; the path arrives then.)'),
+            ),
+            discrepancy:
+              'Section 7.1.1.2.3 (page 7-4) gives "Station keeping began at 5:56:56 g.e.t., or about 42 minutes after TPI, at a range of 150 feet." The story\'s station-keeping event and the spacecraft\'s turn to blunt end forward in vehicle.ts use 5:56:56 for the start of station keeping; the path uses 5:55:00, the time by which section 4.3.1.2.1 puts the spacecraft about 150 feet from the Agena, for its arrival there.',
+          },
         },
         {
           kind: "docked",
@@ -579,7 +611,6 @@ export const flight: FlightPlan = {
           // 50,000 feet, in nautical miles (our conversion).
           drogueAltitude: cite(
             8.23,
-            report('Section 5.1.11 (page 5-107): the landing-system sequence "was actuated near the nominal drogue parachute deployment altitude of 50 000 feet"'),
             report('Section 7.1.2.12 (page 7-23), the crew\'s report: "The drogue parachute was actuated at 50K feet"'),
           ),
           splashdown: SPLASHDOWN,

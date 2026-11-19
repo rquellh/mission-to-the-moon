@@ -1,6 +1,6 @@
 import type { Source } from "../../source-types.ts";
 
-/** Sources cited only by Gemini 8. */
+/** Sources registered by Gemini 8. Only "gemini-8-mission-report" is also cited by other missions (Gemini 3, 4, 5, 6A, 7, 9A, 10, 11 and 12, for the launch pad estimates they reuse); the rest are cited only by Gemini 8. */
 export const sources = {
   "gemini-8-mission-report": {
     title: "Gemini Program Mission Report: Gemini VIII (MSC-G-R-66-4)",
