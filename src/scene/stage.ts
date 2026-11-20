@@ -157,6 +157,9 @@ const POINTER_PX = 16;
 const POINTER_INSET_PX = 22;
 /** A part left behind is labeled when the camera is closer than the first, fading out by the second, in Moon radii. */
 const LABEL_NEAR_MOON_RADII = [1.4, 2.2] as const;
+/** The room between the parts at a site and the first label under them, in CSS pixels, and how long a label takes to fade in or out, in seconds. */
+const LABEL_GAP_PX = 8;
+const LABEL_FADE_SECONDS = 0.5;
 const COMPANION_MARKER_M = 1500;
 const COMPANION_MARKER_PX = 9;
 /** Story seconds over which a ship's line fades out once its path has ended (see fadeEndedPaths). */
@@ -483,6 +486,9 @@ export class Stage implements Director {
   /** The pointer toward the followed ship when it is out of the Earth or Moon view (see updatePointer), and each part left behind's label. */
   private pointer: Sprite | null = null;
   private labels: Sprite[] = [];
+  /** Whether each part left behind is labeled now: only once its lander has gone (see updateLabels). */
+  private labelWanted: boolean[] = [];
+  private readonly screenDown = new Vector3();
   /** The insets the clear area keeps, in CSS pixels (as clamped by updateClearArea). */
   private readonly clearInsets = { top: 0, right: 0, bottom: 0, left: 0 };
   /** False while something covers the whole view (see setDrawing). */
@@ -894,6 +900,7 @@ export class Stage implements Director {
     this.pointer.renderOrder = 12;
     this.shipScene.add(this.pointer);
     this.labels = this.options.leftBehind.map((item) => this.labelSprite(item.label));
+    this.labelWanted = this.labels.map(() => false);
     for (const label of this.labels) this.shipScene.add(label);
     this.pairings = this.findPairings(this.fleet);
     this.stations = this.findStations();
@@ -1761,7 +1768,7 @@ export class Stage implements Director {
     return new CanvasTexture(canvas);
   }
 
-  /** A small label in plain words (a part left behind's), drawn once; its center at its bottom. */
+  /** A small label in plain words (a part left behind's), drawn once; it hangs from its top (see updateLabels). */
   private labelSprite(text: string): Sprite {
     const ratio = 2;
     const font = `${12 * ratio}px system-ui, -apple-system, sans-serif`;
@@ -1792,11 +1799,15 @@ export class Stage implements Director {
       g.fillStyle = '#e8ecf1';
       lines.forEach((l, k) => g.fillText(l, width / 2, 2 * ratio + k * 16 * ratio));
     }
-    const sprite = new Sprite(new SpriteMaterial({ map: new CanvasTexture(canvas), transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false }));
-    sprite.center.set(0.5, 0);
+    const sprite = new Sprite(
+      new SpriteMaterial({ map: new CanvasTexture(canvas), transparent: true, opacity: 0, depthTest: false, depthWrite: false, sizeAttenuation: false }),
+    );
+    sprite.center.set(0.5, 1);
     sprite.userData['aspect'] = canvas.width / Math.max(1, canvas.height);
     sprite.userData['pixels'] = canvas.height / ratio;
     sprite.visible = false;
+    // It is drawn away from the point it hangs from, so that point's being off screen says nothing.
+    sprite.frustumCulled = false;
     sprite.renderOrder = 11;
     return sprite;
   }
@@ -2492,21 +2503,59 @@ export class Stage implements Director {
       const standing = lander !== undefined && lander.root.visible && this.path.phaseAt(part.shipId, t)?.kind === 'surface';
       context.metersPerPixel = standing ? lander.drawnMetersPerPixel : 0;
       part.update(shown, this.sitePosition, this.siteUp, site?.front ?? this.worldUp, context);
-      // Its label, only when the camera is close to it.
-      const label = this.labels[i];
-      if (label) {
-        const near = 1 - smoothstep(LABEL_NEAR_MOON_RADII[0], LABEL_NEAR_MOON_RADII[1], this.camera.position.distanceTo(this.sitePosition) / MOON_RADIUS);
-        label.visible = part.root.visible && context.unitsPerPixel > 0 && near > 0.01;
-        if (label.visible) {
-          part.labelPoint(label.position);
-          const h = (2 * (label.userData['pixels'] as number) * tanHalf) / this.cssHeight;
-          label.scale.set(h * (label.userData['aspect'] as number), h, 1);
-          (label.material as SpriteMaterial).opacity = near;
-        }
-      }
+      // While the lander still stands there, the part is not left behind yet: no label.
+      this.labelWanted[i] = !standing;
     }
     context.metersPerPixel = 0;
+    this.updateLabels(tanHalf, dt, snap);
     this.updatePointer(tanHalf);
+  }
+
+  /**
+   * The label of each part left behind: shown once its lander has lifted
+   * off and the camera is close. It hangs under everything standing at the
+   * site, one label below another, so it covers neither the parts, nor a
+   * ship above them, nor another label.
+   */
+  private updateLabels(tanHalf: number, dt: number, snap: boolean): void {
+    const parts = this.fleet?.leftBehind ?? [];
+    // Toward the bottom of the screen, in world space.
+    const down = this.screenDown.setFromMatrixColumn(this.camera.matrixWorld, 1).normalize().negate();
+    const ease = snap ? 1 : 1 - Math.exp(-dt / LABEL_FADE_SECONDS);
+    for (let i = 0; i < parts.length; i += 1) {
+      const part = parts[i] as LeftBehindModel;
+      const label = this.labels[i];
+      if (!label) continue;
+      const material = label.material as SpriteMaterial;
+      // Everything parked at one site stands around one point: its root's.
+      const site = part.root.position;
+      const unitsPerPixel = part.root.visible ? this.unitsPerPixelAt(site, true, tanHalf) : 0;
+      if (unitsPerPixel <= 0) {
+        label.visible = false;
+        material.opacity = 0;
+        continue;
+      }
+      const near = 1 - smoothstep(LABEL_NEAR_MOON_RADII[0], LABEL_NEAR_MOON_RADII[1], this.camera.position.distanceTo(site) / MOON_RADIUS);
+      material.opacity += ((this.labelWanted[i] ? near : 0) - material.opacity) * ease;
+      label.visible = material.opacity > 0.01;
+      if (!label.visible) continue;
+      // How far the site's parts reach down the screen, and the labels already hanging there, in CSS pixels.
+      let below = 0;
+      let stacked = 0;
+      for (let k = 0; k < parts.length; k += 1) {
+        const other = parts[k] as LeftBehindModel;
+        if (other.shipId !== part.shipId || !other.root.visible) continue;
+        below = Math.max(below, other.reachToward(down) / unitsPerPixel);
+        const above = this.labels[k];
+        if (k < i && above?.visible) stacked += above.userData['pixels'] as number;
+      }
+      const pixels = label.userData['pixels'] as number;
+      label.position.copy(site);
+      // The sprite's center is where it hangs from, in its own heights: above its top edge by the room it needs.
+      label.center.set(0.5, 1 + (below + LABEL_GAP_PX + stacked) / pixels);
+      const h = (2 * pixels * tanHalf) / this.cssHeight;
+      label.scale.set(h * (label.userData['aspect'] as number), h, 1);
+    }
   }
 
   /* ---------------------------------------------------------------- */

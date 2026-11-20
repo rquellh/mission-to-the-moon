@@ -275,7 +275,7 @@ export const leftBehind: readonly LeftBehind[] = [
       locator: 'Apollo 17 Timeline, row "LRV positioned to monitor LM ascent." (167:39:57)',
       url: `${ABN}Apollo_17i_Timeline.htm`,
     }),
-    label: "The rover is unloaded from Challenger, and stays on the Moon",
+    label: "The rover stays on the Moon",
   },
   {
     part: "lm-descent-stage",

@@ -284,7 +284,7 @@ export const leftBehind: readonly LeftBehind[] = [
       locator:
         "Caption of the liftoff pictures, before the paragraph on the liftoff: \"broadcast by the television camera aboard the Lunar Roving Vehicle (Rover), parked about 300 feet away\"",
     }),
-    label: "The rover is unloaded from Orion, and stays on the Moon",
+    label: "The rover stays on the Moon",
   },
   {
     part: "lm-descent-stage",

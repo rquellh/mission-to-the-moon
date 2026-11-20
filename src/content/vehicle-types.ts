@@ -205,6 +205,10 @@ export interface LeftBehind {
   ship: string;
   /** When it is left behind. */
   at: Cited<ElapsedTime>;
-  /** In plain words. */
+  /**
+   * In plain words. The scene shows it under the part once the lander has
+   * lifted off, so write it for then ("The rover stays on the Moon") and
+   * keep it short: every part at a site gets its own line or two.
+   */
   label: string;
 }

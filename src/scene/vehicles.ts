@@ -24,6 +24,7 @@ import {
   TubeGeometry,
   Vector3,
   BoxGeometry,
+  Box3,
   type Material,
   type Object3D,
 } from 'three';
@@ -2765,17 +2766,29 @@ export class LeftBehindModel {
     const size = sizeOf(this.root, [item.part], 0);
     this.largest = size.largest;
     this.reach = size.reach;
-    this.top = extentOf(this.root, [item.part])[1];
+    const box = new Box3().setFromObject(this.root, true);
+    for (const x of [box.min.x, box.max.x]) {
+      for (const y of [box.min.y, box.max.y]) {
+        for (const z of [box.min.z, box.max.z]) this.corners.push(new Vector3(x, y, z));
+      }
+    }
     this.root.visible = false;
   }
 
-  /** The height of the part's top, in meters above the ground. */
-  private readonly top: number;
+  /** The corners of the box around it where it is parked, in meters from its site. */
+  private readonly corners: Vector3[] = [];
 
-  /** Where a label for it goes: just above its top, in world space, as last drawn. */
-  labelPoint(out: Vector3): Vector3 {
-    this.root.updateMatrixWorld(true);
-    return this.root.localToWorld(out.set(this.holder.position.x, this.top * 1.15, this.holder.position.z));
+  /**
+   * How far it reaches from its site in the direction `toward` (a unit
+   * vector in world space), in world units, as last drawn. The scene uses
+   * it to hang a label clear of everything at the site.
+   */
+  reachToward(toward: Vector3): number {
+    let reach = 0;
+    for (const corner of this.corners) {
+      reach = Math.max(reach, _x.copy(corner).applyQuaternion(this.root.quaternion).dot(toward));
+    }
+    return reach * this.root.scale.x;
   }
 
   /**

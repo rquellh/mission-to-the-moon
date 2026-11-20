@@ -259,7 +259,7 @@ export const leftBehind: readonly LeftBehind[] = [
         'Apollo 15 mission summary, "Lunar Orbit/Lunar Surface Phase" section: "After returning to the LM, the LRV was unloaded and parked at 167:35:24 for ground-controlled television coverage of the LM ascent"',
       url: `${ABN}Apollo_15a_Summary.htm`,
     }),
-    label: "The rover is unloaded from Falcon, and stays on the Moon",
+    label: "The rover stays on the Moon",
   },
   {
     part: "lm-descent-stage",
