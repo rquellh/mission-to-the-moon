@@ -87,6 +87,14 @@ export type VehiclePart =
    */
   | "standup-spacewalker"
   /**
+   * The hand-held gas gun (the Gemini IV mission report's "maneuvering
+   * unit"), held up in the right hand of a Gemini spacewalker, as NASA photo
+   * S65-34635 shows it on Gemini IV. List it with "spacewalker" on a Gemini
+   * spacecraft ("alone" or "docked"); it is drawn only while the
+   * spacewalker is, and fades with it. It does not change the model's size.
+   */
+  | "gas-gun"
+  /**
    * The crew hatch standing open with no one outside: the Gemini
    * spacecraft's right-hand hatch, or the Apollo command module's side
    * hatch. List it with the spacecraft's parts from the cited moment the

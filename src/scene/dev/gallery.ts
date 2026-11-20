@@ -9,10 +9,13 @@
  *   &left=PART+PART    parts left behind, parked together at one site
  *                      (left of the row); &site=1 stands the first model
  *                      there too (a lunar module beside its rover)
- *   &yaw=35&pitch=12   turn the models, in degrees
+ *   &yaw=35&pitch=12   turn the models, in degrees (&roll=50 also rolls each
+ *                      about its long axis first)
  *   &dir=up|right      which way travel points on screen (default: up for
  *                      a launch layout, right otherwise)
  *   &halo=1            draw the glow behind each model, as the site does
+ *   &close=1           frame the spacewalkers alone, close up (one model at
+ *                      a time is best)
  *   &preset=NAME       a named set, for example ?preset=saturn-ib (see PRESETS)
  * Problems with a part list are printed under the picture, as the site
  * reports them in the console while developing.
@@ -60,6 +63,8 @@ const PRESETS: Record<string, string> = {
   atda: 'm=alone:atda+atda-shroud&m=alone:atda&m=launch:atlas+atda+atda-shroud&m=launch:atlas+agena+agena-shroud&yaw=30&pitch=10',
   spacewalk:
     'm=alone:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+spacewalker&m=alone:service-module+command-module+spacewalker&yaw=25&pitch=25',
+  // Gemini IV's spacewalker close up, rolled about as the ship view rolls it.
+  'walker-close': 'm=alone:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+spacewalker+gas-gun&close=1&yaw=-10&pitch=8&roll=-15',
   rover: 'm=alone:lm-descent-stage+lm-ascent-stage&left=lunar-rover&site=1&yaw=20&pitch=25',
   'rover-after-liftoff': 'left=lm-descent-stage+lunar-rover&yaw=20&pitch=25',
   'apollo-13':
@@ -204,6 +209,7 @@ function showModels(): void {
   const scene = new Scene();
   const yaw = (Number(params.get('yaw') ?? 35) * Math.PI) / 180;
   const pitch = (Number(params.get('pitch') ?? 12) * Math.PI) / 180;
+  const roll = (Number(params.get('roll') ?? 0) * Math.PI) / 180;
   const sun = new DirectionalLight(0xffffff, SHIP_SUN_INTENSITY);
   sun.position.set(0.6, 0.8, 1.0);
   scene.add(sun, new AmbientLight(0xffffff, SHIP_AMBIENT_INTENSITY));
@@ -240,6 +246,8 @@ function showModels(): void {
     const up = params.get('dir') ?? (c.layout === 'launch' ? 'up' : 'right');
     const forward = up === 'up' ? new Vector3(0, 1, 0) : new Vector3(1, 0, 0);
     const top = up === 'up' ? new Vector3(0, 0, 1) : new Vector3(0, 1, 0);
+    // A roll about the long axis (as the ship view rolls a spacewalker's side toward the camera).
+    top.applyAxisAngle(forward, roll);
     return { exists: true, position: new Vector3(), forward: forward.applyQuaternion(turn), up: top.applyQuaternion(turn) };
   });
   const siteUp = new Vector3(0, 1, 0).applyQuaternion(turn);
@@ -292,6 +300,17 @@ function showModels(): void {
   for (const model of fleet.ships) all.union(visibleBox(model.root));
   for (const part of fleet.leftBehind) all.union(visibleBox(part.root));
   if (all.isEmpty()) all.setFromCenterAndSize(new Vector3(), new Vector3(10, 10, 10));
+  // A close-up of the spacewalkers' figures (the first child of each, see vehicles.ts).
+  if (params.get('close') === '1') {
+    const figures = new Box3();
+    for (const model of fleet.ships) {
+      model.root.traverse((node) => {
+        const figure = node.children[0];
+        if (figure && (node.name === 'spacewalker' || node.name === 'standup-spacewalker')) figures.union(visibleBox(figure));
+      });
+    }
+    if (!figures.isEmpty()) all.copy(figures).expandByScalar(0.25);
+  }
 
   const camera = new OrthographicCamera(-1, 1, 1, -1, -1000, 1000);
   camera.position.set(0, 0, 100);

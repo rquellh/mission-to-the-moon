@@ -43,7 +43,10 @@
  *   spent 4 or 5 minutes mounting a camera outside and a guard on the hatch
  *   sill and putting the gas gun together (section 7.1.2.4.2).
  * - White floating on his tether from his egress (04:23) to the start of
- *   his ingress (04:46). How far out he floats is the scene's illustration.
+ *   his ingress (04:46), the gas gun in his right hand ("gas-gun"), as
+ *   NASA photo S65-34635 shows him; he had "assembled the maneuvering
+ *   unit" standing in the hatch (section 7.1.2.4.2). How far out he floats
+ *   is the scene's illustration.
  * - White standing in the hatch again while he climbs in, from 04:46 to
  *   04:50 (Table D, "Crewman inside"), then the hatch open with him inside
  *   until it closed (05:06).
@@ -112,7 +115,7 @@ const BLUNT_END_FORWARD_RETROFIRE = report(
 
 const GEMINI: readonly VehiclePart[] = ["gemini-equipment-section", "gemini-retro-section", "gemini-reentry-module"];
 const STANDING_IN_HATCH: readonly VehiclePart[] = [...GEMINI, "standup-spacewalker"];
-const SPACEWALK: readonly VehiclePart[] = [...GEMINI, "spacewalker"];
+const SPACEWALK: readonly VehiclePart[] = [...GEMINI, "spacewalker", "gas-gun"];
 const HATCH_OPEN: readonly VehiclePart[] = [...GEMINI, "open-hatch"];
 
 /* ------------------------------------------------------------------ */

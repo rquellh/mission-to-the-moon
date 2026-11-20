@@ -8,6 +8,7 @@ import {
   CatmullRomCurve3,
   CylinderGeometry,
   DoubleSide,
+  Euler,
   Float32BufferAttribute,
   Group,
   LineBasicMaterial,
@@ -28,6 +29,7 @@ import {
 } from 'three';
 import type { LeftBehind, VehicleChange, VehicleLayout, VehiclePart } from '../content/vehicle-types';
 import { SHIP_SIZE_PX } from './config';
+import { buildWalker, GAS_GUN, holdGasGun, walkerLook, walkerMaterials, type SuitEra, type WalkerLook, type WalkerOptions, type WalkerPose } from './astronaut';
 
 /**
  * Simplified spacecraft models built from plain shapes, and how they are
@@ -275,7 +277,7 @@ const APOLLO_HATCH = 'apollo-open-hatch';
 /** Groups that hold other parts and are always shown when their parts are. */
 const WRAPPERS: ReadonlySet<string> = new Set(['csm', 'lm', 'gemini-spacecraft']);
 /** Nodes handled one by one (see ShipModel.showSpecials). */
-const SPECIALS: ReadonlySet<string> = new Set([AGENA_BOOM, ATLAS_AGENA_ADAPTER, ATLAS_ATDA_ADAPTER, GEMINI_RIGHT_HATCH, APOLLO_HATCH, 'spacewalker', 'standup-spacewalker']);
+const SPECIALS: ReadonlySet<string> = new Set([AGENA_BOOM, ATLAS_AGENA_ADAPTER, ATLAS_ATDA_ADAPTER, GEMINI_RIGHT_HATCH, APOLLO_HATCH, 'spacewalker', 'standup-spacewalker', GAS_GUN]);
 
 /** A named part: a group whose rest position is remembered for animation. */
 function part(name: VehiclePart | 'csm' | 'lm' | 'gemini-spacecraft', ...children: Object3D[]): Group {
@@ -302,9 +304,10 @@ const NOT_BODY: ReadonlySet<VehiclePart> = new Set<VehiclePart>([
   'gemini-main-parachute',
   'spacewalker',
   'standup-spacewalker',
+  'gas-gun',
 ]);
 /** Of those, parts that also do not count toward how far the model may reach on screen. */
-const NOT_SIZED: ReadonlySet<VehiclePart> = new Set<VehiclePart>(['spacewalker', 'standup-spacewalker']);
+const NOT_SIZED: ReadonlySet<VehiclePart> = new Set<VehiclePart>(['spacewalker', 'standup-spacewalker', 'gas-gun']);
 /** The lunar module's parts, which ride hidden inside the adapter at launch. */
 const LUNAR_MODULE_PARTS: ReadonlySet<VehiclePart> = new Set<VehiclePart>(['lm-descent-stage', 'lm-ascent-stage']);
 
@@ -662,13 +665,6 @@ function parachutes(kit: Kit, name: 'drogue-parachutes' | 'main-parachutes'): Gr
 
 /* ---------------- A spacewalker, on a tether from a hatch ---------------- */
 
-/** The spacewalker's own materials, so it can fade in and out by itself. */
-interface WalkerLook {
-  suit: MeshStandardMaterial;
-  visor: MeshStandardMaterial;
-  tether: MeshStandardMaterial;
-}
-
 /** The open Apollo side hatch's own materials (it fades in as the hatch opens). */
 interface HatchLook {
   opening: MeshStandardMaterial;
@@ -676,54 +672,88 @@ interface HatchLook {
 }
 
 /**
- * An astronaut in a white pressure suit with a gold visor, floating on a
- * tether, after NASA photos S65-30432 (the first American spacewalk, outside
- * Gemini IV's right-hand hatch, with a gold-wrapped tether) and S71-43202
- * (Apollo 15's film-retrieval spacewalk by the service module, white suit
- * and tether). About 1.9 m tall, head toward +Y, facing +Z, its middle at
- * the origin. Built from the kit's shapes but its own materials, which the
- * ship model fades (see ShipModel.showSpecials).
+ * How far around the craft a spacewalker is from the side the ship view
+ * turns toward the camera, in radians (see ShipModel.walkerSide). Turning
+ * the figure's own side to the camera would draw it in front of the hull,
+ * as if it sat on the craft; turning a side a sixth of a turn farther on
+ * draws it above the craft on screen, clear of the hull and against the sky,
+ * with the open hatch still in view. A figure standing in a hatch then
+ * rises from the craft's upper edge rather than being seen from over its head.
  */
-function walkerFigure(kit: Kit, look: WalkerLook): Group {
-  const group = new Group();
-  group.add(
-    mesh(box(kit, 0.5, 0.62, 0.32), look.suit, 0, 0.22, 0),
-    mesh(box(kit, 0.4, 0.44, 0.18), look.suit, 0, 0.24, -0.25),
-    mesh(sphere(kit, 0.17, 14), look.suit, 0, 0.72, 0),
-    mesh(sphere(kit, 0.13, 12), look.visor, 0, 0.73, 0.08),
-  );
-  for (const side of [-1, 1]) {
-    group.add(
-      rod(kit, new Vector3(side * 0.3, 0.45, 0), new Vector3(side * 0.55, 0.02, 0.2), 0.075, look.suit),
-      rod(kit, new Vector3(side * 0.13, -0.08, 0), new Vector3(side * 0.22, -0.95, 0.12), 0.09, look.suit),
-    );
-  }
-  return group;
+const WALKER_VIEW_LIFT = Math.PI / 3;
+
+/** Where and how a floating spacewalker is drawn, in model coordinates. */
+interface WalkerPlace {
+  /** The figure's middle (between its hip joints). */
+  at: Vector3;
+  /** Its turn from facing +Z with its head toward +Y. */
+  turn: Quaternion;
+  /** The tether's start: a point in the open hatchway, and the way it leaves it (the hull's outward direction there, unless it must clear the figure). */
+  hatch: Vector3;
+  outward: Vector3;
 }
 
 /**
- * A spacewalker at `at` (model coordinates) on a sagging tether from
- * `hatch`. The gap is an illustration: far less than a real tether's
- * length, so the figure stays near the craft on screen.
+ * How a floating figure at `at` is turned so the ship view draws it upright
+ * and facing the viewer. The ship view draws travel (+Y) to the right and
+ * rolls the craft so a side WALKER_VIEW_LIFT on from its spacewalker's
+ * faces the camera (see ShipModel.walkerSide), so a figure whose front
+ * faces out from the craft's axis on that side, and whose head points
+ * across travel a quarter turn around the craft from it, stands upright,
+ * above the craft on screen. `tilt` then turns it on the screen
+ * (radians, its head toward its left), `quarter` about its height
+ * (radians, toward its left), and `lean` tips its head back. A craft
+ * flying blunt end first is built turned end for end (see endFor), which
+ * would draw the figure upside down: `flipped` stands it the other way up.
  */
-function spacewalker(kit: Kit, at: Vector3, hatch: Vector3, lean: number): Group {
-  const look = walkerLook();
-  const figure = walkerFigure(kit, look);
-  figure.position.copy(at);
-  figure.rotation.set(lean, 0.6, -lean * 0.5);
-  // The tether: a gentle curve from the hatch to the waist, as a thin tube
-  // (several times thicker than the real one, so it reads when the ship
-  // view draws the craft close up).
-  const waist = at.clone();
-  const middle = hatch.clone().add(waist).multiplyScalar(0.5).add(new Vector3(0, -0.5, 0.4));
-  const key = `tether:${hatch.toArray().join(',')}:${at.toArray().join(',')}`;
+function walkerTurn(at: Vector3, tilt: number, quarter: number, lean: number, flipped = false): Quaternion {
+  // The side turned to the camera is WALKER_VIEW_LIFT on from the figure's own (the other way in a craft built end for end).
+  const side = Math.atan2(at.x, at.z) + (flipped ? -1 : 1) * WALKER_VIEW_LIFT;
+  const head = new Vector3(-Math.cos(side), 0, Math.sin(side));
+  const front = new Vector3(Math.sin(side), 0, Math.cos(side));
+  const across = new Vector3().crossVectors(head, front);
+  const turn = new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(across, head, front));
+  turn.multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), tilt + (flipped ? Math.PI : 0)));
+  turn.multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), quarter));
+  return turn.multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -lean));
+}
+
+/**
+ * A spacewalker (see astronaut.ts) at `place.at` on a tether from the
+ * hatch. The gap is an illustration: far less than a real tether's length,
+ * so the figure stays near the craft on screen. The tether leaves the
+ * hatchway straight out from the hull, hangs in a loose curve to beside the
+ * figure's hips on the hatch's side, and comes up to the front of the suit
+ * from in front of it and below (on Gemini, the chest pack), so it never
+ * passes through the body.
+ */
+function spacewalker(kit: Kit, place: WalkerPlace, options: Omit<WalkerOptions, 'pose'> & { pose?: WalkerPose }): Group {
+  const look = walkerLook(options.era);
+  const { figure, tetherPoint } = buildWalker(kit.geometries, look, { pose: 'floating', ...options });
+  figure.position.copy(place.at);
+  figure.quaternion.copy(place.turn);
+  figure.updateMatrix();
+  // Points along the way, in the figure's own coordinates (see buildWalker), then in the model's.
+  const inFigure = (x: number, y: number, z: number): Vector3 => new Vector3(x, y, z).applyMatrix4(figure.matrix);
+  const side = place.hatch.clone().applyMatrix4(figure.matrix.clone().invert()).x < 0 ? -1 : 1;
+  const out = place.outward.clone().normalize();
+  const start = place.hatch.clone().addScaledVector(out, -0.08);
+  const rise = place.hatch.clone().addScaledVector(out, 0.35);
+  const beside = inFigure(side * 0.5, tetherPoint.y - 0.32, tetherPoint.z + 0.04);
+  const middle = rise.clone().add(beside).multiplyScalar(0.5).addScaledVector(out, 0.15);
+  const near = inFigure(tetherPoint.x + side * 0.08, tetherPoint.y - 0.17, tetherPoint.z + 0.15);
+  const end = inFigure(tetherPoint.x, tetherPoint.y, tetherPoint.z);
+  const key = `tether:${[start, beside, end].map((p) => p.toArray().map((v) => v.toFixed(3)).join(',')).join(':')}`;
   let tube = kit.geometries.get(key);
   if (!tube) {
-    tube = new TubeGeometry(new CatmullRomCurve3([hatch.clone(), middle, waist]), 24, 0.045, 6, false);
+    // Thicker than the real one (a few centimeters), so it reads when the ship view draws the craft close up.
+    tube = new TubeGeometry(new CatmullRomCurve3([start, rise, middle, beside, near, end], false, 'centripetal'), 56, 0.022, 6, false);
     kit.geometries.set(key, tube);
   }
   const group = part('spacewalker', figure, mesh(tube, look.tether));
   group.userData['look'] = look;
+  // A floating figure is drawn above the craft (the porch figure stands on it, facing the camera).
+  if ((options.pose ?? 'floating') === 'floating') group.userData['viewLift'] = WALKER_VIEW_LIFT;
   return group;
 }
 
@@ -732,22 +762,24 @@ function spacewalker(kit: Kit, at: Vector3, hatch: Vector3, lean: number): Group
  * tether: `at` is a point on the hatch's surface, `outward` the hull's
  * outward direction there, `facing` roughly where the figure looks. The
  * figure is placed with its hips just below the surface, so the hull hides
- * its legs. As on Gemini's "standup" spacewalks (NASA photo S66-63007
- * was taken by Gemini 12's pilot standing in the open hatch, looking along
- * the spacecraft), and Apollo's crewmate standing in the side hatch. No
+ * its legs, and its forearms forward over the hatch's rim. As on Gemini's
+ * "standup" spacewalks (NASA photo S66-63007 was taken by Gemini 12's pilot
+ * standing in the open hatch, looking along the spacecraft), and Apollo's
+ * crewmate standing in the side hatch (seen from behind in S72-37001). No
  * photo shows the figure from outside: its place and pose are approximate.
  */
-function standupWalker(kit: Kit, at: Vector3, outward: Vector3, facing: Vector3): Group {
-  const look = walkerLook();
-  const figure = walkerFigure(kit, look);
+function standupWalker(kit: Kit, era: SuitEra, at: Vector3, outward: Vector3, facing: Vector3): Group {
+  const look = walkerLook(era);
+  const { figure } = buildWalker(kit.geometries, look, { era, pose: 'standing' });
   const up = outward.clone().normalize();
   const front = facing.clone().addScaledVector(up, -facing.dot(up)).normalize();
   const side = new Vector3().crossVectors(up, front);
   figure.quaternion.setFromRotationMatrix(new Matrix4().makeBasis(side, up, front));
-  // The figure's middle is at its waist; lift it so the waist clears the hull a little.
-  figure.position.copy(at).addScaledVector(up, 0.12);
+  // The figure's middle is between its hip joints: just below the surface, so the waist clears the hull.
+  figure.position.copy(at).addScaledVector(up, -0.06);
   const group = part('standup-spacewalker', figure);
   group.userData['look'] = look;
+  group.userData['viewLift'] = WALKER_VIEW_LIFT;
   return group;
 }
 
@@ -755,18 +787,8 @@ function standupWalker(kit: Kit, at: Vector3, outward: Vector3, facing: Vector3)
 function geminiStandup(kit: Kit): Group {
   const y = (HATCH.y0 + HATCH.y1) / 2;
   const a = HATCH.offset;
-  const slope = (1.15 - 0.52) / (GEMINI.cabinTop - GEMINI.shieldTop);
   const at = new Vector3(Math.sin(a) * cabinRadius(y), y, Math.cos(a) * cabinRadius(y));
-  return standupWalker(kit, at, new Vector3(Math.sin(a), slope, Math.cos(a)), new Vector3(0, 1, 0));
-}
-
-/** A spacewalker's own materials (they fade in and out with it). */
-function walkerLook(): WalkerLook {
-  return {
-    suit: new MeshStandardMaterial({ color: 0xf1f1ee, roughness: 0.7, transparent: true }),
-    visor: new MeshStandardMaterial({ color: 0xd8a63a, roughness: 0.25, metalness: 0.6, transparent: true }),
-    tether: new MeshStandardMaterial({ color: 0xe6cf8e, roughness: 0.6, transparent: true }),
-  };
+  return standupWalker(kit, 'gemini', at, geminiHatchOutward(), new Vector3(0, 1, 0));
 }
 
 /* ---------------- Gemini, origin at the adapter's aft face, nose toward +Y ---------------- */
@@ -889,10 +911,23 @@ function geminiReentryModule(kit: Kit): Group {
   );
 }
 
-/** A spacewalker outside a Gemini's right-hand hatch (Gemini coordinates). */
-function geminiSpacewalker(kit: Kit): Group {
+/** The cabin's outward direction at the right-hand hatch (Gemini coordinates). */
+function geminiHatchOutward(): Vector3 {
+  const a = HATCH.offset;
+  const slope = (1.15 - 0.52) / (GEMINI.cabinTop - GEMINI.shieldTop);
+  return new Vector3(Math.sin(a), slope, Math.cos(a)).normalize();
+}
+
+/**
+ * A spacewalker outside a Gemini's right-hand hatch (Gemini coordinates), in
+ * the Gemini suit, with the gas gun for "gas-gun"; `backward` when the
+ * craft is built turned end for end (see walkerTurn).
+ */
+function geminiSpacewalker(kit: Kit, backward: boolean): Group {
   const hatch = new Vector3(Math.sin(HATCH.offset) * cabinRadius(3.4), 3.4, Math.cos(HATCH.offset) * cabinRadius(3.4));
-  return spacewalker(kit, new Vector3(1.5, 4.3, 2.4), hatch, -0.35);
+  const at = new Vector3(1.5, 4.3, 2.4);
+  const place: WalkerPlace = { at, turn: walkerTurn(at, -0.3, -0.6, 0.15, backward), hatch, outward: geminiHatchOutward() };
+  return spacewalker(kit, place, { era: 'gemini', gasGun: true });
 }
 
 /** Gemini's parachute (the small drogue or the big main), above a reentry module whose heat shield is at y = 0. */
@@ -1163,10 +1198,23 @@ function cmRadius(y: number): number {
   return 1.95 - ((y - CSM.smTop - 0.25) / (CSM.cmTop - CSM.smTop - 0.25)) * (1.95 - 0.42);
 }
 
-/** A spacewalker by an Apollo service module, on a tether from the command module's side hatch (service module coordinates). */
-function apolloSpacewalker(kit: Kit): Group {
+/** The command module cone's outward direction at its side hatch (service module coordinates). */
+function cmHatchOutward(): Vector3 {
+  const slope = (1.95 - 0.42) / (CSM.cmTop - CSM.smTop - 0.25);
+  return new Vector3(0, slope, 1).normalize();
+}
+
+/**
+ * A spacewalker by an Apollo service module, on a tether from the command
+ * module's side hatch (service module coordinates), in the Apollo suit with
+ * the small pack on its back that NASA photo S72-37001 shows; `backward`
+ * when the craft is built turned end for end (see walkerTurn).
+ */
+function apolloSpacewalker(kit: Kit, backward: boolean): Group {
   const y = (CM_HATCH.y0 + CM_HATCH.y1) / 2;
-  return spacewalker(kit, new Vector3(0.6, 2.4, 3.6), new Vector3(0, y, cmRadius(y)), 0.25);
+  const at = new Vector3(0.6, 2.4, 3.6);
+  const place: WalkerPlace = { at, turn: walkerTurn(at, -0.25, -0.6, 0.15, backward), hatch: new Vector3(0, y, cmRadius(y)), outward: cmHatchOutward() };
+  return spacewalker(kit, place, { era: 'apollo', pack: 'small' });
 }
 
 /**
@@ -1193,28 +1241,34 @@ function apolloOpenHatch(kit: Kit): Group {
 /** A crewmate standing in the command module's open side hatch (service module coordinates). */
 function apolloStandup(kit: Kit): Group {
   const y = (CM_HATCH.y0 + CM_HATCH.y1) / 2;
-  const slope = (1.95 - 0.42) / (CSM.cmTop - CSM.smTop - 0.25);
-  return standupWalker(kit, new Vector3(0, y, cmRadius(y)), new Vector3(0, slope, 1), new Vector3(0, -1, 0.3));
+  return standupWalker(kit, 'apollo', new Vector3(0, y, cmRadius(y)), cmHatchOutward(), new Vector3(0, -1, 0.3));
 }
 
 /** Both service modules (whole and damaged; the change's parts pick one), the command module, its open hatch, a crewmate standing in it, and (unless left out) a spacewalker. */
-function csmParts(kit: Kit, walker = true): Object3D[] {
+function csmParts(kit: Kit, walker = true, backward = false): Object3D[] {
   const parts = [serviceModule(kit), serviceModuleDamaged(kit), commandModule(kit), apolloOpenHatch(kit), apolloStandup(kit)];
-  return walker ? [...parts, apolloSpacewalker(kit)] : parts;
+  return walker ? [...parts, apolloSpacewalker(kit, backward)] : parts;
 }
 
 /**
- * A spacewalker standing on the lunar module's front porch, below its
- * forward hatch, on a tether from the hatch (lunar module coordinates), as
- * on Apollo 9's spacewalk with the two craft docked (NASA photo
- * AS09-20-3094 shows the lunar module pilot standing on the porch, in its "golden slippers" foot restraints). Places are
+ * A spacewalker standing upright on the lunar module's front porch, below
+ * its forward hatch, on a tether from the hatch (lunar module coordinates),
+ * as on Apollo 9's spacewalk with the two craft docked (NASA photo
+ * AS09-20-3094 shows the lunar module pilot standing on the porch, in its
+ * "golden slippers" foot restraints). The suit follows AS9-19-2994: the
+ * tall pack on the back, the helmet red over its top. Places are
  * approximate.
  */
 function lmPorchSpacewalker(kit: Kit): Group {
-  const walker = spacewalker(kit, new Vector3(0.15, LM.descentTop + 1.0, 2.55), new Vector3(0, LM.descentTop + 0.5, 1.6), 0);
-  const figure = walker.children[0];
-  if (figure) figure.rotation.set(0.12, 0.3, 0);
-  return walker;
+  const place: WalkerPlace = {
+    // On the porch in front of the hatch, a little to one side of it; feet on the descent stage's top.
+    at: new Vector3(-0.2, LM.descentTop + 1.0, 2.0),
+    turn: new Quaternion().setFromEuler(new Euler(0.05, 0.3, 0)),
+    hatch: new Vector3(0, LM.descentTop + 0.5, 1.6),
+    // The tether leaves the hatch to the side, clear of the legs.
+    outward: new Vector3(0.85, 0.1, 0.5),
+  };
+  return spacewalker(kit, place, { era: 'apollo', pose: 'porch', pack: 'large', redHelmet: true });
 }
 
 /** Command module (with or without its service module) with the lunar module (or its ascent stage) on its nose, the lunar module ahead. */
@@ -1228,7 +1282,7 @@ function dockedAssembly(kit: Kit, backward: boolean): Group {
 }
 
 function csmAloneAssembly(kit: Kit, backward: boolean): Group {
-  return endFor(backward, ...csmParts(kit));
+  return endFor(backward, ...csmParts(kit, true, backward));
 }
 
 /** A service module by itself (Apollo 13's, cast off before entry), front forward. */
@@ -1297,7 +1351,7 @@ function endFor(turned: boolean, ...children: Object3D[]): Group {
  * sections behind it, nose first, or blunt end first when `backward`.
  */
 function geminiAloneAssembly(kit: Kit, backward: boolean): Group {
-  return endFor(backward, ...geminiParts(kit), geminiSpacewalker(kit), geminiStandup(kit));
+  return endFor(backward, ...geminiParts(kit), geminiSpacewalker(kit, backward), geminiStandup(kit));
 }
 
 /** The reentry module by itself, heat shield first (+Y), its heat shield at the origin, parachutes trailing; hatches on top (+Z), as in endFor. */
@@ -1326,7 +1380,7 @@ function geminiDockedAssembly(kit: Kit, backward: boolean): Group {
   const atdaTarget = atda(kit);
   atdaTarget.rotation.z = Math.PI;
   atdaTarget.position.y = GEMINI_IN_CONE + ATDA.coneTop;
-  return endFor(backward, ...geminiParts(kit), agenaTarget, atdaTarget, geminiSpacewalker(kit), geminiStandup(kit));
+  return endFor(backward, ...geminiParts(kit), agenaTarget, atdaTarget, geminiSpacewalker(kit, backward), geminiStandup(kit));
 }
 
 /** Where a target's cone mouth sits on a docked Gemini: the nose goes this far into the cone. */
@@ -1465,7 +1519,7 @@ interface Shape {
    * on (halfway from the pivot to the figure, relative to the pivot) and
    * how far the view must reach around it.
    */
-  walkerFocus: { center: Vector3; reach: number } | undefined;
+  walkerFocus: { center: Vector3; side: number; reach: number } | undefined;
   /** Parts of the shape before that are not dropped at this change, because another ship takes them over or they are left behind. */
   keptElsewhere: ReadonlySet<VehiclePart>;
   /** Which end its dropped parts drift away from, once known (see ShipModel.dropSide). */
@@ -1493,7 +1547,8 @@ interface Shape {
  * - Gemini's targets: "launch" atlas with agena (and agena-shroud) or atda
  *   (and atda-shroud); "alone" agena, or atda with or without atda-shroud.
  * - spacewalker: with Gemini sections ("alone", "docked") or Apollo's
- *   command and service module ("alone", "docked").
+ *   command and service module ("alone", "docked"); gas-gun with a
+ *   spacewalker on Gemini.
  */
 function kindOf(layout: VehicleLayout, parts: readonly VehiclePart[]): Kind {
   const has = (name: VehiclePart): boolean => parts.includes(name);
@@ -1777,6 +1832,8 @@ export class ShipModel {
   private hatchLevel = 0;
   /** How far in view a crewmate standing in the hatch is now, 0 to 1. */
   private standLevel = 0;
+  /** Whether the spacewalker, while out or fading out, holds the gas gun ("gas-gun" listed with it). */
+  private walkerGun = false;
   /** How visible the whole model is now (see PoseContext.opacity). */
   private fade = 1;
 
@@ -1968,7 +2025,10 @@ export class ShipModel {
         }
       });
     }
-    return { center, reach: Math.max(at.distanceTo(center) + 1.2, Math.min(reach, WALK_FOCUS_REACH)) };
+    // The side to turn toward the camera: the figure's own, or WALKER_VIEW_LIFT on from it (see there).
+    const lift = (walker?.userData['viewLift'] as number | undefined) ?? 0;
+    const side = Math.hypot(center.x, center.z) < 1e-6 ? Number.NaN : Math.atan2(center.x, center.z) + lift;
+    return { center, side, reach: Math.max(at.distanceTo(center) + 1.2, Math.min(reach, WALK_FOCUS_REACH)) };
   }
 
   /** The spacewalkers' own materials in a group. */
@@ -2139,15 +2199,16 @@ export class ShipModel {
   }
 
   /**
-   * Which side of the craft its spacewalker is on, around its long axis: an
-   * angle in radians from its top (+Z) toward its right (+X), or NaN when
-   * the shape has no spacewalker (Gemini's and the command module's are on
-   * top; on a docked Apollo stack the lunar module's porch is underneath).
+   * Which side of the craft the ship view turns toward the camera during a
+   * spacewalk, around its long axis: an angle in radians from its top (+Z)
+   * toward its right (+X), or NaN when the shape has no spacewalker. It is
+   * WALKER_VIEW_LIFT on from the side the figure is on (Gemini's and the
+   * command module's are on top), so the figure is drawn above the craft;
+   * for the figure on the lunar module's porch (underneath on a docked
+   * Apollo stack) it is the porch's own side.
    */
   walkerSide(index: number): number {
-    const center = this.shapes[index]?.walkerFocus?.center;
-    if (!center || Math.hypot(center.x, center.z) < 1e-6) return Number.NaN;
-    return Math.atan2(center.x, center.z);
+    return this.shapes[index]?.walkerFocus?.side ?? Number.NaN;
   }
 
   /** Meters per CSS pixel at which a spacewalk close-up (see walkerFocusOf) reaches `pixels` around its middle. */
@@ -2479,6 +2540,8 @@ export class ShipModel {
   private updateWalker(shape: Shape, context: PoseContext): void {
     const parts = shape.change.parts;
     const walker = parts.includes('spacewalker') ? 1 : 0;
+    // The gas gun goes with the spacewalker: kept while it fades out.
+    if (walker === 1) this.walkerGun = parts.includes('gas-gun');
     const standing = parts.includes('standup-spacewalker') ? 1 : 0;
     const hatch = walker === 1 || standing === 1 || parts.includes('open-hatch') ? 1 : 0;
     const k = context.snap || context.reducedMotion ? 1 : 1 - Math.exp(-context.dt / WALKER_FADE_SECONDS);
@@ -2508,13 +2571,15 @@ export class ShipModel {
       const look = node.userData['look'] as WalkerLook | undefined;
       if (!look) return;
       const opaque = shown > 0.995;
-      for (const material of [look.suit, look.visor, look.tether]) {
+      for (const material of walkerMaterials(look)) {
         material.opacity = shown;
         if (material.depthWrite !== opaque) material.depthWrite = opaque;
       }
     };
     fadeFigure('spacewalker', level);
     fadeFigure('standup-spacewalker', ease(this.standLevel) * this.fade);
+    const gun = shape.parts.get(GAS_GUN);
+    if (gun) holdGasGun(gun, this.walkerGun);
     const open = ease(this.hatchLevel);
     const hatch = shape.parts.get(GEMINI_RIGHT_HATCH);
     const axis = hatch?.userData['axis'] as Vector3 | undefined;
@@ -2636,7 +2701,7 @@ export class ShipModel {
     (this.halo.material as SpriteMaterial).dispose();
     for (const group of this.groups) {
       for (const look of this.walkerLooks(group)) {
-        for (const material of [look.suit, look.visor, look.tether]) material.dispose();
+        for (const material of walkerMaterials(look)) material.dispose();
       }
       for (const hatch of this.hatchLooks(group)) {
         hatch.opening.dispose();
@@ -2888,8 +2953,10 @@ export function buildStandaloneVehicle(
     if (!figure) continue;
     figure.visible = known.includes(name);
     const look = figure.userData['look'] as WalkerLook | undefined;
-    if (look) for (const material of [look.suit, look.visor, look.tether]) material.transparent = false;
+    if (look) for (const material of walkerMaterials(look)) material.transparent = false;
   }
+  const gun = nodes.get(GAS_GUN);
+  if (gun) holdGasGun(gun, known.includes('gas-gun') && known.includes('spacewalker'));
   const hatch = nodes.get(GEMINI_RIGHT_HATCH);
   const axis = hatch?.userData['axis'] as Vector3 | undefined;
   if (hatch && axis) hatch.quaternion.setFromAxisAngle(axis, open ? HATCH_OPEN_RAD : 0);
@@ -2916,10 +2983,13 @@ export function buildStandaloneVehicle(
   group.position.y = shift;
   const rest = new Map<string, Vector3>();
   for (const [name, node] of nodes) rest.set(name, node.position.clone());
-  const looks: Array<WalkerLook | HatchLook> = [];
+  // The spacewalkers' and the open hatch's own materials (see walkerMaterials).
+  const ownMaterials: Material[] = [];
   group.traverse((child) => {
-    const look = (child.userData['look'] ?? child.userData['hatchLook']) as WalkerLook | HatchLook | undefined;
-    if (look) looks.push(look);
+    const walker = child.userData['look'] as WalkerLook | undefined;
+    const hatch = child.userData['hatchLook'] as HatchLook | undefined;
+    if (walker) ownMaterials.push(...walkerMaterials(walker));
+    if (hatch) ownMaterials.push(hatch.opening, hatch.door);
   });
   return {
     object: holder,
@@ -2944,7 +3014,7 @@ export function buildStandaloneVehicle(
     dispose() {
       for (const geometry of geometries.values()) geometry.dispose();
       for (const material of kitMaterials(kit)) material.dispose();
-      for (const look of looks) for (const material of Object.values(look) as Material[]) material.dispose();
+      for (const material of ownMaterials) material.dispose();
     },
   };
 }
