@@ -19,6 +19,7 @@ export function setUpViewControls(director: Director, mission: Mission): void {
   group.setAttribute('aria-label', copy.views.groupLabel);
   const buttons = viewsFor(mission).map((view) => {
     const viewButton = button('segmented__item', copy.views[view]);
+    viewButton.setAttribute('data-testid', `view-button-${view}`);
     viewButton.dataset['view'] = view;
     viewButton.setAttribute('aria-pressed', 'false');
     viewButton.addEventListener('click', () => director.setView(view));

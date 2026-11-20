@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { flight as apollo11Flight } from "../../content/missions/apollo-11/flight.ts";
 import { elapsedToSeconds } from "../../content/types.ts";

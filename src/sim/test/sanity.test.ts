@@ -3,7 +3,7 @@
  * moments of Apollo 11, with published altitudes beside the model's where
  * Apollo by the Numbers gives them. Run with `npm test`.
  */
-import { it } from "node:test";
+import { it } from "vitest";
 import assert from "node:assert/strict";
 import { flight as apollo11Flight } from "../../content/missions/apollo-11/flight.ts";
 import {

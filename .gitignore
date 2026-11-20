@@ -2,3 +2,7 @@ node_modules/
 dist/
 assets-src/
 .DS_Store
+
+# Playwright: the report and the traces of failed tests
+tests/e2e/report/
+tests/e2e/results/

@@ -4,7 +4,7 @@
  * leave Earth. The numbers here are invented test values, not facts; their
  * citations say so.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import type { Cited, ElapsedTime } from "../../content/types.ts";
 import { EARTH_AXIAL_TILT_RAD, EARTH_EQUATORIAL_RADIUS_KM, EARTH_MEAN_RADIUS_KM, NAUTICAL_MILE_KM } from "../../content/physical-constants.ts";

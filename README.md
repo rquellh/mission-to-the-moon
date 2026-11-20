@@ -55,10 +55,32 @@ Open the "Network" address Vite prints on your phone.
 npm run build     # type-checks, then builds the site into dist/
 npm run preview   # serves dist/ locally to check the build
 npm run typecheck # type-check only
-npm test          # tests for the flight path math, plus one test that checks every mission
+npm test          # the content, flight math, and interface tests
+npm run test:e2e  # the browser tests
 ```
 
-The site uses relative paths, so `dist/` works from any subpath. Each mission, and the 3D code, is built as its own file and fetched only when needed. Pushing to `main` builds and deploys the site to GitHub Pages through `.github/workflows/deploy.yml` (turn on Pages with "GitHub Actions" as the source in the repository settings).
+The site uses relative paths, so `dist/` works from any subpath. Each mission, and the 3D code, is built as its own file and fetched only when needed. Pushing to `main` tests, builds, and deploys the site to GitHub Pages through `.github/workflows/deploy.yml` (turn on Pages with "GitHub Actions" as the source in the repository settings). A failing test stops the publish. A pull request runs the same tests and publishes nothing.
+
+## Tests
+
+There are three layers, each owning different things, so nothing is tested twice:
+
+- **Content and flight** (`src/sim/test/`, `src/app/*.test.ts`): what must be true of every mission, the flight path math, the mission clock, and the tour. Plain Node, no page.
+- **Interface** (`src/ui/*.test.ts`): the real interface over the real `index.html`, with a real mission and the real clock. Only the 3D scene and the screen's frames are replaced (`src/test/`).
+- **Browser** (`tests/`): a few whole journeys in a real browser with the real 3D scene. The scene describes what it is drawing through `window.__missionScene()` (`src/scene/report.ts`), so a test can check that a craft is drawn and that nothing covers it without comparing pictures.
+
+```sh
+npm test                  # content, flight, and interface tests, once (Vitest)
+npm run test:watch        # the same, re-run as files change
+npm run test:e2e          # browser tests against the dev server (Playwright)
+npm run test:e2e:preview  # build, then browser tests against the built site
+npm run test:e2e:ui       # Playwright's window for stepping through a test
+npm run test:e2e:report   # open the report of the last browser run
+```
+
+The browser tests drive the Google Chrome already installed on the machine, so there is no browser to download. They start the site themselves.
+
+Three skills in `.claude/skills/` say how tests are planned and written here: `test-planning` (which layer owns what), `vitest-testing`, and `e2e-testing`. Plan first, then write.
 
 ## Folder structure
 
@@ -75,10 +97,13 @@ src/extras/<id>/              One folder per extra: a hands-on moment or somethi
 src/sim/                      Flight path math (plain TypeScript, no 3D code), with tests
 src/app/                      The mission clock, the tour, and the contract between scene and interface
 src/scene/                    three.js scene: Earth, Moon, stars, paths, spacecraft, camera
-src/ui/                       Interface code: mission list, timeline, event cards, tour, dialogs
+src/ui/                       Interface code: mission list, timeline, event cards, tour, dialogs, with tests
+src/test/                     What the interface tests share: the page setup and the stand-ins for the scene and the screen
+tests/                        Browser tests (Playwright): specs, page objects, helpers
 src/styles/                   CSS
 tools/                        Developer scripts (screenshots, Moon and Sun positions)
-.github/workflows/            GitHub Pages deployment
+.github/workflows/            Tests and GitHub Pages deployment
+.claude/skills/               How tests are planned and written in this project
 assets-src/                   Original downloads and screenshots (not committed)
 ```
 
@@ -101,7 +126,7 @@ How the facts are kept honest:
 
 - `src/content/sources.ts` holds the sources shared by many missions, and each mission's `sources.ts` holds its own. A source goes in only after its page has been opened and checked.
 - Mission content is type-checked. A fact with no citation, or one that cites a source that is not registered, fails the build.
-- `npm test` builds every mission's flight path and checks it: no jumps, nothing under the ground, events in order and inside the flight, every citation resolving, every photo present, and the mission list's summary matching the story.
+- `npm test` includes a test that builds every mission's flight path and checks it: no jumps, nothing under the ground, events in order and inside the flight, every citation resolving, every photo present, and the mission list's summary matching the story.
 - Physical constants live in `src/content/physical-constants.ts`, each with its NASA source.
 - Site-wide images, data, and software are listed in `src/content/credits.json`. Mission photos are credited on their cards and in the "Sources and credits" dialog.
 
@@ -131,7 +156,7 @@ Developer tools:
 
 ## Remove installed packages
 
-Everything `npm install` adds lives in this folder. To remove it, delete the `node_modules` folder:
+Everything `npm install` adds lives in this folder, the test tools included. To remove it, delete the `node_modules` folder:
 
 ```sh
 rm -rf node_modules

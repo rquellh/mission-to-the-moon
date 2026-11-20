@@ -5,7 +5,7 @@
  * plan does not use as inputs. Page and table numbers refer to the Gemini
  * VIII Mission Report (MSC-G-R-66-4).
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { flight as gemini8Flight } from "../../content/missions/gemini-8/flight.ts";
 import {

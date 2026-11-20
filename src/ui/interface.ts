@@ -161,6 +161,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     byId('stage-note-text', HTMLParagraphElement).textContent = options.no3D.note;
     if (options.no3D.offerReload) {
       const reload = el('button', 'button', copy.memorial.reload);
+      reload.setAttribute('data-testid', 'stage-note-reload');
       reload.type = 'button';
       reload.addEventListener('click', () => window.location.reload());
       note.append(reload);

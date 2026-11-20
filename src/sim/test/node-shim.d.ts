@@ -1,20 +1,8 @@
 /**
  * Minimal type declarations for the Node built-ins the tests use. The
- * project has no @types/node (no new dependencies), and the tests only need
- * these few calls. Node 24 runs the tests directly: `npm test`.
+ * project has no @types/node, and the tests only need these few calls.
+ * Vitest runs the tests: `npm test`.
  */
-declare module "node:test" {
-  interface TestContext {
-    /** A note printed under the test in the report. */
-    diagnostic(message: string): void;
-  }
-  type TestFn = (t: TestContext) => void | Promise<void>;
-  export function test(name: string, fn: TestFn): Promise<void>;
-  export function describe(name: string, fn: () => void): void;
-  export function it(name: string, fn: TestFn): void;
-  export default test;
-}
-
 declare module "node:assert/strict" {
   interface Assert {
     (value: unknown, message?: string): asserts value;

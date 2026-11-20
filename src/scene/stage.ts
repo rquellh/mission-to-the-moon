@@ -6,6 +6,7 @@ import {
   Group,
   MathUtils,
   Matrix4,
+  Mesh,
   PerspectiveCamera,
   Quaternion,
   Scene,
@@ -13,6 +14,9 @@ import {
   SpriteMaterial,
   Vector3,
   WebGLRenderer,
+  type BufferGeometry,
+  type Material,
+  type Object3D,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { Director, Player, ViewInsets } from '../app/contract';
@@ -43,6 +47,7 @@ import { createEarth, type Earth } from './earth';
 import { fitDistance, interpolatePose, type CameraPose, type ClearArea, type SphereLike } from './framing';
 import { createMarkers, type MarkerPoint, type MarkerSet } from './markers';
 import { createMoon, type Moon } from './moon';
+import type { SceneBox, SceneReport } from './report';
 import {
   createOrbitRing,
   createPathLine,
@@ -261,6 +266,12 @@ function fieldOfViewFor(aspect: number): number {
   const minHorizontal = MathUtils.degToRad(PORTRAIT_MIN_HORIZONTAL_FOV);
   const vertical = MathUtils.radToDeg(2 * Math.atan(Math.tan(minHorizontal / 2) / aspect));
   return MathUtils.clamp(vertical, CAMERA_FOV, PORTRAIT_MAX_FOV);
+}
+
+/** Whether a mesh with this material shows at all: not hidden, and not faded (almost) out. */
+function isDrawn(material: Material | Material[]): boolean {
+  const list = Array.isArray(material) ? material : [material];
+  return list.some((one) => one.visible && (!one.transparent || one.opacity > 0.05));
 }
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
@@ -771,6 +782,104 @@ export class Stage implements Director {
     this.reducedMotion = reduced;
     this.controls.enableDamping = !reduced;
     this.needsRender = true;
+  }
+
+  /**
+   * What the scene is drawing now, as last drawn (see SceneReport): for the
+   * browser tests, which cannot look inside a canvas. Nothing here changes
+   * the picture.
+   */
+  report(): SceneReport {
+    const t = this.player.time;
+    const models = this.fleet?.ships ?? [];
+    const insets = this.clearInsets;
+    return {
+      view: this.viewNow,
+      scaleMode: this.scaleMode,
+      time: t,
+      fastForward: this.fastForward,
+      canvas: { width: this.cssWidth, height: this.cssHeight },
+      clear: {
+        x: insets.left,
+        y: insets.top,
+        width: this.cssWidth - insets.left - insets.right,
+        height: this.cssHeight - insets.top - insets.bottom,
+      },
+      followed: this.followed.id,
+      ships: this.ships.map((ship, i) => {
+        const model = models[i];
+        const names = model ? model.shapeParts(model.shapeAt(t)) : [];
+        return {
+          id: ship.id,
+          box: model ? this.boxOnCanvas(model.root) : null,
+          parts: names.map((name) => ({ name, box: model ? this.boxOnCanvas(model.root, name) : null })),
+        };
+      }),
+      leftBehind: (this.fleet?.leftBehind ?? []).map((part) => ({
+        part: part.part,
+        ship: part.shipId,
+        box: this.boxOnCanvas(part.root),
+      })),
+      labels: this.labels.map((label, i) => {
+        const opacity = label.visible ? (label.material as SpriteMaterial).opacity : 0;
+        return { text: this.options.leftBehind[i]?.label ?? '', opacity, box: opacity > 0 ? this.labelBox(label) : null };
+      }),
+    };
+  }
+
+  /**
+   * The box on the canvas around the drawn meshes under `root`, or only
+   * those of its part `name`: null when none are drawn (hidden, faded out)
+   * or any of it is behind the camera.
+   */
+  private boxOnCanvas(root: Object3D, name?: string): SceneBox | null {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let behind = false;
+    const corner = this.v1;
+    const walk = (node: Object3D, inside: boolean): void => {
+      if (!node.visible) return;
+      const within = inside || node.name === name;
+      if (within && node instanceof Mesh && isDrawn(node.material as Material | Material[])) {
+        const geometry = node.geometry as BufferGeometry;
+        if (!geometry.boundingBox) geometry.computeBoundingBox();
+        const box = geometry.boundingBox;
+        if (box) {
+          for (let k = 0; k < 8; k += 1) {
+            corner
+              .set(k & 1 ? box.max.x : box.min.x, k & 2 ? box.max.y : box.min.y, k & 4 ? box.max.z : box.min.z)
+              .applyMatrix4(node.matrixWorld);
+            if (this.v2.subVectors(corner, this.camera.position).dot(this.cameraForward) <= this.camera.near) {
+              behind = true;
+              continue;
+            }
+            corner.project(this.camera);
+            const x = ((corner.x + 1) / 2) * this.cssWidth;
+            const y = ((1 - corner.y) / 2) * this.cssHeight;
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+          }
+        }
+      }
+      for (const child of node.children) walk(child, within);
+    };
+    walk(root, name === undefined);
+    if (behind || !Number.isFinite(minX)) return null;
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  }
+
+  /** The box on the canvas a label (see updateLabels) covers. */
+  private labelBox(label: Sprite): SceneBox {
+    const anchor = this.v1.copy(label.position).project(this.camera);
+    const height = label.userData['pixels'] as number;
+    const width = height * (label.userData['aspect'] as number);
+    const x = ((anchor.x + 1) / 2) * this.cssWidth;
+    const y = ((1 - anchor.y) / 2) * this.cssHeight;
+    return { x: x - label.center.x * width, y: y + (label.center.y - 1) * height, width, height };
   }
 
   dispose(): void {

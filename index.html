@@ -15,159 +15,159 @@
     />
     <title>Mission to the Moon</title>
   </head>
-  <body>
-    <canvas id="stage" class="stage" role="img" tabindex="0" aria-label="3D view of the mission"></canvas>
+  <body data-testid="site">
+    <canvas id="stage" class="stage" role="img" tabindex="0" aria-label="3D view of the mission" data-testid="scene-canvas"></canvas>
 
     <!-- Everything a person reads and touches sits in this layer over the 3D view. -->
     <div class="hud" id="hud">
-      <header class="masthead" id="masthead">
+      <header class="masthead" id="masthead" data-testid="masthead">
         <div class="masthead__titles">
           <h1 class="masthead__site">Mission to the Moon</h1>
           <h2 class="masthead__mission">
             <!-- The mission's name opens the mission picker. -->
-            <button type="button" class="masthead__switch" id="hub-button" aria-haspopup="dialog">
+            <button type="button" class="masthead__switch" id="hub-button" aria-haspopup="dialog" data-testid="masthead-missions">
               <span class="masthead__label">
-                <span class="masthead__name" id="mission-name"></span>
-                <span class="masthead__dates" id="mission-dates"></span>
+                <span class="masthead__name" id="mission-name" data-testid="masthead-mission-name"></span>
+                <span class="masthead__dates" id="mission-dates" data-testid="masthead-mission-dates"></span>
               </span>
             </button>
           </h2>
         </div>
         <div class="masthead__actions">
-          <button type="button" class="button button--quiet" id="about-button" aria-haspopup="dialog" aria-label="About this mission">
+          <button type="button" class="button button--quiet" id="about-button" aria-haspopup="dialog" aria-label="About this mission" data-testid="masthead-about">
             <span>About<span class="wide-only"> this mission</span></span>
           </button>
-          <button type="button" class="button button--quiet" id="credits-button" aria-haspopup="dialog" aria-label="Sources and credits">
+          <button type="button" class="button button--quiet" id="credits-button" aria-haspopup="dialog" aria-label="Sources and credits" data-testid="masthead-credits">
             <span>Sources<span class="wide-only"> and credits</span></span>
           </button>
         </div>
       </header>
 
-      <div class="views" id="views">
+      <div class="views" id="views" data-testid="views">
         <!-- One button for each view the mission offers, added by the script. -->
-        <div class="segmented" role="group" aria-label="Look at" id="view-buttons"></div>
-        <button type="button" class="switch" id="scale-toggle" aria-pressed="false">
+        <div class="segmented" role="group" aria-label="Look at" id="view-buttons" data-testid="view-buttons"></div>
+        <button type="button" class="switch" id="scale-toggle" aria-pressed="false" data-testid="scale-toggle">
           <span class="switch__track" aria-hidden="true"><span class="switch__knob"></span></span>
           <span class="switch__label">True scale</span>
         </button>
       </div>
 
       <!-- Without a 3D view, a short note fills the space it would take. -->
-      <div class="stage-note" id="stage-note" hidden>
-        <p class="stage-note__text" id="stage-note-text"></p>
+      <div class="stage-note" id="stage-note" hidden data-testid="stage-note">
+        <p class="stage-note__text" id="stage-note-text" data-testid="stage-note-text"></p>
       </div>
 
-      <p class="caption" id="caption">
-        <span class="caption__note" id="scale-note" aria-live="polite"></span>
-        <button type="button" class="caption__link" id="drawn-button" aria-haspopup="dialog">How this is drawn</button>
+      <p class="caption" id="caption" data-testid="caption">
+        <span class="caption__note" id="scale-note" aria-live="polite" data-testid="caption-scale-note"></span>
+        <button type="button" class="caption__link" id="drawn-button" aria-haspopup="dialog" data-testid="caption-how-drawn">How this is drawn</button>
       </p>
 
-      <aside class="sheet" id="sheet" data-state="compact" aria-labelledby="card-title">
-        <button type="button" class="sheet__handle" id="sheet-handle" aria-expanded="false" aria-controls="card-body">
+      <aside class="sheet" id="sheet" data-state="compact" aria-labelledby="card-title" data-testid="sheet">
+        <button type="button" class="sheet__handle" id="sheet-handle" aria-expanded="false" aria-controls="card-body" data-testid="sheet-handle">
           <span class="sheet__grip" aria-hidden="true"></span>
           <span class="visually-hidden" id="sheet-handle-label">Show the whole card</span>
         </button>
-        <section class="tour" id="tour" aria-label="Guided tour" hidden></section>
-        <article class="card" id="card"></article>
+        <section class="tour" id="tour" aria-label="Guided tour" hidden data-testid="tour-panel"></section>
+        <article class="card" id="card" data-testid="event-card"></article>
       </aside>
 
-      <section class="timeline" id="timeline" aria-label="Timeline">
-        <button type="button" class="play" id="play" aria-label="Play"></button>
+      <section class="timeline" id="timeline" aria-label="Timeline" data-testid="timeline">
+        <button type="button" class="play" id="play" aria-label="Play" data-testid="timeline-play"></button>
         <p class="clock" id="clock">
           <span class="clock__line">
-            <span class="clock__met" id="clock-met">00:00:00</span>
-            <span class="clock__since" id="clock-since">since liftoff</span>
+            <span class="clock__met" id="clock-met" data-testid="clock-time">00:00:00</span>
+            <span class="clock__since" id="clock-since" data-testid="clock-since">since liftoff</span>
           </span>
           <span class="clock__date">
-            <span class="clock__day" id="clock-day" hidden></span>
-            <span class="clock__fast" id="clock-fast" hidden>Fast forward</span>
-            <span class="clock__utc" id="clock-utc"></span>
+            <span class="clock__day" id="clock-day" hidden data-testid="clock-day"></span>
+            <span class="clock__fast" id="clock-fast" hidden data-testid="clock-fast-forward">Fast forward</span>
+            <span class="clock__utc" id="clock-utc" data-testid="clock-utc"></span>
           </span>
         </p>
         <label class="pick pick--chapter">
           <span class="visually-hidden">Jump to a chapter</span>
-          <select class="pick__select" id="chapter-select"></select>
+          <select class="pick__select" id="chapter-select" data-testid="timeline-chapter-select"></select>
         </label>
         <div class="scrubber" id="scrubber">
           <div class="scrubber__rail" aria-hidden="true"><div class="scrubber__played"></div></div>
           <div class="scrubber__ticks" id="scrubber-ticks" aria-hidden="true"></div>
-          <input type="range" class="scrubber__input" id="scrubber-input" min="0" max="1" step="any" value="0" aria-label="Mission time" />
+          <input type="range" class="scrubber__input" id="scrubber-input" min="0" max="1" step="any" value="0" aria-label="Mission time" data-testid="timeline-scrubber" />
         </div>
-        <div class="chapters" id="chapters" role="group" aria-label="Chapters"></div>
+        <div class="chapters" id="chapters" role="group" aria-label="Chapters" data-testid="timeline-chapters"></div>
         <label class="pick pick--speed">
           <span class="visually-hidden">Speed</span>
-          <select class="pick__select" id="speed-select"></select>
+          <select class="pick__select" id="speed-select" data-testid="timeline-speed-select"></select>
         </label>
       </section>
     </div>
 
     <!-- The mission picker: the welcome, and reopened from the mission's name in the header. -->
-    <dialog class="hub" id="hub" aria-labelledby="hub-title" aria-describedby="hub-lede">
+    <dialog class="hub" id="hub" aria-labelledby="hub-title" aria-describedby="hub-lede" data-testid="hub">
       <div class="hub__head">
         <div class="hub__intro">
-          <h2 class="hub__title" id="hub-title" tabindex="-1">Mission to the Moon</h2>
-          <p class="hub__lede" id="hub-lede"></p>
+          <h2 class="hub__title" id="hub-title" tabindex="-1" data-testid="hub-title">Mission to the Moon</h2>
+          <p class="hub__lede" id="hub-lede" data-testid="hub-lede"></p>
         </div>
-        <button type="button" class="button button--quiet hub__close" id="hub-close" hidden>Close</button>
+        <button type="button" class="button button--quiet hub__close" id="hub-close" hidden data-testid="hub-close">Close</button>
       </div>
-      <div class="hub__list" id="hub-list"></div>
+      <div class="hub__list" id="hub-list" data-testid="hub-list"></div>
     </dialog>
 
-    <div class="loading" id="loading" role="status">
-      <p class="loading__text" id="loading-text">Loading…</p>
+    <div class="loading" id="loading" role="status" data-testid="loading">
+      <p class="loading__text" id="loading-text" data-testid="loading-text">Loading…</p>
       <progress class="loading__bar" id="loading-progress" max="3" value="0"></progress>
     </div>
 
-    <div class="message" id="message" role="alert" hidden>
-      <p class="message__text" id="message-text"></p>
+    <div class="message" id="message" role="alert" hidden data-testid="message">
+      <p class="message__text" id="message-text" data-testid="message-text"></p>
       <div class="message__actions">
-        <button type="button" class="button" id="message-reload" hidden>Reload</button>
-        <button type="button" class="button" id="message-action" hidden></button>
+        <button type="button" class="button" id="message-reload" hidden data-testid="message-reload">Reload</button>
+        <button type="button" class="button" id="message-action" hidden data-testid="message-action"></button>
       </div>
     </div>
 
-    <p class="visually-hidden" id="announcer" aria-live="polite"></p>
+    <p class="visually-hidden" id="announcer" aria-live="polite" data-testid="announcer"></p>
 
-    <dialog class="dialog" id="about-dialog" aria-labelledby="about-title">
+    <dialog class="dialog" id="about-dialog" aria-labelledby="about-title" data-testid="about-dialog">
       <div class="dialog__head">
-        <h2 class="dialog__title" id="about-title">About this mission</h2>
-        <button type="button" class="button button--quiet dialog__close">Close</button>
+        <h2 class="dialog__title" id="about-title" data-testid="about-dialog-title">About this mission</h2>
+        <button type="button" class="button button--quiet dialog__close" data-testid="about-dialog-close">Close</button>
       </div>
-      <div class="dialog__body" id="about-body"></div>
+      <div class="dialog__body" id="about-body" data-testid="about-dialog-body"></div>
     </dialog>
 
-    <dialog class="dialog dialog--narrow" id="drawn-dialog" aria-labelledby="drawn-title">
+    <dialog class="dialog dialog--narrow" id="drawn-dialog" aria-labelledby="drawn-title" data-testid="drawn-dialog">
       <div class="dialog__head">
-        <h2 class="dialog__title" id="drawn-title">How this is drawn</h2>
-        <button type="button" class="button button--quiet dialog__close">Close</button>
+        <h2 class="dialog__title" id="drawn-title" data-testid="drawn-dialog-title">How this is drawn</h2>
+        <button type="button" class="button button--quiet dialog__close" data-testid="drawn-dialog-close">Close</button>
       </div>
-      <div class="dialog__body" id="drawn-body"></div>
+      <div class="dialog__body" id="drawn-body" data-testid="drawn-dialog-body"></div>
     </dialog>
 
     <!-- A page of remembrance, for a crew that did not fly. Its content loads when it opens. -->
-    <dialog class="dialog" id="memorial-dialog" aria-labelledby="memorial-title">
+    <dialog class="dialog" id="memorial-dialog" aria-labelledby="memorial-title" data-testid="memorial-dialog">
       <div class="dialog__head">
-        <h2 class="dialog__title" id="memorial-title"></h2>
-        <button type="button" class="button button--quiet dialog__close">Close</button>
+        <h2 class="dialog__title" id="memorial-title" data-testid="memorial-dialog-title"></h2>
+        <button type="button" class="button button--quiet dialog__close" data-testid="memorial-dialog-close">Close</button>
       </div>
-      <div class="dialog__body" id="memorial-body"></div>
+      <div class="dialog__body" id="memorial-body" data-testid="memorial-dialog-body"></div>
     </dialog>
 
     <!-- An extra: a full-screen sheet with its title and Close; the extra fills the body. -->
-    <dialog class="dialog dialog--full" id="extra-dialog" aria-labelledby="extra-title">
+    <dialog class="dialog dialog--full" id="extra-dialog" aria-labelledby="extra-title" data-testid="extra-sheet">
       <div class="dialog__head">
-        <h2 class="dialog__title" id="extra-title"></h2>
-        <button type="button" class="button button--quiet dialog__close">Close</button>
+        <h2 class="dialog__title" id="extra-title" data-testid="extra-sheet-title"></h2>
+        <button type="button" class="button button--quiet dialog__close" data-testid="extra-sheet-close">Close</button>
       </div>
-      <div class="dialog__body" id="extra-body"></div>
+      <div class="dialog__body" id="extra-body" data-testid="extra-sheet-body"></div>
     </dialog>
 
-    <dialog class="dialog" id="credits-dialog" aria-labelledby="credits-title">
+    <dialog class="dialog" id="credits-dialog" aria-labelledby="credits-title" data-testid="credits-dialog">
       <div class="dialog__head">
-        <h2 class="dialog__title" id="credits-title">Sources and credits</h2>
-        <button type="button" class="button button--quiet dialog__close">Close</button>
+        <h2 class="dialog__title" id="credits-title" data-testid="credits-dialog-title">Sources and credits</h2>
+        <button type="button" class="button button--quiet dialog__close" data-testid="credits-dialog-close">Close</button>
       </div>
-      <div class="dialog__body" id="credits-body"></div>
+      <div class="dialog__body" id="credits-body" data-testid="credits-dialog-body"></div>
     </dialog>
 
     <noscript>

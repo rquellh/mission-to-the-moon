@@ -2,7 +2,7 @@
  * Tests for the flight-path model, run with `npm test` (Node's built-in
  * test runner; Node 24 runs TypeScript directly).
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { flight as apollo11Flight } from "../../content/missions/apollo-11/flight.ts";
 import {

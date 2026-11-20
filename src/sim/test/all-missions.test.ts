@@ -10,7 +10,7 @@
  * Run with `npm test`. Each mission gets its own group of tests, named by
  * its folder.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { existsSync, readdirSync } from "node:fs";
 import { SOURCE_GROUPS, SOURCES } from "../../content/sources.ts";
@@ -261,7 +261,7 @@ for (const folder of flights) {
       assert.equal(problems.length, 0, report(problems));
     });
 
-    it("bends no orbit hard to meet its published fixes", (t) => {
+    it("bends no orbit hard to meet its published fixes", ({ annotate }) => {
       const path = folder.path;
       if (!path) return assert.fail("the plan does not build");
       const problems: string[] = [];
@@ -273,7 +273,7 @@ for (const folder of flights) {
           const plane = seg.planeCorrection * DEG_PER_RAD;
           const end = phase.kind === "orbit" && phase.endFix ? "its endFix" : phase.kind === "orbit" && phase.endRange ? "its endRange" : "where the next phase starts";
           const line = `${ship.id} "${phase.label}" (${phase.start.value} to ${phase.end.value}): ${(rate * 100).toFixed(2)}% of its orbital rate, plane turned ${plane.toFixed(2)} degrees, to end at ${end}`;
-          if (rate >= 0.001 || plane >= 0.1) t.diagnostic(line);
+          if (rate >= 0.001 || plane >= 0.1) void annotate(line);
           if (rate > MAX_RATE_CORRECTION || plane > MAX_PLANE_CORRECTION_DEG) problems.push(line);
         });
       }

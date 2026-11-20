@@ -90,6 +90,7 @@ export function setUpExtraSheet(options: ExtraSheetOptions): ExtraSheet {
 
   const note = (text: string): HTMLParagraphElement => {
     const line = el('p', 'extra-sheet__status', text);
+    line.setAttribute('data-testid', 'extra-sheet-status');
     line.setAttribute('role', 'status');
     return line;
   };
@@ -139,12 +140,15 @@ export function setUpExtraSheet(options: ExtraSheetOptions): ExtraSheet {
         console.error(error);
         if (!isCurrent()) return;
         const reload = button('button', copy.extra.reload);
+        reload.setAttribute('data-testid', 'extra-sheet-reload');
         reload.addEventListener('click', () => window.location.assign(extraAddress(id, options.missionId, params)));
         const back = button('button button--primary', copy.extra.back);
+        back.setAttribute('data-testid', 'extra-sheet-back');
         back.addEventListener('click', close);
         const actions = el('div', 'extra-actions');
         actions.append(back, reload);
         const box = el('div', 'extra-sheet__failed');
+        box.setAttribute('data-testid', 'extra-sheet-failed');
         box.append(note(name ? copy.extra.failed(name) : copy.extra.failedUnnamed), actions);
         body.replaceChildren(box);
         body.removeAttribute('aria-busy');
@@ -158,6 +162,7 @@ export function setUpExtraSheet(options: ExtraSheetOptions): ExtraSheet {
           title.textContent = extra.meta.title;
           document.title = copy.pageTitle(extra.meta.title);
           const host = el('div', 'extra-host');
+          host.setAttribute('data-testid', `extra-sheet-host-${id}`);
           host.dataset['extra'] = id;
           body.replaceChildren(host);
           const mount = await extra.mount(host, context, new URLSearchParams(params));

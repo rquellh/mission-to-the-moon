@@ -5,7 +5,7 @@
  * (and, for one case, the landing site moved north with the orbits over it;
  * that value is invented and its citation says so).
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { flight as apollo11 } from "../../content/missions/apollo-11/flight.ts";
 import { EARTH_MEAN_RADIUS_KM, EARTH_MOON_DISTANCE, NAUTICAL_MILE_KM } from "../../content/physical-constants.ts";

@@ -111,6 +111,7 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
     const to = next ? fraction(next.seconds) : 1;
     // The label cuts itself off, not the button, so the button's taller tap area is not clipped.
     const chapterButton = button('chapters__item');
+    chapterButton.setAttribute('data-testid', `chapter-${start.chapter.id}`);
     chapterButton.append(el('span', 'chapters__label', start.chapter.title));
     // The full name, for when a short chapter cuts its label off.
     chapterButton.title = start.chapter.title;

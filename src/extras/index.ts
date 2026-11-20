@@ -10,8 +10,9 @@
  * A meta with `status: "draft"` is listed only on the dev server. It still
  * opens by its address (`?extra=<folder name>`).
  *
- * This file uses `import.meta.glob`, which only Vite understands, so code
- * that Node runs directly (the tests) must not import it.
+ * This file uses `import.meta.glob`, which only Vite understands. The
+ * Vitest tests run through Vite and can import it; code that plain Node or
+ * Playwright runs (tools/, tests/) cannot.
  */
 import type { Extra, ExtraMeta } from "./types.ts";
 

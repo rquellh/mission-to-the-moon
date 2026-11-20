@@ -5,9 +5,9 @@
  * the clock still, on fast screens and on slow ones. Next flies the whole
  * stretch to the next stop in its set number of real seconds, on any screen.
  *
- * Run: node --test src/app/tour.test.ts
+ * Run: npx vitest run src/app/tour.test.ts
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { elapsedToSeconds, type EventView, type Mission } from "../content/types.ts";
 import type { FlightPlan } from "../sim/types.ts";

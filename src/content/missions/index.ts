@@ -12,8 +12,9 @@
  * A summary with `status: "draft"` is listed only in the dev server. It can
  * still be opened by its address (`?mission=<folder name>`).
  *
- * This file uses `import.meta.glob`, which only Vite understands, so code
- * that Node runs directly (the tests) must not import it.
+ * This file uses `import.meta.glob`, which only Vite understands. The
+ * Vitest tests run through Vite and can import it; code that plain Node or
+ * Playwright runs (tools/, tests/) cannot.
  */
 import type { Memorial, MissionSummary } from "../types.ts";
 import type { MissionBundle } from "./bundle.ts";

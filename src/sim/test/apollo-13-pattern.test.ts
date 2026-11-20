@@ -6,7 +6,7 @@
  * shortly before entry. The numbers are invented test values (some borrowed
  * from Apollo 11's plan for realism), not facts; their citations say so.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import type { Cited, ElapsedTime } from "../../content/types.ts";
 import { EARTH_MEAN_RADIUS_KM, FOOT_KM, MOON_RADIUS, NAUTICAL_MILE_KM } from "../../content/physical-constants.ts";

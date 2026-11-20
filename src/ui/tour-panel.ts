@@ -21,28 +21,40 @@ export function setUpTourPanel(tour: Tour, { onExplore, onRestart }: TourPanelOp
   // Stepping view.
   const steps = el('div', 'tour__steps');
   const count = el('p', 'tour__count');
+  count.setAttribute('data-testid', 'tour-count');
   const progress = el('ol', 'tour__progress');
   progress.setAttribute('aria-hidden', 'true');
-  const dots = tour.stops.map(() => el('li', 'tour__dot'));
+  const dots = tour.stops.map((stop) => {
+    const dot = el('li', 'tour__dot');
+    dot.setAttribute('data-testid', `tour-dot-${stop.id}`);
+    return dot;
+  });
   progress.append(...dots);
 
   const back = button('button button--quiet tour__back');
+  back.setAttribute('data-testid', 'tour-back');
   back.append(icon('previous'), el('span', 'tour__back-label', copy.tour.back));
   const next = button('button button--primary tour__next');
+  next.setAttribute('data-testid', 'tour-next');
   const nextLabel = el('span', undefined, copy.tour.next);
   next.append(nextLabel, icon('next'));
   const exit = button('button button--quiet tour__exit', copy.tour.exit);
+  exit.setAttribute('data-testid', 'tour-exit');
   const stepper = el('div', 'tour__nav');
   stepper.append(back, next);
   steps.append(count, progress, exit, stepper);
 
   // The ending.
   const ending = el('div', 'tour__ending');
+  ending.setAttribute('data-testid', 'tour-ending');
   const endTitle = el('h3', 'tour__end-title', copy.tour.endTitle);
+  endTitle.setAttribute('data-testid', 'tour-ending-title');
   endTitle.tabIndex = -1;
   const endActions = el('div', 'tour__end-actions');
   const explore = button('button button--primary', copy.tour.endExplore);
+  explore.setAttribute('data-testid', 'tour-ending-explore');
   const again = button('button button--quiet', copy.tour.endAgain);
+  again.setAttribute('data-testid', 'tour-ending-restart');
   endActions.append(explore, again);
   ending.append(endTitle, el('p', 'tour__end-text', copy.tour.endText), endActions);
 

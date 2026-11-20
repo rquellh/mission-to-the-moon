@@ -181,6 +181,7 @@ export function setUpHub(options: HubOptions): Hub {
   const entry = (shown: MissionSummary): HTMLLIElement => {
     const memorial = shown.kind === 'memorial';
     const item = el('li', memorial ? 'hub__entry hub__entry--memorial' : 'hub__entry');
+    item.setAttribute('data-testid', `hub-mission-${shown.id}`);
     const isCurrent = shown.id === currentId;
     if (isCurrent) item.setAttribute('aria-current', 'true');
     entries.set(keyOf({ mission: shown.id }), item);
@@ -197,6 +198,7 @@ export function setUpHub(options: HubOptions): Hub {
     const buttons = el('div', 'hub__actions');
     if (memorial) {
       const read = button('button hub__read', copy.hub.read);
+      read.setAttribute('data-testid', `hub-mission-${shown.id}-read`);
       read.setAttribute('aria-label', copy.hub.readAbout(shown.name));
       read.setAttribute('aria-haspopup', 'dialog');
       read.addEventListener('click', () => onMemorial(shown.id, read));
@@ -211,11 +213,13 @@ export function setUpHub(options: HubOptions): Hub {
       const primary = (first: boolean): string => (isCurrent && first ? ' button--primary' : '');
       if (shown.hasTour) {
         const tour = button(`button${primary(true)} hub__tour`, copy.hub.tour);
+        tour.setAttribute('data-testid', `hub-mission-${shown.id}-tour`);
         tour.setAttribute('aria-label', copy.hub.tourOf(shown.name));
         tour.addEventListener('click', () => go('tour'));
         buttons.append(tour);
       }
       const explore = button(`button${primary(!shown.hasTour)} hub__explore`, copy.hub.explore);
+      explore.setAttribute('data-testid', `hub-mission-${shown.id}-explore`);
       explore.setAttribute('aria-label', copy.hub.exploreMission(shown.name));
       explore.addEventListener('click', () => go('explore'));
       buttons.append(explore);
@@ -242,6 +246,7 @@ export function setUpHub(options: HubOptions): Hub {
   // The extras: quieter rows under the missions, one small group per kind.
   const extraEntry = (meta: ExtraMeta): HTMLLIElement => {
     const item = el('li', 'hub__entry hub__entry--extra');
+    item.setAttribute('data-testid', `hub-extra-${meta.id}`);
     const key = keyOf({ extra: meta.id });
     entries.set(key, item);
     const heading = el('div', 'hub__heading');
@@ -249,6 +254,7 @@ export function setUpHub(options: HubOptions): Hub {
     if (isExtraDraft(meta)) name.append(' ', el('span', 'hub__mark hub__mark--draft', copy.hub.draft));
     heading.append(name, el('p', 'hub__summary', meta.blurb));
     const open = button('button hub__open', copy.hub.open);
+    open.setAttribute('data-testid', `hub-extra-${meta.id}-open`);
     open.setAttribute('aria-label', copy.hub.openExtra(meta.title));
     open.setAttribute('aria-haspopup', 'dialog');
     open.addEventListener('click', () => onExtra(meta.id, open));

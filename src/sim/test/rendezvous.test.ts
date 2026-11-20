@@ -6,7 +6,7 @@
  * insertion, with no position fix of its own. The numbers are invented test
  * values, not facts; their citations say so.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import type { Cited, ElapsedTime } from "../../content/types.ts";
 import { EARTH_MEAN_RADIUS_KM, NAUTICAL_MILE_KM } from "../../content/physical-constants.ts";

@@ -4,7 +4,7 @@
  * Apollo 11's plan with its landing site moved to 26.1 degrees north (an
  * invented value; its citation says so) and `lunarOrbitPlane` set over it.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { flight as apollo11 } from "../../content/missions/apollo-11/flight.ts";
 import { EARTH_MOON_DISTANCE } from "../../content/physical-constants.ts";

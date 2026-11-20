@@ -5,7 +5,7 @@
  * insertion fix, no retrofire position, no entry state. The numbers here
  * are invented test values, not facts; their citations say so.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import type { Cited, ElapsedTime } from "../../content/types.ts";
 import {

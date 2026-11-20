@@ -47,40 +47,52 @@ export function setUpEventCard({ index, onStep, reducedMotion, extraTitle, onTry
   const titles = el('div', 'card__titles');
   const title = el('h3', 'card__title');
   title.id = 'card-title';
+  title.setAttribute('data-testid', 'event-card-title');
   const time = el('p', 'card__time');
+  time.setAttribute('data-testid', 'event-card-time');
   titles.append(title, time);
 
   const nav = el('div', 'card__nav');
   const previous = button('icon-button');
+  previous.setAttribute('data-testid', 'event-card-previous');
   previous.setAttribute('aria-label', copy.card.previous);
   previous.append(icon('previous'));
   const next = button('icon-button');
+  next.setAttribute('data-testid', 'event-card-next');
   next.setAttribute('aria-label', copy.card.next);
   next.append(icon('next'));
   nav.append(previous, next);
   head.append(titles, nav);
 
   const line = el('p', 'card__line');
+  line.setAttribute('data-testid', 'event-card-line');
   const body = el('div', 'card__body');
   body.id = 'card-body';
+  body.setAttribute('data-testid', 'event-card-body');
   const short = el('p', 'card__short');
   const figure = el('figure', 'card__photo');
+  figure.setAttribute('data-testid', 'event-card-photo');
   const moreToggle = button('disclosure');
+  moreToggle.setAttribute('data-testid', 'event-card-more-toggle');
   moreToggle.setAttribute('aria-expanded', 'false');
   moreToggle.setAttribute('aria-controls', 'card-more');
   const moreLabel = el('span', 'disclosure__label', copy.card.tellMore);
   moreToggle.append(moreLabel, icon('chevron-down', 'icon disclosure__icon'));
   const more = el('div', 'card__more');
   more.id = 'card-more';
+  more.setAttribute('data-testid', 'event-card-more');
   more.hidden = true;
   const sources = el('div', 'card__sources');
+  sources.setAttribute('data-testid', 'event-card-sources');
   const sound = el('div', 'card__audio');
+  sound.setAttribute('data-testid', 'event-card-audio');
   sound.hidden = true;
   body.append(short, sound, moreToggle, more, figure, sources);
 
   const tryRow = el('div', 'card__try');
   tryRow.hidden = true;
   const tryButton = button('button card__try-button');
+  tryButton.setAttribute('data-testid', 'event-card-try-it');
   tryRow.append(tryButton);
   card.append(head, line, body);
   // "Try it" follows the event's text in the side panel. On a phone it sits
