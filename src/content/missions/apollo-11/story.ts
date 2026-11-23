@@ -713,7 +713,7 @@ export const story: Mission = {
         summary("Lunar Orbit/Lunar Surface Phase"),
         nmc("lm", "Mission Profile"),
         transcript(
-          'Tape 71/5, page 385 (PDF page 387): the CDR line at the top of the page (stamped 04 13 52 40, faint on the scan), "For those who haven\'t read the plaque, we\'ll read the plaque ... Underneath it says \"Here Man from the planet Earth first set foot upon the Moon, July 1969 A.D. We came in peace for all mankind.\""',
+          'Tape 71/5, page 385 (PDF page 387): the CDR line at the top of the page (stamped 04 13 52 40, faint on the scan), "For those who haven\'t read the plaque, we\'ll read the plaque ... Underneath it says "Here Man from the planet Earth first set foot upon the Moon, July 1969 A.D. We came in peace for all mankind.""',
         ),
       ],
       discrepancy:

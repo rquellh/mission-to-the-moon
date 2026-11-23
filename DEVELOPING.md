@@ -27,17 +27,20 @@ Open the "Network" address Vite prints on your phone.
 npm run build     # type-checks, then builds the site into dist/
 npm run preview   # serves dist/ locally to check the build
 npm run typecheck # type-check only
+npm run lint      # looks for common mistakes in the code (oxlint)
 npm test          # the content, flight math, and interface tests
 npm run test:e2e  # the browser tests
 ```
+
+The lint rules come from Cloudflare's preset (`@cloudflare/oxlint-config`), which includes the anti-slop rules and checks types as it goes. `oxlint.config.ts` lists the rules that are off here, and why. Every rule that is on is an error, so a clean run prints nothing.
 
 The site uses relative paths, so `dist/` works from any subpath. Each mission, and the 3D code, is built as its own file and fetched only when needed.
 
 ## How a change reaches the site
 
-A pull request runs two workflows from `.github/workflows/` side by side: `vitest.yml` runs the content, flight math, and interface tests, and `playwright.yml` builds the site and runs the browser tests against the build. It publishes nothing. Pushing to `main` runs `deploy.yml`, which runs both sets of tests again, builds the site, and publishes it to GitHub Pages only if both pass (turn on Pages with "GitHub Actions" as the source in the repository settings).
+A pull request runs three workflows from `.github/workflows/` side by side: `oxlint.yml` lints the code, `vitest.yml` runs the content, flight math, and interface tests, and `playwright.yml` builds the site and runs the browser tests against the build. It publishes nothing. Pushing to `main` runs `deploy.yml`, which runs all three again, builds the site, and publishes it to GitHub Pages only if all three pass (turn on Pages with "GitHub Actions" as the source in the repository settings).
 
-`main` is protected: a repository rule (Settings → Rules) requires the `vitest` and `playwright` checks to pass before a commit reaches `main`, so changes go through a pull request and a direct push of untested work is turned away.
+`main` is protected: a repository rule (Settings → Rules) requires the `vitest` and `playwright` checks to pass before a commit reaches `main`, so changes go through a pull request and a direct push of untested work is turned away. The `oxlint` check is not in that rule, so a lint error stops the publish but not the merge.
 
 ## Tests
 
@@ -82,7 +85,7 @@ src/test/                     What the interface tests share: the page setup and
 tests/                        Browser tests (Playwright): specs, page objects, helpers
 src/styles/                   CSS
 tools/                        Developer scripts (screenshots, Moon and Sun positions)
-.github/workflows/            Tests and GitHub Pages deployment
+.github/workflows/            Lint, tests, and GitHub Pages deployment
 .claude/skills/               How tests are planned and written in this project
 assets-src/                   Original downloads and screenshots (not committed)
 ```

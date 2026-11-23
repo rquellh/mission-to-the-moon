@@ -1,0 +1,37 @@
+name: Oxlint
+
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+# A newer push to a pull request replaces the older run. When deploy.yml runs
+# the lint check, it waits in a line of its own, never the deployment's.
+concurrency:
+  group: oxlint-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # deploy.yml calls this job and waits for it, so a lint error stops the
+  # publish. The rule on the repository that guards main names only `vitest`
+  # and `playwright`; add the check name `oxlint` there to make a lint error
+  # stop a merge as well.
+  oxlint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint

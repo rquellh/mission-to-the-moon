@@ -178,12 +178,12 @@ async function main() {
   lines.push(`const HORIZONS_TIMES = ${JSON.stringify(timesPart)};`);
   lines.push("const HORIZONS_QUERY = (command: string, center: string, quantities: string): string =>");
   lines.push(
-    "  `" + API + "?format=text&COMMAND=%27\${command}%27&CENTER=%27\${center}%27&QUANTITIES=%27\${quantities}%27&OBJ_DATA=%27NO%27&CSV_FORMAT=%27YES%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27\${HORIZONS_TIMES}`;",
+    "  `" + API + "?format=text&COMMAND=%27${command}%27&CENTER=%27${center}%27&QUANTITIES=%27${quantities}%27&OBJ_DATA=%27NO%27&CSV_FORMAT=%27YES%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27${HORIZONS_TIMES}`;",
   );
   lines.push("");
   lines.push("const horizons = (target: string, quantity: string, time: string, url: string): Citation => ({");
   lines.push('  source: "jpl-horizons",');
-  lines.push("  locator: `Observer table, \${target}, \${quantity}, \${time} UT`,");
+  lines.push("  locator: `Observer table, ${target}, ${quantity}, ${time} UT`,");
   lines.push("  url,");
   lines.push("});");
   for (const table of TABLES) lines.push(`const ${table.constant} = HORIZONS_QUERY(${JSON.stringify(table.command)}, ${JSON.stringify(table.center)}, ${JSON.stringify(table.quantities)});`);

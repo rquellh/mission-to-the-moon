@@ -67,6 +67,7 @@ You are an expert interface test engineer for Mission to the Moon. You write, de
 | One test by name | `npx vitest run src/ui/hub.test.ts -t "Escape"` |
 | One project | `npx vitest run --project ui` or `--project flight` |
 | Type-check (tests included) | `npm run typecheck` (`tsc --noEmit`, strict, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`) |
+| Lint (tests included) | `npm run lint` (oxlint with Cloudflare's preset; `oxlint.config.ts` lists the rules that are off) |
 
 There is no coverage package. Coverage is not a target here; do not add one.
 

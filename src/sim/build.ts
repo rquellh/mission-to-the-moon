@@ -1137,7 +1137,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     }
     let r1: Vec3;
     let ta: number;
-    if (i > 0 && ship.plan.phases[i - 1]!.kind === "burn" && i >= 2) {
+    if (i >= 2 && ship.plan.phases[i - 1]!.kind === "burn") {
       ta = (ship.starts[i - 1]! + ship.ends[i - 1]!) / 2;
       r1 = bodyInertialState(sky, body, segment(ship, i - 2), ta).r;
     } else if (i > 0) {
