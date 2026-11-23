@@ -20,6 +20,10 @@ concurrency:
 jobs:
   # Every test must pass before the site is published. A pull request runs
   # the same tests and stops there.
+  #
+  # A rule on the repository requires this job, by the name `build`, before
+  # anything merges into main. Rename it and every pull request waits forever
+  # on a check that never reports; change the rule's check name with it.
   build:
     runs-on: ubuntu-latest
     steps:

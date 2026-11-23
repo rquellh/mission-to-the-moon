@@ -61,6 +61,8 @@ npm run test:e2e  # the browser tests
 
 The site uses relative paths, so `dist/` works from any subpath. Each mission, and the 3D code, is built as its own file and fetched only when needed. Pushing to `main` tests, builds, and deploys the site to GitHub Pages through `.github/workflows/deploy.yml` (turn on Pages with "GitHub Actions" as the source in the repository settings). A failing test stops the publish. A pull request runs the same tests and publishes nothing.
 
+`main` is protected: a commit reaches it only after those tests have passed on it, so changes go through a pull request and a direct push of untested work is turned away. The rule lives in the repository settings under Rules, and requires the workflow's `build` job.
+
 ## Tests
 
 There are three layers, each owning different things, so nothing is tested twice:
