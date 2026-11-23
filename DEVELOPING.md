@@ -76,14 +76,14 @@ gallery.html                  Developer page for looking at spacecraft models (d
 public/textures/              Earth, Moon, and star textures (2K and 4K JPEGs)
 public/media/<mission>/       Mission photos and recordings from NASA, one folder per mission
 src/main.ts                   Starts the app, loads the chosen mission, and connects the pieces
-src/content/                  Shared facts and text: sources, physical constants, credits, interface copy
+src/content/                  Shared facts and text: sources, physical constants, credits, interface copy, mission patch images
 src/content/missions/<id>/    One folder per mission (see below)
 src/content/extras/           Sources cited only by an extra, one file per extra
 src/extras/<id>/              One folder per extra: a hands-on moment or something to explore
 src/sim/                      Flight path math (plain TypeScript, no 3D code), with tests
-src/app/                      The mission clock, the tour, and the contract between scene and interface
+src/app/                      The mission clock, the tour, what the end of a flight suggests, and the contract between scene and interface
 src/scene/                    three.js scene: Earth, Moon, stars, paths, spacecraft, camera
-src/ui/                       Interface code: first screen, mission list, the moment card and its two doors (Tell me more, Controls), tour, dialogs, with tests
+src/ui/                       Interface code: first screen, mission list, the moment card and its two doors (Tell me more, Controls), tour, the end of a flight, dialogs, with tests
 src/test/                     What the interface tests share: the page setup and the stand-ins for the scene and the screen
 tests/                        Browser tests (Playwright): specs, page objects, helpers
 src/styles/                   CSS

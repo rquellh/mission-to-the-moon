@@ -40,6 +40,11 @@ A few moments carry a real NASA recording, with every word written out beside th
 time, the chapters, the speed, and what the camera follows (Earth, the ship, or the Moon).
 **True scale**, beside them, shows how far apart everything really is.
 
+Every flight ends by saying what's next. After the tour's last stop, or **Finish** once the clock
+reaches the end, the card shows the mission patch you just collected and one button to the next
+flight you haven't flown. **More to explore** adds one pick from each shelf: that flight,
+something to try, and something to explore.
+
 <p align="center">
   <img src="docs/images/apollo-11-liftoff.jpg" alt="Apollo 11 two minutes after liftoff, with the Saturn V climbing away from Florida." width="32%">
   <img src="docs/images/apollo-11-journey.jpg" alt="Apollo 11 sixty hours in, with the whole path from Earth to the Moon and back in view." width="32%">

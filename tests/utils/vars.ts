@@ -61,11 +61,13 @@ export const EXTRAS = [
 ] as const;
 
 /**
- * The guided tour the tests take: Gemini 6A's first three stops. Its first
- * trip is one of the shortest of any tour, which keeps the test quick.
+ * The guided tour the tests take: Gemini 6A, named by its first three stops,
+ * and how many it makes in all. Its first trip is one of the shortest of any
+ * tour, which keeps the test quick.
  */
 export const TOUR = {
   mission: 'gemini-6a',
+  stopCount: 10,
   stops: [
     { id: 'liftoff', title: 'Liftoff, at last' },
     { id: 'in-orbit', title: 'In orbit, far behind' },
@@ -86,6 +88,13 @@ export const EVENTS = {
     id: 'first-step',
     title: 'First step on the Moon',
     clock: '109:24:15',
+  },
+  /** The last moment, at the end of the clock: Finish shows the end of the flight, which suggests Apollo 12 on a fresh device. */
+  APOLLO_11_SPLASHDOWN: {
+    mission: 'apollo-11',
+    id: 'splashdown',
+    title: 'Splashdown',
+    next: { mission: 'apollo-12', name: 'Apollo 12', firstTitle: 'Liftoff' },
   },
   /** The third moonwalk: the lander and the rover are on the Moon, and nothing has been left behind yet. */
   APOLLO_17_THIRD_MOONWALK: { mission: 'apollo-17', id: 'third-moonwalk' },

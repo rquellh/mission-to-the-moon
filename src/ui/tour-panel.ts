@@ -4,22 +4,20 @@ import { button, byId, el } from './dom';
 import { icon } from './icons';
 
 export interface TourPanelOptions {
-  /** Called when the person leaves the tour, from Exit or the ending. */
+  /** Called when the person leaves the tour with Exit. */
   onExplore(): void;
-  /** Called to start the tour over from the ending. */
-  onRestart(): void;
 }
 
 /**
  * The tour's controls inside the moment card, in place of Play and
  * Controls: which stop this is, a progress row, and Back, Next (Skip while
- * on the way), and Exit. After the last stop it shows the ending in the
- * moment's place, which hands off to exploring freely.
+ * on the way, Finish at the last stop), and Exit. After the last stop the
+ * panel steps aside for the end of the flight (see ending.ts); its
+ * `data-phase` still says "finished".
  */
-export function setUpTourPanel(tour: Tour, { onExplore, onRestart }: TourPanelOptions): void {
+export function setUpTourPanel(tour: Tour, { onExplore }: TourPanelOptions): void {
   const panel = byId('tour', HTMLElement);
 
-  // Stepping view.
   const steps = el('div', 'tour__steps');
   const count = el('p', 'tour__count');
   count.setAttribute('data-testid', 'tour-count');
@@ -45,38 +43,20 @@ export function setUpTourPanel(tour: Tour, { onExplore, onRestart }: TourPanelOp
   stepper.append(back, next);
   steps.append(count, progress, exit, stepper);
 
-  // The ending.
-  const ending = el('div', 'tour__ending');
-  ending.setAttribute('data-testid', 'tour-ending');
-  const endTitle = el('h3', 'tour__end-title', copy.tour.endTitle);
-  endTitle.setAttribute('data-testid', 'tour-ending-title');
-  endTitle.tabIndex = -1;
-  const endActions = el('div', 'tour__end-actions');
-  const explore = button('button button--primary', copy.tour.endExplore);
-  explore.setAttribute('data-testid', 'tour-ending-explore');
-  const again = button('button button--quiet', copy.tour.endAgain);
-  again.setAttribute('data-testid', 'tour-ending-restart');
-  endActions.append(explore, again);
-  ending.append(endTitle, el('p', 'tour__end-text', copy.tour.endText), endActions);
-
-  panel.replaceChildren(steps, ending);
+  panel.replaceChildren(steps);
 
   back.addEventListener('click', () => tour.back());
   next.addEventListener('click', () => tour.next());
   exit.addEventListener('click', onExplore);
-  explore.addEventListener('click', onExplore);
-  again.addEventListener('click', onRestart);
 
   let lastPhase = tour.phase;
   const render = (): void => {
     const phase = tour.phase;
-    panel.hidden = phase === 'off';
+    // Off the tour, or past its last stop, the panel steps aside.
+    panel.hidden = phase === 'off' || phase === 'finished';
     panel.dataset['phase'] = phase;
-    const finished = phase === 'finished';
-    steps.hidden = finished;
-    ending.hidden = !finished;
 
-    if (!finished && phase !== 'off') {
+    if (phase === 'traveling' || phase === 'stopped') {
       const position = tour.index + 1;
       count.replaceChildren(
         el('strong', 'tour__count-number', copy.tour.stopOf(position, tour.total)),
@@ -101,11 +81,9 @@ export function setUpTourPanel(tour: Tour, { onExplore, onRestart }: TourPanelOp
         nextLabel.textContent = tour.index >= tour.total - 1 ? copy.tour.finish : copy.tour.next;
         next.removeAttribute('aria-label');
       }
+      // Starting again from the end of the flight: Next takes keyboard focus.
+      if (lastPhase === 'finished') next.focus();
     }
-
-    // Keep keyboard focus somewhere sensible as the panel changes.
-    if (finished && lastPhase !== 'finished') endTitle.focus();
-    if (lastPhase === 'finished' && !finished && phase !== 'off') next.focus();
     lastPhase = phase;
   };
   tour.subscribe(render);

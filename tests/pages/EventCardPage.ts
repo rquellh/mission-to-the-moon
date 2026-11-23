@@ -2,8 +2,9 @@ import type { Locator, Page } from '@playwright/test';
 
 /**
  * The moment card (`dock`), always at the bottom during a flight: the story
- * of the moment, the photo's small picture, "Hear the recording", "Try it",
- * Play (TimelinePage), and its two doors, "Tell me more" (`recordsToggle`,
+ * of the moment, the photo's small picture, "Finish" (once exploring has
+ * reached the end of the clock; it opens EndingPage), "Hear the recording",
+ * "Try it", Play (TimelinePage), and its two doors, "Tell me more" (`recordsToggle`,
  * which opens RecordsPage) and "Controls" (`controlsToggle`, which opens the
  * tools in TimelinePage and the view buttons in MissionPage). Each door has
  * `aria-expanded` true or false. Previous and next show with Controls.
@@ -21,6 +22,7 @@ export class EventCardPage {
   // Beside the story
   readonly photo: Locator;
   readonly photoCredit: Locator;
+  readonly finish: Locator;
   readonly recording: Locator;
   readonly tryIt: Locator;
   // The doors
@@ -44,6 +46,7 @@ export class EventCardPage {
     this.text = page.getByTestId('event-card-text');
     this.photo = page.getByTestId('event-card-photo');
     this.photoCredit = page.getByTestId('event-card-photo-credit');
+    this.finish = page.getByTestId('event-card-finish');
     this.recording = page.getByTestId('event-card-recording');
     this.tryIt = page.getByTestId('event-card-try-it');
     this.recordsToggle = page.getByTestId('records-toggle');

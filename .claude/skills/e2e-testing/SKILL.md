@@ -47,26 +47,28 @@ The id in a dynamic test id is always a content id: a mission id (`apollo-11`), 
 
 Pattern: `{component}-{entity-id?}-{element}`
 
-| Type              | Pattern                      | Example                                                                                                                                                          |
-| ----------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Container         | `{component}`                | `welcome`, `dock`, `records`, `tour-panel`, `event-card`, `hub`, `extra-sheet`, `about-dialog`                                                                   |
-| Container element | `{component}-{element}`      | `welcome-tour`, `welcome-all-missions`, `controls-toggle`, `records-close`, `tour-next`, `event-card-title`, `timeline-play`, `clock-time`, `about-dialog-close` |
-| Dynamic container | `{component}-{id}`           | `hub-mission-apollo-11`, `view-button-moon`, `chapter-landing`, `tour-dot-liftoff`                                                                               |
-| Dynamic child     | `{component}-{id}-{element}` | `hub-mission-apollo-11-tour`, `hub-mission-apollo-1-read`, `hub-extra-stages-open`                                                                               |
+| Type              | Pattern                      | Example                                                                                                                                                                                                                                        |
+| ----------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Container         | `{component}`                | `welcome`, `dock`, `records`, `tour-panel`, `ending`, `event-card`, `hub`, `extra-sheet`, `about-dialog`                                                                                                                                       |
+| Container element | `{component}-{element}`      | `welcome-tour`, `welcome-all-missions`, `controls-toggle`, `records-close`, `tour-next`, `event-card-title`, `event-card-finish`, `ending-next`, `ending-more-toggle`, `ending-pick-next`, `timeline-play`, `clock-time`, `about-dialog-close` |
+| Dynamic container | `{component}-{id}`           | `hub-mission-apollo-11`, `view-button-moon`, `chapter-landing`, `tour-dot-liftoff`                                                                                                                                                             |
+| Dynamic child     | `{component}-{id}-{element}` | `hub-mission-apollo-11-tour`, `hub-mission-apollo-1-read`, `hub-extra-stages-open`                                                                                                                                                             |
 
 `<body data-testid="site">` is the page itself: it carries the state classes `is-ready`, `is-welcome`, `is-touring`, and `no-3d`.
 
 **Test ids locate; state attributes are what you assert.** The site already says what state it is in, so read that rather than adding test ids for states:
 
-| Element                                                           | State                                                   |
-| ----------------------------------------------------------------- | ------------------------------------------------------- |
-| `site` (body)                                                     | classes `is-ready`, `is-welcome`, `is-touring`, `no-3d` |
-| `tour-panel`                                                      | `data-phase`: `off`, `traveling`, `stopped`, `finished` |
-| `records-toggle`, `controls-toggle` (the moment card's two doors) | `aria-expanded`                                         |
-| `extra-sheet`                                                     | `data-extra`: the open extra's id                       |
-| `view-button-<view>`, `scale-toggle`                              | `aria-pressed`                                          |
-| `timeline-play`                                                   | `aria-label`: `Play`, `Pause`                           |
-| `hub-mission-<id>`                                                | `aria-current="true"` on the loaded mission             |
+| Element                                                             | State                                                                                                                 |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `site` (body)                                                       | classes `is-ready`, `is-welcome`, `is-touring`, `no-3d`                                                               |
+| `tour-panel`                                                        | `data-phase`: `off`, `traveling`, `stopped`, `finished` (hidden once finished: the end of the flight takes its place) |
+| `records-toggle`, `controls-toggle` (the moment card's two doors)   | `aria-expanded`                                                                                                       |
+| `ending-more-toggle` (the end of a flight's "More to explore" door) | `aria-expanded`                                                                                                       |
+| `ending-again`                                                      | `aria-label`: `Watch again`, or `Start the tour again` after a tour                                                   |
+| `extra-sheet`                                                       | `data-extra`: the open extra's id                                                                                     |
+| `view-button-<view>`, `scale-toggle`                                | `aria-pressed`                                                                                                        |
+| `timeline-play`                                                     | `aria-label`: `Play`, `Pause`                                                                                         |
+| `hub-mission-<id>`                                                  | `aria-current="true"` on the loaded mission                                                                           |
 
 ### Real Examples
 
@@ -169,11 +171,6 @@ export class TourPanelPage {
   readonly back: Locator;
   readonly next: Locator;
   readonly exit: Locator;
-  // The ending, after the last stop
-  readonly ending: Locator;
-  readonly endingTitle: Locator;
-  readonly endingExplore: Locator;
-  readonly endingRestart: Locator;
   // Dynamic locators (arrow functions)
   readonly dot: (stopId: string) => Locator;
 
@@ -184,10 +181,6 @@ export class TourPanelPage {
     this.back = page.getByTestId('tour-back');
     this.next = page.getByTestId('tour-next');
     this.exit = page.getByTestId('tour-exit');
-    this.ending = page.getByTestId('tour-ending');
-    this.endingTitle = page.getByTestId('tour-ending-title');
-    this.endingExplore = page.getByTestId('tour-ending-explore');
-    this.endingRestart = page.getByTestId('tour-ending-restart');
     this.dot = (stopId: string) => page.getByTestId(`tour-dot-${stopId}`);
   }
   // Methods only for complex logic (4+ lines) - see skipTrip() below
@@ -263,18 +256,19 @@ async skipTrip(): Promise<void> {
 
 Each page object is the documentation of the test ids in its part of the site. Keep every locator, used or not.
 
-| Page object      | Part of the site                                                                                                            | Methods                     |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| `MissionPage`    | `site`, header, the view buttons and True scale with its note (shown with Controls), the no-3D note, loading, messages      | `waitForLoad()`             |
-| `ScenePage`      | the canvas, and the scene report                                                                                            | `waitForLoad()`, `report()` |
-| `TourPanelPage`  | the tour panel in the card, and its ending                                                                                  | `skipTrip()`                |
-| `EventCardPage`  | the moment card (`dock`): the story, the photo, the recording, Try it, its two doors, the phone's status, previous and next | none                        |
-| `RecordsPage`    | "Tell me more": its head and Close, its parts, and the links to the mission's own pages                                     | none                        |
-| `TimelinePage`   | Play, and the tools behind Controls: the clock, the scrubber, chapters, speed                                               | none                        |
-| `WelcomePage`    | the welcome: the mission on show, Take the tour, Explore on my own, All missions, the no-3D note                            | `waitForLoad()`             |
-| `HubPage`        | the mission list, opened from the welcome or the header                                                                     | `waitForLoad()`             |
-| `DialogsPage`    | About this mission, How this is drawn, Sources and credits (opened from "Tell me more"), a memorial page                    | none                        |
-| `ExtraSheetPage` | the full-screen sheet an extra opens in                                                                                     | `waitForLoad()`             |
+| Page object      | Part of the site                                                                                                                                                                                          | Methods                     |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `MissionPage`    | `site`, header, the view buttons and True scale with its note (shown with Controls), the no-3D note, loading, messages                                                                                    | `waitForLoad()`             |
+| `ScenePage`      | the canvas, and the scene report                                                                                                                                                                          | `waitForLoad()`, `report()` |
+| `TourPanelPage`  | the tour panel in the card (hidden once the tour is finished)                                                                                                                                             | `skipTrip()`                |
+| `EventCardPage`  | the moment card (`dock`): the story, the photo, Finish, the recording, Try it, its two doors, the phone's status, previous and next                                                                       | none                        |
+| `EndingPage`     | the end of a flight in the card: Watch again, the title, the patch collected, the next flight, the "More to explore" door, and, opened, its picks and quiet ways on (with Explore on my own after a tour) | none                        |
+| `RecordsPage`    | "Tell me more": its head and Close, its parts, and the links to the mission's own pages                                                                                                                   | none                        |
+| `TimelinePage`   | Play, and the tools behind Controls: the clock, the scrubber, chapters, speed                                                                                                                             | none                        |
+| `WelcomePage`    | the welcome: the mission on show, Take the tour, Explore on my own, All missions, the no-3D note                                                                                                          | `waitForLoad()`             |
+| `HubPage`        | the mission list, opened from the welcome or the header                                                                                                                                                   | `waitForLoad()`             |
+| `DialogsPage`    | About this mission, How this is drawn, Sources and credits (opened from "Tell me more"), a memorial page                                                                                                  | none                        |
+| `ExtraSheetPage` | the full-screen sheet an extra opens in                                                                                                                                                                   | `waitForLoad()`             |
 
 ---
 
@@ -516,7 +510,7 @@ await expect(tourPage.panel).toHaveAttribute('data-phase', 'stopped', { timeout:
 
 ## 5. Setting Up Through the Address, and Reading the Scene
 
-There is no API to set data up with. The counterpart is the address: a deep link puts the site at any mission, moment, and view at once (`src/app/deep-link.ts` lists every value). **NEVER set a starting place up through the interface.** Clicking through the welcome to reach a mission's 3D view is slow and tests the welcome by accident; only the tests of those journeys (`welcome.test.ts`, `explore.test.ts`) do it. The mission list has no address of its own, so a test that needs it opens it from the welcome's All missions (`missions.test.ts`).
+There is no API to set data up with. The counterpart is the address: a deep link puts the site at any mission, moment, and view at once (`src/app/deep-link.ts` lists every value). **NEVER set a starting place up through the interface.** Clicking through the welcome to reach a mission's 3D view is slow and tests the welcome by accident; only the tests of those journeys (`welcome.test.ts`, `explore.test.ts`) do it. The mission list has no address of its own, so a test that needs it opens it from the welcome's All missions (`missions.test.ts`). The end of a flight has none either: open the last moment by address (`EVENTS.APOLLO_11_SPLASHDOWN`, which is at the end of the clock) and press Finish (`ending.test.ts`); the tour's end is reached only by the tour's own journey (`tour.test.ts`).
 
 ### URLS (tests/utils/vars.ts)
 
@@ -768,17 +762,19 @@ tests/
 │   ├── deep-links.test.ts      # A deep link opens the right place (desktop)
 │   ├── dialogs.test.ts         # A dialog opens from Tell me more and gives focus back
 │   ├── doors.test.ts           # The moment card's doors: Tell me more and Controls open, close, and give focus back
+│   ├── ending.test.ts          # Explore to the end, Finish, open More to explore (the ship clear of it), fly the next flight
 │   ├── explore.test.ts         # Choose Explore on my own, open Controls, look through the views, True scale, Play
 │   ├── extras.test.ts          # Every extra opens and closes (desktop)
 │   ├── missions.test.ts        # Every mission opens in the Ship view (desktop)
 │   ├── no-webgl.test.ts        # Without WebGL the mission can still be read (desktop)
 │   ├── scene.test.ts           # What the scene draws, at moments it has drawn wrong before, and the ship clear of the card and its doors
-│   ├── tour.test.ts            # Take the guided tour
+│   ├── tour.test.ts            # Take the guided tour to its end, start it again, and leave it
 │   ├── welcome.test.ts         # Arrive: the scene framed beside the welcome, All missions and back, take the tour
 │   ├── report/                 # HTML report (git-ignored)
 │   └── results/                # Traces of failed tests (git-ignored)
 ├── pages/                      # Page objects (locators + complex methods)
 │   ├── DialogsPage.ts
+│   ├── EndingPage.ts
 │   ├── EventCardPage.ts
 │   ├── ExtraSheetPage.ts
 │   ├── HubPage.ts
@@ -820,7 +816,7 @@ npm run test:e2e -- --project=chrome-desktop tests/e2e/scene.test.ts
 npm run test:e2e -- --grep "Deep links"
 ```
 
-The config starts the server itself and reuses one that is already running. It drives the installed Google Chrome, so there is nothing to download: never run `npx playwright install`. The whole suite runs 50 tests (41 on the desktop, 9 on the phone, where the desktop-only ones are skipped) in about 50 seconds on a laptop; most of that is drawing 3D scenes in software.
+The config starts the server itself and reuses one that is already running. It drives the installed Google Chrome, so there is nothing to download: never run `npx playwright install`. The whole suite runs 52 tests (42 on the desktop, 10 on the phone, where the desktop-only ones are skipped) in about a minute on a laptop; most of that is drawing 3D scenes in software.
 
 ---
 

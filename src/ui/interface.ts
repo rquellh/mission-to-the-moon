@@ -10,9 +10,10 @@ import { renderAbout, renderHowDrawn } from './about-dialog';
 import { pauseAllAudio } from './audio-player';
 import { renderCredits } from './credits-dialog';
 import { recordVisit } from './device-store';
-import { setUpDialog } from './dialogs';
+import { setUpDialog, type DialogHandle } from './dialogs';
 import { setUpDock } from './dock';
 import { byId, el, hiddenText, reducedMotionQuery } from './dom';
+import { setUpEnding, type EndingAfter } from './ending';
 import { setUpEventCard } from './event-card';
 import { setUpExtraSheet } from './extra-sheet';
 import { missionDates, speakMissionTime } from './format';
@@ -169,15 +170,20 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   renderAbout(mission);
   renderHowDrawn(mission, flight);
   renderCredits(credits, { mission, cited, summaries, extras });
-  // The mission's own pages open from the reference links at the end of "Tell me more".
-  const dialogLinks: Array<[string, string]> = [
-    ['records-about', 'about-dialog'],
-    ['records-how-drawn', 'drawn-dialog'],
-    ['records-credits', 'credits-dialog'],
+  // The mission's own pages open from the reference links at the end of "Tell me more" (and About and
+  // Sources and credits from the end of the flight too).
+  const dialogs = {
+    about: setUpDialog(byId('about-dialog', HTMLDialogElement)),
+    drawn: setUpDialog(byId('drawn-dialog', HTMLDialogElement)),
+    credits: setUpDialog(byId('credits-dialog', HTMLDialogElement)),
+  };
+  const dialogLinks: Array<[string, DialogHandle]> = [
+    ['records-about', dialogs.about],
+    ['records-how-drawn', dialogs.drawn],
+    ['records-credits', dialogs.credits],
   ];
-  for (const [linkId, dialogId] of dialogLinks) {
+  for (const [linkId, dialog] of dialogLinks) {
     const link = byId(linkId, HTMLButtonElement);
-    const dialog = setUpDialog(byId(dialogId, HTMLDialogElement));
     link.append(icon('next', 'icon records__link-icon'));
     link.addEventListener('click', () => dialog.open(link));
   }
@@ -255,6 +261,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
       dock.openRecords();
       records.revealPhoto();
     },
+    onFinish: () => showEnding('explore'),
   });
   const timeline = setUpTimeline(player, index);
 
@@ -282,12 +289,75 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     byId('play', HTMLButtonElement).focus({ preventScroll: true });
   };
 
+  /* The end of the flight ---------------------------------------------- */
+  // After the tour's last stop, or "Finish" at the end of the clock while exploring, the card says what's next.
+  let endedAfter: EndingAfter | null = null;
+  const ending = setUpEnding({
+    index,
+    summaries,
+    extras,
+    announce,
+    onWatchAgain: () => watchAgain(),
+    // After the tour: leave the ending and the tour, and explore from the last stop, with Play focused.
+    onExplore: () => {
+      hideEnding();
+      explore();
+    },
+    onExtra: (id, params, from) => extraSheet.open(id, params, from),
+    onAbout: (from) => dialogs.about.open(from),
+    onCredits: (from) => dialogs.credits.open(from),
+    onAllMissions: (from) => openList(from),
+    onLayout: () => remeasure(),
+  });
+
+  // "Finish" is offered while exploring, once the clock has reached the end of the flight. The last
+  // moment is at the end, so the card keeps it there to be read until the visitor moves on.
+  const offerFinish = (): void => {
+    const atEnd = player.storyTime >= player.story.duration - 1e-6;
+    card.setFinishOffered(atEnd && !tour.active && endedAfter === null);
+  };
+  player.subscribe(offerFinish);
+  offerFinish();
+
+  const showEnding = (after: EndingAfter): void => {
+    endedAfter = after;
+    card.setHidden(true);
+    dock.setEnding(true);
+    offerFinish();
+    ending.show(after);
+  };
+  const hideEnding = (): void => {
+    if (endedAfter === null) return;
+    endedAfter = null;
+    ending.hide();
+    dock.setEnding(false);
+    card.setHidden(false);
+    offerFinish();
+  };
+
+  /** The flight from the beginning, or, after the tour, the tour from its first stop. */
+  const watchAgain = (): void => {
+    if (endedAfter === 'tour') {
+      // Leaving the tour's end hides the ending (see the tour's listener below).
+      tour.start(0);
+      focusTourNext();
+      return;
+    }
+    hideEnding();
+    player.seek(index.seconds[0] ?? player.start);
+    player.play();
+    byId('play', HTMLButtonElement).focus({ preventScroll: true });
+  };
+
   let tourPhase = tour.phase;
   tour.subscribe(() => {
     document.body.classList.toggle('is-touring', tour.active);
     timeline.setLocked(tour.active);
-    dock.setTour(tour.phase === 'finished' ? 'ending' : tour.active ? 'touring' : 'off');
-    card.setHidden(tour.phase === 'finished');
+    dock.setTour(tour.active ? 'touring' : 'off');
+    // Past the last stop, the tour ends the way every flight does.
+    if (tour.phase === 'finished' && tourPhase !== 'finished') showEnding('tour');
+    if (tour.phase !== 'finished' && tourPhase === 'finished') hideEnding();
+    offerFinish();
     // Opening an extra pauses the clock, which would end a tour's travel early, so
     // "Try it" waits for the stop. At a stop the clock is already still.
     card.setTryItAllowed(tour.phase !== 'traveling');
@@ -302,13 +372,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     if (tour.phase === 'off' && tourPhase === 'traveling') card.show(index.eventAt(player.time));
     tourPhase = tour.phase;
   });
-  setUpTourPanel(tour, {
-    onExplore: explore,
-    onRestart: () => {
-      tour.start(0);
-      focusTourNext();
-    },
-  });
+  setUpTourPanel(tour, { onExplore: explore });
 
   /* The welcome ------------------------------------------------------- */
   const welcomeOptions: WelcomeOptions = {
@@ -327,6 +391,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   // The welcome goes first, so the interface is back on the screen before focus moves into it.
   const startTour = (): void => {
     welcome.hide();
+    hideEnding();
     recordVisit(mission.id);
     if (tour.total === 0) {
       explore();
@@ -338,6 +403,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   };
   const startExploring = (): void => {
     welcome.hide();
+    hideEnding();
     recordVisit(mission.id);
     explore();
     remeasure();

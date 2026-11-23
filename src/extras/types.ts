@@ -7,8 +7,10 @@ import type { MissionBundle } from '../content/missions/bundle.ts';
  * edit: the registry (src/extras/index.ts) finds it by its file names.
  *
  *   src/extras/<id>/meta.ts    export const meta: ExtraMeta
- *                              Loads with the page, for the list. Keep it
- *                              tiny: import only the type, nothing else.
+ *                              Loads with the page, for the list and the
+ *                              end of each flight. Keep it tiny: import
+ *                              only the type, nothing else (the interface
+ *                              imports it; your other files load later).
  *   src/extras/<id>/index.ts   export const extra: Extra
  *                              Loads only when the extra is opened, as its
  *                              own file in the build, with everything it imports.
@@ -23,6 +25,11 @@ import type { MissionBundle } from '../content/missions/bundle.ts';
  * - An event can point at a hands-on extra with `handsOn: "<id>"` (see
  *   MissionEvent in src/content/types.ts). Its card then shows "Try it",
  *   which opens the extra with `mission=<mission id>&event=<event id>`.
+ * - The end of every flight suggests one extra of each kind (see
+ *   src/app/related.ts): a hands-on extra one of its events names, and an
+ *   explore extra whose `missions` names the flight (otherwise "rockets").
+ *   It opens the extra with `mission=<mission id>` (and the event, for a
+ *   hands-on extra), so start on that flight's page when you have one.
  * - The address `?extra=<id>` opens it directly. Every other value in the
  *   address reaches `mount` as `params`, so `?extra=stages&mission=apollo-11&event=liftoff`
  *   opens it over Apollo 11, at liftoff, with those two values in `params`.
@@ -123,6 +130,12 @@ export interface ExtraMeta {
   order: number;
   /** "draft" keeps an unfinished extra off the published list. */
   status: 'ready' | 'draft';
+  /**
+   * The flights this extra is about, by mission id, for an explore extra
+   * tied to some flights (the landing sites: the six flights that landed).
+   * The end of each of those flights suggests it under "More to explore".
+   */
+  missions?: readonly string[];
 }
 
 /** Where `openMission` should start the mission. */

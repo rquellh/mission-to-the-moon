@@ -222,6 +222,9 @@ export function mountRecordings(...clips: AudioClip[]): MountedRecordings {
   return { user: makeUser() };
 }
 
+/** Where the site keeps the missions visited on this device. */
+const VISITS_KEY = 'mission-to-the-moon/site/visited-missions';
+
 /** The ids of the missions this device has noted as visited, oldest first, as the site stores them. */
 export type VisitedMissions = readonly string[];
 
@@ -231,10 +234,18 @@ export type VisitedMissions = readonly string[];
  * list of ids fails the test.
  */
 export function visitedMissions(): VisitedMissions | undefined {
-  const raw = window.localStorage.getItem('mission-to-the-moon/site/visited-missions');
+  const raw = window.localStorage.getItem(VISITS_KEY);
   if (raw === null) return undefined;
   const stored: unknown = JSON.parse(raw);
   if (Array.isArray(stored) && stored.every((id): id is string => typeof id === 'string'))
     return stored;
   throw new Error(`The visited missions are stored as ${raw}, which is not a list of mission ids`);
+}
+
+/**
+ * Missions this device visited before the page opened, written to the
+ * device's storage the way the site writes them. Call it before mounting.
+ */
+export function rememberVisits(ids: readonly string[]): void {
+  window.localStorage.setItem(VISITS_KEY, JSON.stringify(ids));
 }

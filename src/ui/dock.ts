@@ -2,8 +2,8 @@ import { copy } from '../content/copy';
 import { byId, wideLayoutQuery } from './dom';
 import { icon } from './icons';
 
-/** Where the guided tour is, as the card sees it: not touring, touring (at a stop or on the way), or at its ending. */
-export type DockTour = 'off' | 'touring' | 'ending';
+/** Whether the guided tour runs the clock (at a stop, on the way, or at its end), as the card sees it. */
+export type DockTour = 'off' | 'touring';
 
 export interface DockOptions {
   /** False without a 3D view: then "Look at" and True scale are never shown. */
@@ -17,12 +17,14 @@ export interface Dock {
   openRecords(): void;
   /** True while "Tell me more" is open. */
   readonly recordsOpen: boolean;
-  /**
-   * Follow the guided tour. While it runs, Controls are closed and out of
-   * reach; at its ending, the ending takes the moment's place and "Tell me
-   * more" closes.
-   */
+  /** Follow the guided tour. While it runs, Controls are closed and out of reach. */
   setTour(tour: DockTour): void;
+  /**
+   * Make room for the end of the flight, which takes the moment's place:
+   * both doors close, and Play, where the flight is, and Controls step
+   * aside (the progress strip stays, full).
+   */
+  setEnding(ending: boolean): void;
 }
 
 /**
@@ -41,7 +43,7 @@ export function setUpDock({ has3D, onLayout }: DockOptions): Dock {
   const controlsDoor = byId('controls-toggle', HTMLButtonElement);
   const tools = byId('timeline', HTMLElement);
   const views = byId('views', HTMLDivElement);
-  const transport = byId('dock-transport', HTMLDivElement);
+  const play = byId('play', HTMLButtonElement);
   const status = byId('dock-status', HTMLDivElement);
   const where = byId('dock-where', HTMLParagraphElement);
   const clock = byId('clock', HTMLParagraphElement);
@@ -69,16 +71,18 @@ export function setUpDock({ has3D, onLayout }: DockOptions): Dock {
   let recordsOpen = false;
   let toolsOpen = false;
   let tour: DockTour = 'off';
+  let ending = false;
 
   const render = (): void => {
     panel.hidden = !recordsOpen;
     recordsDoor.setAttribute('aria-expanded', String(recordsOpen));
-    controlsDoor.hidden = tour !== 'off';
+    controlsDoor.hidden = tour !== 'off' || ending;
     controlsDoor.setAttribute('aria-expanded', String(toolsOpen));
     tools.hidden = !toolsOpen;
     views.hidden = !toolsOpen || !has3D;
-    // The tour's ending takes the moment's place, Play and all.
-    transport.hidden = tour === 'ending';
+    // The end of the flight takes the moment's place, with its own button where Play was.
+    play.hidden = ending;
+    status.hidden = ending;
     // On a phone, the clock takes the place of the chapter and the day while the tools are open.
     where.hidden = toolsOpen;
     clock.hidden = !toolsOpen;
@@ -134,8 +138,17 @@ export function setUpDock({ has3D, onLayout }: DockOptions): Dock {
       if (next === tour) return;
       tour = next;
       if (tour !== 'off') toolsOpen = false;
-      // The ending's title takes keyboard focus (see tour-panel.ts), so nothing is handed back here.
-      if (tour === 'ending') recordsOpen = false;
+      render();
+      onLayout();
+    },
+    setEnding(next) {
+      if (next === ending) return;
+      ending = next;
+      // The ending's title takes keyboard focus (see ending.ts), so nothing is handed back here.
+      if (ending) {
+        toolsOpen = false;
+        recordsOpen = false;
+      }
       render();
       onLayout();
     },

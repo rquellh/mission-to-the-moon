@@ -140,7 +140,7 @@ import { howDrawnParagraphs } from './about-dialog.ts';
 
 - Import `mountMission`, `screen`, `within`, and `waitFor` from `../test/test-utils.ts`, **never** from `@testing-library/dom`
 - Do not import `userEvent`: the mount hands you `user`, made with `userEvent.setup()`
-- Import `sound`, `navigation`, `later`, `visitedMissions`, `mountRecordings`, and the `User`, `Frames`, and `MountedMission` types from test-utils too
+- Import `sound`, `navigation`, `later`, `visitedMissions`, `rememberVisits`, `mountRecordings`, and the `User`, `Frames`, and `MountedMission` types from test-utils too
 - Use `import type` for types (`verbatimModuleSyntax` is on)
 - An interface test never imports the module it covers: it mounts the interface and uses it
 
@@ -420,6 +420,8 @@ The welcome is not a dialog: it is a region named by its heading ("Ride along on
 
 "Tell me more" is not a dialog either: it is a region named by the moment's title, `hidden` until its door opens it. Opening it moves focus to its heading; Close (Show less on a phone), its door, and Escape while focus is inside it close it and give focus back to the door. The tools behind Controls work the same way, with focus staying on the door.
 
+The end of a flight is not a dialog either: a region named "That’s the flight!" inside the moment card, shown after the tour's last stop, or with "Finish" (on the card once exploring has reached the end of the clock). It takes the moment's place, so the story, Tell me more, Controls, Play, and the tour panel leave the role queries while it shows, and its heading has focus. Its "More to explore" door (`aria-expanded`) opens the card with focus on the opened heading; that part is built the first time it opens, so its text is not in the page before. Show less and Escape close it and give focus back to the door. After the tour, its quiet ways on include "Explore on my own", which leaves the tour and explores from the last stop with Play focused; after exploring it is not offered. The ending reads the device's visits each time it shows: prepare them with `rememberVisits` (section 10).
+
 ### Per-Test Overrides for Loading States
 
 `later()` makes a promise the test settles when it chooses. Pass it through a loader to see the loading state, then let the answer come:
@@ -510,15 +512,16 @@ Every override lasts for its own test only: each test mounts afresh, and the set
 
 The data is the real content. Pick missions that differ in the way the test needs:
 
-| Need                                                                   | Mission                                                                                      |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| A Moon flight with two craft, a landing, recordings, call signs        | `apollo-11`, `apollo-17`                                                                     |
-| Earth orbit, two craft, an event before liftoff, a spin, no call signs | `gemini-8`                                                                                   |
-| A short tour (6 stops), one craft                                      | `gemini-3`                                                                                   |
-| Sources borrowed from other missions                                   | `gemini-7` (from Gemini 6A and Gemini 8)                                                     |
-| A Moon flight with no landing, one craft                               | `apollo-8`                                                                                   |
-| A memorial page                                                        | `apollo-1` (opened from the mission list)                                                    |
-| A hands-on extra on an event                                           | `liftoff` on most flights ("Drop the stages"); `docking` on Gemini 8 ("Dock two spacecraft") |
+| Need                                                                   | Mission                                                                                                                                                                        |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A Moon flight with two craft, a landing, recordings, call signs        | `apollo-11`, `apollo-17`                                                                                                                                                       |
+| Earth orbit, two craft, an event before liftoff, a spin, no call signs | `gemini-8`                                                                                                                                                                     |
+| A short tour (6 stops), one craft                                      | `gemini-3`                                                                                                                                                                     |
+| Sources borrowed from other missions                                   | `gemini-7` (from Gemini 6A and Gemini 8)                                                                                                                                       |
+| A Moon flight with no landing, one craft                               | `apollo-8`                                                                                                                                                                     |
+| A memorial page                                                        | `apollo-1` (opened from the mission list)                                                                                                                                      |
+| A hands-on extra on an event                                           | `liftoff` on most flights ("Drop the stages"); `docking` on Gemini 8 ("Dock two spacecraft")                                                                                   |
+| The end of a flight                                                    | `apollo-11` with `event: 'splashdown'` (the last moment, at the end of the clock: Finish shows); `gemini-8` (suggests the docking and the rockets); `gemini-3` (no crew patch) |
 
 Assert with the content's own words, written out: `'The Eagle has landed'`, `'Stop 1 of 6'`, `'102:45:39'`. When the test passes text in (a no-3D note), take it from `copy` (`src/content/copy.ts`) as the site does.
 
@@ -687,6 +690,8 @@ screen.getByRole('region', { name: 'What is happening' }); // the moment card, a
 screen.getByRole('region', { name: 'The Eagle has landed' }); // "Tell me more", once open, by the moment's title
 screen.getByRole('region', { name: 'Timeline' }); // the tools behind Controls, once open
 screen.getByRole('region', { name: 'Guided tour' }); // in the card, on the tour
+screen.getByRole('region', { name: 'That’s the flight!' }); // the end of a flight, in the card
+within(ending).getByRole('group', { name: 'Next flight' }); // with More to explore open: also 'Try it yourself', 'More to explore'
 screen.getByRole('group', { name: 'Look at' }); // at the top left, with Controls open
 within(card).getByRole('group', { name: 'Where the flight is' }); // beside Play: the chapter and the day
 within(timeline).getByRole('group', { name: 'Chapters' });
@@ -699,6 +704,8 @@ within(story).getByRole('heading', { level: 3 });
 // when the moment has nothing more than its sources.
 within(card).getByRole('button', { name: 'Tell me more' });
 within(card).getByRole('button', { name: 'Controls' });
+within(card).getByRole('button', { name: 'Finish' }); // exploring, once the clock has reached the end
+within(ending).getByRole('button', { name: 'More to explore' }); // the ending's door, with aria-expanded
 
 // Controls
 within(card).getByRole('button', { name: 'Play' });
@@ -890,6 +897,13 @@ Only one value is stored, the missions visited. Read it with `visitedMissions()`
 expect(visitedMissions()).toEqual(['apollo-11']);
 ```
 
+To start from a device that has flown other missions (the end of a flight counts them and suggests one not flown yet), write the visits with `rememberVisits()` before mounting. It writes the page's own storage, under the site's own key:
+
+```ts
+rememberVisits(['gemini-3', 'apollo-12']);
+await mountMission('apollo-11', { event: 'splashdown' });
+```
+
 ### What Is Never Replaced
 
 - A module of the site, with `vi.mock` (no `vi.mock` at all in interface tests)
@@ -965,7 +979,7 @@ Each test reads in three steps, separated by blank lines: mount (and get to the 
 | `choosing`                                  | Picking an entry, a view, a chapter                                                                                |
 | `stepping` / `traveling`                    | The card's Previous and Next; the tour's trips and Skip                                                            |
 | `exploring` / `touring` / `during the tour` | States of the whole interface                                                                                      |
-| `the ending` / `leaving`                    | The tour's end and the ways out of it                                                                              |
+| `the ending` / `leaving`                    | The end of a flight (after the tour or exploring) and the ways out of it                                           |
 | `announcements`                             | What screen readers hear (fake timers allowed here)                                                                |
 | Domain groups                               | `the door`, `photo`, `sources`, `try it`, `recording`, `true scale`, `one at a time`, `one recording, two buttons` |
 
@@ -975,7 +989,7 @@ Each test reads in three steps, separated by blank lines: mount (and get to the 
 
 ### When a Unit Test Is Right
 
-Write a unit test only for a pure helper with many cases or tricky edges: the time and date writers (`format.ts`), the event and chapter lookups (`mission-index.ts`), the device store, the citation builders, `howDrawnParagraphs`, and in `src/app` the deep link reader, the views, and the flight outline. Use real missions as inputs, and `it.each` tables for many cases:
+Write a unit test only for a pure helper with many cases or tricky edges: the time and date writers (`format.ts`), the event and chapter lookups (`mission-index.ts`), the device store, the citation builders, `howDrawnParagraphs`, and in `src/app` the deep link reader, the views, the flight outline, and what the end of a flight suggests (`related.ts`). Use real missions as inputs, and `it.each` tables for many cases:
 
 ```ts
 describe('missionDates', () => {
@@ -1027,6 +1041,7 @@ import { story as gemini8 } from '../content/missions/gemini-8/story.ts';
 - **New tests assert with `expect`.** The older flight tests use `node:assert/strict` (declared in `src/sim/test/node-shim.d.ts`, since there is no `@types/node`). Leave them as they are; do not convert them, and do not add `node:assert` to new files.
 - **Rules about content** (events in order, every citation resolves, every photo and recording exists, no durations in raw seconds, summaries match their stories) live in `src/sim/test/all-missions.test.ts`, once, for every mission. Add a new rule there, not an interface test per mission.
 - **The tour's timing** (trip length, easing, the camera's lead before arrival, a stalled tab) lives in `src/app/tour.test.ts`, with its own fake screen. Interface tests only check that a trip arrives.
+- **What the end of a flight suggests** (the next flight not flown yet, the extra to try, the extra to explore, the flights collected) lives in `src/app/related.test.ts`, as tables of real summaries, stories, and extras' metas. Interface tests only check that the ending shows what it is told.
 - **Flight path math** lives in `src/sim/test/`.
 
 ---

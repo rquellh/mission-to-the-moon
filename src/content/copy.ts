@@ -192,6 +192,8 @@ export const copy = {
     /** The button that opens an event's hands-on extra. */
     tryIt: 'Try it',
     tryItLabel: (title: string) => `Try it: ${title}`,
+    /** Once the clock has reached the end of the flight: shows what comes next. */
+    finish: 'Finish',
   },
 
   /** "Tell me more": the records of the moment on the card. */
@@ -233,11 +235,52 @@ export const copy = {
     exit: 'Exit tour',
     arrived: (index: number, total: number, title: string) =>
       `Stop ${index} of ${total}: ${title}.`,
-    endTitle: 'That’s the tour!',
-    endText: 'Now it’s your turn. Press play, or open Controls to jump to any part of the flight.',
-    endExplore: EXPLORE_ON_MY_OWN,
-    endAgain: 'Start the tour again',
     ended: 'Tour ended. You are exploring on your own.',
+  },
+
+  /**
+   * The end of every flight, in the moment card: what comes next. One
+   * recommended next step, and "More to explore", which opens one pick from
+   * each shelf.
+   */
+  ending: {
+    title: 'That’s the flight!',
+    /** The round button where Play was: the flight from the beginning. */
+    watchAgain: 'Watch again',
+    /** The same button after the guided tour: the tour from its first stop. */
+    tourAgain: 'Start the tour again',
+    /** Beside the patch: how many flights this device has flown. */
+    patchCollected: (count: number, total: number) => `Patch collected · ${count} of ${total}`,
+    /** The same, for a flight whose crew had no patch (its page in the book still fills in). */
+    flightCollected: (count: number, total: number) => `Flight collected · ${count} of ${total}`,
+    /** The main button: the next flight to fly. */
+    next: (missionName: string) => `Next: ${missionName}`,
+    /** The door that opens one pick from each shelf. */
+    more: 'More to explore',
+    less: 'Less',
+    lessLabel: 'Show less',
+    /** Under the title, with "More to explore" open. */
+    flew: (missionName: string) => `You flew ${missionName} from liftoff to splashdown.`,
+    inYourBook: (count: number, total: number) =>
+      `Its patch is in your book: ${count} of ${total}.`,
+    pageInYourBook: (count: number, total: number) =>
+      `Its page in your book is filled in: ${count} of ${total}.`,
+    /** The three shelves, one pick each. */
+    nextFlight: 'Next flight',
+    handsOn: 'Try it yourself',
+    explore: 'More to explore',
+    fly: (missionName: string) => `Fly ${missionName}`,
+    /** In place of the next flight, once this device has flown them all. */
+    allFlown: 'You have flown every flight! Pick any one to fly again from All missions.',
+    open: 'Open',
+    openExtra: (title: string) => `Open ${title}`,
+    /** The quiet actions at the bottom. After the guided tour, one keeps exploring the flight. */
+    keepExploring: EXPLORE_ON_MY_OWN,
+    about: (missionName: string) => `About ${missionName}`,
+    credits: 'Sources and credits',
+    allMissions: ALL_MISSIONS,
+    /** The number beside "All missions", read out. */
+    count: (count: number) => `${count} ${count === 1 ? 'mission' : 'missions'}`,
   },
 
   about: {

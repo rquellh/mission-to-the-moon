@@ -13,7 +13,9 @@ type IconName =
   | 'chevron-down'
   | 'chevron-up'
   | 'close'
-  | 'external';
+  | 'external'
+  | 'replay'
+  | 'arrow-right';
 
 const SHAPES: Record<IconName, { fill?: string[]; stroke?: string[] }> = {
   play: {
@@ -37,6 +39,9 @@ const SHAPES: Record<IconName, { fill?: string[]; stroke?: string[] }> = {
       'M16.5 13.5v4a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h4',
     ],
   },
+  // Round and back to the start: "Watch again".
+  replay: { stroke: ['M3.5 12a8.5 8.5 0 1 0 2.8-6.3', 'M3.5 4.5v5h5'] },
+  'arrow-right': { stroke: ['M5 12h14', 'M13 6l6 6-6 6'] },
 };
 
 /** An inline SVG icon, hidden from assistive technology. */

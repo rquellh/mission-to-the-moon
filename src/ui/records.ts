@@ -30,7 +30,7 @@ export interface RecordsOptions {
 }
 
 /** The date and time of an event: its own, when the sources give one, or the launch time plus the mission time. */
-function dateOf(index: MissionIndex, eventIndex: number): Date | null {
+export function momentDate(index: MissionIndex, eventIndex: number): Date | null {
   const event = index.events[eventIndex];
   if (!event) return null;
   const date = event.utc ? new Date(event.utc) : index.utcAt(index.seconds[eventIndex] ?? 0);
@@ -51,7 +51,7 @@ export function momentEyebrow(index: MissionIndex, eventIndex: number): string {
   if (chapter) parts.push(chapter.title);
   const day = index.countsDays ? flightDay(index.seconds[eventIndex] ?? 0) : null;
   if (day !== null) parts.push(copy.timeline.day(day));
-  const date = dateOf(index, eventIndex);
+  const date = momentDate(index, eventIndex);
   if (date) parts.push(formatDate(date));
   return parts.join(' · ');
 }
@@ -119,7 +119,7 @@ export function setUpRecords({ index, reducedMotion }: RecordsOptions): Records 
         el('span', 'records__met', formatElapsed(seconds)),
         ` ${isBeforeLiftoff(seconds) ? copy.card.beforeLiftoff : copy.card.afterLiftoff}`,
       );
-      const date = dateOf(index, eventIndex);
+      const date = momentDate(index, eventIndex);
       if (date) time.append(el('span', 'records__utc', formatUtc(date)));
     } else {
       time.replaceChildren();

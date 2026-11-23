@@ -179,8 +179,18 @@
             hidden
             data-testid="event-card-photo"
           ></button>
-          <!-- "Hear the recording" goes first, when the moment has one. -->
+          <!-- "Finish" goes first once the clock has reached the end of the flight; then
+               "Hear the recording", when the moment has one. -->
           <div class="card__actions" id="card-actions">
+            <button
+              type="button"
+              class="button button--primary card__finish"
+              id="card-finish"
+              hidden
+              data-testid="event-card-finish"
+            >
+              Finish
+            </button>
             <button
               type="button"
               class="button dock__door"
@@ -212,6 +222,14 @@
           aria-label="Guided tour"
           hidden
           data-testid="tour-panel"
+        ></section>
+        <!-- The end of the flight, in the moment's place: what comes next, and "More to explore". Filled by the script. -->
+        <section
+          class="ending"
+          id="ending"
+          hidden
+          aria-labelledby="ending-title"
+          data-testid="ending"
         ></section>
         <div class="dock__transport" id="dock-transport">
           <button

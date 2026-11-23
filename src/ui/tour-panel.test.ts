@@ -1,12 +1,20 @@
 /**
  * The guided tour in the moment card, on Gemini 3's six stops: where the
- * tour is, the trip to the next stop, Skip, the ending in the moment's
- * place, and the ways out. How long a trip takes and when the camera moves
+ * tour is, the trip to the next stop, Skip, the ways out, and the tour
+ * handing over to the end of the flight (whose own details are in
+ * ending.test.ts). How long a trip takes and when the camera moves
  * belong to the tour itself (src/app/tour.test.ts); here the frames only
  * carry each trip to its end.
  */
 import { describe, expect, it } from 'vitest';
-import { mountMission, screen, within, type Frames, type User } from '../test/test-utils.ts';
+import {
+  mountMission,
+  navigation,
+  screen,
+  within,
+  type Frames,
+  type User,
+} from '../test/test-utils.ts';
 
 /** Longer than any trip between two stops takes. */
 const A_WHOLE_TRIP = 16;
@@ -131,17 +139,17 @@ describe('the tour panel', () => {
       return { user, frames };
     }
 
-    it('reads Finish on the last stop, then shows the ending', async () => {
+    it('reads Finish on the last stop, then steps aside for the end of the flight', async () => {
       const { user } = await atTheLastStop();
       const panel = screen.getByRole('region', { name: 'Guided tour' });
       expect(panel).toHaveTextContent('Stop 6 of 6');
 
       await user.click(within(panel).getByRole('button', { name: 'Finish' }));
 
-      expect(within(panel).getByRole('heading', { name: 'That’s the tour!' })).toHaveFocus();
-      expect(panel).toHaveTextContent(
-        'Now it’s your turn. Press play, or open Controls to jump to any part of the flight.',
-      );
+      expect(screen.queryByRole('region', { name: 'Guided tour' })).not.toBeInTheDocument();
+      const ending = within(theCard()).getByRole('region', { name: 'That’s the flight!' });
+      expect(within(ending).getByRole('heading', { level: 3 })).toHaveFocus();
+      expect(ending).toHaveTextContent('Molly Brown comes aboard · March 23, 1965');
       // The ending takes the moment's place in the card.
       expect(within(theCard()).queryByRole('article')).not.toBeInTheDocument();
       expect(
@@ -160,20 +168,7 @@ describe('the tour panel', () => {
       expect(
         screen.queryByRole('region', { name: 'Molly Brown comes aboard' }),
       ).not.toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'That’s the tour!' })).toHaveFocus();
-    });
-
-    it('hands over to exploring', async () => {
-      const { user } = await atTheLastStop();
-      await user.click(screen.getByRole('button', { name: 'Finish' }));
-
-      await user.click(screen.getByRole('button', { name: 'Explore on my own' }));
-
-      expect(screen.queryByRole('region', { name: 'Guided tour' })).not.toBeInTheDocument();
-      expect(within(theCard()).getByRole('button', { name: 'Play' })).toHaveFocus();
-      expect(
-        within(theCard()).getByRole('heading', { level: 3, name: 'Molly Brown comes aboard' }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'That’s the flight!' })).toHaveFocus();
     });
 
     it('starts the tour again from the first stop', async () => {
@@ -183,9 +178,47 @@ describe('the tour panel', () => {
       await user.click(screen.getByRole('button', { name: 'Start the tour again' }));
       frames.advance(A_WHOLE_TRIP);
 
+      expect(screen.queryByRole('region', { name: 'That’s the flight!' })).not.toBeInTheDocument();
       const panel = screen.getByRole('region', { name: 'Guided tour' });
       expect(panel).toHaveTextContent('Stop 1 of 6');
       expect(within(panel).getByRole('button', { name: 'Next' })).toHaveFocus();
+    });
+
+    it('takes the next flight as a tour too', async () => {
+      const { user } = await atTheLastStop();
+      await user.click(screen.getByRole('button', { name: 'Finish' }));
+
+      await user.click(screen.getByRole('button', { name: 'Next: Gemini 4' }));
+
+      expect(navigation.address).toBe('http://localhost:3000/?mission=gemini-4&start=tour');
+    });
+
+    it('hands over to exploring with Explore on my own, at the last stop', async () => {
+      const { user } = await atTheLastStop();
+      await user.click(screen.getByRole('button', { name: 'Finish' }));
+      await user.click(screen.getByRole('button', { name: 'More to explore' }));
+
+      await user.click(screen.getByRole('button', { name: 'Explore on my own' }));
+
+      expect(screen.queryByRole('region', { name: 'That’s the flight!' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'Guided tour' })).not.toBeInTheDocument();
+      expect(document.body).not.toHaveClass('is-touring');
+      expect(within(theCard()).getByRole('button', { name: 'Play' })).toHaveFocus();
+      expect(
+        within(theCard()).getByRole('heading', { level: 3, name: 'Molly Brown comes aboard' }),
+      ).toBeInTheDocument();
+    });
+
+    it("leaves the ending for exploring from the mission list's Explore too", async () => {
+      const { user } = await atTheLastStop();
+      await user.click(screen.getByRole('button', { name: 'Finish' }));
+      await user.click(screen.getByRole('button', { name: /all missions$/ }));
+
+      await user.click(screen.getByRole('button', { name: 'Explore Gemini 3' }));
+
+      expect(screen.queryByRole('region', { name: 'That’s the flight!' })).not.toBeInTheDocument();
+      expect(document.body).not.toHaveClass('is-touring');
+      expect(within(theCard()).getByRole('button', { name: 'Play' })).toHaveFocus();
     });
   });
 

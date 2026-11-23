@@ -12,10 +12,12 @@ export interface EventCard {
   show(eventIndex: number): void;
   /** The event index on show. */
   readonly shown: number;
-  /** Hide the moment (for the end of the tour, which takes its place) or show it again. */
+  /** Hide the moment (for the end of the flight, which takes its place) or show it again. */
   setHidden(hidden: boolean): void;
   /** Allow "Try it" or hide it (it is hidden while the tour travels between stops). */
   setTryItAllowed(allowed: boolean): void;
+  /** Offer "Finish" or take it away (it is offered while exploring, once the clock has reached the end). */
+  setFinishOffered(offered: boolean): void;
   /** The "Try it" button, while it is showing, so focus can come back to it. */
   readonly tryItButton: HTMLButtonElement | null;
 }
@@ -33,27 +35,30 @@ export interface EventCardOptions {
   onTryIt(extraId: string, event: MissionEvent, from: HTMLButtonElement): void;
   /** The photo's small picture was pressed: open "Tell me more" at the photo. */
   onPhoto(): void;
+  /** "Finish" was pressed: show the end of the flight. */
+  onFinish(): void;
 }
 
 /**
  * The moment card's story: the moment on the clock, with its chapter, day,
  * and date over its title, and its short text in full. Beside it, the
- * photo's small picture, "Hear the recording", the "Tell me more" door
- * (named "Sources" when the moment has nothing more than its sources),
- * "Try it" when the event has a hands-on extra, and the photo's credit.
+ * photo's small picture, "Finish" once the clock has reached the end of the
+ * flight, "Hear the recording", the "Tell me more" door (named "Sources"
+ * when the moment has nothing more than its sources), "Try it" when the
+ * event has a hands-on extra, and the photo's credit.
  * It keeps "Tell me more" on the same moment, and the previous and next
  * buttons in Controls in step with it.
  */
 export function setUpEventCard(options: EventCardOptions): EventCard {
-  const { index, records, onStep, reducedMotion, extraTitle, onTryIt, onPhoto } = options;
+  const { index, records, onStep, reducedMotion, extraTitle, onTryIt, onPhoto, onFinish } = options;
   const card = byId('card', HTMLElement);
   const eyebrow = byId('card-eyebrow', HTMLParagraphElement);
   const title = byId('card-title', HTMLHeadingElement);
   const short = byId('card-short', HTMLParagraphElement);
   const media = byId('dock-media', HTMLDivElement);
-  const actions = byId('card-actions', HTMLDivElement);
   const doorLabel = byId('records-toggle-label', HTMLSpanElement);
   const tryButton = byId('card-try', HTMLButtonElement);
+  const finishButton = byId('card-finish', HTMLButtonElement);
   const credit = byId('card-photo-credit', HTMLParagraphElement);
   const previous = byId('event-previous', HTMLButtonElement);
   const next = byId('event-next', HTMLButtonElement);
@@ -78,7 +83,11 @@ export function setUpEventCard(options: EventCardOptions): EventCard {
   previous.addEventListener('click', () => onStep(-1));
   next.addEventListener('click', () => onStep(1));
 
-  // One recording at a time, for the moment on show. Its card button goes first among the actions.
+  // The last moment stays on the card to be read; "Finish" moves on to the end of the flight when the visitor is ready.
+  finishButton.textContent = copy.card.finish;
+  finishButton.addEventListener('click', () => onFinish());
+
+  // One recording at a time, for the moment on show. Its card button goes first among the actions, after "Finish".
   let player: AudioPlayer | null = null;
   const renderAudio = (event: MissionEvent | undefined): void => {
     player?.dispose();
@@ -86,7 +95,7 @@ export function setUpEventCard(options: EventCardOptions): EventCard {
     player = event?.audio ? createAudioPlayer(event.audio) : null;
     if (player) {
       player.button.setAttribute('data-testid', 'event-card-recording');
-      actions.prepend(player.button);
+      finishButton.after(player.button);
     }
   };
 
@@ -169,6 +178,9 @@ export function setUpEventCard(options: EventCardOptions): EventCard {
     setTryItAllowed(allowed) {
       tryAllowed = allowed;
       tryButton.hidden = !tryTarget || !tryAllowed;
+    },
+    setFinishOffered(offered) {
+      finishButton.hidden = !offered;
     },
     get tryItButton() {
       return tryButton.hidden ? null : tryButton;

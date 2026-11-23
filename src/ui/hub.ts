@@ -42,7 +42,7 @@ export interface Hub {
  * The address of a mission, starting with the tour or exploring. Built from
  * the current address so it works under any path the site is served from.
  */
-function missionAddress(id: string, start: 'tour' | 'explore'): string {
+export function missionAddress(id: string, start: 'tour' | 'explore'): string {
   const url = new URL(window.location.href);
   url.search = '';
   url.hash = '';
