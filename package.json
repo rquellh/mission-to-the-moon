@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "dev": "vite",
     "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",

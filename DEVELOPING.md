@@ -35,15 +35,15 @@ npm run test:e2e  # the browser tests
 
 The lint rules come from Cloudflare's preset (`@cloudflare/oxlint-config`), which includes the anti-slop rules and checks types as it goes. `oxlint.config.ts` lists the rules that are off here, and why. Every rule that is on is an error, so a clean run prints nothing.
 
-The format settings are in `oxfmt.config.ts`. They are the ones Cloudflare's oxlint-config repo uses for its own code: single quotes, sorted imports, and a sorted `package.json`. Everything else is oxfmt's default.
+The format settings are in `oxfmt.config.ts`. They are the ones Cloudflare's oxlint-config repo uses for its own code: single quotes, sorted imports, and a sorted `package.json`. Everything else is oxfmt's default. `npm run format:check` changes nothing and fails on a file that is not in this format, and `npm run format` fixes it.
 
 The site uses relative paths, so `dist/` works from any subpath. Each mission, and the 3D code, is built as its own file and fetched only when needed.
 
 ## How a change reaches the site
 
-A pull request runs three workflows from `.github/workflows/` side by side: `oxlint.yml` lints the code, `vitest.yml` runs the content, flight math, and interface tests, and `playwright.yml` builds the site and runs the browser tests against the build. It publishes nothing. Pushing to `main` runs `deploy.yml`, which runs all three again, builds the site, and publishes it to GitHub Pages only if all three pass (turn on Pages with "GitHub Actions" as the source in the repository settings).
+A pull request runs four workflows from `.github/workflows/` side by side: `oxlint.yml` lints the code, `oxfmt.yml` checks the format, `vitest.yml` runs the content, flight math, and interface tests, and `playwright.yml` builds the site and runs the browser tests against the build. It publishes nothing. Pushing to `main` runs `deploy.yml`, which runs all four again, builds the site, and publishes it to GitHub Pages only if all four pass (turn on Pages with "GitHub Actions" as the source in the repository settings).
 
-`main` is protected: a repository rule (Settings → Rules) requires the `vitest` and `playwright` checks to pass before a commit reaches `main`, so changes go through a pull request and a direct push of untested work is turned away. The `oxlint` check is not in that rule, so a lint error stops the publish but not the merge.
+`main` is protected: a repository rule (Settings → Rules) requires the `vitest` and `playwright` checks to pass before a commit reaches `main`, so changes go through a pull request and a direct push of untested work is turned away. The `oxlint` and `oxfmt` checks are not in that rule, so a lint error or an unformatted file stops the publish but not the merge.
 
 ## Tests
 
@@ -88,7 +88,7 @@ src/test/                     What the interface tests share: the page setup and
 tests/                        Browser tests (Playwright): specs, page objects, helpers
 src/styles/                   CSS
 tools/                        Developer scripts (screenshots, Moon and Sun positions)
-.github/workflows/            Lint, tests, and GitHub Pages deployment
+.github/workflows/            Lint, format check, tests, and GitHub Pages deployment
 .claude/skills/               How tests are planned and written in this project
 assets-src/                   Original downloads and screenshots (not committed)
 ```

@@ -49,25 +49,26 @@ You are an expert interface test engineer for Mission to the Moon. You write, de
 
 ## 2. Infrastructure Quick Reference
 
-| Item                                              | Location                                                                                               |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Test runner                                       | Vitest (`vitest.config.ts`, two projects)                                                              |
-| Interface tests (project `ui`, jsdom)             | `src/ui/**/*.test.ts`, `src/extras/**/*.test.ts`                                                       |
-| Content and flight tests (project `flight`, Node) | `src/sim/**/*.test.ts`, `src/app/**/*.test.ts`, `src/content/**/*.test.ts`                             |
-| Queries and events                                | `@testing-library/dom`, `@testing-library/user-event`                                                  |
-| Matchers                                          | `@testing-library/jest-dom` (loaded by the setup file)                                                 |
-| Mount function                                    | `src/test/test-utils.ts` (`mountMission`)                                                              |
-| Global setup (`ui` only)                          | `src/test/setup.ts`                                                                                    |
-| What jsdom lacks, filled in                       | `src/test/browser.ts`                                                                                  |
-| Edge fakes                                        | `src/test/fakes.ts` (`FakeDirector`, `fakeFrames`, `standInExtra`, `later`)                            |
-| Imports                                           | Relative, with the `.ts` extension (no path alias)                                                     |
-| Run every test                                    | `npm test`                                                                                             |
-| Watch mode                                        | `npm run test:watch`                                                                                   |
-| One file                                          | `npx vitest run src/ui/hub.test.ts`                                                                    |
-| One test by name                                  | `npx vitest run src/ui/hub.test.ts -t "Escape"`                                                        |
-| One project                                       | `npx vitest run --project ui` or `--project flight`                                                    |
-| Type-check (tests included)                       | `npm run typecheck` (`tsc --noEmit`, strict, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`) |
-| Lint (tests included)                             | `npm run lint` (oxlint with Cloudflare's preset; `oxlint.config.ts` lists the rules that are off)      |
+| Item                                              | Location                                                                                                       |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Test runner                                       | Vitest (`vitest.config.ts`, two projects)                                                                      |
+| Interface tests (project `ui`, jsdom)             | `src/ui/**/*.test.ts`, `src/extras/**/*.test.ts`                                                               |
+| Content and flight tests (project `flight`, Node) | `src/sim/**/*.test.ts`, `src/app/**/*.test.ts`, `src/content/**/*.test.ts`                                     |
+| Queries and events                                | `@testing-library/dom`, `@testing-library/user-event`                                                          |
+| Matchers                                          | `@testing-library/jest-dom` (loaded by the setup file)                                                         |
+| Mount function                                    | `src/test/test-utils.ts` (`mountMission`)                                                                      |
+| Global setup (`ui` only)                          | `src/test/setup.ts`                                                                                            |
+| What jsdom lacks, filled in                       | `src/test/browser.ts`                                                                                          |
+| Edge fakes                                        | `src/test/fakes.ts` (`FakeDirector`, `fakeFrames`, `standInExtra`, `later`)                                    |
+| Imports                                           | Relative, with the `.ts` extension (no path alias)                                                             |
+| Run every test                                    | `npm test`                                                                                                     |
+| Watch mode                                        | `npm run test:watch`                                                                                           |
+| One file                                          | `npx vitest run src/ui/hub.test.ts`                                                                            |
+| One test by name                                  | `npx vitest run src/ui/hub.test.ts -t "Escape"`                                                                |
+| One project                                       | `npx vitest run --project ui` or `--project flight`                                                            |
+| Type-check (tests included)                       | `npm run typecheck` (`tsc --noEmit`, strict, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`)         |
+| Lint (tests included)                             | `npm run lint` (oxlint with Cloudflare's preset; `oxlint.config.ts` lists the rules that are off)              |
+| Format (tests included)                           | `npm run format` fixes it and `npm run format:check` only checks (oxfmt; `oxfmt.config.ts` holds the settings) |
 
 There is no coverage package. Coverage is not a target here; do not add one.
 

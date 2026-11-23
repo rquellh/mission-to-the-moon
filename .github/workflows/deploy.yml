@@ -16,10 +16,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # The lint check and the two test workflows run again here, beside the
-  # build. The site is published only if all three pass.
+  # The lint check, the format check, and the two test workflows run again
+  # here, beside the build. The site is published only if all four pass.
   oxlint:
     uses: ./.github/workflows/oxlint.yml
+
+  oxfmt:
+    uses: ./.github/workflows/oxfmt.yml
 
   vitest:
     uses: ./.github/workflows/vitest.yml
@@ -54,7 +57,7 @@ jobs:
           path: dist
 
   deploy:
-    needs: [oxlint, vitest, playwright, build]
+    needs: [oxlint, oxfmt, vitest, playwright, build]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
