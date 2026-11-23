@@ -1,9 +1,8 @@
-name: Test and deploy to GitHub Pages
+name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -12,18 +11,19 @@ permissions:
   id-token: write
 
 # One deployment at a time; let an in-progress deployment finish.
-# Each pull request has its own line, and a newer push to it replaces the older run.
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'pages' }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  # Every test must pass before the site is published. A pull request runs
-  # the same tests and stops there.
-  #
-  # A rule on the repository requires this job, by the name `build`, before
-  # anything merges into main. Rename it and every pull request waits forever
-  # on a check that never reports; change the rule's check name with it.
+  # The two test workflows run again here, beside the build. The site is
+  # published only if both pass.
+  vitest:
+    uses: ./.github/workflows/vitest.yml
+
+  playwright:
+    uses: ./.github/workflows/playwright.yml
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -39,45 +39,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Test the content, the flight math, and the interface
-        run: npm test
-
       - name: Build
         run: npm run build
 
-      # The browser tests drive Google Chrome. GitHub's machines come with it;
-      # fetch it only if one does not.
-      - name: Find Chrome
-        run: google-chrome --version || npx playwright install chrome
-
-      - name: Test the built site in a browser
-        run: npx playwright test -c tests/playwright.e2e.config.ts
-        env:
-          E2E_TARGET: preview
-
-      - name: Keep the browser test report
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: browser-test-report
-          path: |
-            tests/e2e/report
-            tests/e2e/results
-          retention-days: 7
-
       - name: Configure Pages
-        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/configure-pages@v6
 
       - name: Upload site
-        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
   deploy:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: build
+    needs: [vitest, playwright, build]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
