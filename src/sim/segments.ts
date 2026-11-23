@@ -55,13 +55,19 @@ export function fromBodyInertial(sky: Sky, body: BodyId, p: Readonly<Vec3>, t: n
   return body === "earth" ? sky.inertialToScene(p, t, out) : sky.moonInertialToScene(p, t, out);
 }
 
+/** Where a craft is and how it is moving at one moment: position (km) and velocity (km/s), in the frame each use names. */
+export interface PositionAndVelocity {
+  r: Vec3;
+  v: Vec3;
+}
+
 /** State (position and velocity) relative to a body in its inertial frame. */
 export function bodyInertialState(
   sky: Sky,
   body: BodyId,
   seg: Segment,
   t: number,
-): { r: Vec3; v: Vec3 } {
+): PositionAndVelocity {
   const h = 0.5;
   const a = toBodyInertial(sky, body, seg.evaluate(t - h, vec3()), t - h, vec3());
   const b = toBodyInertial(sky, body, seg.evaluate(t + h, vec3()), t + h, vec3());
@@ -86,7 +92,7 @@ export function fromBodyFixed(sky: Sky, body: BodyId, p: Readonly<Vec3>, t: numb
 }
 
 /** Body-fixed position and velocity of a segment at t. */
-export function bodyFixedState(sky: Sky, body: BodyId, seg: Segment, t: number): { r: Vec3; v: Vec3 } {
+export function bodyFixedState(sky: Sky, body: BodyId, seg: Segment, t: number): PositionAndVelocity {
   const h = 0.5;
   const a = toBodyFixed(sky, body, seg.evaluate(t - h, vec3()), t - h, vec3());
   const b = toBodyFixed(sky, body, seg.evaluate(t + h, vec3()), t + h, vec3());
@@ -253,6 +259,13 @@ export class SizeSchedule {
   }
 }
 
+/** How far the bulge has turned an orbit since its reference time: its node, its periapsis, and its mean anomaly, radians. */
+interface OrbitDrift {
+  node: number;
+  periapsis: number;
+  mean: number;
+}
+
 /**
  * An orbit of published size (periapsis and apoapsis radii) whose position
  * is pinned to a reference point and, optionally, to a published direction
@@ -410,7 +423,7 @@ export class AnchoredOrbit implements Segment {
   }
 
   /** The oblateness drift since the reference time: node, periapsis, and mean anomaly, radians. */
-  private drift(t: number): { node: number; periapsis: number; mean: number } {
+  private drift(t: number): OrbitDrift {
     const dt = t - this.conic.t0;
     return { node: this.nodeRate * dt, periapsis: this.periapsisRate * dt, mean: this.meanAnomalyRate * dt };
   }

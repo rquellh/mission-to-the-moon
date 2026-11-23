@@ -28,7 +28,7 @@ import { extraFor, extras, isExtraReady } from '../extras/index.ts';
 import type { Extra } from '../extras/types.ts';
 import { buildFlightPath, createStoryTime } from '../sim/index.ts';
 import { createAudioPlayer } from '../ui/audio-player.ts';
-import { mountInterface, type MissionInterface } from '../ui/interface.ts';
+import { mountInterface, type InterfaceOptions, type MissionInterface } from '../ui/interface.ts';
 import { setScreen } from './browser.ts';
 import { FakeDirector, fakeFrames, standInExtra, type Frames } from './fakes.ts';
 
@@ -145,7 +145,7 @@ export async function mountMission(id: string, options: MountOptions = {}): Prom
   if (atEvent) player.seek(elapsedToSeconds(atEvent.elapsed));
   const director = new FakeDirector(atEvent ? nearestView(mission, atEvent.view) : homeView(mission));
 
-  const ui: MissionInterface = mountInterface({
+  const interfaceOptions: InterfaceOptions = {
     mission,
     flight: outlineOf(bundle),
     cited: sourcesCitedBy(bundle),
@@ -167,8 +167,9 @@ export async function mountMission(id: string, options: MountOptions = {}): Prom
     player,
     director,
     has3D: !options.no3D,
-    ...(options.no3D ? { no3D: options.no3D } : {}),
-  });
+  };
+  if (options.no3D) interfaceOptions.no3D = options.no3D;
+  const ui: MissionInterface = mountInterface(interfaceOptions);
 
   const begin = options.start ?? (atEvent ? 'explore' : 'welcome');
   if (begin === 'tour') ui.tour();
@@ -178,17 +179,33 @@ export async function mountMission(id: string, options: MountOptions = {}): Prom
   return { user: makeUser(), director, frames };
 }
 
+/** What mountRecordings gives a test: a visitor to use the players. */
+export interface MountedRecordings {
+  /** A visitor, set up with userEvent.setup(). It keeps working under fake timers. */
+  user: User;
+}
+
 /**
  * Recording players on their own, side by side on a fresh page, for what
  * only shows with more than one (the card holds one at a time).
  */
-export function mountRecordings(...clips: AudioClip[]): { user: User } {
+export function mountRecordings(...clips: AudioClip[]): MountedRecordings {
   document.body.replaceChildren(...clips.map((clip) => createAudioPlayer(clip).element));
   return { user: makeUser() };
 }
 
-/** The missions this device has noted as visited, oldest first, as an extra reads them. */
-export function visitedMissions(): unknown {
+/** The ids of the missions this device has noted as visited, oldest first, as the site stores them. */
+export type VisitedMissions = readonly string[];
+
+/**
+ * The missions this device has noted as visited, oldest first, as an extra
+ * reads them: undefined until the first one. Anything stored that is not a
+ * list of ids fails the test.
+ */
+export function visitedMissions(): VisitedMissions | undefined {
   const raw = window.localStorage.getItem('mission-to-the-moon/site/visited-missions');
-  return raw === null ? undefined : JSON.parse(raw);
+  if (raw === null) return undefined;
+  const stored: unknown = JSON.parse(raw);
+  if (Array.isArray(stored) && stored.every((id): id is string => typeof id === 'string')) return stored;
+  throw new Error(`The visited missions are stored as ${raw}, which is not a list of mission ids`);
 }

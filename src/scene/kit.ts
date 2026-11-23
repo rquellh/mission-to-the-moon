@@ -42,6 +42,7 @@ import {
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EARTH_RADIUS, MOON_RADIUS } from '../content/physical-constants';
 import type { VehicleLayout, VehiclePart } from '../content/vehicle-types';
+import type { GroundPoint } from '../sim/frames';
 import {
   AMBIENT_INTENSITY,
   CAMERA_FOV,
@@ -57,8 +58,8 @@ import { fitDistance } from './framing';
 import { createMarkers, type MarkerSet } from './markers';
 import { createMoon as createMoonGlobe } from './moon';
 import { createStarfield, type Starfield } from './stars';
-import { chooseTextureTier, loadTexture } from './textures';
-import { buildStandaloneVehicle, launchStackHeights } from './vehicles';
+import { chooseTextureTier, loadTexture, type TextureTier } from './textures';
+import { buildStandaloneVehicle, launchStackHeights, type StackHeights } from './vehicles';
 import { webGL2Available } from './webgl';
 
 export type { VehicleLayout, VehiclePart } from '../content/vehicle-types';
@@ -125,7 +126,7 @@ export function latLonToVector(latitude: number, longitude: number, out = new Ve
 }
 
 /** The latitude and longitude (degrees) of a direction in a globe's own frame (the reverse of latLonToVector). */
-export function vectorToLatLon(direction: Vector3): { latitude: number; longitude: number } {
+export function vectorToLatLon(direction: Vector3): GroundPoint {
   const d = direction.clone().normalize();
   return {
     latitude: MathUtils.radToDeg(Math.asin(MathUtils.clamp(d.y, -1, 1))),
@@ -479,7 +480,7 @@ export function createVehicle(options: VehicleOptions): Vehicle {
  * each height from NASA and call `setHeight` with it.
  */
 let heights: ReturnType<typeof launchStackHeights> | null = null;
-export function stackHeights(): { saturnV: number; saturnIB: number; titanII: number; atlasAgena: number } {
+export function stackHeights(): StackHeights {
   heights ??= launchStackHeights();
   return heights;
 }
@@ -530,7 +531,7 @@ export interface Globe {
    * canvas (CSS pixels from the canvas's top left, as event.offsetX and
    * offsetY), or null when the pointer is off the globe.
    */
-  pick(x: number, y: number): { latitude: number; longitude: number } | null;
+  pick(x: number, y: number): GroundPoint | null;
   dispose(): void;
 }
 
@@ -646,8 +647,14 @@ function kitGlobe(
   };
 }
 
+/** How sharply a globe is drawn: the size of its map, and how many facets it has. */
+interface GlobeQuality {
+  tier: TextureTier;
+  detail: 'low' | 'high';
+}
+
 /** Texture tier and detail for a view. */
-function globeQuality(view: MiniView, detail: GlobeOptions['detail']): { tier: '2k' | '4k'; detail: 'low' | 'high' } {
+function globeQuality(view: MiniView, detail: GlobeOptions['detail']): GlobeQuality {
   const tier = chooseTextureTier(view.renderer.capabilities.maxTextureSize);
   return { tier, detail: detail ?? (tier === '4k' ? 'high' : 'low') };
 }

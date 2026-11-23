@@ -15,9 +15,9 @@ import {
   NAUTICAL_MILE_KM,
 } from "../../content/physical-constants.ts";
 import { buildFlightPath } from "../build.ts";
-import { bodyFixedLatLon } from "../frames.ts";
+import { bodyFixedLatLon, type GroundPoint } from "../frames.ts";
 import { AnchoredOrbit, bodyInertialState } from "../segments.ts";
-import type { FlightPlan, OrbitPhase, Phase } from "../types.ts";
+import type { Fix, FlightPlan, OrbitPhase, Phase } from "../types.ts";
 import { pathProblems } from "./path-checks.ts";
 
 function fake<T>(value: T): Cited<T> {
@@ -85,7 +85,7 @@ function pos(path: Built, t: number, mix = 1): number[] {
 }
 
 /** Geocentric latitude and east longitude under a position, degrees. */
-function ground(path: Built, p: number[], t: number): { latitude: number; longitude: number } {
+function ground(path: Built, p: number[], t: number): GroundPoint {
   const km: [number, number, number] = [p[0]! * EARTH_MEAN_RADIUS_KM, p[1]! * EARTH_MEAN_RADIUS_KM, p[2]! * EARTH_MEAN_RADIUS_KM];
   const ll = bodyFixedLatLon(path.report.sky.sceneToEarthFixed(km, t, [0, 0, 0]));
   return { latitude: ll.latitude / DEG, longitude: ll.longitude / DEG };
@@ -100,14 +100,14 @@ function heightNm(p: number[]): number {
  * nine minutes before the landing time: where a capsule leaving that orbit
  * would come down.
  */
-function splashUnderTrack(orbit: (end: number) => OrbitPhase): { latitude: Cited<number>; longitude: Cited<number> } {
+function splashUnderTrack(orbit: (end: number) => OrbitPhase): Fix {
   const path = buildFlightPath(plan([launch(), orbit(END)]));
   const t = END - 9 * 60;
   const g = ground(path, pos(path, t), t);
   return { latitude: fake(g.latitude), longitude: fake(g.longitude) };
 }
 
-function returnPhases(splashdown: { latitude: Cited<number>; longitude: Cited<number> }): Phase[] {
+function returnPhases(splashdown: Fix): Phase[] {
   return [
     { kind: "burn", label: "Retrofire", body: "earth", start: clock(RETROFIRE), end: clock(RETROFIRE_END) },
     { kind: "entry", label: "Entry and splashdown", start: clock(RETROFIRE_END), end: clock(END), splashdown },

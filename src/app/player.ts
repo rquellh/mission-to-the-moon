@@ -31,12 +31,18 @@ interface Trip {
   elapsed: number;
 }
 
+/** A moment on a trip: how far along it is (`share`) and how fast it is going (`pace`). */
+export interface TripProgress {
+  share: number;
+  pace: number;
+}
+
 /**
  * How far along a trip is, from 0 to 1, after `elapsed` of its `seconds`,
  * and how fast it is going then, in whole trips per real second. The speed
  * rises from zero along half a cosine wave, holds, and falls back the same way.
  */
-export function tripShape(elapsed: number, seconds: number): { share: number; pace: number } {
+export function tripShape(elapsed: number, seconds: number): TripProgress {
   if (!(seconds > 0)) return { share: 1, pace: 0 };
   const u = Math.min(1, Math.max(0, elapsed / seconds));
   const ramp = Math.min(0.5, TRIP_EASE_SECONDS / seconds);

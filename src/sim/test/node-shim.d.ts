@@ -9,7 +9,7 @@ declare module "node:assert/strict" {
     ok(value: unknown, message?: string): asserts value;
     equal<T>(actual: T, expected: T, message?: string): void;
     deepEqual<T>(actual: T, expected: T, message?: string): void;
-    throws(fn: () => unknown, message?: string | RegExp): void;
+    throws(fn: () => void, message?: string | RegExp): void;
     fail(message?: string): never;
   }
   const assert: Assert;

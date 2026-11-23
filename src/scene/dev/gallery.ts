@@ -54,9 +54,9 @@ import { SHIP_AMBIENT_INTENSITY, SHIP_COLORS, SHIP_SUN_INTENSITY } from '../conf
 import { Stage } from '../stage';
 import { buildFleet, type PoseContext } from '../vehicles';
 import { COLORS, createMiniView, createMoon, createVehicle, stackHeights } from '../kit';
-import { fixture } from './fixtures';
+import { fixture, invented } from './fixtures';
 
-const PRESETS: Record<string, string> = {
+const PRESETS = new Map(Object.entries({
   'saturn-ib':
     'm=launch:saturn-ib-first-stage+third-stage+adapter+service-module+command-module+escape-tower&m=launch:first-stage+aft-interstage+second-stage+third-stage+adapter+lm-descent-stage+lm-ascent-stage+service-module+command-module+escape-tower&dir=up&yaw=20&pitch=8',
   'apollo-7': 'm=alone:service-module+command-module&m=alone:third-stage+adapter&yaw=40&pitch=20',
@@ -73,12 +73,12 @@ const PRESETS: Record<string, string> = {
   standup:
     'm=alone:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+standup-spacewalker&m=docked:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+agena+standup-spacewalker&m=alone:service-module+command-module+standup-spacewalker&yaw=-25&pitch=30',
   warnings: 'm=alone:lunar-rover&m=launch:titan-first-stage+titan-second-stage+spacewalker&m=alone:third-stage+gemini-main-parachute',
-};
+}));
 
 const params = new URLSearchParams(window.location.search);
-const preset = params.get('preset');
-if (preset && PRESETS[preset]) {
-  for (const [key, value] of new URLSearchParams(PRESETS[preset])) {
+const preset = PRESETS.get(params.get('preset') ?? '');
+if (preset) {
+  for (const [key, value] of new URLSearchParams(preset)) {
     if (key === 'm') params.append(key, value);
     else if (!params.has(key)) params.set(key, value);
   }
@@ -177,27 +177,28 @@ function showKit(): void {
 /* ------------------------------------------------------------------ */
 
 function showModels(): void {
-  const AT = { value: '000:00:00', citations: [] } as unknown as VehicleChange['at'];
+  const AT = invented<ElapsedTime>('000:00:00');
   const specs = params.getAll('m');
   const changes: VehicleChange[] = specs.map((spec, i) => {
     const [main = '', option] = spec.split('|');
     const [layout = 'alone', list = ''] = main.split(':');
     const parts = list.split(/[+ ,]/).filter(Boolean) as VehiclePart[];
-    return {
+    const change: VehicleChange = {
       ship: `m${i}`,
       at: AT,
       label: `model ${i + 1}`,
       layout: layout as VehicleLayout,
       parts,
-      ...(option === 'backward' ? { facing: 'backward' as const } : {}),
     };
+    if (option === 'backward') change.facing = 'backward';
+    return change;
   });
   const leftParts = (params.get('left') ?? '').split(/[+ ,]/).filter(Boolean) as VehiclePart[];
   const leftBehind: LeftBehind[] = leftParts.map((part) => ({ part, ship: 'site', at: AT, label: `left behind: ${part}` }));
   label.dataset['title'] = [
     ...changes.map((c, i) => `${i + 1}. ${c.layout}: ${c.parts.join(' + ')}${c.facing ? ` (${c.facing})` : ''}`),
     leftParts.length ? `left behind: ${leftParts.join(' + ')}` : '',
-    changes.length === 0 && leftParts.length === 0 ? `presets: ${Object.keys(PRESETS).join(', ')}` : '',
+    changes.length === 0 && leftParts.length === 0 ? `presets: ${[...PRESETS.keys()].join(', ')}` : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -392,8 +393,8 @@ async function showFlight(name: string): Promise<void> {
     onContextRestored: () => undefined,
   });
   stage.setReducedMotion(params.get('reduced') === '1');
-  const views: Record<string, EventView> = { earth: 'earth', moon: 'moon', spacecraft: 'spacecraft', ship: 'spacecraft', journey: 'journey' };
-  const view = views[params.get('view') ?? ''];
+  const views = new Map<string, EventView>([['earth', 'earth'], ['moon', 'moon'], ['spacecraft', 'spacecraft'], ['ship', 'spacecraft'], ['journey', 'journey']]);
+  const view = views.get(params.get('view') ?? '');
   if (view) stage.setView(view);
   await stage.load(() => undefined);
   stage.start();
@@ -411,13 +412,14 @@ async function showFlight(name: string): Promise<void> {
   director.subscribe(status);
   status();
   window.addEventListener('keydown', (event) => {
-    const byKey: Record<string, EventView> = { '1': 'earth', '2': 'moon', '3': 'spacecraft', '4': 'journey' };
+    const byKey = new Map<string, EventView>([['1', 'earth'], ['2', 'moon'], ['3', 'spacecraft'], ['4', 'journey']]);
+    const keyView = byKey.get(event.key);
     if (event.key === ' ') {
       event.preventDefault();
       if (player.playing) player.pause();
       else player.play();
-    } else if (byKey[event.key]) {
-      director.setView(byKey[event.key]!);
+    } else if (keyView) {
+      director.setView(keyView);
     } else if (event.key === '+' || event.key === '=') {
       player.setRate(player.rate * 2);
     } else if (event.key === '-') {
@@ -425,5 +427,12 @@ async function showFlight(name: string): Promise<void> {
     }
   });
   // For screenshots: the page's own hooks.
-  (window as unknown as { dev: unknown }).dev = { player, stage };
+  window.dev = { player, stage };
+}
+
+declare global {
+  interface Window {
+    /** The flight page's player and scene (gallery.html?flight=... only), for screenshots. */
+    dev?: { player: MissionPlayer; stage: Stage };
+  }
 }

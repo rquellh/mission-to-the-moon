@@ -143,16 +143,16 @@ const TEXT = {
     "A practice toy, not a simulator. Real spacecraft in orbit do not move in straight lines like this, and the real docking took hours of catching up first. The distances and speeds here are not the real ones.",
 } as const;
 
-const KEYS: Readonly<Record<string, Thrust>> = {
-  ArrowUp: "up",
-  ArrowDown: "down",
-  ArrowLeft: "left",
-  ArrowRight: "right",
-  f: "forward",
-  F: "forward",
-  b: "back",
-  B: "back",
-};
+const KEYS: ReadonlyMap<string, Thrust> = new Map([
+  ["ArrowUp", "up"],
+  ["ArrowDown", "down"],
+  ["ArrowLeft", "left"],
+  ["ArrowRight", "right"],
+  ["f", "forward"],
+  ["F", "forward"],
+  ["b", "back"],
+  ["B", "back"],
+]);
 
 /** The key shown on each button (the arrows draw their own arrow). */
 const KEY_LABEL: Readonly<Record<Thrust, string>> = {
@@ -604,7 +604,7 @@ async function mount(host: HTMLElement, context: ExtraContext, params: URLSearch
       if (phase !== "flying" || event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target;
       if (target instanceof HTMLElement && (target.isContentEditable || target.closest("input, textarea, select"))) return;
-      const thrust = KEYS[event.key];
+      const thrust = KEYS.get(event.key);
       if (!thrust) return;
       // The arrows would otherwise scroll the sheet.
       event.preventDefault();

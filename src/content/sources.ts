@@ -152,13 +152,16 @@ export const SOURCES = {
 /** The id of a registered source. */
 export type SourceId = keyof typeof SOURCES;
 
-/** The same sources in groups: the shared ones, and each mission's own under its mission id, in flight order. */
-export const SOURCE_GROUPS: {
+/** The registered sources grouped by who cites them: the shared ones, each mission's own, and each extra's own. */
+export interface SourceGroups {
   readonly shared: Readonly<Record<string, Source>>;
   readonly missions: Readonly<Record<string, Readonly<Record<string, Source>>>>;
   /** Each extra’s own sources, under the extra’s id (a folder under src/extras). */
   readonly extras: Readonly<Record<string, Readonly<Record<string, Source>>>>;
-} = {
+}
+
+/** The same sources in groups: the shared ones, and each mission's own under its mission id, in flight order. */
+export const SOURCE_GROUPS: SourceGroups = {
   shared: SHARED,
   missions: {
     "gemini-3": gemini3,

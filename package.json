@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "lint": "oxlint",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test -c tests/playwright.e2e.config.ts",
@@ -22,12 +23,15 @@
     "three": "^0.187.0"
   },
   "devDependencies": {
+    "@cloudflare/oxlint-config": "0.2.0",
     "@playwright/test": "^1.65.1",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^8.0.0",
     "@testing-library/user-event": "^14.6.13",
     "@types/three": "^0.187.0",
     "jsdom": "^29.1.1",
+    "oxlint": "1.94.0",
+    "tsrs": "7.1.0-beta.tsrs4",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
     "vitest": "^5.1.1"

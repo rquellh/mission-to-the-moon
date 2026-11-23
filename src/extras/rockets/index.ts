@@ -142,7 +142,12 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
   const corner = new Vector3();
   /** Each rocket's box on screen when last drawn, for tapping. */
   let onScreen: { stand: Stand; left: number; right: number; top: number; bottom: number }[] = [];
-  const toScreen = (point: Vector3): { x: number; y: number } => {
+  /** A point on the canvas, in CSS pixels from its top left corner. */
+  interface ScreenPoint {
+    x: number;
+    y: number;
+  }
+  const toScreen = (point: Vector3): ScreenPoint => {
     point.project((view as MiniView).camera);
     return { x: ((point.x + 1) / 2) * canvas.clientWidth, y: ((1 - point.y) / 2) * canvas.clientHeight };
   };

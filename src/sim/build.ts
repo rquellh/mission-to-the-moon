@@ -78,6 +78,7 @@ import {
   type Oblateness,
   type OrbitReference,
   type PathKnot,
+  type PositionAndVelocity,
   type Segment,
   type SizeKnot,
 } from "./segments.ts";
@@ -739,8 +740,15 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
 
   /* ---------------- orbit planes from the launch site ---------------- */
 
+  /** The directions north and east along the ground under a point on Earth, and the cosine of its latitude. */
+  interface LocalAxes {
+    north: Vec3;
+    east: Vec3;
+    cosLatitude: number;
+  }
+
   /** North, east, and the cosine of the latitude at an inertial unit direction (Earth). */
-  function localAxes(up: Readonly<Vec3>): { north: Vec3; east: Vec3; cosLatitude: number } {
+  function localAxes(up: Readonly<Vec3>): LocalAxes {
     const pole = sky.earthPoleInertial(vec3());
     const horizontal = sub(vec3(), pole, scale(vec3(), up, dot(pole, up)));
     const cosLatitude = length(horizontal);
@@ -946,11 +954,16 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     return scale(vec3(), sub(vec3(), b, a), 1 / (2 * h));
   }
 
+  /** Where the phase before leaves a craft (position and velocity in Earth's inertial frame), and when (mission clock seconds). */
+  interface Departure extends PositionAndVelocity {
+    t: number;
+  }
+
   /**
    * Where the previous phase leaves off, in Earth's inertial frame: after a
    * burn, the position before the burn at its middle (as coasts do).
    */
-  function departure(ship: ShipState, i: number): { r: Vec3; v: Vec3; t: number } {
+  function departure(ship: ShipState, i: number): Departure {
     const phases = ship.plan.phases;
     if (i >= 2 && phases[i - 1]!.kind === "burn") {
       const t = (ship.starts[i - 1]! + ship.ends[i - 1]!) / 2;
@@ -968,7 +981,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
    * A coarse scan, then a golden-section search around the best.
    */
   function leastChangeJoin(
-    start: { r: Vec3; v: Vec3; t: number },
+    start: Departure,
     t0: number,
     end: number,
     pointAt: (t: number) => Vec3,
@@ -1137,7 +1150,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     }
     let r1: Vec3;
     let ta: number;
-    if (i > 0 && ship.plan.phases[i - 1]!.kind === "burn" && i >= 2) {
+    if (i >= 2 && ship.plan.phases[i - 1]!.kind === "burn") {
       ta = (ship.starts[i - 1]! + ship.ends[i - 1]!) / 2;
       r1 = bodyInertialState(sky, body, segment(ship, i - 2), ta).r;
     } else if (i > 0) {

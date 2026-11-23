@@ -48,7 +48,14 @@ function plan(options: { endFix: boolean; north?: boolean }): FlightPlan {
 
 type Built = ReturnType<typeof buildFlightPath>;
 
-function insertion(path: Built): { longitude: number; heightNm: number; correction: number } {
+/** Where the lander's orbit after liftoff begins (east longitude, degrees; height, n mi), and how much its rate was corrected (a fraction). */
+interface Insertion {
+  longitude: number;
+  heightNm: number;
+  correction: number;
+}
+
+function insertion(path: Built): Insertion {
   const seg = path.report.segment("lm", K) as AnchoredOrbit;
   const p = [0, 0, 0];
   path.position("lm", seg.t0, 1, p);

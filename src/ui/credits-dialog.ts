@@ -89,12 +89,11 @@ function mediaItem(entry: CreditEntry): HTMLLIElement {
 function sourceGroups({ mission, cited, summaries, extras }: CreditsOptions): HTMLElement {
   const listed = new Set<string>();
   const take = (ids: readonly string[]): HTMLLIElement[] =>
-    ids
-      .filter((id): id is SourceId => isSourceId(id) && !listed.has(id))
-      .map((id) => {
-        listed.add(id);
-        return sourceItem(id);
-      });
+    ids.flatMap((id) => {
+      if (!isSourceId(id) || listed.has(id)) return [];
+      listed.add(id);
+      return [sourceItem(id)];
+    });
 
   const sharedIds = Object.keys(SOURCE_GROUPS.shared);
   const ownIds = Object.keys(SOURCE_GROUPS.missions[mission.id] ?? {});

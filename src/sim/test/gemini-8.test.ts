@@ -17,6 +17,7 @@ import {
 } from "../../content/physical-constants.ts";
 import { elapsedToSeconds, type ElapsedTime } from "../../content/types.ts";
 import { buildFlightPath } from "../build.ts";
+import type { GroundPoint } from "../frames.ts";
 import { AnchoredOrbit, bodyInertialState, Converge, type Segment } from "../segments.ts";
 import type { AscentPhase, EntryPhase, OrbitPhase, Phase, ShipPlan, SurfacePhase } from "../types.ts";
 import { readableRadius, EARTH_LIFT } from "../warp.ts";
@@ -68,7 +69,7 @@ function earthSurfacePoint(latDeg: number, lonDeg: number, t: number): number[] 
 }
 
 /** Geocentric latitude and east longitude, degrees, under a scene position at t. */
-function groundPoint(p: number[], t: number): { latitude: number; longitude: number } {
+function groundPoint(p: number[], t: number): GroundPoint {
   let v = rotY(p, -path.earthAxisAngle(t));
   v = rotX(v, EARTH_AXIAL_TILT_RAD);
   v = rotY(v, -path.earthSpinAngle(t));
@@ -79,8 +80,8 @@ function groundPoint(p: number[], t: number): { latitude: number; longitude: num
 }
 
 /** Angle between two ground points, degrees. */
-function groundAngle(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }): number {
-  const u = (g: { latitude: number; longitude: number }) => [
+function groundAngle(a: GroundPoint, b: GroundPoint): number {
+  const u = (g: GroundPoint) => [
     Math.cos(g.latitude * DEG) * Math.cos(g.longitude * DEG),
     Math.cos(g.latitude * DEG) * Math.sin(g.longitude * DEG),
     Math.sin(g.latitude * DEG),
@@ -557,8 +558,7 @@ describe("Gemini VIII: readable scale", () => {
     const highest = (EARTH_EQUATORIAL_RADIUS_KM + 100.4 * NAUTICAL_MILE_KM) / EARTH_MEAN_RADIUS_KM;
     const band = EARTH_LIFT.band!;
     assert.ok(highest - 1 < band.from, "the band must start above Apollo 11's parking orbit");
-    const without = { ...EARTH_LIFT };
-    delete (without as { band?: unknown }).band;
+    const { band: _, ...without } = EARTH_LIFT;
     for (let r = 1; r <= 1 + band.from; r += 0.0005) {
       assert.equal(readableRadius(r, EARTH_LIFT), readableRadius(r, without));
     }

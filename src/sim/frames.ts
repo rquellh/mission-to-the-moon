@@ -78,8 +78,14 @@ export function bodyFixedDirection(latitude: number, longitude: number, out: Vec
   return set(out, c * Math.cos(longitude), Math.sin(latitude), -c * Math.sin(longitude));
 }
 
+/** A point on a body's surface: latitude north and longitude east, in radians or degrees as each use says. */
+export interface GroundPoint {
+  latitude: number;
+  longitude: number;
+}
+
 /** Latitude and east longitude (radians) of a body-fixed vector. */
-export function bodyFixedLatLon(v: Readonly<Vec3>): { latitude: number; longitude: number } {
+export function bodyFixedLatLon(v: Readonly<Vec3>): GroundPoint {
   return {
     latitude: Math.atan2(v[1], Math.hypot(v[0], v[2])),
     longitude: Math.atan2(-v[2], v[0]),
@@ -98,7 +104,7 @@ export function moonFixedDirection(latitude: number, longitude: number, out: Vec
 }
 
 /** Inverse of moonFixedDirection. */
-export function moonFixedLatLon(v: Readonly<Vec3>): { latitude: number; longitude: number } {
+export function moonFixedLatLon(v: Readonly<Vec3>): GroundPoint {
   return {
     latitude: Math.atan2(v[1], Math.hypot(v[0], v[2])),
     longitude: Math.atan2(v[2], -v[0]),

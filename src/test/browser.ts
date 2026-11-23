@@ -83,9 +83,9 @@ function matchesQuery(query: string): boolean {
   return false;
 }
 
-class FakeMediaQueryList extends EventTarget {
+class FakeMediaQueryList extends EventTarget implements MediaQueryList {
   readonly media: string;
-  onchange: ((this: MediaQueryList, event: MediaQueryListEvent) => unknown) | null = null;
+  onchange: MediaQueryList['onchange'] = null;
   private answer: boolean;
 
   constructor(media: string) {
@@ -127,22 +127,49 @@ function installMediaQueries(): void {
   window.matchMedia = (query: string): MediaQueryList => {
     const list = new FakeMediaQueryList(query);
     lists.add(list);
-    return list as unknown as MediaQueryList;
+    return list;
   };
 }
 
 /* Layout ------------------------------------------------------------ */
 
-class InertResizeObserver {
+class InertResizeObserver implements ResizeObserver {
   observe(): void {}
   unobserve(): void {}
   disconnect(): void {}
 }
 
+/** An animation that is over as soon as it starts: jsdom draws nothing, so nothing moves. */
+class InertAnimation extends EventTarget implements Animation {
+  currentTime: CSSNumberish | null = null;
+  effect: AnimationEffect | null = null;
+  readonly finished: Promise<Animation> = Promise.resolve(this);
+  id = '';
+  oncancel: Animation['oncancel'] = null;
+  onfinish: Animation['onfinish'] = null;
+  onremove: Animation['onremove'] = null;
+  readonly overallProgress: number | null = null;
+  readonly pending = false;
+  readonly playState: AnimationPlayState = 'finished';
+  playbackRate = 1;
+  readonly ready: Promise<Animation> = Promise.resolve(this);
+  readonly replaceState: AnimationReplaceState = 'active';
+  startTime: CSSNumberish | null = null;
+  timeline: AnimationTimeline | null = null;
+  cancel(): void {}
+  commitStyles(): void {}
+  finish(): void {}
+  pause(): void {}
+  persist(): void {}
+  play(): void {}
+  reverse(): void {}
+  updatePlaybackRate(): void {}
+}
+
 function installLayout(): void {
-  window.ResizeObserver = InertResizeObserver as unknown as typeof ResizeObserver;
+  window.ResizeObserver = InertResizeObserver;
   Element.prototype.animate = function animate(): Animation {
-    return { cancel() {}, finish() {}, finished: Promise.resolve() } as unknown as Animation;
+    return new InertAnimation();
   };
   Element.prototype.scrollBy = function scrollBy(): void {};
 }

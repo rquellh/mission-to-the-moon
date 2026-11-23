@@ -49,15 +49,15 @@ export function readDeepLink(search: string): DeepLink {
         : Number.NaN;
     if (Number.isFinite(seconds)) time = seconds;
   }
-  const names: Record<string, EventView> = {
-    journey: 'journey',
-    both: 'journey',
-    earth: 'earth',
-    moon: 'moon',
-    spacecraft: 'spacecraft',
-    ship: 'spacecraft',
-  };
-  const view = names[params.get('view')?.trim().toLowerCase() ?? ''] ?? null;
+  const names = new Map<string, EventView>([
+    ['journey', 'journey'],
+    ['both', 'journey'],
+    ['earth', 'earth'],
+    ['moon', 'moon'],
+    ['spacecraft', 'spacecraft'],
+    ['ship', 'spacecraft'],
+  ]);
+  const view = names.get(params.get('view')?.trim().toLowerCase() ?? '') ?? null;
   const startParam = params.get('start')?.trim().toLowerCase();
   const start = startParam === 'tour' || startParam === 'explore' ? startParam : null;
   const extraParams = new URLSearchParams(params);

@@ -45,7 +45,7 @@ import type { Citation, Mission, Photo } from "../../types.ts";
 const CHRONOLOGY_1966 = "https://www.nasa.gov/history/SP-4002/p3b.htm";
 
 /** Printed pages of the mission report and the PDF's pages, for the pages cited here. */
-const PDF_PAGE: Record<string, number> = {
+const PDF_PAGE = {
   "1-1": 35,
   "1-2": 36,
   "1-3": 37,
@@ -87,15 +87,14 @@ const PDF_PAGE: Record<string, number> = {
   "7-10": 391,
   "7-27": 409,
   "7-28": 410,
-};
+} as const;
+
+/** A printed page of the mission report listed in PDF_PAGE, such as "4-2". */
+type PrintedPage = keyof typeof PDF_PAGE;
 
 /** "page 4-2, PDF page 81" or "pages 4-2 and 4-3, PDF pages 81 and 82". */
-function pages(...printed: string[]): string {
-  const pdf = printed.map((page) => {
-    const n = PDF_PAGE[page];
-    if (n === undefined) throw new Error(`No PDF page recorded for printed page ${page}`);
-    return n;
-  });
+function pages(...printed: PrintedPage[]): string {
+  const pdf = printed.map((page) => PDF_PAGE[page]);
   return printed.length === 1
     ? `page ${printed[0]}, PDF page ${pdf[0]}`
     : `pages ${printed.join(" and ")}, PDF pages ${pdf.join(" and ")}`;
@@ -118,14 +117,14 @@ function launchSequence(row: string): Citation {
 }
 
 /** A section or table of the mission report. */
-function report(section: string, ...printed: string[]): Citation {
+function report(section: string, ...printed: PrintedPage[]): Citation {
   return { source: "gemini-10-mission-report", locator: `${section} (${pages(...printed)})` };
 }
 
-const SUMMARY = (...printed: string[]): Citation => report('Section 1.0, "Mission Summary"', ...printed);
-const ACTUAL_MISSION = (...printed: string[]): Citation => report('Section 4.1, "Actual Mission"', ...printed);
-const FIRST_RENDEZVOUS = (...printed: string[]): Citation => report('Section 4.3.1.2.1, "First rendezvous"', ...printed);
-const SECOND_RENDEZVOUS = (...printed: string[]): Citation => report('Section 4.3.1.2.2, "Second rendezvous"', ...printed);
+const SUMMARY = (...printed: PrintedPage[]): Citation => report('Section 1.0, "Mission Summary"', ...printed);
+const ACTUAL_MISSION = (...printed: PrintedPage[]): Citation => report('Section 4.1, "Actual Mission"', ...printed);
+const FIRST_RENDEZVOUS = (...printed: PrintedPage[]): Citation => report('Section 4.3.1.2.1, "First rendezvous"', ...printed);
+const SECOND_RENDEZVOUS = (...printed: PrintedPage[]): Citation => report('Section 4.3.1.2.2, "Second rendezvous"', ...printed);
 
 /** A row of the recovery events table in section 6.3.2 of the mission report. */
 function recovery(time: string, row: string): Citation {

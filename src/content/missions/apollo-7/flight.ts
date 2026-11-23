@@ -104,13 +104,13 @@ const sequence = (row: string, page: "2-3" | "2-4"): Citation =>
   report(`Table 2-I, "Sequence of Events" (page ${page}, PDF page ${page === "2-3" ? 29 : 30}), "${row}" row, actual column`);
 
 /** Table 2-II, the orbit before or after a maneuver, "Actual" column (heights above the oblate Earth model, the Fischer ellipsoid of section 3.0). */
-const elements = (maneuver: string, when: "before" | "after", row: string): Citation => {
-  const page = TABLE_2_II_PAGES[maneuver] ?? "2-5";
+const elements = (maneuver: keyof typeof TABLE_2_II_PAGES, when: "before" | "after", row: string): Citation => {
+  const page = TABLE_2_II_PAGES[maneuver];
   return report(
     `Table 2-II, "Orbital Elements Before and After Maneuvers" (page ${page}, PDF page ${Number(page.slice(2)) + 26}), ${maneuver}, ${when} maneuver, "${row}" row, actual column`,
   );
 };
-const TABLE_2_II_PAGES: Record<string, string> = {
+const TABLE_2_II_PAGES = {
   Insertion: "2-5",
   "S-IVB venting": "2-5",
   "Spacecraft/S-IVB separation": "2-5",
@@ -127,7 +127,7 @@ const TABLE_2_II_PAGES: Record<string, string> = {
   "Sixth service propulsion": "2-7",
   "Seventh service propulsion": "2-7",
   "Eighth service propulsion": "2-7",
-};
+} as const;
 
 /** Table 3-III, a maneuver's ignition or cutoff state, "Actual" column. */
 const maneuverState = (maneuver: string, page: string, when: "ignition" | "cutoff", row: string): Citation =>
@@ -695,7 +695,7 @@ function ascentPoint(row: string, elapsed: ElapsedTime, altitude: number, latitu
 }
 
 /** An orbit size from Table 2-II, which Apollo by the Numbers' Earth Orbit Phase table repeats. */
-function size(maneuver: string, when: "before" | "after", apoapsis: number, periapsis: number) {
+function size(maneuver: keyof typeof TABLE_2_II_PAGES, when: "before" | "after", apoapsis: number, periapsis: number) {
   return {
     apoapsis: cite(apoapsis, elements(maneuver, when, "Apogee, n. mi.")),
     periapsis: cite(periapsis, elements(maneuver, when, "Perigee, n. mi.")),

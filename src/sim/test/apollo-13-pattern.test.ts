@@ -149,8 +149,15 @@ function burnDeltaV(path: Built, label: string, body: BodyId): number {
   return Math.hypot(...[0, 1, 2].map((k) => after.v[k]! - before.v[k]!)) / FOOT_KM;
 }
 
+/** The closest approach to the Moon in a stretch of time: when, how high (km), and how many low points the stretch has. */
+interface ClosestApproach {
+  t: number;
+  height: number;
+  minima: number;
+}
+
 /** Closest approach to the Moon between two times: when, and how high (km). */
-function closest(path: Built, from: number, to: number): { t: number; height: number; minima: number } {
+function closest(path: Built, from: number, to: number): ClosestApproach {
   let best = { t: from, height: Infinity };
   let minima = 0;
   let a = moonHeight(path, from);

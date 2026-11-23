@@ -146,8 +146,13 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
   }
   let lineup: Lineup | null = null;
 
+  /** Where the camera stands: the height it looks at, and how far back it is. */
+  interface CameraPlace {
+    y: number;
+    distance: number;
+  }
   /** Where the camera fits a box: its height with a little room below and more above. */
-  const fit = (box: Box3): { y: number; distance: number } => {
+  const fit = (box: Box3): CameraPlace => {
     if (box.isEmpty()) return { ...camera };
     const height = box.max.y - box.min.y;
     const low = box.min.y - height * 0.06;

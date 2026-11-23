@@ -1625,12 +1625,18 @@ function axisPoint(group: Group, name: string, y: number): number | undefined {
 /** The Gemini spacecraft's own sections. */
 const GEMINI_PARTS: readonly VehiclePart[] = ['gemini-equipment-section', 'gemini-retro-section', 'gemini-reentry-module'];
 
+/** How big some parts are: the largest side of the box around them, and the farthest they reach from a pivot. */
+interface PartsSize {
+  largest: number;
+  reach: number;
+}
+
 /**
  * The box (in group coordinates, at rest) around the given parts: its largest
  * side, and the farthest any of it reaches from a point on the Y axis.
  * `offset` moves the parts first (a part parked apart from another).
  */
-function sizeOf(group: Group, names: readonly string[], pivot: number, offset?: Vector3): { largest: number; reach: number } {
+function sizeOf(group: Group, names: readonly string[], pivot: number, offset?: Vector3): PartsSize {
   const min = new Vector3(Infinity, Infinity, Infinity);
   const max = new Vector3(-Infinity, -Infinity, -Infinity);
   const point = new Vector3();
@@ -1802,6 +1808,12 @@ class Fader {
       item.material.opacity = item.opacity * value;
     }
   }
+}
+
+/** Where the command and service module is during transposition: its middle along the stack, and how far it has turned (radians). */
+interface TranspositionPose {
+  center: number;
+  angle: number;
 }
 
 export class ShipModel {
@@ -2095,7 +2107,7 @@ export class ShipModel {
   }
 
   /** Largest side and reach from the pivot, parachutes included (the turning-around CSM reaches farther). */
-  private capSizes(group: Group, change: VehicleChange, kind: Kind, pivot: number): { largest: number; reach: number } {
+  private capSizes(group: Group, change: VehicleChange, kind: Kind, pivot: number): PartsSize {
     const all = this.visibleParts(kind, change).filter((name) => !NOT_SIZED.has(name as VehiclePart));
     const size = sizeOf(group, all, pivot);
     if (change.layout === 'transposition') {
@@ -2119,7 +2131,7 @@ export class ShipModel {
    * (`docks` false: Apollo 8, which carried no lunar module), it stays
    * backed off, turned to face the stage.
    */
-  private transposition(p: number, docks = true): { center: number; angle: number } {
+  private transposition(p: number, docks = true): TranspositionPose {
     const start = STACK.csmBase + CSM.center;
     const apart = start + TRANSPOSITION_APART;
     const docked = STACK.lmBase + LM.tunnelTop + (CSM.tunnelTop - CSM.center);
@@ -3032,6 +3044,14 @@ export function buildStandaloneVehicle(
   };
 }
 
+/** How tall each full launch stack is as the models draw it, in meters (see launchStackHeights). */
+export interface StackHeights {
+  saturnV: number;
+  saturnIB: number;
+  titanII: number;
+  atlasAgena: number;
+}
+
 /**
  * The full launch stacks as the models encode them, in meters from the
  * lowest engine bell to the escape tower's tip (or the nose). These are
@@ -3043,7 +3063,7 @@ export function buildStandaloneVehicle(
  * their proportions were set by eye from photos. Cite heights from NASA
  * separately and scale a model to them (see kit.ts, createVehicle).
  */
-export function launchStackHeights(): { saturnV: number; saturnIB: number; titanII: number; atlasAgena: number } {
+export function launchStackHeights(): StackHeights {
   const measure = (layout: VehicleLayout, parts: readonly VehiclePart[]): number => {
     const vehicle = buildStandaloneVehicle(layout, parts);
     const height = vehicle.length;

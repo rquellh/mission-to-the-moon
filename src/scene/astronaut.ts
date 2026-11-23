@@ -248,7 +248,7 @@ const PORCH: Pose = {
 const POSES: Record<WalkerPose, Pose> = { floating: FLOATING, standing: STANDING, porch: PORCH };
 
 /** The right arm holding the gas gun up and out to the side, as Ed White holds it in S65-34635. */
-const GUN_ARM: { shoulder: Swing; elbow: number } = { shoulder: { flex: 30, out: 70, twist: -55 }, elbow: 50 };
+const GUN_ARM = { shoulder: { flex: 30, out: 70, twist: -55 }, elbow: 50 } satisfies Pick<Side, 'shoulder' | 'elbow'>;
 
 const DEG = Math.PI / 180;
 

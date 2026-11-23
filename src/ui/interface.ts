@@ -15,7 +15,7 @@ import { byId, el, hiddenText, reducedMotionQuery } from './dom';
 import { setUpEventCard } from './event-card';
 import { setUpExtraSheet } from './extra-sheet';
 import { missionDates, speakMissionTime } from './format';
-import { setUpHub, type HubTarget } from './hub';
+import { setUpHub, type HubOptions, type HubTarget } from './hub';
 import { icon } from './icons';
 import { watchViewInsets } from './layout';
 import { setUpMemorial } from './memorial-dialog';
@@ -81,13 +81,16 @@ export interface MissionListOptions {
   addressOf(id: string): string;
 }
 
+/** The mission list with no mission behind it, ready to open over the page. */
+export interface MissionList {
+  open(returnTo: HTMLElement): void;
+}
+
 /**
  * The mission list on its own, with no mission behind it: the way on when a
  * mission could not be loaded. Every entry opens its own page.
  */
-export function setUpMissionList({ summaries, nameOf, isDraft, loadMemorial, addressOf }: MissionListOptions): {
-  open(returnTo: HTMLElement): void;
-} {
+export function setUpMissionList({ summaries, nameOf, isDraft, loadMemorial, addressOf }: MissionListOptions): MissionList {
   const memorials = setUpMemorial({ load: loadMemorial, nameOf, addressOf });
   const hub = setUpHub({
     currentId: null,
@@ -315,10 +318,9 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   // Reopening the picker pauses the clock; closing it without a choice plays on.
   let resumeAfterHub = false;
   const memorials = setUpMemorial({ load: loadMemorial, nameOf, addressOf });
-  const hub = setUpHub({
+  const hubOptions: HubOptions = {
     currentId: mission.id,
     currentName: mission.name,
-    ...(options.no3D ? { lede: copy.hub.ledeNo3D } : {}),
     summaries,
     isDraft,
     onMemorial: (id, from) => memorials.open(id, from),
@@ -331,7 +333,10 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
       if (resumeAfterHub) player.play();
       resumeAfterHub = false;
     },
-  });
+  };
+  // Without a 3D view, the picker opens with a line that says so.
+  if (options.no3D) hubOptions.lede = copy.hub.ledeNo3D;
+  const hub = setUpHub(hubOptions);
   hubButton.addEventListener('click', () => {
     // A tour on its way to a stop arrives there when the clock pauses.
     resumeAfterHub = player.playing && !tour.active;
