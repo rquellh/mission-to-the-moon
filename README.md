@@ -85,6 +85,11 @@ Under the missions are five things to try and explore:
 
 A liftoff or docking card in a mission offers the matching one with a "Try it" button.
 
+The two hands-on ones end the same way, with **Up next**: one button back to the flight it was
+opened from, or, opened from the list, to the flight where it really happened. Under it are the
+other thing to try, something to explore, and **Try again**. On a phone the next step stays
+pinned at the bottom of the screen.
+
 <p align="center">
   <img src="docs/images/try-docking.jpg" alt="Dock two spacecraft: a Gemini's nose in the foreground, lined up on the docking cone of its Agena target." width="32%">
   <img src="docs/images/try-landing-sites.jpg" alt="Six landings on the Moon: the Moon with a ring at each Apollo landing site, and Apollo 11's place and time beside it." width="32%">

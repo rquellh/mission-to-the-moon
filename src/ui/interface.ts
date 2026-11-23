@@ -255,7 +255,12 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     // "Try it" only for an extra the list shows, so a draft stays hidden in a published build.
     extraTitle: (id) => extras.find((meta) => meta.id === id)?.title,
     onTryIt: (extraId, event, from) =>
-      extraSheet.open(extraId, new URLSearchParams({ mission: mission.id, event: event.id }), from),
+      extraSheet.open(
+        extraId,
+        new URLSearchParams({ mission: mission.id, event: event.id }),
+        'flight',
+        from,
+      ),
     // The photo's small picture opens "Tell me more" and brings the photo into view.
     onPhoto: () => {
       dock.openRecords();
@@ -303,7 +308,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
       hideEnding();
       explore();
     },
-    onExtra: (id, params, from) => extraSheet.open(id, params, from),
+    onExtra: (id, params, from) => extraSheet.open(id, params, 'flight', from),
     onAbout: (from) => dialogs.about.open(from),
     onCredits: (from) => dialogs.credits.open(from),
     onAllMissions: (from) => openList(from),
@@ -416,6 +421,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     load: loadExtra,
     titleOf: extraTitleOf,
     summaries,
+    extras,
     missionId: mission.id,
     loadBundle,
     announce,
@@ -430,6 +436,10 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
       if (resumeAfterExtra) player.play();
       resumeAfterExtra = false;
     },
+    // "All missions" at the end of a run opened from the list: back to the list (still open under an extra opened from it).
+    onAllMissions: (from) => {
+      if (!hub.showing) openList(from ?? hubButton);
+    },
   });
 
   /* The mission list -------------------------------------------------- */
@@ -443,7 +453,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     onMemorial: (id, from) => memorials.open(id, from),
     extras,
     isExtraDraft,
-    onExtra: (id, from) => extraSheet.open(id, new URLSearchParams(), from),
+    onExtra: (id, from) => extraSheet.open(id, new URLSearchParams(), 'list', from),
     onTour: startTour,
     onExplore: startExploring,
     onReturn: () => {
@@ -491,8 +501,10 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
       memorials.open(id, welcome.showing ? welcome.allMissions : null);
     },
     extra(id, params) {
-      // Over the welcome, focus goes to "All missions" when the sheet closes.
-      extraSheet.open(id, params, welcome.showing ? welcome.allMissions : null);
+      // Over the welcome there is no flight behind the sheet, as when it opens from the list,
+      // and focus goes to "All missions" when it closes. Otherwise the flight waits behind it.
+      if (welcome.showing) extraSheet.open(id, params, 'list', welcome.allMissions);
+      else extraSheet.open(id, params, 'flight');
     },
   };
 }

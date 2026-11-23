@@ -1,11 +1,19 @@
 import { copy } from '../content/copy';
 import type { MissionBundle } from '../content/missions/bundle';
 import type { MissionSummary } from '../content/types';
-import type { Extra, ExtraContext, ExtraMount, OpenMissionOptions } from '../extras/types';
+import type {
+  Extra,
+  ExtraContext,
+  ExtraMeta,
+  ExtraMount,
+  ExtraOrigin,
+  OpenMissionOptions,
+} from '../extras/types';
 import { extraStore } from './device-store';
 import { setUpDialog } from './dialogs';
 import { button, byId, el, find, reducedMotionQuery } from './dom';
 import { mediaUrl } from './photo';
+import { buildUpNext } from './up-next';
 
 export interface ExtraSheetOptions {
   /** Load an extra's code. */
@@ -13,6 +21,8 @@ export interface ExtraSheetOptions {
   /** An extra's title, to show while it loads. */
   titleOf(id: string): string | undefined;
   summaries: readonly MissionSummary[];
+  /** The extras list: "Up next" picks from it. */
+  extras: readonly ExtraMeta[];
   /** The mission loaded behind the sheet. */
   missionId: string;
   loadBundle(id: string): Promise<MissionBundle>;
@@ -21,11 +31,26 @@ export interface ExtraSheetOptions {
   onOpen(): void;
   /** Called once it has closed and the extra is gone: put things back. */
   onClose(): void;
+  /**
+   * "All missions" in "Up next": the sheet has closed; show the mission list
+   * (unless it is already open under the sheet), giving focus back to
+   * `returnTo` when it closes.
+   */
+  onAllMissions(returnTo: HTMLElement | null): void;
 }
 
 export interface ExtraSheet {
-  /** Open an extra; focus goes back to `returnTo` (or what had focus) when it closes. */
-  open(id: string, params: URLSearchParams, returnTo?: HTMLElement | null): void;
+  /**
+   * Open an extra. `origin` is how it was opened: over a flight waiting
+   * behind the sheet, or from the list. Focus goes back to `returnTo` (or
+   * what had focus) when it closes.
+   */
+  open(
+    id: string,
+    params: URLSearchParams,
+    origin: ExtraOrigin,
+    returnTo?: HTMLElement | null,
+  ): void;
 }
 
 /** The address of a mission, starting where `options` asks. */
@@ -53,8 +78,9 @@ function extraAddress(id: string, missionId: string, params: URLSearchParams): s
 
 /**
  * The extras sheet: a full-screen dialog with the extra's title and a Close
- * button, whose body the extra fills. One extra is open at a time. Closing
- * (Close, Escape, or the extra asking) disposes of it and puts focus back.
+ * button, whose body the extra fills. One extra is open at a time; one can
+ * open another in its place. Closing (Close, Escape, or the extra asking)
+ * disposes of it and puts focus back.
  */
 export function setUpExtraSheet(options: ExtraSheetOptions): ExtraSheet {
   const dialog = byId('extra-dialog', HTMLDialogElement);
@@ -66,6 +92,28 @@ export function setUpExtraSheet(options: ExtraSheetOptions): ExtraSheet {
   let open: { ticket: number; mount: ExtraMount | null; controller: AbortController } | null = null;
   let tickets = 0;
   let titleBefore = document.title;
+
+  // On a phone, "Up next" is pinned at the bottom of the screen. The page keeps
+  // room for it at its end (--up-next-room), so its last lines can always be read.
+  const pinned = new Set<HTMLElement>();
+  let roomFrame: number | null = null;
+  const measureRoom = (): void => {
+    roomFrame = null;
+    let height = 0;
+    for (const block of pinned) {
+      if (!block.isConnected) {
+        pinned.delete(block);
+        room.unobserve(block);
+        continue;
+      }
+      height = Math.max(height, block.getBoundingClientRect().height);
+    }
+    body.style.setProperty('--up-next-room', `${Math.ceil(height)}px`);
+  };
+  // On the next frame: the room moves the extra's own layout, which may be watched for its size too.
+  const room = new ResizeObserver(() => {
+    roomFrame ??= requestAnimationFrame(measureRoom);
+  });
 
   /** Take down the open extra and put the page back. Safe to call more than once. */
   const finish = (): void => {
@@ -80,6 +128,11 @@ export function setUpExtraSheet(options: ExtraSheetOptions): ExtraSheet {
     }
     body.replaceChildren();
     body.removeAttribute('aria-busy');
+    for (const block of pinned) room.unobserve(block);
+    pinned.clear();
+    if (roomFrame !== null) cancelAnimationFrame(roomFrame);
+    roomFrame = null;
+    body.style.removeProperty('--up-next-room');
     delete dialog.dataset['extra'];
     document.title = titleBefore;
     options.onClose();
@@ -95,8 +148,11 @@ export function setUpExtraSheet(options: ExtraSheetOptions): ExtraSheet {
     return line;
   };
 
-  return {
-    open(id, params, returnTo) {
+  const sheet: ExtraSheet = {
+    open(id, params, origin, returnTo) {
+      // Focus goes back to where it was before the sheet opened, even after one extra has opened another in its place.
+      const from =
+        returnTo ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
       finish();
       const ticket = (tickets += 1);
       const controller = new AbortController();
@@ -111,19 +167,44 @@ export function setUpExtraSheet(options: ExtraSheetOptions): ExtraSheet {
       body.setAttribute('aria-busy', 'true');
       body.replaceChildren(note(name ? copy.loadingMission(name) : copy.extra.loadingUnnamed));
       options.onOpen();
-      handle.open(returnTo);
+      handle.open(from);
 
       const close = (): void => {
         if (!isCurrent()) return;
         handle.close();
         finish();
       };
+      const openExtra = (other: string, otherParams?: URLSearchParams): void => {
+        if (isCurrent()) sheet.open(other, otherParams ?? new URLSearchParams(), origin, from);
+      };
       const context: ExtraContext = {
         summaries: options.summaries,
         missionId: options.missionId,
+        origin,
         loadBundle: options.loadBundle,
         openMission: (mission, where) => window.location.assign(missionAddress(mission, where)),
         close,
+        openExtra,
+        upNext(next) {
+          const block = buildUpNext(
+            {
+              extraId: id,
+              origin,
+              missionId: options.missionId,
+              extras: options.extras,
+              openExtra,
+              onAllMissions: () => {
+                close();
+                options.onAllMissions(from);
+              },
+              signal: controller.signal,
+            },
+            next,
+          );
+          pinned.add(block);
+          room.observe(block);
+          return block;
+        },
         reducedMotion: () => motion.matches,
         onReducedMotionChange(listener) {
           const changed = (): void => listener(motion.matches);
@@ -179,4 +260,5 @@ export function setUpExtraSheet(options: ExtraSheetOptions): ExtraSheet {
         .catch(failed);
     },
   };
+  return sheet;
 }

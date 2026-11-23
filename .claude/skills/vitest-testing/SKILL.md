@@ -104,6 +104,7 @@ afterEach(() => {
 | `matchMedia`                                     | A phone-sized screen with no reduced-motion preference; the mount's `wide` option switches to the wide layout                                     |
 | `ResizeObserver`                                 | Never calls back (nothing is laid out in jsdom)                                                                                                   |
 | `Element.animate`, `Element.scrollBy`            | Accepted and ignored                                                                                                                              |
+| A canvas's `getContext`                          | Always `null`, as in a browser that cannot draw: an extra with a 3D view of its own shows its flat version                                        |
 | `HTMLMediaElement` `play`, `pause`, `load`       | A recording waits for the test to say how the file went (`sound`)                                                                                 |
 | Navigation (`location.assign`, `reload`)         | Recorded in `navigation`; nothing loads                                                                                                           |
 
@@ -211,17 +212,18 @@ jsdom loads no stylesheet, so only the `hidden` attribute hides anything in an i
 
 ### All the Options
 
-| Option         | What it does                                                                           |
-| -------------- | -------------------------------------------------------------------------------------- |
-| `start`        | `'welcome'` (default), `'tour'`, or `'explore'`                                        |
-| `event`        | Open paused at this event id and explore                                               |
-| `no3D`         | `{ note, offerReload }`: no 3D view                                                    |
-| `story`        | Make the real mission into a typed fixture (section 6)                                 |
-| `missionList`  | Make the real mission list into a typed fixture (section 6)                            |
-| `isDraft`      | Which list entries count as unfinished                                                 |
-| `loadMemorial` | Replace the memorial loader (section 5)                                                |
-| `loadExtra`    | Replace the extra loader; the default loads a stand-in extra                           |
-| `wide`         | The wide layout (the card floats at the bottom; "Tell me more" is a panel at the side) |
+| Option         | What it does                                                                                                                                                                  |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `start`        | `'welcome'` (default), `'tour'`, or `'explore'`                                                                                                                               |
+| `event`        | Open paused at this event id and explore                                                                                                                                      |
+| `no3D`         | `{ note, offerReload }`: no 3D view                                                                                                                                           |
+| `story`        | Make the real mission into a typed fixture (section 6)                                                                                                                        |
+| `missionList`  | Make the real mission list into a typed fixture (section 6)                                                                                                                   |
+| `isDraft`      | Which list entries count as unfinished                                                                                                                                        |
+| `loadMemorial` | Replace the memorial loader (section 5)                                                                                                                                       |
+| `loadExtra`    | Replace the extra loader; the default loads a stand-in extra                                                                                                                  |
+| `wide`         | The wide layout (the card floats at the bottom; "Tell me more" is a panel at the side)                                                                                        |
+| `extra`        | Open this extra as `?extra=` does once the visit has begun: over the welcome (from the list, as an address naming only the extra), or over the flight with `start` or `event` |
 
 ### Recording Players on Their Own
 
@@ -420,6 +422,8 @@ The welcome is not a dialog: it is a region named by its heading ("Ride along on
 
 "Tell me more" is not a dialog either: it is a region named by the moment's title, `hidden` until its door opens it. Opening it moves focus to its heading; Close (Show less on a phone), its door, and Escape while focus is inside it close it and give focus back to the door. The tools behind Controls work the same way, with focus staying on the door.
 
+An extra's sheet is a dialog named by the extra's title. At the end of a run in a hands-on extra, "Up next" is a region named "Up next" inside it, which the sheet builds from what the extra says: the next step as a level-3 heading and its one amber button (back to the flight the sheet was opened over, or, opened from the list, "Fly" the flight where it really happened), the two picks as groups ("Try it yourself", "More to explore") whose Open buttons open that extra in place of this one, and the quiet actions ("Try again", then "All missions" only when the sheet was opened from the list). On a phone only the next step, "Try again", and "More to explore" (`aria-expanded`) are in the role queries; that door pulls up the rest with focus on the next step's heading, and Show less and Escape put it back with focus on the door, the sheet still open. On a wide screen everything shows and there is no door.
+
 The end of a flight is not a dialog either: a region named "That’s the flight!" inside the moment card, shown after the tour's last stop, or with "Finish" (on the card once exploring has reached the end of the clock). It takes the moment's place, so the story, Tell me more, Controls, Play, and the tour panel leave the role queries while it shows, and its heading has focus. Its "More to explore" door (`aria-expanded`) opens the card with focus on the opened heading; that part is built the first time it opens, so its text is not in the page before. Show less and Escape close it and give focus back to the door. After the tour, its quiet ways on include "Explore on my own", which leaves the tour and explores from the last stop with Play focused; after exploring it is not offered. The ending reads the device's visits each time it shows: prepare them with `rememberVisits` (section 10).
 
 ### Per-Test Overrides for Loading States
@@ -512,16 +516,17 @@ Every override lasts for its own test only: each test mounts afresh, and the set
 
 The data is the real content. Pick missions that differ in the way the test needs:
 
-| Need                                                                   | Mission                                                                                                                                                                        |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A Moon flight with two craft, a landing, recordings, call signs        | `apollo-11`, `apollo-17`                                                                                                                                                       |
-| Earth orbit, two craft, an event before liftoff, a spin, no call signs | `gemini-8`                                                                                                                                                                     |
-| A short tour (6 stops), one craft                                      | `gemini-3`                                                                                                                                                                     |
-| Sources borrowed from other missions                                   | `gemini-7` (from Gemini 6A and Gemini 8)                                                                                                                                       |
-| A Moon flight with no landing, one craft                               | `apollo-8`                                                                                                                                                                     |
-| A memorial page                                                        | `apollo-1` (opened from the mission list)                                                                                                                                      |
-| A hands-on extra on an event                                           | `liftoff` on most flights ("Drop the stages"); `docking` on Gemini 8 ("Dock two spacecraft")                                                                                   |
-| The end of a flight                                                    | `apollo-11` with `event: 'splashdown'` (the last moment, at the end of the clock: Finish shows); `gemini-8` (suggests the docking and the rockets); `gemini-3` (no crew patch) |
+| Need                                                                   | Mission                                                                                                                                                                                                                       |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A Moon flight with two craft, a landing, recordings, call signs        | `apollo-11`, `apollo-17`                                                                                                                                                                                                      |
+| Earth orbit, two craft, an event before liftoff, a spin, no call signs | `gemini-8`                                                                                                                                                                                                                    |
+| A short tour (6 stops), one craft                                      | `gemini-3`                                                                                                                                                                                                                    |
+| Sources borrowed from other missions                                   | `gemini-7` (from Gemini 6A and Gemini 8)                                                                                                                                                                                      |
+| A Moon flight with no landing, one craft                               | `apollo-8`                                                                                                                                                                                                                    |
+| A memorial page                                                        | `apollo-1` (opened from the mission list)                                                                                                                                                                                     |
+| A hands-on extra on an event                                           | `liftoff` on most flights ("Drop the stages"); `docking` on Gemini 8 ("Dock two spacecraft")                                                                                                                                  |
+| The end of a flight                                                    | `apollo-11` with `event: 'splashdown'` (the last moment, at the end of the clock: Finish shows); `gemini-8` (suggests the docking and the rockets); `gemini-3` (no crew patch)                                                |
+| The end of a run in an extra ("Up next")                               | `apollo-11` with `event: 'liftoff'` and Try it (from a flight: back to Apollo 11; the picks are the docking and the landing sites); the docking opened from the list (Fly Gemini 8; the picks are the stages and the rockets) |
 
 Assert with the content's own words, written out: `'The Eagle has landed'`, `'Stop 1 of 6'`, `'102:45:39'`. When the test passes text in (a no-3D note), take it from `copy` (`src/content/copy.ts`) as the site does.
 
@@ -603,7 +608,19 @@ const tinyStages: Extra = {
 };
 ```
 
-Without a `loadExtra` option the mount loads `standInExtra`, which writes one line: `Dock two spacecraft for gemini-8`.
+Without a `loadExtra` option the mount loads `standInExtra`, which writes one line: `Dock two spacecraft for gemini-8`. To test "Up next", the tiny extra ends at once with `context.upNext(...)`, choosing its next step by `context.origin`, as a real one does (`tinyWithAnEnd` in `src/ui/extra-sheet.test.ts`).
+
+An extra's own tests (`src/extras/<id>/<id>.test.ts`) run the real extra in the real sheet: pass the registry's real loader, `loadExtra` from `src/extras/index.ts`, as the mount's `loadExtra` (the same way a memorial test hands over the real `loadMemorial`). jsdom draws no canvas, so the extra runs without its 3D view and on its own frame loop, driven by `frames.advance`: "Drop the stages" climbs to orbit by itself (each part drops when it is overdue), and "Dock two spacecraft" docks with its thruster buttons and some frames (it warns in the console that it has no 3D view; spy on `console.warn` to keep it quiet).
+
+```ts
+const { user, frames } = await mountMission('apollo-11', { event: 'liftoff', loadExtra });
+await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
+await user.click(await within(theSheet()).findByRole('button', { name: 'Start' }));
+frames.advance(A_WHOLE_CLIMB);
+expect(within(theSheet()).getByRole('region', { name: 'Up next' })).toHaveTextContent(
+  'Pick up Apollo 11 after liftoff',
+);
+```
 
 ---
 
@@ -691,6 +708,8 @@ screen.getByRole('region', { name: 'The Eagle has landed' }); // "Tell me more",
 screen.getByRole('region', { name: 'Timeline' }); // the tools behind Controls, once open
 screen.getByRole('region', { name: 'Guided tour' }); // in the card, on the tour
 screen.getByRole('region', { name: 'That’s the flight!' }); // the end of a flight, in the card
+within(sheet).getByRole('region', { name: 'Up next' }); // the end of a run in an extra, in its sheet
+within(upNext).getByRole('group', { name: 'Try it yourself' }); // a pick; also 'More to explore' (on a phone, once pulled up)
 within(ending).getByRole('group', { name: 'Next flight' }); // with More to explore open: also 'Try it yourself', 'More to explore'
 screen.getByRole('group', { name: 'Look at' }); // at the top left, with Controls open
 within(card).getByRole('group', { name: 'Where the flight is' }); // beside Play: the chapter and the day
@@ -706,6 +725,7 @@ within(card).getByRole('button', { name: 'Tell me more' });
 within(card).getByRole('button', { name: 'Controls' });
 within(card).getByRole('button', { name: 'Finish' }); // exploring, once the clock has reached the end
 within(ending).getByRole('button', { name: 'More to explore' }); // the ending's door, with aria-expanded
+within(upNext).getByRole('button', { name: 'More to explore' }); // on a phone, the door that pulls "Up next" up
 
 // Controls
 within(card).getByRole('button', { name: 'Play' });
@@ -964,24 +984,24 @@ Each test reads in three steps, separated by blank lines: mount (and get to the 
 
 ### Naming Conventions
 
-- **Test files:** beside their module: `src/ui/hub.ts` and `src/ui/hub.test.ts`. The whole interface working together is `src/ui/interface.test.ts`.
+- **Test files:** beside their module: `src/ui/hub.ts` and `src/ui/hub.test.ts`. The whole interface working together is `src/ui/interface.test.ts`. An extra's own tests are in its folder, named for it: `src/extras/stages/stages.test.ts`.
 - **Describe blocks:** what the visitor knows the part as, in plain words: `describe('the mission list', ...)`, `describe('the tour panel', ...)`. A pure helper uses its own name: `describe('formatElapsed', ...)`.
 - **Nested describes:** behavioral groupings: `describe('choosing', ...)`, `describe('leaving without a choice', ...)`.
 - **Test names:** what a visitor sees or can do: `it('starts exploring when the welcome is closed with Escape', ...)`.
 
 ### Standard Behavioral Describe Groupings
 
-| Grouping                                    | When to use                                                                                                        |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `rendering`                                 | What a part shows for a mission, and what it leaves out                                                            |
-| `opening` / `closing`                       | A dialog, sheet, or panel coming and going, focus, the tab title                                                   |
-| `loading` / `failing to load`               | A loader's waiting, answer, and failure                                                                            |
-| `choosing`                                  | Picking an entry, a view, a chapter                                                                                |
-| `stepping` / `traveling`                    | The card's Previous and Next; the tour's trips and Skip                                                            |
-| `exploring` / `touring` / `during the tour` | States of the whole interface                                                                                      |
-| `the ending` / `leaving`                    | The end of a flight (after the tour or exploring) and the ways out of it                                           |
-| `announcements`                             | What screen readers hear (fake timers allowed here)                                                                |
-| Domain groups                               | `the door`, `photo`, `sources`, `try it`, `recording`, `true scale`, `one at a time`, `one recording, two buttons` |
+| Grouping                                    | When to use                                                                                                                                                       |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rendering`                                 | What a part shows for a mission, and what it leaves out                                                                                                           |
+| `opening` / `closing`                       | A dialog, sheet, or panel coming and going, focus, the tab title                                                                                                  |
+| `loading` / `failing to load`               | A loader's waiting, answer, and failure                                                                                                                           |
+| `choosing`                                  | Picking an entry, a view, a chapter                                                                                                                               |
+| `stepping` / `traveling`                    | The card's Previous and Next; the tour's trips and Skip                                                                                                           |
+| `exploring` / `touring` / `during the tour` | States of the whole interface                                                                                                                                     |
+| `the ending` / `leaving`                    | The end of a flight (after the tour or exploring) and the ways out of it                                                                                          |
+| `announcements`                             | What screen readers hear (fake timers allowed here)                                                                                                               |
+| Domain groups                               | `the door`, `photo`, `sources`, `try it`, `recording`, `true scale`, `one at a time`, `one recording, two buttons`, `up next`, `on a phone`, `the end of a climb` |
 
 ---
 
@@ -989,7 +1009,7 @@ Each test reads in three steps, separated by blank lines: mount (and get to the 
 
 ### When a Unit Test Is Right
 
-Write a unit test only for a pure helper with many cases or tricky edges: the time and date writers (`format.ts`), the event and chapter lookups (`mission-index.ts`), the device store, the citation builders, `howDrawnParagraphs`, and in `src/app` the deep link reader, the views, the flight outline, and what the end of a flight suggests (`related.ts`). Use real missions as inputs, and `it.each` tables for many cases:
+Write a unit test only for a pure helper with many cases or tricky edges: the time and date writers (`format.ts`), the event and chapter lookups (`mission-index.ts`), the device store, the citation builders, `howDrawnParagraphs`, and in `src/app` the deep link reader, the views, the flight outline, and what the end of a flight or of an extra's run suggests (`related.ts`). Use real missions as inputs, and `it.each` tables for many cases:
 
 ```ts
 describe('missionDates', () => {
@@ -1041,7 +1061,7 @@ import { story as gemini8 } from '../content/missions/gemini-8/story.ts';
 - **New tests assert with `expect`.** The older flight tests use `node:assert/strict` (declared in `src/sim/test/node-shim.d.ts`, since there is no `@types/node`). Leave them as they are; do not convert them, and do not add `node:assert` to new files.
 - **Rules about content** (events in order, every citation resolves, every photo and recording exists, no durations in raw seconds, summaries match their stories) live in `src/sim/test/all-missions.test.ts`, once, for every mission. Add a new rule there, not an interface test per mission.
 - **The tour's timing** (trip length, easing, the camera's lead before arrival, a stalled tab) lives in `src/app/tour.test.ts`, with its own fake screen. Interface tests only check that a trip arrives.
-- **What the end of a flight suggests** (the next flight not flown yet, the extra to try, the extra to explore, the flights collected) lives in `src/app/related.test.ts`, as tables of real summaries, stories, and extras' metas. Interface tests only check that the ending shows what it is told.
+- **What the end of a flight suggests** (the next flight not flown yet, the extra to try, the extra to explore, the flights collected), and what the end of a run in an extra suggests (the other hands-on extra), lives in `src/app/related.test.ts`, as tables of real summaries, stories, and extras' metas. Interface tests only check that the ending and "Up next" show what they are told.
 - **Flight path math** lives in `src/sim/test/`.
 
 ---

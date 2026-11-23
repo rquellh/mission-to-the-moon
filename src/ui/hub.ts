@@ -36,6 +36,8 @@ export interface Hub {
    * where the visitor was, with focus on `returnTo`.
    */
   open(returnTo: HTMLElement): void;
+  /** True while it is open (an extra opened from it sits over it). */
+  readonly showing: boolean;
 }
 
 /**
@@ -292,6 +294,9 @@ export function setUpHub(options: HubOptions): Hub {
       dialog.showModal();
       reveal();
       closeButton.focus({ preventScroll: true });
+    },
+    get showing() {
+      return isOpen;
     },
   };
 }

@@ -9,6 +9,8 @@
  *   reduced motion, unless a test asks for another (see setScreen).
  * - ResizeObserver: nothing is ever laid out in jsdom, so it never calls back.
  * - Element.animate and Element.scrollBy: accepted and ignored.
+ * - Drawing on a canvas: there is none, as in a browser without WebGL, so
+ *   an extra with a 3D view of its own shows its flat version.
  * - Sound (HTMLMediaElement): play, pause, and load, driven by the test
  *   through `sound`.
  * - Leaving the page (location.assign and reload): recorded in `navigation`
@@ -175,6 +177,10 @@ function installLayout(): void {
     return new InertAnimation();
   };
   Element.prototype.scrollBy = function scrollBy(): void {};
+  // jsdom draws nothing: no canvas gives a context, as in a browser that cannot draw.
+  HTMLCanvasElement.prototype.getContext = function getContext(): null {
+    return null;
+  };
 }
 
 /* Sound ------------------------------------------------------------- */

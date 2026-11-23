@@ -96,6 +96,27 @@ export const copy = {
     back: 'Back to the mission',
   },
 
+  /**
+   * The end of a run in a hands-on extra: what's next. The extra says the
+   * next step and its own actions; the sheet adds the rest, so every extra
+   * ends the same way.
+   */
+  upNext: {
+    title: 'Up next',
+    /** After the extra's sentence, while the flight the next step flies is not collected yet. */
+    collect: 'Fly it to collect its patch.',
+    /** On a phone: the door that pulls the next step up into a sheet with the picks and the other ways on. */
+    more: 'More to explore',
+    lessLabel: 'Show less',
+    /** The two shelves, one pick each. */
+    handsOn: 'Try it yourself',
+    explore: 'More to explore',
+    open: 'Open',
+    openExtra: (title: string) => `Open ${title}`,
+    /** Only when the extra was opened from the list (or on its own): back to every mission. */
+    allMissions: ALL_MISSIONS,
+  },
+
   /** A page of remembrance, for a crew that did not fly. */
   memorial: {
     crew: 'The crew',

@@ -126,6 +126,18 @@ export function yearOf(iso: string): number | null {
   return Number.isNaN(date.getTime()) ? null : date.getUTCFullYear();
 }
 
+const monthAndYear = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'UTC',
+  month: 'long',
+  year: 'numeric',
+});
+
+/** The month and year of an ISO 8601 date, in UTC: "March 1966". Empty when it does not read as a date. */
+export function monthOf(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? '' : monthAndYear.format(date);
+}
+
 /** "1965–1966", or "1969" for one year. */
 export function formatYears(first: number, last: number): string {
   return first === last ? String(first) : `${first}–${last}`;

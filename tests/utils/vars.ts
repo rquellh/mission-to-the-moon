@@ -100,6 +100,13 @@ export const EVENTS = {
   APOLLO_17_THIRD_MOONWALK: { mission: 'apollo-17', id: 'third-moonwalk' },
   /** The first American spacewalk: the astronaut floats out with his gas gun. */
   GEMINI_4_FLOATING_OUT: { mission: 'gemini-4', id: 'floating-out' },
+  /** The first docking in orbit, where "Dock two spacecraft" opened from the list leads ("Fly Gemini 8"). */
+  GEMINI_8_DOCKING: {
+    mission: 'gemini-8',
+    id: 'docking',
+    title: 'The first docking',
+    name: 'Gemini 8',
+  },
 } as const;
 
 /** Mission times the tests open by address. */
@@ -110,7 +117,7 @@ export const MOMENTS = {
 
 /** What an address asks for (see src/app/deep-link.ts). Values left out are left out of the address. */
 interface Place {
-  mission: string;
+  mission?: string | undefined;
   start?: 'tour' | 'explore' | undefined;
   event?: string | undefined;
   t?: string | undefined;
@@ -145,4 +152,6 @@ export const URLS = {
   LINK: (place: Place) => address(place),
   /** An extra, open over a mission. */
   EXTRA: (mission: string, extra: string) => address({ mission, extra }),
+  /** An extra on its own, as the mission list opens it: over the welcome, with no flight behind it. */
+  EXTRA_ON_ITS_OWN: (extra: string) => address({ extra }),
 } as const;

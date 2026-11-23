@@ -314,7 +314,7 @@ describe('the end of a flight', () => {
 
       const docking = screen.getByRole('dialog', { name: 'Dock two spacecraft' });
       expect(
-        await within(docking).findByText('Dock two spacecraft for gemini-8, at docking'),
+        await within(docking).findByText('Dock two spacecraft for gemini-8, at no moment'),
       ).toBeInTheDocument();
       await user.click(within(docking).getByRole('button', { name: 'Close' }));
       expect(openDocking).toHaveFocus();

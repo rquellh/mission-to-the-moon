@@ -1,7 +1,9 @@
 /**
  * What to suggest at the end of a flight: the next flight to fly, one
- * hands-on extra, and one extra to explore. The rules live here, in one
- * place with no page in it, so the interface only asks and shows.
+ * hands-on extra, and one extra to explore. And at the end of a run in a
+ * hands-on extra ("Up next"): the other hands-on extra, and the same extra
+ * to explore. The rules live here, in one place with no page in it, so the
+ * interface only asks and shows.
  *
  * "Collected" means what it means in the patch book (src/extras/patches):
  * the flight's tour or exploring has started on this device (see
@@ -59,6 +61,15 @@ export function handsOnPick(mission: Mission, extras: readonly ExtraMeta[]): Han
     return extra ? [{ extra, event }] : [];
   });
   return named.find((pick) => pick.event.id !== 'liftoff') ?? named[0] ?? null;
+}
+
+/**
+ * The hands-on extra to suggest at the end of a run in another one: the
+ * first listed hands-on extra that is not this one. Null when there is no
+ * other.
+ */
+export function otherHandsOn(currentId: string, extras: readonly ExtraMeta[]): ExtraMeta | null {
+  return extras.find((meta) => meta.kind === 'hands-on' && meta.id !== currentId) ?? null;
 }
 
 /**

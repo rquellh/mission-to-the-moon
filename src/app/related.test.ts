@@ -1,8 +1,9 @@
 /**
  * What the end of a flight suggests: the next flight to fly, a hands-on
  * extra, and an extra to explore, and how many flights are collected (the
- * numbers the patch book shows too). How the ending shows them is in
- * src/ui/ending.test.ts.
+ * numbers the patch book shows too). And what the end of a run in a
+ * hands-on extra suggests: the other hands-on extra. How the ending shows
+ * them is in src/ui/ending.test.ts, and "Up next" in src/ui/extra-sheet.test.ts.
  *
  * Run: npx vitest run src/app/related.test.ts
  */
@@ -25,7 +26,7 @@ import { meta as landingSites } from '../extras/landing-sites/meta.ts';
 import { meta as patches } from '../extras/patches/meta.ts';
 import { meta as rockets } from '../extras/rockets/meta.ts';
 import { meta as stages } from '../extras/stages/meta.ts';
-import { explorePick, flightsCollected, handsOnPick, nextFlight } from './related.ts';
+import { explorePick, flightsCollected, handsOnPick, nextFlight, otherHandsOn } from './related.ts';
 
 /** Part of the real mission list, in its date order, with the memorial among the flights. */
 const LIST: readonly MissionSummary[] = [
@@ -99,6 +100,25 @@ describe('handsOnPick', () => {
 
   it('picks none when the flight names no listed hands-on extra', () => {
     expect(handsOnPick(apollo11Story, [docking, patches, rockets])).toBeNull();
+  });
+});
+
+describe('otherHandsOn', () => {
+  it.each([
+    ['the docking after the stages', 'stages', EXTRAS, 'docking'],
+    ['the stages after the docking', 'docking', EXTRAS, 'stages'],
+    [
+      'the first hands-on extra listed, never an extra to explore',
+      'patches',
+      [patches, rockets, docking, stages],
+      'docking',
+    ],
+  ])('picks %s', (_name, current, extras, expected) => {
+    expect(otherHandsOn(current, extras)?.id).toBe(expected);
+  });
+
+  it('picks none when this is the only hands-on extra listed', () => {
+    expect(otherHandsOn('stages', [stages, patches, landingSites, rockets])).toBeNull();
   });
 });
 

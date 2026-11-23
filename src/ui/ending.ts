@@ -53,9 +53,10 @@ export interface Ending {
  * A mission's patch as a small round picture: in color with a thin amber
  * ring once collected, grey and dimmed before. None for a flight whose crew
  * had no patch. Its words are beside it, so the picture says nothing unless
- * it is given words of its own.
+ * it is given words of its own. "Up next", at the end of a run in an extra,
+ * shows it too.
  */
-function patch(
+export function patch(
   missionId: string,
   collected: boolean,
   className: string,
@@ -293,7 +294,8 @@ export function setUpEnding(options: EndingOptions): Ending {
       nextTile.append(go);
       shelves.append(nextTile);
 
-      // Something to try and something to explore, each opened over the ending, on this flight's page.
+      // Something to try and something to explore, each opened over the ending, on this flight's page. Only the
+      // flight is passed, not the moment: the flight waits at its end, so the extra must not say it waits at liftoff.
       const extraTile = (
         shelf: string,
         name: string,
@@ -315,8 +317,14 @@ export function setUpEnding(options: EndingOptions): Ending {
       };
       const handsOn = handsOnPick(mission, extras);
       if (handsOn) {
-        const params = new URLSearchParams({ mission: mission.id, event: handsOn.event.id });
-        shelves.append(extraTile('hands-on', copy.ending.handsOn, handsOn.extra, params));
+        shelves.append(
+          extraTile(
+            'hands-on',
+            copy.ending.handsOn,
+            handsOn.extra,
+            new URLSearchParams({ mission: mission.id }),
+          ),
+        );
       }
       const explore = explorePick(mission.id, extras);
       if (explore)

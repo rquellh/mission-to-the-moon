@@ -2994,6 +2994,178 @@ body.is-welcome .hud {
   gap: 8px;
 }
 
+/* "Up next": the end of a run in a hands-on extra (src/ui/up-next.ts), the
+   same family as the end of a flight. Phone first: the next step is pinned
+   at the bottom of the screen, within thumb reach, with the run again and
+   "More to explore" side by side under it. That door pulls it up into a
+   sheet: the next step as a tinted tile, one pick from each shelf as rows,
+   and the quiet actions. The page scrolls behind it, and keeps room at its
+   end (--up-next-room, measured by the sheet) so its last lines show. */
+.extra-host:has(.up-next) {
+  padding-bottom: calc(var(--safe-bottom) + 18px + var(--up-next-room, 0px));
+}
+
+.up-next {
+  container: up-next / inline-size;
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100dvh - 72px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px var(--safe-right) max(16px, env(safe-area-inset-bottom)) var(--safe-left);
+  border-top: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 18px 18px 0 0;
+  background: rgb(18 21 27 / 0.96);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  box-shadow: 0 -10px 30px rgb(0 0 0 / 0.45);
+}
+
+.up-next__grip {
+  flex: none;
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.3);
+}
+
+.up-next__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.up-next__less {
+  flex: none;
+  width: 44px;
+  padding: 0;
+}
+
+.up-next__less .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.up-next__step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Pinned, the title sits right under "Up next", and only the title and the button show. */
+.up-next.is-pinned .up-next__step {
+  margin-top: -8px;
+}
+
+.up-next.is-pinned .up-next__patch,
+.up-next.is-pinned .up-next__line,
+.up-next.is-pinned .up-next__sentence {
+  display: none;
+}
+
+.up-next__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.up-next__title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  outline: none;
+}
+
+.up-next__line {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.up-next__sentence {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.up-next__go {
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 18px;
+  font-size: 1.0625rem;
+  font-weight: 650;
+}
+
+/* Pulled up: the next step is the recommended tile, tinted, with its patch beside the title. */
+.up-next.is-open .up-next__step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-accent-line);
+  border-radius: 12px;
+  background: var(--color-accent-soft);
+}
+
+.up-next.is-open .up-next__step:not(:has(> .up-next__patch)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.up-next.is-open .up-next__title {
+  font-weight: 700;
+}
+
+.up-next.is-open .up-next__sentence,
+.up-next.is-open .up-next__go {
+  grid-column: 1 / -1;
+}
+
+.up-next.is-open .up-next__go {
+  min-height: 48px;
+  font-size: 1rem;
+}
+
+.up-next__patch {
+  width: 44px;
+  height: 44px;
+}
+
+.up-next__picks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.up-next__pick {
+  min-height: 56px;
+}
+
+/* The quiet actions share a row; a label never wraps, so a button with no room moves down a row. */
+.up-next__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.up-next__actions .ending__action {
+  flex: 1 1 0;
+  min-width: max-content;
+}
+
 @media (min-width: 860px), (min-width: 600px) and (orientation: landscape) {
   .dialog--full .dialog__head {
     padding-left: max(24px, env(safe-area-inset-left));
@@ -3002,6 +3174,117 @@ body.is-welcome .hud {
 
   .extra-host {
     --extra-gutter: 24px;
+    --up-next-room: 0px;
+  }
+
+  /* Wide, "Up next" sits in the extra's column, under the result: a softly tinted box with
+     "Up next", the title and its line (the patch beside them), the button, a rule, the picks,
+     and the quiet actions. */
+  .up-next {
+    position: static;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0;
+    max-height: none;
+    overflow: visible;
+    padding: 16px;
+    border: 1px solid rgb(244 185 66 / 0.4);
+    border-radius: 14px;
+    background: rgb(244 185 66 / 0.08);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .up-next__grip {
+    display: none;
+  }
+
+  .up-next__top,
+  .up-next__step {
+    display: contents;
+  }
+
+  .up-next__eyebrow {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .up-next__patch {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 48px;
+    height: 48px;
+    margin-right: 12px;
+  }
+
+  .up-next__titles {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: 2px;
+  }
+
+  .up-next__title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .up-next__line {
+    font-size: 0.875rem;
+  }
+
+  .up-next__sentence {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-top: 10px;
+    color: var(--color-text-muted);
+  }
+
+  .up-next__go {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    min-height: 48px;
+    margin-top: 12px;
+    font-size: 1rem;
+  }
+
+  .up-next__picks {
+    grid-column: 1 / -1;
+    grid-row: 5;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .up-next__actions {
+    grid-column: 1 / -1;
+    grid-row: 6;
+    gap: 4px;
+    margin: 12px 0 0 -10px;
+  }
+
+  .up-next__actions .ending__action {
+    flex: none;
+  }
+
+  /* With room, and no sentence to read first, the button stands beside the title, and the picks side by side. */
+  @container up-next (min-width: 30rem) {
+    .up-next__step:not(:has(> .up-next__sentence)) > .up-next__go {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+      width: auto;
+      margin: 0 0 0 16px;
+    }
+
+    .up-next__picks {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
   }
 
   .extra-sheet__failed,
@@ -3690,30 +3973,31 @@ body.is-welcome .hud {
     font-size: 0.9375rem;
   }
 
-  .tile--extra {
+  /* The end of a flight's picks stand as tiles with an Open button; "Up next" keeps them as rows. */
+  .ending__shelves .tile--extra {
     justify-content: flex-start;
     gap: 8px;
     padding: 14px;
   }
 
-  .tile--extra:hover {
+  .ending__shelves .tile--extra:hover {
     background: var(--color-raised);
   }
 
-  .tile--extra .tile__title {
+  .ending__shelves .tile--extra .tile__title {
     font-size: 1.0625rem;
     font-weight: 700;
     line-height: 1.25;
   }
 
-  .tile--extra .tile__blurb {
+  .ending__shelves .tile--extra .tile__blurb {
     display: block;
     font-size: 0.8125rem;
     line-height: 1.35;
     color: var(--color-text-muted);
   }
 
-  .tile__open {
+  .ending__shelves .tile__open {
     width: 100%;
     min-height: 44px;
     margin-top: auto;
@@ -3722,19 +4006,19 @@ body.is-welcome .hud {
     background: var(--color-raised);
   }
 
-  .tile__open::after {
+  .ending__shelves .tile__open::after {
     content: none;
   }
 
-  .tile__open:focus-visible {
+  .ending__shelves .tile__open:focus-visible {
     outline: 2px solid var(--color-accent);
   }
 
-  .tile--extra:has(.tile__open:focus-visible) {
+  .ending__shelves .tile--extra:has(.tile__open:focus-visible) {
     outline: none;
   }
 
-  .tile__open-label {
+  .ending__shelves .tile__open-label {
     position: static;
     width: auto;
     height: auto;
@@ -3742,7 +4026,7 @@ body.is-welcome .hud {
     clip-path: none;
   }
 
-  .tile__open .tile__chevron {
+  .ending__shelves .tile__open .tile__chevron {
     display: none;
   }
 
