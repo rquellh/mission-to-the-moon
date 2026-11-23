@@ -105,15 +105,12 @@ export const copy = {
   },
 
   header: {
-    about: 'About',
-    aboutFull: 'About this mission',
-    sources: 'Sources',
-    sourcesFull: 'Sources and credits',
     /** Spoken after the mission's name on the button that opens the mission picker. */
     missions: 'all missions',
     missionsHint: ALL_MISSIONS,
   },
 
+  /** What the camera looks at, shown at the top left with Controls. */
   views: {
     groupLabel: 'Look at',
     earth: 'Earth',
@@ -121,10 +118,9 @@ export const copy = {
     spacecraft: 'Ship',
     journey: 'Both',
     trueScale: 'True scale',
-    howDrawn: 'How this is drawn',
   },
 
-  /** The note under the 3D view, by destination and scale. */
+  /** The small note beside True scale, by destination and scale. */
   scaleNote: {
     moon: {
       readable: 'Distances not to scale',
@@ -149,6 +145,7 @@ export const copy = {
     seconds: (count: number) => `${count} ${count === 1 ? 'second' : 'seconds'}`,
   },
 
+  /** Play, and the tools behind "Controls" for moving through the flight. */
   timeline: {
     regionLabel: 'Timeline',
     play: 'Play',
@@ -160,40 +157,60 @@ export const copy = {
     beforeLiftoff: 'before liftoff',
     /** Beside the clock on flights longer than two days. Day 1 is the first 24 hours. */
     day: (day: number) => `Day ${day}`,
+    /** Under the chapter's name on a phone's card, on flights longer than two days. */
+    dayOf: (day: number, total: number) => `Day ${day} of ${total}`,
     /** Beside the clock while the ship circles too fast to follow and the view holds still. */
     fastForward: 'Fast forward',
     fastForwardSpoken:
       'Fast forward. The ship goes around too fast to see, so its path shows as a ring.',
-    lockedDuringTour: 'The timeline follows the tour. Exit the tour to use it.',
+    /** On Play, which rests while the tour runs the clock. */
+    lockedDuringTour: 'The tour runs the clock for you. Exit the tour to play it yourself.',
   },
 
+  /** The moment card at the bottom of the screen, and its two doors. */
   card: {
     regionLabel: 'What is happening',
     previous: 'Previous event',
     next: 'Next event',
     afterLiftoff: 'after liftoff',
     beforeLiftoff: 'before liftoff',
+    /** The door to the records of the moment: its longer text, recording, photo, and sources. */
     tellMore: 'Tell me more',
     tellLess: 'Show less',
+    /** The door to the tools for moving through the flight. */
+    controls: 'Controls',
+    /** Beside Play on a phone: the chapter and the day, or the clock while Controls are open. */
+    where: 'Where the flight is',
+    /** The photo's small picture on the card, which opens "Tell me more" at the photo. */
+    seePhoto: 'See the photo',
     sourcesDiffer: 'Sources differ.',
+    /** Also the name of "Tell me more" when a moment has nothing but its sources. */
     sources: 'Sources',
     photoCredit: 'Photo:',
     original: 'Original',
-    expand: 'Show the whole card',
-    collapse: 'Show less of the card',
     nowShowing: (title: string, spokenTime: string) => `${title}, ${spokenTime}.`,
     /** The button that opens an event's hands-on extra. */
     tryIt: 'Try it',
     tryItLabel: (title: string) => `Try it: ${title}`,
   },
 
+  /** "Tell me more": the records of the moment on the card. */
+  records: {
+    fullStory: 'The full story',
+    photo: 'Photo',
+    /** Under "About <mission>": what that page tells, with the spacecraft's names when the mission has them. */
+    aboutLine: (hasCallSigns: boolean) =>
+      hasCallSigns ? 'Crew, spacecraft names, what they did' : 'Crew and what they did',
+    credits: 'Sources and credits',
+  },
+
   /** The recording player on an event card. Its words are always shown as text. */
   audio: {
     label: 'Recording',
-    play: 'Play',
+    play: 'Hear the recording',
     pause: 'Pause',
     loading: 'Loading…',
-    playLabel: (length: string) => `Play the recording, ${length}`,
+    playLabel: (length: string) => `Hear the recording, ${length}`,
     pauseLabel: 'Pause the recording',
     playing: 'Playing the recording.',
     paused: 'Recording paused.',
@@ -217,8 +234,7 @@ export const copy = {
     arrived: (index: number, total: number, title: string) =>
       `Stop ${index} of ${total}: ${title}.`,
     endTitle: 'That’s the tour!',
-    endText:
-      'Now it’s your turn. Press play, drag the timeline, or pick a chapter. Use the arrows on each card to step through every event.',
+    endText: 'Now it’s your turn. Press play, or open Controls to jump to any part of the flight.',
     endExplore: EXPLORE_ON_MY_OWN,
     endAgain: 'Start the tour again',
     ended: 'Tour ended. You are exploring on your own.',

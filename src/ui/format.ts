@@ -100,17 +100,6 @@ export function formatDate(date: Date, style: 'long' | 'short' = 'long'): string
   return (style === 'long' ? longDate : shortDate).format(date);
 }
 
-const monthDay = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'UTC',
-  month: 'short',
-  day: 'numeric',
-});
-
-/** "Jul 20", in UTC. */
-export function formatMonthDay(date: Date): string {
-  return monthDay.format(date);
-}
-
 /** "20:17:39", in UTC. */
 export function formatTimeOfDay(date: Date): string {
   return timeOfDay.format(date);

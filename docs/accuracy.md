@@ -16,6 +16,6 @@ Each mission's flight plan and vehicle file list, in their opening comments, whi
 - Mission content is type-checked. A fact with no citation, or one that cites a source that is not registered, fails the build.
 - `npm test` includes a test that builds every mission's flight path and checks it: no jumps, nothing under the ground, events in order and inside the flight, every citation resolving, every photo present, and the mission list's summary matching the story.
 - Physical constants live in `src/content/physical-constants.ts`, each with its NASA source.
-- Site-wide images, data, and software are listed in `src/content/credits.json`. Mission photos are credited on their cards and in the "Sources and credits" dialog.
+- Site-wide images, data, and software are listed in `src/content/credits.json`. Mission photos are credited on the card, in "Tell me more", and in the "Sources and credits" dialog.
 
 The principles of the site are in the [README](../README.md). How to run the tests is in [DEVELOPING.md](../DEVELOPING.md).

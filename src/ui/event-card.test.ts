@@ -1,8 +1,13 @@
 /**
- * The event card: what it shows for an event (title, time, text, photo,
- * recording, sources, "Try it"), and stepping from event to event.
+ * The moment card: the story of the moment on the clock (its chapter, day,
+ * and date, its title, and its short text in full), what sits beside it
+ * (the photo's small picture, "Hear the recording", the "Tell me more"
+ * door, "Try it"), and, on a phone, where the flight is beside Play. What
+ * "Tell me more" holds is in records.test.ts, and the tools behind Controls
+ * in timeline.test.ts.
  */
 import { describe, expect, it } from 'vitest';
+import { story as apollo11 } from '../content/missions/apollo-11/story.ts';
 import type { Mission } from '../content/types.ts';
 import { mountMission, screen, within } from '../test/test-utils.ts';
 
@@ -12,7 +17,7 @@ const withoutLiftoff = (mission: Mission): Mission => ({
   events: mission.events.filter((event) => event.id !== 'liftoff'),
 });
 
-/** Apollo 11 with nothing more to tell about its first stage separation. */
+/** Apollo 11 with nothing more to tell about its first stage separation (no real event has only its sources). */
 const withoutMoreOnStaging = (mission: Mission): Mission => ({
   ...mission,
   events: mission.events.map((event) =>
@@ -28,166 +33,148 @@ const unlistedExtraOnLiftoff = (mission: Mission): Mission => ({
   ),
 });
 
-describe('the event card', () => {
+const theCard = (): HTMLElement => screen.getByRole('region', { name: 'What is happening' });
+const theStory = (): HTMLElement => within(theCard()).getByRole('article');
+
+describe('the moment card', () => {
   describe('rendering', () => {
-    it("shows the event's title, mission time, date, and text", async () => {
+    it('tells the moment: its chapter, day, and date, its title, and its whole short text', async () => {
       await mountMission('apollo-11', { event: 'landing' });
 
-      const card = screen.getByRole('article');
-      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent(
+      const story = theStory();
+      expect(story).toHaveAccessibleName('The Eagle has landed');
+      expect(within(story).getByText('Landing · Day 5 · July 20, 1969')).toBeVisible();
+      expect(within(story).getByRole('heading', { level: 3 })).toHaveTextContent(
         'The Eagle has landed',
       );
-      expect(card).toHaveTextContent('102:45:39 after liftoff');
-      expect(within(card).getByText('July 20, 1969, 20:17:39 UTC')).toBeInTheDocument();
-      expect(card).toHaveTextContent('Armstrong flies Eagle past a crater full of boulders');
-    });
-
-    it('counts down to liftoff for an event before it', async () => {
-      await mountMission('gemini-8', { start: 'explore' });
-
-      const card = screen.getByRole('article');
-      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent(
-        'The target launches',
+      const landing = apollo11.events.find((event) => event.id === 'landing');
+      // The short text in full, never cut down to fit.
+      expect(within(story).getByText(landing?.text.short ?? 'missing')).toHaveTextContent(
+        "Armstrong flies Eagle past a crater full of boulders and lands on the Moon's Sea of Tranquility. People have landed on the Moon for the first time.",
       );
-      expect(card).toHaveTextContent('−01:40:59 before liftoff');
-      expect(within(card).getByText('March 16, 1966, 15:00:03 UTC')).toBeInTheDocument();
     });
 
-    it('shows what the mission is before its first event', async () => {
-      await mountMission('apollo-11', { story: withoutLiftoff });
+    it('offers the photo, the recording, and more on a moment that has them, with the photo credited', async () => {
+      await mountMission('apollo-11', { event: 'landing' });
 
-      const card = screen.getByRole('article');
-      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent('Apollo 11');
-      expect(card).toHaveTextContent('July 16–24, 1969');
-      expect(card).toHaveTextContent('Apollo 11 was the first mission to land people on the Moon.');
-      expect(within(card).queryByRole('button', { name: 'Tell me more' })).not.toBeInTheDocument();
-    });
-  });
-
-  describe('stepping', () => {
-    it('steps to the next and previous events', async () => {
-      const { user } = await mountMission('apollo-11', { start: 'explore' });
-      const card = screen.getByRole('article');
-      expect(within(card).getByRole('button', { name: 'Previous event' })).toBeDisabled();
-
-      await user.click(within(card).getByRole('button', { name: 'Next event' }));
-      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent(
-        'First stage separates',
-      );
-      expect(within(card).getByRole('button', { name: 'Previous event' })).toBeEnabled();
-
-      await user.click(within(card).getByRole('button', { name: 'Previous event' }));
-      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent('Liftoff');
-    });
-
-    it('stops at the last event and keeps keyboard focus on a button that still works', async () => {
-      const { user } = await mountMission('apollo-11', { event: 'parachutes' });
-      const card = screen.getByRole('article');
-
-      await user.click(within(card).getByRole('button', { name: 'Next event' }));
-
-      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent('Splashdown');
-      expect(within(card).getByRole('button', { name: 'Next event' })).toBeDisabled();
-      expect(within(card).getByRole('button', { name: 'Previous event' })).toHaveFocus();
-    });
-  });
-
-  describe('tell me more', () => {
-    it('opens the fuller text, and keeps it open on the next event', async () => {
-      const { user } = await mountMission('apollo-11', { event: 'landing' });
-      const card = screen.getByRole('article');
-      const toggle = within(card).getByRole('button', { name: 'Tell me more' });
-      expect(toggle).toHaveAttribute('aria-expanded', 'false');
-      expect(within(card).getByText(/^Eagle touched down at 4:17:39 p\.m\. EDT/)).not.toBeVisible();
-
-      await user.click(toggle);
-      expect(toggle).toHaveAccessibleName('Show less');
-      expect(toggle).toHaveAttribute('aria-expanded', 'true');
-      expect(within(card).getByText(/^Eagle touched down at 4:17:39 p\.m\. EDT/)).toBeVisible();
-
-      await user.click(within(card).getByRole('button', { name: 'Next event' }));
-      expect(within(card).getByText(/^Armstrong's left foot touched the surface/)).toBeVisible();
-      expect(within(card).getByRole('button', { name: 'Show less' })).toHaveAttribute(
+      const card = theCard();
+      expect(within(card).getByRole('button', { name: 'See the photo' })).toBeVisible();
+      expect(within(card).getByText('Photo: NASA')).toBeVisible();
+      expect(
+        within(card).getByRole('button', { name: 'Hear the recording, 15 seconds' }),
+      ).toHaveTextContent('Hear the recording0:15');
+      expect(within(card).getByRole('button', { name: 'Tell me more' })).toHaveAttribute(
         'aria-expanded',
-        'true',
+        'false',
+      );
+      expect(within(card).getByRole('button', { name: 'Controls' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
       );
     });
 
-    it('is not offered when an event has nothing more to tell', async () => {
+    it('leaves out the photo and the recording on a moment with neither', async () => {
+      await mountMission('apollo-11', { event: 'translunar-injection' });
+
+      const card = theCard();
+      expect(within(theStory()).getByText('Earth orbit · Day 1 · July 16, 1969')).toBeVisible();
+      expect(within(card).queryByRole('button', { name: 'See the photo' })).not.toBeInTheDocument();
+      expect(within(card).queryByText(/^Photo:/)).not.toBeInTheDocument();
+      expect(
+        within(card).queryByRole('button', { name: /^Hear the recording/ }),
+      ).not.toBeInTheDocument();
+      expect(within(card).getByRole('button', { name: 'Tell me more' })).toBeVisible();
+    });
+
+    it('names the door Sources when the moment has nothing more than its sources', async () => {
       await mountMission('apollo-11', {
         story: withoutMoreOnStaging,
         event: 'first-stage-separation',
       });
 
-      const card = screen.getByRole('article');
-      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent(
-        'First stage separates',
+      const door = within(theCard()).getByRole('button', { name: 'Sources' });
+      expect(door).toHaveAttribute('aria-expanded', 'false');
+      expect(
+        within(theCard()).queryByRole('button', { name: 'Tell me more' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows what the mission is before its first event', async () => {
+      await mountMission('apollo-11', { story: withoutLiftoff });
+
+      const story = theStory();
+      expect(within(story).getByText('July 16–24, 1969')).toBeVisible();
+      expect(within(story).getByRole('heading', { level: 3 })).toHaveTextContent('Apollo 11');
+      expect(story).toHaveTextContent(
+        'Apollo 11 was the first mission to land people on the Moon.',
       );
-      expect(within(card).queryByRole('button', { name: 'Tell me more' })).not.toBeInTheDocument();
+      expect(within(theCard()).getByRole('button', { name: 'Tell me more' })).toBeVisible();
+    });
+
+    it('leaves the day out before liftoff, and on a flight too short to count days', async () => {
+      await mountMission('gemini-8', { start: 'explore' });
+
+      const story = theStory();
+      expect(within(story).getByRole('heading', { level: 3 })).toHaveTextContent(
+        'The target launches',
+      );
+      expect(within(story).getByText('The target · March 16, 1966')).toBeVisible();
     });
   });
 
-  describe('photo', () => {
-    it("shows the event's photo with its credit, and none on an event without one", async () => {
-      const { user } = await mountMission('apollo-11', { event: 'landing' });
-      const card = screen.getByRole('article');
+  describe('where the flight is', () => {
+    it('says the chapter and the day of the flight beside Play on a phone', async () => {
+      await mountMission('apollo-11', { event: 'landing' });
 
-      const photo = within(card).getByRole('figure');
-      expect(within(photo).getByRole('img')).toHaveAccessibleName(
-        /^The flat, gray surface of the Moon/,
-      );
-      expect(photo).toHaveTextContent('Photo: NASA.');
-      expect(within(photo).getByRole('link', { name: /^Original/ })).toHaveAttribute(
-        'href',
-        'https://images.nasa.gov/details/as11-37-5458',
-      );
+      const where = within(theCard()).getByRole('group', { name: 'Where the flight is' });
+      expect(within(where).getByText('Landing')).toBeVisible();
+      expect(within(where).getByText('Day 5 of 9')).toBeVisible();
+    });
 
-      await user.click(within(card).getByRole('button', { name: 'Previous event' }));
+    it('leaves out the day on a flight too short to count days', async () => {
+      await mountMission('gemini-3', { start: 'explore' });
 
-      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent('Computer alarms');
-      expect(within(card).queryByRole('figure')).not.toBeInTheDocument();
+      const where = within(theCard()).getByRole('group', { name: 'Where the flight is' });
+      expect(within(where).getByText('Launch')).toBeVisible();
+      expect(where).not.toHaveTextContent(/Day \d/);
     });
   });
 
-  describe('sources', () => {
-    it('folds the sources away under their count, with any disagreement inside', async () => {
+  describe('the photo', () => {
+    it('opens "Tell me more" at the photo when its small picture is pressed', async () => {
       const { user } = await mountMission('apollo-11', { event: 'landing' });
-      const card = screen.getByRole('article');
-      const sources = within(card).getByRole('group');
-      expect(within(sources).getByText('Sources (7)')).toBeVisible();
-      expect(within(sources).getByText('Sources differ.')).not.toBeVisible();
 
-      await user.click(within(sources).getByText('Sources (7)'));
+      await user.click(within(theCard()).getByRole('button', { name: 'See the photo' }));
 
-      expect(within(sources).getByText('Sources differ.')).toBeVisible();
-      expect(
-        within(sources).getByText(/NSSDCA gives the landing time as 20:17:40 UT/),
-      ).toBeVisible();
-      expect(
-        within(sources).getByRole('link', {
-          name: /^Apollo 11 Timeline, row "LM lunar landing\."/,
-        }),
-      ).toBeVisible();
-      // The note sits with the sources, never in the story.
-      expect(within(card).getAllByText(/NSSDCA gives the landing time/)).toHaveLength(1);
+      const records = screen.getByRole('region', { name: 'The Eagle has landed' });
+      expect(within(records).getByRole('heading', { level: 3 })).toHaveFocus();
+      expect(within(theCard()).getByRole('button', { name: 'Tell me more' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+      expect(within(records).getByRole('figure')).toBeVisible();
     });
   });
 
   describe('try it', () => {
     it("offers an event's hands-on extra, and only on that event", async () => {
       const { user } = await mountMission('gemini-8', { event: 'liftoff' });
-      const card = screen.getByRole('article');
-      expect(within(card).getByRole('button', { name: 'Try it: Drop the stages' })).toBeVisible();
+      expect(
+        within(theCard()).getByRole('button', { name: 'Try it: Drop the stages' }),
+      ).toBeVisible();
+      await user.click(screen.getByRole('button', { name: 'Controls' }));
 
-      await user.click(within(card).getByRole('button', { name: 'Next event' }));
+      await user.click(screen.getByRole('button', { name: 'Next event' }));
 
-      expect(within(card).queryByRole('button', { name: /^Try it/ })).not.toBeInTheDocument();
+      expect(within(theCard()).queryByRole('button', { name: /^Try it/ })).not.toBeInTheDocument();
     });
 
     it('opens the extra for this moment of this mission', async () => {
       const { user } = await mountMission('gemini-8', { event: 'docking' });
 
-      await user.click(screen.getByRole('button', { name: 'Try it: Dock two spacecraft' }));
+      await user.click(
+        within(theCard()).getByRole('button', { name: 'Try it: Dock two spacecraft' }),
+      );
 
       const sheet = screen.getByRole('dialog', { name: 'Dock two spacecraft' });
       expect(within(sheet).getByText('Dock two spacecraft for gemini-8')).toBeInTheDocument();
@@ -196,29 +183,7 @@ describe('the event card', () => {
     it('is not offered for an extra the list leaves out', async () => {
       await mountMission('apollo-11', { story: unlistedExtraOnLiftoff, start: 'explore' });
 
-      expect(
-        within(screen.getByRole('article')).queryByRole('button', { name: /^Try it/ }),
-      ).not.toBeInTheDocument();
-    });
-  });
-
-  describe('recording', () => {
-    it('has a recording player, with the words written out, only on an event with a recording', async () => {
-      const { user } = await mountMission('apollo-11', { event: 'landing' });
-      const card = screen.getByRole('article');
-
-      const recording = within(card).getByRole('region', { name: 'Recording' });
-      expect(
-        within(recording).getByRole('button', { name: 'Play the recording, 15 seconds' }),
-      ).toBeInTheDocument();
-      const words = within(recording).getByRole('list', { name: 'What they said' });
-      expect(within(words).getAllByRole('listitem')[0]).toHaveTextContent(
-        'Neil Armstrong: Houston, Tranquility Base here. The Eagle has landed.',
-      );
-
-      await user.click(within(card).getByRole('button', { name: 'Previous event' }));
-
-      expect(within(card).queryByRole('region', { name: 'Recording' })).not.toBeInTheDocument();
+      expect(within(theCard()).queryByRole('button', { name: /^Try it/ })).not.toBeInTheDocument();
     });
   });
 });

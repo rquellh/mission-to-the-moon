@@ -83,15 +83,15 @@ describe('the extras sheet', () => {
         event: 'landing',
         loadExtra: loadTinyStages,
       });
-      const recording = screen.getByRole('region', { name: 'Recording' });
+      const card = screen.getByRole('region', { name: 'What is happening' });
       await user.click(
-        within(recording).getByRole('button', { name: 'Play the recording, 15 seconds' }),
+        within(card).getByRole('button', { name: 'Hear the recording, 15 seconds' }),
       );
       sound.starts();
 
-      await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
+      await user.click(within(card).getByRole('button', { name: 'Try it: Drop the stages' }));
 
-      expect(within(recording).getByRole('status')).toHaveTextContent('Recording paused.');
+      expect(within(card).getByRole('status')).toHaveTextContent('Recording paused.');
     });
   });
 

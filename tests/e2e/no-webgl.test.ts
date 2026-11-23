@@ -13,7 +13,7 @@ import { MISSIONS, URLS } from '../utils/vars';
 test.describe('Without WebGL', () => {
   test.skip(({ isMobile }) => isMobile, 'The fallback does not depend on the screen.');
 
-  test('the site says there is no 3D view, and the card and Play still work', async ({
+  test('the site says there is no 3D view, and the card, Controls, and Play still work', async ({
     sitePage,
   }) => {
     const missionPage = new MissionPage(sitePage);
@@ -36,8 +36,10 @@ test.describe('Without WebGL', () => {
       await expect(missionPage.views).toBeHidden();
     });
 
-    await test.step('The card steps to the next event', async () => {
+    await test.step('Controls open with no view buttons, and step the card to the next event', async () => {
       await expect(cardPage.title).toHaveText('Liftoff');
+      await cardPage.controlsToggle.click();
+      await expect(missionPage.views).toBeHidden();
       await cardPage.next.click();
       await expect(cardPage.title).toHaveText('First stage separates');
     });

@@ -11,9 +11,10 @@ export interface TourPanelOptions {
 }
 
 /**
- * The tour's controls inside the event sheet: which stop this is, a progress
- * row, and Back, Next (Skip while on the way), and Exit. After the last stop it shows the ending,
- * which hands off to exploring freely.
+ * The tour's controls inside the moment card, in place of Play and
+ * Controls: which stop this is, a progress row, and Back, Next (Skip while
+ * on the way), and Exit. After the last stop it shows the ending in the
+ * moment's place, which hands off to exploring freely.
  */
 export function setUpTourPanel(tour: Tour, { onExplore, onRestart }: TourPanelOptions): void {
   const panel = byId('tour', HTMLElement);

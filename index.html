@@ -54,31 +54,10 @@
             </button>
           </h2>
         </div>
-        <div class="masthead__actions">
-          <button
-            type="button"
-            class="button button--quiet"
-            id="about-button"
-            aria-haspopup="dialog"
-            aria-label="About this mission"
-            data-testid="masthead-about"
-          >
-            <span>About<span class="wide-only"> this mission</span></span>
-          </button>
-          <button
-            type="button"
-            class="button button--quiet"
-            id="credits-button"
-            aria-haspopup="dialog"
-            aria-label="Sources and credits"
-            data-testid="masthead-credits"
-          >
-            <span>Sources<span class="wide-only"> and credits</span></span>
-          </button>
-        </div>
       </header>
 
-      <div class="views" id="views" data-testid="views">
+      <!-- What the camera looks at, and True scale: shown with Controls, and never without a 3D view. -->
+      <div class="views" id="views" hidden data-testid="views">
         <!-- One button for each view the mission offers, added by the script. -->
         <div
           class="segmented"
@@ -87,16 +66,19 @@
           id="view-buttons"
           data-testid="view-buttons"
         ></div>
-        <button
-          type="button"
-          class="switch"
-          id="scale-toggle"
-          aria-pressed="false"
-          data-testid="scale-toggle"
-        >
-          <span class="switch__track" aria-hidden="true"><span class="switch__knob"></span></span>
-          <span class="switch__label">True scale</span>
-        </button>
+        <div class="views__scale">
+          <button
+            type="button"
+            class="switch"
+            id="scale-toggle"
+            aria-pressed="false"
+            data-testid="scale-toggle"
+          >
+            <span class="switch__track" aria-hidden="true"><span class="switch__knob"></span></span>
+            <span class="switch__label" id="scale-toggle-label">True scale</span>
+          </button>
+          <p class="views__note" id="scale-note" aria-live="polite" data-testid="scale-note"></p>
+        </div>
       </div>
 
       <!-- Without a 3D view, a short note fills the space it would take. -->
@@ -104,42 +86,126 @@
         <p class="stage-note__text" id="stage-note-text" data-testid="stage-note-text"></p>
       </div>
 
-      <p class="caption" id="caption" data-testid="caption">
-        <span
-          class="caption__note"
-          id="scale-note"
-          aria-live="polite"
-          data-testid="caption-scale-note"
-        ></span>
-        <button
-          type="button"
-          class="caption__link"
-          id="drawn-button"
-          aria-haspopup="dialog"
-          data-testid="caption-how-drawn"
-        >
-          How this is drawn
-        </button>
-      </p>
-
-      <aside
-        class="sheet"
-        id="sheet"
-        data-state="compact"
-        aria-labelledby="card-title"
-        data-testid="sheet"
+      <!-- "Tell me more": the records of the moment on the card. A panel at the side on a wide
+           screen; on a phone it joins the card in one sheet. -->
+      <section
+        class="records"
+        id="records"
+        hidden
+        aria-labelledby="records-title"
+        data-testid="records"
       >
-        <button
-          type="button"
-          class="sheet__handle"
-          id="sheet-handle"
-          aria-expanded="false"
-          aria-controls="card-body"
-          data-testid="sheet-handle"
-        >
-          <span class="sheet__grip" aria-hidden="true"></span>
-          <span class="visually-hidden" id="sheet-handle-label">Show the whole card</span>
-        </button>
+        <div class="records__head">
+          <div class="records__titles">
+            <p class="records__eyebrow" id="records-eyebrow" data-testid="records-eyebrow"></p>
+            <h3
+              class="records__title"
+              id="records-title"
+              tabindex="-1"
+              data-testid="records-title"
+            ></h3>
+            <p class="records__time" id="records-time" data-testid="records-time"></p>
+          </div>
+          <button
+            type="button"
+            class="icon-button records__close"
+            id="records-close"
+            aria-controls="records"
+            data-testid="records-close"
+          ></button>
+        </div>
+        <!-- The body scrolls between the head and the reference links on a wide screen; on a phone the links scroll with it. -->
+        <div class="records__scroll" id="records-scroll">
+          <div class="records__body" id="records-body" data-testid="records-body"></div>
+          <div class="records__links">
+            <button
+              type="button"
+              class="records__link"
+              id="records-about"
+              aria-haspopup="dialog"
+              aria-labelledby="records-about-name"
+              aria-describedby="records-about-line"
+              data-testid="records-about"
+            >
+              <span class="records__link-text">
+                <span class="records__link-name" id="records-about-name"></span>
+                <span class="records__link-line" id="records-about-line"></span>
+              </span>
+            </button>
+            <button
+              type="button"
+              class="records__link"
+              id="records-how-drawn"
+              aria-haspopup="dialog"
+              data-testid="records-how-drawn"
+            >
+              <span class="records__link-text"
+                ><span class="records__link-name" id="records-how-drawn-name"
+                  >How this is drawn</span
+                ></span
+              >
+            </button>
+            <button
+              type="button"
+              class="records__link"
+              id="records-credits"
+              aria-haspopup="dialog"
+              data-testid="records-credits"
+            >
+              <span class="records__link-text"
+                ><span class="records__link-name" id="records-credits-name"
+                  >Sources and credits</span
+                ></span
+              >
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- The moment card: the story of the moment on the clock, always on screen during a flight,
+           with Play and its two doors, "Tell me more" and "Controls". -->
+      <section class="dock" id="dock" aria-label="What is happening" data-testid="dock">
+        <article class="card" id="card" aria-labelledby="card-title" data-testid="event-card">
+          <p class="card__eyebrow" id="card-eyebrow" data-testid="event-card-eyebrow"></p>
+          <h3 class="card__title" id="card-title" data-testid="event-card-title"></h3>
+          <p class="card__short" id="card-short" data-testid="event-card-text"></p>
+        </article>
+        <div class="dock__media" id="dock-media">
+          <!-- The photo's small picture, added by the script when the moment has one. -->
+          <button
+            type="button"
+            class="card__thumb"
+            id="card-photo"
+            hidden
+            data-testid="event-card-photo"
+          ></button>
+          <!-- "Hear the recording" goes first, when the moment has one. -->
+          <div class="card__actions" id="card-actions">
+            <button
+              type="button"
+              class="button dock__door"
+              id="records-toggle"
+              aria-expanded="false"
+              aria-controls="records"
+              data-testid="records-toggle"
+            >
+              <span class="dock__door-label" id="records-toggle-label">Tell me more</span>
+            </button>
+            <button
+              type="button"
+              class="button card__try"
+              id="card-try"
+              hidden
+              data-testid="event-card-try-it"
+            ></button>
+            <p
+              class="card__photo-credit"
+              id="card-photo-credit"
+              hidden
+              data-testid="event-card-photo-credit"
+            ></p>
+          </div>
+        </div>
         <section
           class="tour"
           id="tour"
@@ -147,70 +213,118 @@
           hidden
           data-testid="tour-panel"
         ></section>
-        <article class="card" id="card" data-testid="event-card"></article>
-      </aside>
-
-      <section class="timeline" id="timeline" aria-label="Timeline" data-testid="timeline">
-        <button
-          type="button"
-          class="play"
-          id="play"
-          aria-label="Play"
-          data-testid="timeline-play"
-        ></button>
-        <p class="clock" id="clock">
-          <span class="clock__line">
-            <span class="clock__met" id="clock-met" data-testid="clock-time">00:00:00</span>
-            <span class="clock__since" id="clock-since" data-testid="clock-since"
-              >since liftoff</span
-            >
-          </span>
-          <span class="clock__date">
-            <span class="clock__day" id="clock-day" hidden data-testid="clock-day"></span>
-            <span class="clock__fast" id="clock-fast" hidden data-testid="clock-fast-forward"
-              >Fast forward</span
-            >
-            <span class="clock__utc" id="clock-utc" data-testid="clock-utc"></span>
-          </span>
-        </p>
-        <label class="pick pick--chapter">
-          <span class="visually-hidden">Jump to a chapter</span>
-          <select
-            class="pick__select"
-            id="chapter-select"
-            data-testid="timeline-chapter-select"
-          ></select>
-        </label>
-        <div class="scrubber" id="scrubber">
-          <div class="scrubber__rail" aria-hidden="true"><div class="scrubber__played"></div></div>
-          <div class="scrubber__ticks" id="scrubber-ticks" aria-hidden="true"></div>
-          <input
-            type="range"
-            class="scrubber__input"
-            id="scrubber-input"
-            min="0"
-            max="1"
-            step="any"
-            value="0"
-            aria-label="Mission time"
-            data-testid="timeline-scrubber"
-          />
+        <div class="dock__transport" id="dock-transport">
+          <button
+            type="button"
+            class="play"
+            id="play"
+            aria-label="Play"
+            data-testid="timeline-play"
+          ></button>
+          <!-- On a phone: the chapter and the day, or the clock while Controls are open. -->
+          <div
+            class="dock__status"
+            id="dock-status"
+            role="group"
+            aria-label="Where the flight is"
+            data-testid="dock-status"
+          >
+            <p class="dock__where" id="dock-where">
+              <span
+                class="dock__chapter"
+                id="dock-chapter"
+                data-testid="dock-status-chapter"
+              ></span>
+              <span class="dock__day" id="dock-day" data-testid="dock-status-day"></span>
+            </p>
+          </div>
+          <!-- How far through the flight, one segment per chapter. The scrubber in Controls is the real one. -->
+          <div
+            class="dock__progress"
+            id="dock-progress"
+            aria-hidden="true"
+            data-testid="dock-progress"
+          ></div>
+          <button
+            type="button"
+            class="button dock__door dock__controls"
+            id="controls-toggle"
+            aria-expanded="false"
+            aria-controls="timeline"
+            data-testid="controls-toggle"
+          >
+            <span class="dock__door-label" id="controls-toggle-label">Controls</span>
+          </button>
         </div>
-        <div
-          class="chapters"
-          id="chapters"
-          role="group"
-          aria-label="Chapters"
-          data-testid="timeline-chapters"
-        ></div>
-        <label class="pick pick--speed">
-          <span class="visually-hidden">Speed</span>
-          <select
-            class="pick__select"
-            id="speed-select"
-            data-testid="timeline-speed-select"
-          ></select>
-        </label>
+        <section class="tools" id="timeline" aria-label="Timeline" hidden data-testid="timeline">
+          <div class="tools__row">
+            <button
+              type="button"
+              class="icon-button tools__step"
+              id="event-previous"
+              aria-label="Previous event"
+              data-testid="event-card-previous"
+            ></button>
+            <button
+              type="button"
+              class="icon-button tools__step"
+              id="event-next"
+              aria-label="Next event"
+              data-testid="event-card-next"
+            ></button>
+            <!-- On a phone, the clock moves to the card's status while Controls are open. -->
+            <p class="clock" id="clock">
+              <span class="clock__met" id="clock-met" data-testid="clock-time">00:00:00</span>
+              <span class="clock__since" id="clock-since" data-testid="clock-since"
+                >since liftoff</span
+              >
+              <span class="clock__day" id="clock-day" hidden data-testid="clock-day"></span>
+              <span class="clock__fast" id="clock-fast" hidden data-testid="clock-fast-forward"
+                >Fast forward</span
+              >
+            </p>
+            <label class="pick pick--chapter">
+              <span class="visually-hidden">Jump to a chapter</span>
+              <select
+                class="pick__select"
+                id="chapter-select"
+                data-testid="timeline-chapter-select"
+              ></select>
+            </label>
+            <label class="pick pick--speed">
+              <span class="visually-hidden">Speed</span>
+              <select
+                class="pick__select"
+                id="speed-select"
+                data-testid="timeline-speed-select"
+              ></select>
+            </label>
+          </div>
+          <div class="scrubber" id="scrubber">
+            <div class="scrubber__rail" aria-hidden="true">
+              <div class="scrubber__played"></div>
+            </div>
+            <div class="scrubber__ticks" id="scrubber-ticks" aria-hidden="true"></div>
+            <input
+              type="range"
+              class="scrubber__input"
+              id="scrubber-input"
+              min="0"
+              max="1"
+              step="any"
+              value="0"
+              aria-label="Mission time"
+              data-testid="timeline-scrubber"
+            />
+          </div>
+          <div
+            class="chapters"
+            id="chapters"
+            role="group"
+            aria-label="Chapters"
+            data-testid="timeline-chapters"
+          ></div>
+        </section>
       </section>
     </div>
 

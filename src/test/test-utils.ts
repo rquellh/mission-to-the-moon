@@ -70,7 +70,7 @@ export interface MountOptions {
   loadMemorial?: (id: string) => Promise<Memorial>;
   /** Load an extra. The default loads a stand-in for it (an extra's own code is tested on its own). */
   loadExtra?: (id: string) => Promise<Extra>;
-  /** The wide layout (the card is a side panel) instead of a phone's. */
+  /** The wide layout (the card floats at the bottom; "Tell me more" is a panel at the side) instead of a phone's. */
   wide?: boolean;
 }
 

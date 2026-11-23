@@ -9,10 +9,10 @@ import { followedShip, isInside } from '../utils/scene-report';
 import { MISSIONS, URLS } from '../utils/vars';
 
 /**
- * A visitor opens a mission and looks around: the view buttons move the
- * real camera, True scale redraws the scene, and Play runs the real clock.
- * The scene report says what the camera shows; the interface tests cover
- * which view the buttons ask for.
+ * A visitor opens a mission and looks around: Controls bring out the view
+ * buttons, which move the real camera, True scale redraws the scene, and
+ * Play runs the real clock. The scene report says what the camera shows;
+ * the interface tests cover which view the buttons ask for.
  */
 test.describe('Exploring a mission', () => {
   test('a visitor chooses Explore on my own from the welcome and looks through each view', async ({
@@ -35,6 +35,11 @@ test.describe('Exploring a mission', () => {
       await expect(welcomePage.welcome).toBeHidden();
       await expect(missionPage.site).not.toHaveClass(/\bis-welcome\b/);
       await expect(cardPage.title).toBeVisible();
+    });
+
+    await test.step('Open Controls, which bring out the view buttons', async () => {
+      await cardPage.controlsToggle.click();
+      await expect(missionPage.viewButtons).toBeVisible();
     });
 
     for (const view of ['earth', 'moon', 'journey', 'spacecraft'] as const) {

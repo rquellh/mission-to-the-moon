@@ -28,15 +28,17 @@ every one of them.
 The site opens on one flight: Apollo 11, unless a link names another. **Take the tour** to step
 through its key moments, or **Explore on my own** and roam. **All missions** lists every flight.
 
-Press play, or drag the timeline. The clock shows real mission time, and the trip is paced so
-every stretch is worth watching: you get the burns, the dockings, and the landings, without the
-days of coasting in between. Drag to turn the view, pinch or scroll to zoom, and choose what the
-camera follows: Earth, the ship, or the Moon. **True scale** shows how far apart everything
-really is.
+A card at the bottom of the screen always tells the moment on the clock, in a few words. Press
+its play button to fly the mission. The trip is paced so every stretch is worth watching: you get
+the burns, the dockings, and the landings, without the days of coasting in between. Drag to turn
+the view, and pinch or scroll to zoom.
 
-Each moment has a short card, a longer "Tell me more", a NASA photo where there is one, and the
-sources it came from. A few carry a real NASA recording of the moment, with every word written out
-beside the player.
+The card has two doors, and neither is needed to follow the flight. **Tell me more** opens the
+moment's records: its longer story, a NASA photo where there is one, and the sources it came from.
+A few moments carry a real NASA recording, with every word written out beside the player.
+**Controls** opens the tools for moving around: the timeline to drag, the clock with real mission
+time, the chapters, the speed, and what the camera follows (Earth, the ship, or the Moon).
+**True scale**, beside them, shows how far apart everything really is.
 
 <p align="center">
   <img src="docs/images/apollo-11-liftoff.jpg" alt="Apollo 11 two minutes after liftoff, with the Saturn V climbing away from Florida." width="32%">

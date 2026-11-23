@@ -11,6 +11,7 @@ import { pauseAllAudio } from './audio-player';
 import { renderCredits } from './credits-dialog';
 import { recordVisit } from './device-store';
 import { setUpDialog } from './dialogs';
+import { setUpDock } from './dock';
 import { byId, el, hiddenText, reducedMotionQuery } from './dom';
 import { setUpEventCard } from './event-card';
 import { setUpExtraSheet } from './extra-sheet';
@@ -20,7 +21,7 @@ import { icon } from './icons';
 import { watchViewInsets } from './layout';
 import { setUpMemorial } from './memorial-dialog';
 import { MissionIndex } from './mission-index';
-import { setUpSheet } from './sheet';
+import { setUpRecords } from './records';
 import { setUpTimeline } from './timeline';
 import { focusTourNext, setUpTourPanel } from './tour-panel';
 import { setUpViewControls } from './view-controls';
@@ -168,15 +169,18 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   renderAbout(mission);
   renderHowDrawn(mission, flight);
   renderCredits(credits, { mission, cited, summaries, extras });
-  const about = setUpDialog(byId('about-dialog', HTMLDialogElement));
-  const drawn = setUpDialog(byId('drawn-dialog', HTMLDialogElement));
-  const sources = setUpDialog(byId('credits-dialog', HTMLDialogElement));
-  const aboutButton = byId('about-button', HTMLButtonElement);
-  const creditsButton = byId('credits-button', HTMLButtonElement);
-  const drawnButton = byId('drawn-button', HTMLButtonElement);
-  aboutButton.addEventListener('click', () => about.open(aboutButton));
-  creditsButton.addEventListener('click', () => sources.open(creditsButton));
-  drawnButton.addEventListener('click', () => drawn.open(drawnButton));
+  // The mission's own pages open from the reference links at the end of "Tell me more".
+  const dialogLinks: Array<[string, string]> = [
+    ['records-about', 'about-dialog'],
+    ['records-how-drawn', 'drawn-dialog'],
+    ['records-credits', 'credits-dialog'],
+  ];
+  for (const [linkId, dialogId] of dialogLinks) {
+    const link = byId(linkId, HTMLButtonElement);
+    const dialog = setUpDialog(byId(dialogId, HTMLDialogElement));
+    link.append(icon('next', 'icon records__link-icon'));
+    link.addEventListener('click', () => dialog.open(link));
+  }
 
   /* View controls ---------------------------------------------------- */
   document.body.classList.toggle('no-3d', !has3D);
@@ -195,8 +199,8 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   }
 
   // Fast forward: the scene says when the ship circles too fast to follow.
-  // A quiet mark takes the date's place by the clock (the date spins too fast
-  // to read then), and screen readers hear why once, not on every lap.
+  // A quiet mark shows by the clock, and screen readers hear why once, not
+  // on every lap.
   const fastMark = byId('clock-fast', HTMLSpanElement);
   fastMark.textContent = copy.timeline.fastForward;
   let fastShown = false;
@@ -206,7 +210,6 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     if (fast === fastShown) return;
     fastShown = fast;
     fastMark.hidden = !fast;
-    fastMark.parentElement?.classList.toggle('clock__date--fast', fast);
     const now = performance.now();
     if (fast && now - fastSpokenAt > 60_000) {
       fastSpokenAt = now;
@@ -214,9 +217,11 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     }
   });
 
-  /* Event card, timeline, and tour ---------------------------------- */
-  const sheet = setUpSheet();
+  /* The moment card, its two doors, and the tour ---------------------- */
   const tour = new Tour(mission, player, director, { jumpStraight: () => motion.matches });
+  // The doors change what covers the 3D view; a resize alone may not show it (the card only moves).
+  const dock = setUpDock({ has3D, onLayout: () => remeasure() });
+  const records = setUpRecords({ index, reducedMotion: () => motion.matches });
 
   const describe = (eventIndex: number): string => {
     const event = index.events[eventIndex];
@@ -230,6 +235,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
 
   const card = setUpEventCard({
     index,
+    records,
     reducedMotion: () => motion.matches,
     onStep: (step) => {
       const target = Math.min(index.events.length - 1, Math.max(0, card.shown + step));
@@ -244,6 +250,11 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     extraTitle: (id) => extras.find((meta) => meta.id === id)?.title,
     onTryIt: (extraId, event, from) =>
       extraSheet.open(extraId, new URLSearchParams({ mission: mission.id, event: event.id }), from),
+    // The photo's small picture opens "Tell me more" and brings the photo into view.
+    onPhoto: () => {
+      dock.openRecords();
+      records.revealPhoto();
+    },
   });
   const timeline = setUpTimeline(player, index);
 
@@ -275,7 +286,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   tour.subscribe(() => {
     document.body.classList.toggle('is-touring', tour.active);
     timeline.setLocked(tour.active);
-    card.setTourMode(tour.active);
+    dock.setTour(tour.phase === 'finished' ? 'ending' : tour.active ? 'touring' : 'off');
     card.setHidden(tour.phase === 'finished');
     // Opening an extra pauses the clock, which would end a tour's travel early, so
     // "Try it" waits for the stop. At a stop the clock is already still.
@@ -283,7 +294,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     const stop = tour.stop;
     // On the way, the card already shows the stop it is heading for, so it
     // turns once as the trip begins rather than flicking through every event
-    // passed, which go by too quickly to read. The clock and the timeline show the way.
+    // passed, which go by too quickly to read. The scene shows the way.
     if (stop) card.show(index.events.indexOf(stop));
     if (tour.phase === 'stopped' && stop)
       announce(copy.tour.arrived(tour.index + 1, tour.total, stop.title));
@@ -320,7 +331,6 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     if (tour.total === 0) {
       explore();
     } else {
-      sheet.setExpanded(false);
       tour.start(0);
       focusTourNext();
     }
@@ -391,9 +401,11 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   const remeasure = watchViewInsets(
     [
       { element: byId('masthead', HTMLElement), side: 'top' },
+      // "Look at" and True scale, while Controls are open.
       { element: byId('views', HTMLDivElement), side: 'top' },
-      { element: byId('sheet', HTMLElement), side: (wide) => (wide ? 'right' : 'bottom') },
-      { element: byId('timeline', HTMLElement), side: 'bottom' },
+      { element: byId('dock', HTMLElement), side: 'bottom' },
+      // "Tell me more": a panel at the side on a wide screen, one sheet with the card on a phone.
+      { element: byId('records', HTMLElement), side: (wide) => (wide ? 'right' : 'bottom') },
       // The welcome: beside the view on a wide screen, under it on a phone. It counts only
       // while it shows, and the rest of the interface is hidden then.
       { element: byId('welcome', HTMLElement), side: (wide) => (wide ? 'right' : 'bottom') },

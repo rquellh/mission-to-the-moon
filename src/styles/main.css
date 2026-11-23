@@ -254,8 +254,10 @@ h4 {
 }
 
 /* ------------------------------------------------------------------ */
-/* The interface layer. Phone first: header and view buttons on top,  */
-/* the event sheet and timeline docked at the bottom.                  */
+/* The interface layer. Phone first: the header on top, with "Look at" */
+/* and True scale under it while Controls are open; the moment card    */
+/* docked at the bottom, and "Tell me more" rising above it as one     */
+/* sheet with the card.                                                */
 /* ------------------------------------------------------------------ */
 
 .hud {
@@ -264,14 +266,14 @@ h4 {
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+  /* The card's row may shrink on a very short screen (the card then scrolls
+     inside itself), so nothing runs off the bottom. */
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, auto);
   grid-template-areas:
     'masthead'
     'views'
-    '.'
-    'caption'
-    'sheet'
-    'timeline';
+    'main'
+    'dock';
   pointer-events: none;
 }
 
@@ -374,29 +376,16 @@ body.is-welcome .hud {
   color: var(--color-text-muted);
 }
 
-.masthead__actions {
-  display: flex;
-  gap: 8px;
-  flex: none;
-  pointer-events: auto;
-}
+/* View controls: "Look at" and True scale, with Controls open ------- */
 
-.masthead__actions .button {
-  padding: 0 14px;
-  font-size: 0.875rem;
-}
-
-.wide-only {
-  display: none;
-}
-
-/* View controls ----------------------------------------------------- */
-
+/* Phone: the view buttons on one row, True scale and its note under them. */
 .views {
   grid-area: views;
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
-  padding: 10px var(--safe-right) 0 var(--safe-left);
+  padding: 8px var(--safe-right) 0 var(--safe-left);
 }
 
 .segmented {
@@ -409,6 +398,12 @@ body.is-welcome .hud {
   -webkit-backdrop-filter: var(--blur);
   backdrop-filter: var(--blur);
   pointer-events: auto;
+}
+
+/* The view switcher only: extras reuse .segmented and lay out their own rows. */
+.views .segmented {
+  flex: none;
+  max-width: 100%;
 }
 
 .segmented__item {
@@ -425,6 +420,12 @@ body.is-welcome .hud {
   font-weight: 600;
   cursor: pointer;
   transition: color 160ms ease-out;
+}
+
+.views .segmented__item {
+  flex: 0 0 auto;
+  min-width: 64px;
+  padding: 0 14px;
 }
 
 .segmented__item::before {
@@ -520,113 +521,284 @@ body.is-welcome .hud {
   background: var(--color-accent-ink);
 }
 
-/* Caption: the figure note under the 3D view ------------------------ */
-
-.caption {
-  grid-area: caption;
+/* True scale, with the note on what is drawn to scale beside it. */
+.views__scale {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 0 12px;
+  gap: 10px;
+  min-width: 0;
+}
+
+.views__note {
+  min-width: 0;
   margin: 0;
-  padding: 0 var(--safe-right) 4px var(--safe-left);
   font-size: 0.8125rem;
+  line-height: 1.3;
   color: var(--color-text-muted);
   text-shadow: 0 1px 8px rgb(0 0 0 / 0.95);
 }
 
-.caption__link {
-  /* Above the sheet handle's enlarged touch area, which reaches up under this link on phones. */
-  position: relative;
-  z-index: 1;
-  min-height: 44px;
-  margin: -8px 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-text);
-  font-size: inherit;
-  font-weight: 600;
-  text-decoration: underline;
-  text-decoration-color: var(--color-line-strong);
-  text-underline-offset: 3px;
-  cursor: pointer;
-  pointer-events: auto;
+/* Buttons that open something, and look pressed while it is open ---- */
+
+.dock__door .icon {
+  width: 16px;
+  height: 16px;
 }
 
-.caption__link:hover {
-  text-decoration-color: currentColor;
+.dock__door[aria-expanded='true'] {
+  border-color: var(--color-accent-line);
+  background: var(--color-accent-soft);
 }
 
-/* Phones: with the card expanded the 3D view is mostly covered, so its note
-   steps aside; on a short screen it would otherwise crowd the view buttons. */
-.hud:has(.sheet[data-state='expanded']) .caption {
+.dock__door[aria-expanded='true']:hover:not(:disabled) {
+  background: rgb(244 185 66 / 0.2);
+}
+
+.dock__door-open,
+.dock__door[aria-expanded='true'] .dock__door-closed {
   display: none;
 }
 
-/* Event sheet (phone) / side panel (wide) --------------------------- */
+.dock__door[aria-expanded='true'] .dock__door-open {
+  display: block;
+}
 
-.sheet {
-  grid-area: sheet;
+/* The moment card ---------------------------------------------------- */
+
+/* Phone: a sheet across the bottom. The story, then the photo beside its
+   buttons, then Play with where the flight is and Controls. */
+.dock {
+  container: dock / inline-size;
+  grid-area: dock;
   position: relative;
   display: flex;
   flex-direction: column;
-  /* On a short phone the sheet takes only the room left over (its card
-     scrolls), so the timeline never runs off the bottom of the screen. */
+  gap: 10px;
   min-height: 0;
-  max-height: 62dvh;
-  border-top: 1px solid var(--color-line);
+  max-height: 100%;
+  padding: 16px var(--safe-right) var(--safe-bottom) var(--safe-left);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.2) transparent;
+  border: 1px solid var(--color-line);
+  border-bottom: 0;
   border-radius: 18px 18px 0 0;
-  background: var(--color-surface-strong);
+  background: var(--color-surface);
   -webkit-backdrop-filter: var(--blur);
   backdrop-filter: var(--blur);
   box-shadow: 0 -10px 30px rgb(0 0 0 / 0.35);
   pointer-events: auto;
 }
 
-.sheet__handle {
-  position: relative;
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 18px 18px 0 0;
-  background: none;
-  cursor: pointer;
-  touch-action: none;
+/* The story: a museum label for the moment on the clock, its text always in full. */
+.card {
+  order: 1;
+  min-width: 0;
 }
 
-/* Reach above the sheet so the grab area is a full 44 pixels. */
-.sheet__handle::before {
+.card__eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.card__title {
+  margin: 2px 0 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.card__short {
+  max-width: 62ch;
+  margin: 10px 0 0;
+  overflow-wrap: break-word;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+/* The photo's small picture beside the buttons for the moment. */
+.dock__media {
+  order: 2;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.card__thumb {
+  flex: none;
+  width: 112px;
+  height: 96px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: #000;
+  cursor: pointer;
+}
+
+.card__thumb-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 160ms ease-out;
+}
+
+.card__thumb:hover .card__thumb-image {
+  opacity: 0.85;
+}
+
+.card__actions {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* On a phone the buttons fill their column, and a long name wraps inside its button. */
+.card__actions .button {
+  width: 100%;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  white-space: normal;
+  text-align: center;
+}
+
+.card__photo-credit {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* The credit is in "Tell me more" on a phone; the card has no room for it. */
+.dock .card__photo-credit {
+  display: none;
+}
+
+/* Play, where the flight is, its progress, and Controls. */
+.dock__transport {
+  order: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-line);
+}
+
+.dock__status {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.dock__where {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+}
+
+.dock__chapter {
+  font-size: 0.9375rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.dock__day {
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
+/* One segment per chapter, as long as the chapter is, filled up to now. */
+.dock__progress {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 1px;
+  min-width: 40px;
+  height: 3px;
+}
+
+.dock__segment {
+  position: relative;
+  flex: var(--span) 1 0;
+  min-width: 2px;
+  overflow: hidden;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 0.2);
+}
+
+.dock__segment::before {
   content: '';
   position: absolute;
-  inset: -22px 0 0;
+  inset: 0;
+  background: var(--color-accent);
+  transform: scaleX(var(--fill, 0));
+  transform-origin: left;
 }
 
-.sheet__grip {
-  width: 36px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgb(255 255 255 / 0.28);
-  transition: background-color 160ms ease-out;
-}
-
-.sheet__handle:hover .sheet__grip {
-  background: rgb(255 255 255 / 0.5);
-}
-
-.sheet__handle:focus-visible {
-  outline-offset: -3px;
-}
-
-/* Tour controls, at the top of the sheet. */
-.tour {
+.dock__controls {
   flex: none;
-  padding: 2px var(--safe-right) 12px var(--safe-left);
-  border-bottom: 1px solid var(--color-line);
+  margin-left: auto;
+}
+
+/* A short phone with Controls open: the card scrolls, and Play stays in reach at its bottom. */
+@media (max-height: 640px) {
+  .dock__transport {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    margin-bottom: calc(-1 * var(--safe-bottom));
+    padding-bottom: var(--safe-bottom);
+    background: var(--color-surface-solid);
+  }
+}
+
+/* With Controls open on a phone, the tools sit over Play and the clock, and the scrubber shows the progress. */
+.dock:has(> .tools:not([hidden])) .dock__transport {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.dock:has(> .tools:not([hidden])) .dock__progress {
+  display: none;
+}
+
+/* On the tour, its controls take the place of Play and Controls. */
+.is-touring .dock__transport {
+  display: none;
+}
+
+/* With "Tell me more" open on a phone, the records and the card are one
+   sheet: the records show the story, so the card keeps only Play. */
+.hud:has(> .records:not([hidden])) .dock {
+  border-top: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.hud:has(> .records:not([hidden])) .dock > .card,
+.hud:has(> .records:not([hidden])) .dock__media {
+  display: none;
+}
+
+/* Tour controls, in the card. */
+.tour {
+  order: 4;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-line);
 }
 
 /* Phone: a thin progress row, then Exit, the count, and Back and Next in one row. */
@@ -731,12 +903,14 @@ body.is-welcome .hud {
   }
 }
 
-.tour:not([hidden]) + .card {
-  padding-top: 12px;
+/* The ending takes the moment's place in the card. */
+.dock:has(> .card[hidden]) .tour {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .tour__ending {
-  padding: 6px 0 2px;
+  padding: 2px 0;
 }
 
 .tour__end-title {
@@ -759,138 +933,8 @@ body.is-welcome .hud {
   gap: 8px;
 }
 
-/* The event card: a museum label for the moment on the clock. */
-.card {
-  flex: 1 1 auto;
-  min-height: 0;
-  padding: 2px var(--safe-right) 14px var(--safe-left);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgb(255 255 255 / 0.2) transparent;
-}
-
-.card__head {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.card__titles {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.card__title {
-  margin: 0;
-  font-size: 1.1875rem;
-  font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-}
-
-.card__time {
-  margin: 4px 0 0;
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-}
-
-.card__met {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text);
-}
-
-.card__utc {
-  display: block;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.75rem;
-  color: var(--color-text-faint);
-}
-
-.card__nav {
-  display: flex;
-  flex: none;
-  gap: 6px;
-}
-
-.card__line {
-  margin: 8px 0 0;
-  overflow: hidden;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  cursor: pointer;
-}
-
-.card__body {
-  padding-top: 14px;
-}
-
-.sheet[data-state='compact'] .card__body,
-.sheet[data-state='compact'] .card__utc {
-  display: none;
-}
-
-.sheet[data-state='expanded'] .card__line {
-  display: none;
-}
-
-/* On the tour, the compact card shows a little more of the text. */
-.is-touring .sheet[data-state='compact'] .card__line {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  white-space: normal;
-}
-
-.card__short {
-  max-width: 62ch;
-  margin: 0;
-  font-size: 1rem;
-  line-height: 1.55;
-}
-
-.card__photo {
-  margin: 18px 0 0;
-}
-
-.card__image {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: min(340px, 42vh);
-  border-radius: 8px;
-  background: #000;
-  object-fit: contain;
-}
-
-.card__credit {
-  margin-top: 6px;
-  font-size: 0.75rem;
-  color: var(--color-text-faint);
-}
-
-/* "Try it": the event's hands-on extra. It sits outside the card body, so a
-   phone's compact card shows it too. A long title wraps inside the button. */
-.card__try {
-  margin-top: 10px;
-}
-
-.card__try-button {
-  max-width: 100%;
-  padding: 8px 16px;
-  white-space: normal;
-  text-align: left;
-}
-
-/* A recording: Play with its length, the words written out, and the credit. */
-.card__audio {
-  margin-top: 16px;
-}
-
+/* A recording: Play with its length, the words written out, and the credit.
+   The card's "Hear the recording" is the same recording, with one button. */
 .audio {
   padding: 10px 14px 12px;
   border: 1px solid var(--color-line);
@@ -904,17 +948,44 @@ body.is-welcome .hud {
   gap: 12px;
 }
 
-.audio__toggle {
+.audio__toggle,
+.audio-mini__toggle {
   flex: none;
-  padding: 0 14px 0 10px;
+  gap: 8px;
+  padding: 0 14px 0 12px;
+  border-color: var(--color-accent-line);
+  background: var(--color-accent-soft);
+}
+
+.audio__toggle:hover:not(:disabled),
+.audio-mini__toggle:hover:not(:disabled) {
+  background: rgb(244 185 66 / 0.2);
+}
+
+.audio__toggle .icon,
+.audio-mini__toggle .icon {
+  width: 14px;
+  height: 14px;
+  color: var(--color-accent);
+}
+
+.audio-mini {
+  display: flex;
+}
+
+.audio-mini__toggle {
+  flex: 1 1 auto;
 }
 
 .audio__toggle .icon--pause,
-.audio--on .audio__toggle .icon--play {
+.audio-mini__toggle .icon--pause,
+.audio--on .audio__toggle .icon--play,
+.audio--on .audio-mini__toggle .icon--play {
   display: none;
 }
 
-.audio--on .audio__toggle .icon--pause {
+.audio--on .audio__toggle .icon--pause,
+.audio--on .audio-mini__toggle .icon--pause {
   display: block;
 }
 
@@ -922,8 +993,13 @@ body.is-welcome .hud {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 0.8125rem;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--color-text-muted);
+}
+
+/* On a phone's card, the button leaves out the length (its spoken name keeps it). */
+.audio-mini .audio__time {
+  display: none;
 }
 
 .audio__bar {
@@ -975,6 +1051,7 @@ body.is-welcome .hud {
   color: var(--color-text-faint);
 }
 
+/* "Tell me more" in a memorial page, and in the extras. */
 .disclosure {
   display: inline-flex;
   align-items: center;
@@ -1008,17 +1085,25 @@ body.is-welcome .hud {
   transform: rotate(180deg);
 }
 
-.card__more {
-  max-width: 62ch;
-  padding-top: 12px;
+/* A photo with its credit: in "Tell me more", "About this mission", and a memorial page. */
+.card__photo {
+  margin: 18px 0 0;
 }
 
-.card__more-text {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: 0.9375rem;
-  line-height: 1.6;
-  color: var(--color-text);
+.card__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(340px, 42vh);
+  border-radius: 8px;
+  background: #000;
+  object-fit: contain;
+}
+
+.card__credit {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--color-text-faint);
 }
 
 /* Small print under a fact's sources, for where the sources disagree. It is
@@ -1099,28 +1184,220 @@ body.is-welcome .hud {
   padding: 12px 0;
 }
 
-/* Timeline ---------------------------------------------------------- */
+/* "Tell me more": the records of the moment ------------------------ */
 
-.timeline {
-  grid-area: timeline;
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  grid-template-areas:
-    'play clock speed'
-    'scrub scrub scrub'
-    'chapter chapter chapter';
-  align-items: center;
-  gap: 4px 12px;
-  padding: 8px var(--safe-right) var(--safe-bottom) var(--safe-left);
-  border-top: 1px solid var(--color-line);
-  background: var(--color-surface-strong);
+/* Phone: one sheet with the card, from under the header down to Play. The
+   head stays put while the rest scrolls, reference links last. */
+.records {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 6px;
+  border: 1px solid var(--color-line);
+  border-bottom: 0;
+  border-radius: 18px 18px 0 0;
+  background: var(--color-surface);
   -webkit-backdrop-filter: var(--blur);
   backdrop-filter: var(--blur);
+  box-shadow: 0 -10px 30px rgb(0 0 0 / 0.35);
   pointer-events: auto;
+  animation: appear 200ms ease-out both;
+}
+
+.records__head {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px var(--safe-right) 12px var(--safe-left);
+}
+
+.records__titles {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.records__eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.records__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  outline: none;
+}
+
+.records__time {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.records__utc {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.records__close {
+  flex: none;
+}
+
+.records__close-wide {
+  display: none;
+}
+
+.records__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.2) transparent;
+}
+
+.records__body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 0 var(--safe-right) 18px var(--safe-left);
+}
+
+.records__short,
+.records__story {
+  max-width: 62ch;
+  margin: 0;
+  overflow-wrap: break-word;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+.records__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.records__heading {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.records__photo {
+  margin: 0;
+}
+
+.records__section .citations {
+  margin: 0;
+}
+
+/* The mission's own pages: About, How this is drawn, Sources and credits. */
+.records__links {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0 calc(var(--safe-bottom) + 4px);
+  border-top: 1px solid var(--color-line);
+}
+
+.records__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px var(--safe-right) 6px var(--safe-left);
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease-out;
+}
+
+.records__link:hover {
+  background: var(--color-hover);
+}
+
+.records__link:focus-visible {
+  outline-offset: -2px;
+}
+
+.records__link-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.records__link-line {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.records__link-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted);
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Controls: the tools for moving through the flight ----------------- */
+
+/* Phone: previous, next, the chapter menu, and the speed; then the scrubber.
+   The clock goes to the card's status, next to Play. */
+.tools {
+  order: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-line);
+}
+
+.tools__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tools__step {
+  flex: none;
+  border-color: var(--color-line-strong);
 }
 
 .play {
-  grid-area: play;
+  flex: none;
   display: grid;
   place-items: center;
   width: 48px;
@@ -1145,6 +1422,12 @@ body.is-welcome .hud {
   transform: scale(0.96);
 }
 
+/* While the tour runs the clock, Play rests. */
+.play:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .play .icon {
   width: 22px;
   height: 22px;
@@ -1159,49 +1442,40 @@ body.is-welcome .hud {
   display: block;
 }
 
+/* The mission clock: the time over "since liftoff · Day 5" on a phone. */
 .clock {
-  grid-area: clock;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 4px;
   min-width: 0;
   margin: 0;
   line-height: 1.2;
 }
 
-.clock__line {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
 .clock__met {
-  min-width: 9ch;
+  flex-basis: 100%;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 1.3125rem;
+  font-size: 1.0625rem;
   font-weight: 500;
   letter-spacing: -0.01em;
 }
 
-.clock__since {
+.clock__since,
+.clock__day {
   font-size: 0.75rem;
+  line-height: 1.3;
   color: var(--color-text-muted);
   white-space: nowrap;
 }
 
-/* The day of the flight, on flights longer than two days, before the date. */
-.clock__day {
-  padding: 0 5px;
-  border: 1px solid var(--color-line-strong);
-  border-radius: 6px;
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  font-weight: 650;
-  line-height: 1.25;
-  color: var(--color-text);
+.clock__day::before {
+  content: '· ';
+  content: '· ' / '';
 }
 
-/* Fast forward: a quiet mark in the date's place while the ship circles too fast to follow. */
+/* Fast forward: a quiet mark by the clock while the ship circles too fast to follow. */
 .clock__fast {
   padding: 0 5px;
   border: 1px solid var(--color-accent-line);
@@ -1214,27 +1488,6 @@ body.is-welcome .hud {
   white-space: nowrap;
 }
 
-.clock__date--fast .clock__utc {
-  display: none;
-}
-
-/* Phones: the day takes the year's room; the header shows the year. */
-.clock__day:not([hidden]) ~ .clock__utc .clock__year {
-  display: none;
-}
-
-.clock__date {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 3px;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
 /* Chapter and speed menus. */
 .pick {
   position: relative;
@@ -1243,13 +1496,15 @@ body.is-welcome .hud {
 }
 
 .pick--chapter {
-  grid-area: chapter;
-  justify-self: start;
-  max-width: 100%;
+  flex: 1 1 auto;
+}
+
+.pick--chapter .pick__select {
+  width: 100%;
 }
 
 .pick--speed {
-  grid-area: speed;
+  flex: none;
 }
 
 .pick__select {
@@ -1257,7 +1512,7 @@ body.is-welcome .hud {
   max-width: 100%;
   min-height: 44px;
   padding: 0 34px 0 14px;
-  border: 1px solid var(--color-line);
+  border: 1px solid var(--color-line-strong);
   border-radius: 10px;
   background-color: var(--color-raised);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaa7a0' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 9.5 12 15l5.5-5.5'/%3E%3C/svg%3E");
@@ -1292,7 +1547,6 @@ body.is-welcome .hud {
 .scrubber {
   --inset: 11px;
   --progress: 0;
-  grid-area: scrub;
   position: relative;
   height: 44px;
 }
@@ -1411,7 +1665,6 @@ body.is-welcome .hud {
 
 /* Chapter names along the ruler (wide layout only). */
 .chapters {
-  grid-area: chapters;
   position: relative;
   display: none;
   height: 36px;
@@ -1424,7 +1677,7 @@ body.is-welcome .hud {
   left: calc(var(--at) * 100%);
   width: calc(var(--span) * 100%);
   height: 36px;
-  padding: 0 6px;
+  padding: 0 3px;
   border: 0;
   background: none;
   color: var(--color-text-faint);
@@ -1459,7 +1712,8 @@ body.is-welcome .hud {
   text-overflow: ellipsis;
 }
 
-/* The current chapter, or the one with keyboard focus, shows its whole name. */
+/* The current chapter, or the one with keyboard focus, shows its whole name.
+   Its backing matches the card, so it covers the names it grows over. */
 .chapters__item--featured {
   z-index: 2;
   width: var(--grow, calc(var(--span) * 100%));
@@ -1487,23 +1741,6 @@ body.is-welcome .hud {
 
 .chapters__item:disabled {
   cursor: default;
-}
-
-/* While the tour drives the clock, the timeline only reports. */
-.timeline--locked .play,
-.timeline--locked .pick,
-.timeline--locked .chapters,
-.timeline--locked .scrubber__input {
-  opacity: 0.45;
-}
-
-.timeline--locked .scrubber__input {
-  cursor: default;
-}
-
-/* On phones the tour needs the room more than the chapter menu does. */
-.timeline--locked .pick--chapter {
-  display: none;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2532,8 +2769,7 @@ body.is-welcome .hud {
 
 /* Without a 3D view: a short note in the space the view would take. */
 .stage-note {
-  grid-row: 3;
-  grid-column: 1;
+  grid-area: main;
   align-self: center;
   justify-self: center;
   display: flex;
@@ -2555,12 +2791,6 @@ body.is-welcome .hud {
   line-height: 1.5;
   text-align: center;
   color: var(--color-text-muted);
-}
-
-/* Without a 3D view there is nothing to point the camera at. */
-.no-3d .views,
-.no-3d .caption {
-  display: none;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2596,20 +2826,25 @@ body.is-welcome .hud {
 }
 
 /* ------------------------------------------------------------------ */
-/* Wide layout: the event card is a panel at the side, the timeline    */
-/* runs along the bottom. Keep in step with wideLayoutQuery() in dom.ts.*/
+/* Wide layout: the moment card floats at the bottom, centered in the  */
+/* room the records leave, and "Tell me more" is a panel at the side.  */
+/* Keep in step with wideLayoutQuery() in dom.ts.                      */
 /* ------------------------------------------------------------------ */
 
 @media (min-width: 860px), (min-width: 600px) and (orientation: landscape) {
+  :root {
+    --records-width: clamp(320px, 32vw, 416px);
+    --dock-margin: 24px;
+    --dock-bottom: max(28px, env(safe-area-inset-bottom));
+  }
+
   .hud {
-    grid-template-columns: minmax(0, 1fr) var(--panel-width);
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      'masthead sheet'
-      'views sheet'
-      '. sheet'
-      'caption sheet'
-      'timeline timeline';
+      'masthead records'
+      'views records'
+      'main records'
+      'dock records';
   }
 
   .masthead {
@@ -2631,63 +2866,227 @@ body.is-welcome .hud {
     font-size: 0.9375rem;
   }
 
+  /* "Look at" and True scale in one row, the note beside the switch. */
   .views {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
     padding: 12px 16px 0 max(24px, env(safe-area-inset-left));
   }
 
-  /* The view switcher only: extras reuse .segmented and lay out their own rows. */
-  .views .segmented {
-    flex: 0 1 auto;
-  }
-
   .views .segmented__item {
-    flex: 0 0 auto;
     min-width: 72px;
-    padding: 0 14px;
   }
 
-  .caption,
-  .hud:has(.sheet[data-state='expanded']) .caption {
-    display: flex;
-    padding: 0 16px 10px max(24px, env(safe-area-inset-left));
+  /* The card: centered at the bottom, in the room the records leave. */
+  .dock {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'play card thumb'
+      '. actions controls'
+      'tools tools tools'
+      'tour tour tour';
+    column-gap: 16px;
+    row-gap: 0;
+    align-self: end;
+    justify-self: center;
+    width: min(760px, 100% - 2 * var(--dock-margin));
+    max-height: calc(100% - var(--dock-bottom));
+    margin-bottom: var(--dock-bottom);
+    padding: 19px 16px 16px;
+    border-bottom: 1px solid var(--color-line);
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
   }
 
-  .sheet {
-    max-height: none;
-    border-top: 0;
-    border-left: 1px solid var(--color-line);
-    border-radius: 0;
-    box-shadow: none;
-    padding-top: var(--safe-top);
+  .dock__media,
+  .dock__transport,
+  .is-touring .dock__transport {
+    display: contents;
   }
 
-  .sheet__handle {
-    display: none;
-  }
-
-  .tour {
-    padding: 8px max(24px, env(safe-area-inset-right)) 16px 24px;
+  .play {
+    grid-area: play;
+    align-self: start;
+    width: 56px;
+    height: 56px;
   }
 
   .card {
-    padding: 14px max(24px, env(safe-area-inset-right)) 28px 24px;
+    grid-area: card;
   }
 
-  .sheet[data-state] .card__body {
+  /* With no photo, the story takes the photo's room too. */
+  .dock:has(.card__thumb[hidden]) .card {
+    grid-column: 2 / 4;
+  }
+
+  .card__title {
+    margin-top: 4px;
+    font-size: 1.375rem;
+  }
+
+  .card__short {
+    margin-top: 4px;
+    font-size: 1rem;
+  }
+
+  .card__thumb {
+    grid-area: thumb;
+    align-self: start;
+    justify-self: end;
+    width: 104px;
+    height: 104px;
+  }
+
+  .card__actions {
+    grid-area: actions;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px 12px;
+    margin-top: 12px;
+  }
+
+  .card__actions .button {
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .card__actions .card__try {
+    white-space: normal;
+    text-align: left;
+  }
+
+  .audio-mini__toggle {
+    flex: none;
+  }
+
+  .audio-mini .audio__time {
+    display: inline;
+  }
+
+  .dock .card__photo-credit {
     display: block;
   }
 
-  .sheet[data-state] .card__line,
-  .is-touring .sheet[data-state] .card__line {
+  .dock__controls {
+    grid-area: controls;
+    align-self: center;
+    justify-self: end;
+    margin-top: 12px;
+    margin-left: 0;
+  }
+
+  .dock__status {
     display: none;
   }
 
+  /* The progress strip runs along the card's top edge. */
+  .dock__progress,
+  .dock:has(> .tools:not([hidden])) .dock__progress {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    display: flex;
+    gap: 3px;
+    height: 3px;
+  }
+
+  .dock__segment {
+    border-radius: 0;
+  }
+
+  /* The card keeps its own story while "Tell me more" is open beside it. */
+  .hud:has(> .records:not([hidden])) .dock {
+    border-top: 1px solid var(--color-line);
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+  }
+
+  .hud:has(> .records:not([hidden])) .dock > .card {
+    display: block;
+  }
+
+  .hud:has(> .records:not([hidden])) .dock__media {
+    display: contents;
+  }
+
+  /* Controls: previous, next, the clock, and the speed at the far right;
+     then the scrubber, with the chapters named under it. */
+  .tools {
+    grid-area: tools;
+    gap: 8px;
+    margin: 16px -16px -16px;
+    padding: 10px 16px 12px;
+  }
+
+  .tools__row {
+    gap: 12px;
+  }
+
+  .clock {
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    column-gap: 8px;
+  }
+
+  .clock__met {
+    flex-basis: auto;
+    font-size: 1.25rem;
+  }
+
+  .clock__since {
+    font-size: 0.75rem;
+  }
+
+  /* The day of the flight, on flights longer than two days. */
+  .clock__day {
+    padding: 0 6px;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 650;
+    line-height: 1.35;
+    color: var(--color-text);
+  }
+
+  .clock__day::before {
+    content: none;
+  }
+
+  .pick--chapter {
+    display: none;
+  }
+
+  .pick--speed {
+    margin-left: auto;
+  }
+
+  .chapters {
+    display: block;
+  }
+
+  .tick--chapter {
+    height: 19px;
+    background: rgb(255 255 255 / 0.2);
+  }
+
+  /* The tour: its own row along the bottom of the card. */
+  .tour {
+    grid-area: tour;
+    margin: 16px -16px -16px;
+    padding: 12px 16px;
+  }
+
   .tour__steps {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      'count count'
-      'progress progress'
-      'exit nav';
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: 'count progress exit nav';
+    gap: 12px;
   }
 
   .tour__count {
@@ -2696,75 +3095,128 @@ body.is-welcome .hud {
     gap: 8px;
   }
 
-  .tour__nav {
-    justify-self: end;
+  /* The ending fills the card on its own. */
+  .dock:has(> .card[hidden]) .tour {
+    margin: -19px -16px -16px;
+    padding: 18px 20px 20px;
   }
 
-  .sheet[data-state] .card__utc {
-    display: block;
+  /* "Tell me more": a floating panel in a column at the right. The head and
+     the reference links stay put; the parts between them scroll. */
+  .records {
+    grid-area: records;
+    width: var(--records-width);
+    margin: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+      max(20px, env(safe-area-inset-bottom)) 0;
+    border-bottom: 1px solid var(--color-line);
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
   }
 
-  .card__title {
+  .records__head {
+    padding: 20px 20px 16px 24px;
+  }
+
+  .records__titles {
+    gap: 6px;
+  }
+
+  .records__title {
     font-size: 1.5rem;
-    line-height: 1.2;
   }
 
-  .card__time {
-    margin-top: 6px;
+  .records__time {
     font-size: 0.875rem;
   }
 
-  .card__short {
-    font-size: 1.0625rem;
+  .records__utc {
+    margin-top: 2px;
+    font-size: 0.8125rem;
   }
 
-  .card__body {
-    padding-top: 16px;
+  .records__close-wide {
+    display: block;
   }
 
-  .timeline {
-    grid-template-columns: 48px auto minmax(0, 1fr) auto;
-    grid-template-rows: 44px 36px;
-    grid-template-areas:
-      'play clock scrub speed'
-      'play clock chapters speed';
-    gap: 0 20px;
-    padding: 10px max(24px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
-      max(24px, env(safe-area-inset-left));
-  }
-
-  .tick--chapter {
-    height: 19px;
-    background: rgb(255 255 255 / 0.2);
-  }
-
-  .play {
-    align-self: center;
-  }
-
-  .clock {
-    align-self: center;
-    min-width: 11.5rem;
-  }
-
-  .clock__met {
-    font-size: 1.5rem;
-  }
-
-  .clock__day:not([hidden]) ~ .clock__utc .clock__year {
-    display: inline;
-  }
-
-  .pick--chapter {
+  .records__close-phone {
     display: none;
   }
 
-  .pick--speed {
-    align-self: center;
+  .records__scroll {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
   }
 
-  .chapters {
-    display: block;
+  .records__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 20px;
+    padding: 0 24px 20px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 0.2) transparent;
+  }
+
+  /* The card beside the panel shows the short text. */
+  .records__short {
+    display: none;
+  }
+
+  .records__story {
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  .records__links {
+    flex: none;
+    padding: 4px 0;
+  }
+
+  .records__link {
+    padding: 6px 24px;
+  }
+
+  /* A short window: the card sits lower, and the whole panel scrolls, head and links with it. */
+  @media (max-height: 560px) {
+    :root {
+      --dock-bottom: max(12px, env(safe-area-inset-bottom));
+    }
+
+    .records__scroll {
+      display: block;
+      overflow-y: auto;
+    }
+
+    .records__body {
+      overflow: visible;
+    }
+  }
+
+  /* A card squeezed by the panel beside it: the photo and its credit are in
+     the panel, so the card leaves them out, and the tour's row wraps. */
+  @container dock (max-width: 620px) {
+    .hud:has(> .records:not([hidden])) .card__thumb,
+    .hud:has(> .records:not([hidden])) .card__photo-credit {
+      display: none;
+    }
+
+    .hud:has(> .records:not([hidden])) .card {
+      grid-column: 2 / 4;
+    }
+
+    .tour__steps {
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas:
+        'count count'
+        'progress progress'
+        'exit nav';
+    }
+
+    .tour__nav {
+      justify-self: end;
+    }
   }
 }
 
@@ -2918,15 +3370,6 @@ body.is-welcome .hud {
     padding-top: 6px;
   }
 
-  .caption,
-  .hud:has(.sheet[data-state='expanded']) .caption {
-    display: none;
-  }
-
-  .timeline {
-    padding-top: 4px;
-  }
-
   .card__image {
     max-height: 200px;
   }
@@ -2989,14 +3432,15 @@ body.is-welcome .hud {
   }
 }
 
-/* The narrowest phones: keep the four view buttons and the switch on one row. */
+/* The narrowest phones: keep the four view buttons on one row, and leave the story more room. */
 @media (max-width: 379px) {
   .views {
     gap: 6px;
   }
 
   .views .segmented__item {
-    padding: 0 2px;
+    min-width: 0;
+    padding: 0 10px;
     font-size: 0.8125rem;
   }
 
@@ -3010,6 +3454,10 @@ body.is-welcome .hud {
     font-size: 0.8125rem;
   }
 
+  .card__thumb {
+    width: 88px;
+  }
+
   /* The welcome leaves the 3D view a little more room. */
   .welcome__title {
     font-size: 1.75rem;
@@ -3020,12 +3468,8 @@ body.is-welcome .hud {
   }
 }
 
-/* Room for the site name and the longer button labels. */
+/* Room for the site name. */
 @media (min-width: 1100px) {
-  .wide-only {
-    display: inline;
-  }
-
   .masthead__site {
     position: static;
     width: auto;

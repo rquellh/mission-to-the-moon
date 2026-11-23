@@ -68,7 +68,7 @@ export function closeAllDialogs(): void {
 /* Media queries ----------------------------------------------------- */
 
 export interface ScreenSettings {
-  /** The wide layout (a laptop, or a phone on its side): the card is a side panel. */
+  /** The wide layout (a laptop, or a phone on its side): the card floats at the bottom, "Tell me more" at the side. */
   wide: boolean;
   /** The visitor has asked the system to reduce motion. */
   reducedMotion: boolean;

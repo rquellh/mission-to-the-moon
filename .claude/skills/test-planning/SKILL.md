@@ -75,7 +75,7 @@ The site is static: there is no server and no API. What a server would own elsew
 
 - What a card, panel, or dialog shows for a real mission
 - Visitor interactions (clicks, keys, selections) and what they change
-- States: touring, traveling between stops, exploring, playing, paused, no 3D view
+- States: touring, traveling between stops, exploring, playing, paused, the moment card's doors open or closed, no 3D view
 - What the interface asks of the scene (which view, which scale)
 - Variations between missions (Earth orbit or Moon, one craft or two, a crew portrait or none)
 - Accessibility (names, roles, pressed and expanded states, announcements)

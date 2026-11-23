@@ -140,7 +140,7 @@ import { howDrawnParagraphs } from './about-dialog.ts';
 
 - Import `mountMission`, `screen`, `within`, and `waitFor` from `../test/test-utils.ts`, **never** from `@testing-library/dom`
 - Do not import `userEvent`: the mount hands you `user`, made with `userEvent.setup()`
-- Import `sound`, `navigation`, `later`, `visitedMissions`, `mountRecordings`, and the `User` and `Frames` types from test-utils too
+- Import `sound`, `navigation`, `later`, `visitedMissions`, `mountRecordings`, and the `User`, `Frames`, and `MountedMission` types from test-utils too
 - Use `import type` for types (`verbatimModuleSyntax` is on)
 - An interface test never imports the module it covers: it mounts the interface and uses it
 
@@ -201,25 +201,27 @@ await mountMission('gemini-8', { no3D: { note: copy.errors.noWebGL, offerReload:
 
 ### Mount on a Wide Screen
 
-The default screen is a phone's. `wide` switches the layout media query, for behavior that differs by layout:
+The default screen is a phone's. `wide` switches the layout media query, for behavior that differs by layout: "Tell me more" closes with Close on a wide screen and with Show less on a phone, and the clock sits among the tools behind Controls on a wide screen but beside Play on a phone.
 
 ```ts
 const { user } = await mountMission('apollo-11', { start: 'explore', wide: true });
 ```
 
+jsdom loads no stylesheet, so only the `hidden` attribute hides anything in an interface test. What the stylesheet alone hides on one layout (the card's story stepping aside for "Tell me more" on a phone, the phone's status on a wide screen) is the browser tests' to check.
+
 ### All the Options
 
-| Option         | What it does                                                 |
-| -------------- | ------------------------------------------------------------ |
-| `start`        | `'welcome'` (default), `'tour'`, or `'explore'`              |
-| `event`        | Open paused at this event id and explore                     |
-| `no3D`         | `{ note, offerReload }`: no 3D view                          |
-| `story`        | Make the real mission into a typed fixture (section 6)       |
-| `missionList`  | Make the real mission list into a typed fixture (section 6)  |
-| `isDraft`      | Which list entries count as unfinished                       |
-| `loadMemorial` | Replace the memorial loader (section 5)                      |
-| `loadExtra`    | Replace the extra loader; the default loads a stand-in extra |
-| `wide`         | The wide layout                                              |
+| Option         | What it does                                                                           |
+| -------------- | -------------------------------------------------------------------------------------- |
+| `start`        | `'welcome'` (default), `'tour'`, or `'explore'`                                        |
+| `event`        | Open paused at this event id and explore                                               |
+| `no3D`         | `{ note, offerReload }`: no 3D view                                                    |
+| `story`        | Make the real mission into a typed fixture (section 6)                                 |
+| `missionList`  | Make the real mission list into a typed fixture (section 6)                            |
+| `isDraft`      | Which list entries count as unfinished                                                 |
+| `loadMemorial` | Replace the memorial loader (section 5)                                                |
+| `loadExtra`    | Replace the extra loader; the default loads a stand-in extra                           |
+| `wide`         | The wide layout (the card floats at the bottom; "Tell me more" is a panel at the side) |
 
 ### Recording Players on Their Own
 
@@ -235,16 +237,46 @@ const [landing, firstStep] = screen.getAllByRole('region', { name: 'Recording' }
 When several tests need the same start, extract a helper at file scope:
 
 ```ts
-async function atTheLanding() {
-  const mounted = await mountMission('apollo-11', { event: 'landing' });
-  return { ...mounted, recording: screen.getByRole('region', { name: 'Recording' }) };
+/** The moment card, always on the screen during a flight. */
+const theCard = (): HTMLElement => screen.getByRole('region', { name: 'What is happening' });
+```
+
+```ts
+/** Explore a mission with Controls open, so "Look at" and True scale are on the screen. */
+async function exploreWithControls(id: string): Promise<MountedMission> {
+  const mounted = await mountMission(id, { start: 'explore' });
+  await mounted.user.click(screen.getByRole('button', { name: 'Controls' }));
+  return mounted;
 }
 ```
 
 ```ts
+async function atTheLanding() {
+  const mounted = await mountMission('apollo-11', { event: 'landing' });
+  await mounted.user.click(within(theCard()).getByRole('button', { name: 'Tell me more' }));
+  const records = screen.getByRole('region', { name: 'The Eagle has landed' });
+  return {
+    ...mounted,
+    records,
+    recording: within(records).getByRole('region', { name: 'Recording' }),
+  };
+}
+```
+
+```ts
+/** Open "Tell me more" on the card, then "Sources and credits" from the links at its end. */
 async function openCredits(user: User): Promise<HTMLElement> {
+  await user.click(screen.getByRole('button', { name: 'Tell me more' }));
   await user.click(screen.getByRole('button', { name: 'Sources and credits' }));
   return screen.getByRole('dialog', { name: 'Sources and credits' });
+}
+```
+
+```ts
+/** Open Controls from the card and find the tools, a region named Timeline. */
+async function openControls(user: User): Promise<HTMLElement> {
+  await user.click(within(theCard()).getByRole('button', { name: 'Controls' }));
+  return screen.getByRole('region', { name: 'Timeline' });
 }
 ```
 
@@ -263,6 +295,7 @@ The interface asks the scene for a view and a scale; the fake takes them at once
 ```ts
 it('asks the scene for the view pressed, and shows it pressed', async () => {
   const { user, director } = await mountMission('apollo-17', { start: 'explore' });
+  await user.click(screen.getByRole('button', { name: 'Controls' }));
   expect(screen.getByRole('button', { name: 'Both' })).toHaveAttribute('aria-pressed', 'true');
 
   await user.click(screen.getByRole('button', { name: 'Moon' }));
@@ -272,7 +305,7 @@ it('asks the scene for the view pressed, and shows it pressed', async () => {
 });
 
 it('shows Earth when the scene reports a view an Earth-orbit flight does not offer', async () => {
-  const { director } = await mountMission('gemini-8', { start: 'explore' });
+  const { director } = await exploreWithControls('gemini-8');
   director.cameraMovesTo('spacecraft');
 
   director.cameraMovesTo('moon');
@@ -308,6 +341,7 @@ it('sets off for the next stop, and arrives when the trip is over', async () => 
 
   expect(panel).toHaveTextContent('Stop 2 of 6');
   expect(panel).not.toHaveTextContent('On the way…');
+  expect(within(panel).getByRole('button', { name: 'Next' })).toBeEnabled();
 });
 ```
 
@@ -330,7 +364,7 @@ it('loads the recording, then plays it', async () => {
   expect(within(recording).getByText('0:15')).toBeInTheDocument();
 
   await user.click(
-    within(recording).getByRole('button', { name: 'Play the recording, 15 seconds' }),
+    within(recording).getByRole('button', { name: 'Hear the recording, 15 seconds' }),
   );
 
   const toggle = within(recording).getByRole('button', { name: 'Pause the recording' });
@@ -383,6 +417,8 @@ it('puts the visitor back where they were when the list closes', async () => {
 A closed `<dialog>` is `display: none`, so its contents drop out of role queries, as they do for a screen reader.
 
 The welcome is not a dialog: it is a region named by its heading ("Ride along on Apollo 11"), and once the visitor chooses a way in it is `hidden`, so it drops out of role queries too. Escape on the welcome means Explore on my own, unless a dialog (the mission list, a memorial page, an extra) is open over it; then the dialog takes it.
+
+"Tell me more" is not a dialog either: it is a region named by the moment's title, `hidden` until its door opens it. Opening it moves focus to its heading; Close (Show less on a phone), its door, and Escape while focus is inside it close it and give focus back to the door. The tools behind Controls work the same way, with focus staying on the door.
 
 ### Per-Test Overrides for Loading States
 
@@ -577,11 +613,11 @@ Without a `loadExtra` option the mount loads `standInExtra`, which writes one li
 ```ts
 it('steps to the next and previous events', async () => {
   const { user } = await mountMission('apollo-11', { start: 'explore' });
-  const card = screen.getByRole('article');
-  expect(within(card).getByRole('button', { name: 'Previous event' })).toBeDisabled();
+  const timeline = await openControls(user);
+  expect(within(timeline).getByRole('button', { name: 'Previous event' })).toBeDisabled();
 
-  await user.click(within(card).getByRole('button', { name: 'Next event' }));
-  expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent(
+  await user.click(within(timeline).getByRole('button', { name: 'Next event' }));
+  expect(within(theCard()).getByRole('heading', { level: 3 })).toHaveTextContent(
     'First stage separates',
   );
 });
@@ -647,27 +683,40 @@ screen.getByRole('dialog', { name: 'About Apollo 11' });
 
 // Landmarks and groups named in index.html
 screen.getByRole('region', { name: 'Ride along on Apollo 11' }); // the welcome, by its heading
-screen.getByRole('region', { name: 'Timeline' });
-screen.getByRole('region', { name: 'Guided tour' });
-screen.getByRole('group', { name: 'Look at' });
+screen.getByRole('region', { name: 'What is happening' }); // the moment card, always there during a flight
+screen.getByRole('region', { name: 'The Eagle has landed' }); // "Tell me more", once open, by the moment's title
+screen.getByRole('region', { name: 'Timeline' }); // the tools behind Controls, once open
+screen.getByRole('region', { name: 'Guided tour' }); // in the card, on the tour
+screen.getByRole('group', { name: 'Look at' }); // at the top left, with Controls open
+within(card).getByRole('group', { name: 'Where the flight is' }); // beside Play: the chapter and the day
 within(timeline).getByRole('group', { name: 'Chapters' });
 
-// The event card is an article; its title is its only level-3 heading
-const card = screen.getByRole('article');
-within(card).getByRole('heading', { level: 3 });
+// The card's story is an article named by its title, a level-3 heading ("Tell me more" has the same title)
+const story = within(card).getByRole('article');
+within(story).getByRole('heading', { level: 3 });
+
+// The card's doors: toggle buttons with aria-expanded. "Tell me more" is named "Sources"
+// when the moment has nothing more than its sources.
+within(card).getByRole('button', { name: 'Tell me more' });
+within(card).getByRole('button', { name: 'Controls' });
 
 // Controls
+within(card).getByRole('button', { name: 'Play' });
 within(timeline).getByRole('slider', { name: 'Mission time' });
 within(timeline).getByRole('combobox', { name: 'Speed' });
-within(card).getByRole('region', { name: 'Recording' });
+within(records).getByRole('region', { name: 'Recording' });
 within(recording).getByRole('status');
+within(card).getByRole('button', { name: 'Hear the recording, 15 seconds' }); // the same recording, from the card
 
 // The mission on show in the list
 within(missionList()).getByRole('listitem', { current: true });
 
-// A folded Sources list is a group; the photo is a figure
-within(card).getByRole('group');
-within(card).getByRole('figure');
+// In "Tell me more", each part has a level-4 heading; the photo is a figure
+within(records).getAllByRole('heading', { level: 4 }); // The full story, What they said, Photo, Sources
+within(records).getByRole('figure');
+
+// A folded Sources list (in About this mission and a memorial page) is a group
+within(about).getByRole('group');
 ```
 
 **Names with hidden words.** A link that opens a new tab ends with hidden words, and the mission's button ends with ", all missions". Match the start or the end with a regular expression:
@@ -729,7 +778,8 @@ expect(within(card).getByRole('button', { name: 'Tell me more' })).not.toBeInThe
 Role queries leave out `hidden` elements, closed dialogs, and `aria-hidden` ones. Text queries do not. For text that is there but hidden, assert visibility:
 
 ```ts
-const { director } = await mountMission('apollo-11', { start: 'explore' });
+const { user, director } = await mountMission('apollo-11', { start: 'explore' });
+await user.click(screen.getByRole('button', { name: 'Controls' }));
 expect(screen.getByText('Fast forward')).not.toBeVisible();
 
 director.setFastForward(true);
@@ -740,12 +790,13 @@ expect(screen.getByText('Fast forward')).toBeVisible();
 
 ### Text Broken Up by Elements
 
-`getByText` matches an element's own text. When a line is built from several elements (the card's time, the clock's date), assert on the container's text instead:
+`getByText` matches an element's own text. When a line is built from several elements (the time in "Tell me more"), assert on the container's text instead:
 
 ```ts
-expect(card).toHaveTextContent('102:45:39 after liftoff');
-expect(timeline).toHaveTextContent('Jul 20, 1969 20:17:39 UTC');
+expect(records).toHaveTextContent('102:45:39 after liftoff');
 ```
+
+Text queries also find text inside a closed panel (the same moment's title and time are in "Tell me more" while it is `hidden`). Scope them with `within` to the part on show.
 
 ### Announcements: the One Place for Fake Timers
 
@@ -762,6 +813,7 @@ describe('announcements', () => {
   it('says the event and its time once the card stops stepping, and only the latest', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const { user, frames } = await mountMission('apollo-11', { start: 'explore' });
+    await user.click(screen.getByRole('button', { name: 'Controls' }));
 
     await user.click(screen.getByRole('button', { name: 'Next event' }));
     await user.click(screen.getByRole('button', { name: 'Next event' }));
@@ -905,17 +957,17 @@ Each test reads in three steps, separated by blank lines: mount (and get to the 
 
 ### Standard Behavioral Describe Groupings
 
-| Grouping                                    | When to use                                                              |
-| ------------------------------------------- | ------------------------------------------------------------------------ |
-| `rendering`                                 | What a part shows for a mission, and what it leaves out                  |
-| `opening` / `closing`                       | A dialog or sheet coming and going, focus, the tab title                 |
-| `loading` / `failing to load`               | A loader's waiting, answer, and failure                                  |
-| `choosing`                                  | Picking an entry, a view, a chapter                                      |
-| `stepping` / `traveling`                    | The card's Previous and Next; the tour's trips and Skip                  |
-| `exploring` / `touring` / `during the tour` | States of the whole interface                                            |
-| `the ending` / `leaving`                    | The tour's end and the ways out of it                                    |
-| `announcements`                             | What screen readers hear (fake timers allowed here)                      |
-| Domain groups                               | `photo`, `sources`, `try it`, `recording`, `true scale`, `one at a time` |
+| Grouping                                    | When to use                                                                                                        |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `rendering`                                 | What a part shows for a mission, and what it leaves out                                                            |
+| `opening` / `closing`                       | A dialog, sheet, or panel coming and going, focus, the tab title                                                   |
+| `loading` / `failing to load`               | A loader's waiting, answer, and failure                                                                            |
+| `choosing`                                  | Picking an entry, a view, a chapter                                                                                |
+| `stepping` / `traveling`                    | The card's Previous and Next; the tour's trips and Skip                                                            |
+| `exploring` / `touring` / `during the tour` | States of the whole interface                                                                                      |
+| `the ending` / `leaving`                    | The tour's end and the ways out of it                                                                              |
+| `announcements`                             | What screen readers hear (fake timers allowed here)                                                                |
+| Domain groups                               | `the door`, `photo`, `sources`, `try it`, `recording`, `true scale`, `one at a time`, `one recording, two buttons` |
 
 ---
 
@@ -999,7 +1051,7 @@ await mountMission('apollo-11', { event: 'landing' });
 fireEvent.click(button);
 
 // CORRECT - the full sequence a visitor's browser sends
-await user.click(within(card).getByRole('button', { name: 'Next event' }));
+await user.click(within(timeline).getByRole('button', { name: 'Next event' }));
 ```
 
 ### 3. Using `getBy*` for Negative Assertions
@@ -1030,7 +1082,7 @@ vi.mock('../app/player.ts');
 
 // CORRECT - the real clock, on the screen's fake frames
 const { user, frames } = await mountMission('apollo-11', { start: 'explore' });
-await user.click(within(timeline).getByRole('button', { name: 'Play' }));
+await user.click(within(card).getByRole('button', { name: 'Play' }));
 frames.advance(2);
 ```
 
@@ -1086,9 +1138,7 @@ expect(secondsTaken).toBe(5);
 
 // CORRECT - draw enough frames, then check it arrived
 frames.advance(A_WHOLE_TRIP);
-expect(
-  within(screen.getByRole('region', { name: 'Timeline' })).getByText('01:33:00'),
-).toBeInTheDocument();
+expect(screen.getByRole('region', { name: 'Guided tour' })).not.toHaveTextContent('On the way…');
 ```
 
 ---

@@ -7,7 +7,9 @@ import { describe, expect, it } from 'vitest';
 import { SOURCES } from '../content/sources.ts';
 import { mountMission, screen, within, type User } from '../test/test-utils.ts';
 
+/** Open "Tell me more" on the card, then "Sources and credits" from the links at its end. */
 async function openCredits(user: User): Promise<HTMLElement> {
+  await user.click(screen.getByRole('button', { name: 'Tell me more' }));
   await user.click(screen.getByRole('button', { name: 'Sources and credits' }));
   return screen.getByRole('dialog', { name: 'Sources and credits' });
 }

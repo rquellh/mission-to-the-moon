@@ -5,7 +5,15 @@
  */
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-type IconName = 'play' | 'pause' | 'previous' | 'next' | 'chevron-down' | 'external';
+type IconName =
+  | 'play'
+  | 'pause'
+  | 'previous'
+  | 'next'
+  | 'chevron-down'
+  | 'chevron-up'
+  | 'close'
+  | 'external';
 
 const SHAPES: Record<IconName, { fill?: string[]; stroke?: string[] }> = {
   play: {
@@ -20,6 +28,8 @@ const SHAPES: Record<IconName, { fill?: string[]; stroke?: string[] }> = {
   previous: { stroke: ['M14.5 5.5 8 12l6.5 6.5'] },
   next: { stroke: ['M9.5 5.5 16 12l-6.5 6.5'] },
   'chevron-down': { stroke: ['M6.5 9.5 12 15l5.5-5.5'] },
+  'chevron-up': { stroke: ['M6.5 14.5 12 9l5.5 5.5'] },
+  close: { stroke: ['M6.5 6.5l11 11', 'M17.5 6.5l-11 11'] },
   external: {
     stroke: [
       'M13.5 5.5h5v5',

@@ -1,14 +1,7 @@
 import type { Player } from '../app/contract';
 import { copy } from '../content/copy';
 import { button, byId, el, setText } from './dom';
-import {
-  flightDay,
-  formatElapsed,
-  formatMonthDay,
-  formatTimeOfDay,
-  isBeforeLiftoff,
-  speakMissionTime,
-} from './format';
+import { flightDay, formatElapsed, isBeforeLiftoff, speakMissionTime } from './format';
 import { icon } from './icons';
 import type { MissionIndex } from './mission-index';
 
@@ -23,22 +16,25 @@ const SPEEDS: ReadonlyArray<{ rate: number; label: string }> = [
 const ARROW_STEP = 1 / 100;
 
 export interface Timeline {
-  /** Lock the controls while the guided tour drives the clock. */
+  /** Lock Play and the tools while the guided tour drives the clock. */
   setLocked(locked: boolean): void;
 }
 
 /**
- * Play and pause, the scrubber (in story time, with a tick for every event
- * and labeled chapters), the speed choice, and the mission clock.
+ * Play and pause on the moment card, with its progress strip (one segment
+ * per chapter) and, on a phone, its status (the chapter and the day); and
+ * the tools behind Controls: the mission clock, the scrubber (in story
+ * time, with a tick for every event and labeled chapters), the chapter
+ * menu, and the speed.
  */
 export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
-  const region = byId('timeline', HTMLElement);
   const play = byId('play', HTMLButtonElement);
   const met = byId('clock-met', HTMLSpanElement);
   const since = byId('clock-since', HTMLSpanElement);
   const day = byId('clock-day', HTMLSpanElement);
-  const utc = byId('clock-utc', HTMLSpanElement);
-  let shownUtc = '';
+  const progressStrip = byId('dock-progress', HTMLDivElement);
+  const chapterName = byId('dock-chapter', HTMLSpanElement);
+  const dayLine = byId('dock-day', HTMLSpanElement);
   const scrubber = byId('scrubber', HTMLDivElement);
   const ticks = byId('scrubber-ticks', HTMLDivElement);
   const input = byId('scrubber-input', HTMLInputElement);
@@ -151,6 +147,37 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
   );
   speedSelect.addEventListener('change', () => player.setRate(Number(speedSelect.value)));
 
+  /* The card's progress strip: a segment per chapter, as long as the chapter is in story time */
+  const segments = index.chapters.map((start, i) => {
+    const next = index.chapters[i + 1];
+    // The first segment also holds any story before the first chapter, so the strip covers it all.
+    const from = i === 0 ? 0 : fraction(start.seconds);
+    const to = next ? fraction(next.seconds) : 1;
+    const segment = el('span', 'dock__segment');
+    segment.style.setProperty('--span', String(Math.max(0, to - from)));
+    return { segment, from, to, fill: -1 };
+  });
+  progressStrip.replaceChildren(...segments.map(({ segment }) => segment));
+  const fillStrip = (progress: number): void => {
+    for (const part of segments) {
+      const length = part.to - part.from;
+      const fill =
+        length > 0
+          ? Math.min(1, Math.max(0, (progress - part.from) / length))
+          : progress >= part.to
+            ? 1
+            : 0;
+      // A thousandth is finer than a pixel on any screen; skip changes smaller than that.
+      const rounded = Math.round(fill * 1000) / 1000;
+      if (rounded === part.fill) continue;
+      part.fill = rounded;
+      part.segment.style.setProperty('--fill', String(rounded));
+    }
+  };
+
+  // How long the flight lasts in days, for "Day 5 of 9" on a phone's card.
+  const totalDays = flightDay(index.end);
+
   /* Keep everything in step with the clock -------------------------- */
   let shownEvent = -2;
   let shownChapter = -1;
@@ -173,19 +200,23 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
     current.classList.add('chapters__item--featured');
 
     // Measure every name before changing anything, so nothing is laid out twice.
-    // The natural width is the label's full text plus the padding before it.
+    // The natural width is the label's full text plus the padding on both sides,
+    // so a name short of room by a single pixel counts as cut off (it would end in "…").
     const rowWidth = chapterRow.clientWidth;
-    const boxes = chapterButtons.map((chapterButton) => ({
-      left: chapterButton.offsetLeft,
-      width: chapterButton.clientWidth,
-      natural:
-        (chapterButton.firstElementChild?.scrollWidth ?? 0) +
-        parseFloat(getComputedStyle(chapterButton).paddingLeft),
-    }));
+    const boxes = chapterButtons.map((chapterButton) => {
+      const style = getComputedStyle(chapterButton);
+      return {
+        left: chapterButton.offsetLeft,
+        width: chapterButton.clientWidth,
+        natural:
+          (chapterButton.firstElementChild?.scrollWidth ?? 0) +
+          parseFloat(style.paddingLeft) +
+          parseFloat(style.paddingRight),
+      };
+    });
     const box = boxes[featured]!;
-    const grows = box.natural > box.width + 1;
-    // The measured width leaves out the padding after the text, so add it back.
-    const grown = Math.ceil(box.natural + parseFloat(getComputedStyle(current).paddingRight)) + 1;
+    const grows = box.natural > box.width;
+    const grown = Math.ceil(box.natural) + 1;
     const shift = grows ? Math.min(0, rowWidth - (box.left + grown)) : 0;
     const currentLeft = box.left + shift;
     const currentRight = currentLeft + (grows ? grown : box.width);
@@ -193,7 +224,7 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
     chapterButtons.forEach((chapterButton, i) => {
       if (i === featured) return;
       const other = boxes[i]!;
-      const cutOff = other.natural > other.width + 1;
+      const cutOff = other.natural > other.width;
       const covered = grows && other.left < currentRight && other.left + other.width > currentLeft;
       chapterButton.classList.toggle('chapters__item--hidden', cutOff || covered);
     });
@@ -219,6 +250,7 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
     const progress = story.duration > 0 ? player.storyTime / story.duration : 0;
     scrubber.style.setProperty('--progress', String(progress));
     if (!dragging) input.value = String(player.storyTime);
+    fillStrip(progress);
 
     play.setAttribute('aria-label', player.playing ? copy.timeline.pause : copy.timeline.play);
     play.classList.toggle('play--playing', player.playing);
@@ -232,24 +264,15 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
     const dayNumber = index.countsDays ? flightDay(time) : null;
     day.hidden = dayNumber === null;
     setText(day, dayNumber === null ? '' : copy.timeline.day(dayNumber));
-    // "Jul 20, 1969 20:17:39 UTC". The year has its own span so a phone can
-    // leave it out to make room for the day (the header shows the year).
-    const date = index.utcAt(time);
-    const utcKey = date
-      ? `${formatMonthDay(date)}|${date.getUTCFullYear()}|${formatTimeOfDay(date)}`
-      : '';
-    if (utcKey !== shownUtc) {
-      shownUtc = utcKey;
-      if (date) {
-        utc.replaceChildren(
-          formatMonthDay(date),
-          el('span', 'clock__year', `, ${date.getUTCFullYear()}`),
-          ` ${formatTimeOfDay(date)} UTC`,
-        );
-      } else {
-        utc.replaceChildren();
-      }
-    }
+    // A phone's card says which chapter and day it is, or the time on a flight too short to count days.
+    const chapterNow = index.chapters[index.chapterAt(time)];
+    setText(chapterName, chapterNow?.chapter.title ?? '');
+    setText(
+      dayLine,
+      dayNumber !== null && totalDays !== null
+        ? copy.timeline.dayOf(dayNumber, totalDays)
+        : formatElapsed(time),
+    );
 
     const current = index.eventAt(time);
     if (current !== shownEvent) {
@@ -294,8 +317,8 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
   ];
   return {
     setLocked(locked) {
-      region.classList.toggle('timeline--locked', locked);
-      region.title = locked ? copy.timeline.lockedDuringTour : '';
+      // The tools are out of reach on the tour; Play stays on the card, resting, and says why.
+      play.title = locked ? copy.timeline.lockedDuringTour : '';
       for (const control of controls) control.disabled = locked;
       if (locked) endDrag();
     },
