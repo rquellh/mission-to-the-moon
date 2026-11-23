@@ -28,11 +28,14 @@ npm run build     # type-checks, then builds the site into dist/
 npm run preview   # serves dist/ locally to check the build
 npm run typecheck # type-check only
 npm run lint      # looks for common mistakes in the code (oxlint)
+npm run format    # rewrites every file in the project's format (oxfmt)
 npm test          # the content, flight math, and interface tests
 npm run test:e2e  # the browser tests
 ```
 
 The lint rules come from Cloudflare's preset (`@cloudflare/oxlint-config`), which includes the anti-slop rules and checks types as it goes. `oxlint.config.ts` lists the rules that are off here, and why. Every rule that is on is an error, so a clean run prints nothing.
+
+The format settings are in `oxfmt.config.ts`. They are the ones Cloudflare's oxlint-config repo uses for its own code: single quotes, sorted imports, and a sorted `package.json`. Everything else is oxfmt's default.
 
 The site uses relative paths, so `dist/` works from any subpath. Each mission, and the 3D code, is built as its own file and fetched only when needed.
 
