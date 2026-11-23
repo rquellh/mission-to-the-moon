@@ -15,7 +15,7 @@ import { byId, el, hiddenText, reducedMotionQuery } from './dom';
 import { setUpEventCard } from './event-card';
 import { setUpExtraSheet } from './extra-sheet';
 import { missionDates, speakMissionTime } from './format';
-import { setUpHub, type HubOptions, type HubTarget } from './hub';
+import { setUpHub, type HubOptions } from './hub';
 import { icon } from './icons';
 import { watchViewInsets } from './layout';
 import { setUpMemorial } from './memorial-dialog';
@@ -24,6 +24,7 @@ import { setUpSheet } from './sheet';
 import { setUpTimeline } from './timeline';
 import { focusTourNext, setUpTourPanel } from './tour-panel';
 import { setUpViewControls } from './view-controls';
+import { setUpWelcome, type WelcomeOptions } from './welcome';
 
 export interface InterfaceOptions {
   mission: Mission;
@@ -60,13 +61,13 @@ export interface InterfaceOptions {
 }
 
 export interface MissionInterface {
-  /** Show the mission picker over the 3D view, as the first thing a visitor sees, scrolled to an entry if one is named. */
-  welcome(reveal?: HubTarget): void;
-  /** Skip the picker and start exploring. */
+  /** Show the welcome over the 3D view, as the first thing a visitor sees. */
+  welcome(): void;
+  /** Skip the welcome and start exploring. */
   explore(): void;
-  /** Skip the picker and start the guided tour (or explore, if the mission has no tour). */
+  /** Skip the welcome and start the guided tour (or explore, if the mission has no tour). */
   tour(): void;
-  /** Open a memorial page, over the picker when it is showing. */
+  /** Open a memorial page, over the welcome when it is showing. */
   memorial(id: string): void;
   /** Open an extra in its full-screen sheet, with the address's other values as its params. */
   extra(id: string, params: URLSearchParams): void;
@@ -298,9 +299,23 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     },
   });
 
-  /* The mission picker ------------------------------------------------ */
-  // Starting a tour or exploring counts as a visit (the patch book reads it); the list alone does not.
+  /* The welcome ------------------------------------------------------- */
+  const welcomeOptions: WelcomeOptions = {
+    mission,
+    tourStops: tour.total,
+    summaries,
+    onTour: () => startTour(),
+    onExplore: () => startExploring(),
+    onAllMissions: (from) => openList(from),
+  };
+  // Without a 3D view, the welcome says so.
+  if (options.no3D) welcomeOptions.no3D = options.no3D;
+  const welcome = setUpWelcome(welcomeOptions);
+
+  // Starting a tour or exploring counts as a visit (the patch book reads it); the welcome and the list alone do not.
+  // The welcome goes first, so the interface is back on the screen before focus moves into it.
   const startTour = (): void => {
+    welcome.hide();
     recordVisit(mission.id);
     if (tour.total === 0) {
       explore();
@@ -312,6 +327,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     remeasure();
   };
   const startExploring = (): void => {
+    welcome.hide();
     recordVisit(mission.id);
     explore();
     remeasure();
@@ -340,12 +356,12 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     },
   });
 
-  // Reopening the picker pauses the clock; closing it without a choice plays on.
+  /* The mission list -------------------------------------------------- */
+  // Opening the list pauses the clock; closing it without a choice plays on.
   let resumeAfterHub = false;
   const memorials = setUpMemorial({ load: loadMemorial, nameOf, addressOf });
   const hubOptions: HubOptions = {
     currentId: mission.id,
-    currentName: mission.name,
     summaries,
     isDraft,
     onMemorial: (id, from) => memorials.open(id, from),
@@ -359,16 +375,17 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
       resumeAfterHub = false;
     },
   };
-  // Without a 3D view, the picker opens with a line that says so.
+  // Without a 3D view, the list opens with a line that says so.
   if (options.no3D) hubOptions.lede = copy.hub.ledeNo3D;
   const hub = setUpHub(hubOptions);
-  hubButton.addEventListener('click', () => {
+  const openList = (from: HTMLElement): void => {
     // A tour on its way to a stop arrives there when the clock pauses.
     resumeAfterHub = player.playing && !tour.active;
     player.pause();
     pauseAllAudio();
-    hub.open(hubButton);
-  });
+    hub.open(from);
+  };
+  hubButton.addEventListener('click', () => openList(hubButton));
 
   /* Tell the scene what the interface covers ------------------------- */
   const remeasure = watchViewInsets(
@@ -377,31 +394,27 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
       { element: byId('views', HTMLDivElement), side: 'top' },
       { element: byId('sheet', HTMLElement), side: (wide) => (wide ? 'right' : 'bottom') },
       { element: byId('timeline', HTMLElement), side: 'bottom' },
-      // The picker frames the view only as the welcome; reopened, it sits over everything.
-      {
-        element: byId('hub', HTMLDialogElement),
-        side: (wide) => (hub.mode !== 'welcome' ? null : wide ? 'right' : 'bottom'),
-      },
+      // The welcome: beside the view on a wide screen, under it on a phone. It counts only
+      // while it shows, and the rest of the interface is hidden then.
+      { element: byId('welcome', HTMLElement), side: (wide) => (wide ? 'right' : 'bottom') },
     ],
     (insets) => director.setViewInsets(insets),
   );
 
   return {
-    welcome(reveal) {
-      hub.welcome(reveal);
+    welcome() {
+      welcome.show();
       remeasure();
     },
     explore: startExploring,
     tour: startTour,
     memorial(id) {
-      // Over the picker, focus goes back to the entry's Read button when the page closes.
-      const from = hub.mode ? hub.actionFor({ mission: id }) : null;
-      memorials.open(id, from);
+      // Over the welcome, focus goes to "All missions" when the page closes.
+      memorials.open(id, welcome.showing ? welcome.allMissions : null);
     },
     extra(id, params) {
-      // Over the picker, focus goes back to the entry's Open button when the sheet closes.
-      const from = hub.mode ? hub.actionFor({ extra: id }) : null;
-      extraSheet.open(id, params, from);
+      // Over the welcome, focus goes to "All missions" when the sheet closes.
+      extraSheet.open(id, params, welcome.showing ? welcome.allMissions : null);
     },
   };
 }

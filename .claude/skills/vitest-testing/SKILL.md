@@ -175,7 +175,7 @@ It does not hand out the player or the tour: a test reads the clock and the tour
 
 ### Basic Mount
 
-Without options the visit begins as a plain address does, with the welcome (the mission list):
+Without options the visit begins as a plain address does, with the welcome (the mission on show, with Take the tour, Explore on my own, and All missions):
 
 ```ts
 await mountMission('apollo-11');
@@ -366,7 +366,7 @@ expect(navigation.reloaded).toBe(true);
 The stand-ins act like the browser, so tests use dialogs the way a visitor does: press the opener, read the dialog by its name, close it with Close or Escape.
 
 ```ts
-it('puts the visitor back where they were when the reopened list closes', async () => {
+it('puts the visitor back where they were when the list closes', async () => {
   const { user } = await mountMission('apollo-11', { start: 'explore' });
   const missionName = screen.getByRole('button', { name: /all missions$/ });
   await user.click(missionName);
@@ -374,13 +374,15 @@ it('puts the visitor back where they were when the reopened list closes', async 
 
   await user.keyboard('{Escape}');
 
-  expect(screen.queryByRole('dialog', { name: 'Mission to the Moon' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('dialog', { name: 'All missions' })).not.toBeInTheDocument();
   expect(document.title).toBe('Apollo 11 · Mission to the Moon');
   expect(missionName).toHaveFocus();
 });
 ```
 
 A closed `<dialog>` is `display: none`, so its contents drop out of role queries, as they do for a screen reader.
+
+The welcome is not a dialog: it is a region named by its heading ("Ride along on Apollo 11"), and once the visitor chooses a way in it is `hidden`, so it drops out of role queries too. Escape on the welcome means Explore on my own, unless a dialog (the mission list, a memorial page, an extra) is open over it; then the dialog takes it.
 
 ### Per-Test Overrides for Loading States
 
@@ -640,10 +642,11 @@ Use the highest-priority query that works:
 
 ```ts
 // Dialogs, by their titles
-screen.getByRole('dialog', { name: 'Mission to the Moon' }); // the mission list
+screen.getByRole('dialog', { name: 'All missions' }); // the mission list
 screen.getByRole('dialog', { name: 'About Apollo 11' });
 
 // Landmarks and groups named in index.html
+screen.getByRole('region', { name: 'Ride along on Apollo 11' }); // the welcome, by its heading
 screen.getByRole('region', { name: 'Timeline' });
 screen.getByRole('region', { name: 'Guided tour' });
 screen.getByRole('group', { name: 'Look at' });
@@ -685,7 +688,7 @@ The interface answers a click, a key, a frame, or a fake's call at once. Assert 
 ```ts
 await user.click(screen.getByRole('button', { name: 'Take the tour of Apollo 11' }));
 
-expect(screen.queryByRole('dialog', { name: 'Mission to the Moon' })).not.toBeInTheDocument();
+expect(screen.queryByRole('dialog', { name: 'All missions' })).not.toBeInTheDocument();
 expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 1 of 12');
 expect(navigation.address).toBeNull();
 ```

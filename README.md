@@ -25,12 +25,14 @@ flights practiced the hard parts in Earth orbit. Eleven Apollo flights then test
 went around the Moon, and landed on it six times. Mission to the Moon lets you ride along on
 every one of them.
 
-Pick a mission and press play, or drag the timeline. The clock shows real mission time, and the
-trip is paced so every stretch is worth watching: you get the burns, the dockings, and the
-landings, without the days of coasting in between. Take the **Tour** to step through a mission's
-key moments, or **Explore** and roam on your own. Drag to turn the view, pinch or scroll to zoom,
-and choose what the camera follows: Earth, the ship, or the Moon. **True scale** shows how far
-apart everything really is.
+The site opens on one flight: Apollo 11, unless a link names another. **Take the tour** to step
+through its key moments, or **Explore on my own** and roam. **All missions** lists every flight.
+
+Press play, or drag the timeline. The clock shows real mission time, and the trip is paced so
+every stretch is worth watching: you get the burns, the dockings, and the landings, without the
+days of coasting in between. Drag to turn the view, pinch or scroll to zoom, and choose what the
+camera follows: Earth, the ship, or the Moon. **True scale** shows how far apart everything
+really is.
 
 Each moment has a short card, a longer "Tell me more", a NASA photo where there is one, and the
 sources it came from. A few carry a real NASA recording of the moment, with every word written out

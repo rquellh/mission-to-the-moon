@@ -120,7 +120,7 @@ function address(place: Place): string {
 
 /** The addresses specs open. Each puts the site straight where the test begins. */
 export const URLS = {
-  /** The welcome: the mission list over the mission's 3D view. */
+  /** The welcome: the mission on show, and the ways in, over its 3D view. */
   WELCOME: (mission: string) => address({ mission }),
   /** The guided tour, from its first stop. */
   TOUR: (mission: string) => address({ mission, start: 'tour' }),

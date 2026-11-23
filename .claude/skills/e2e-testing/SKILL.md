@@ -47,12 +47,12 @@ The id in a dynamic test id is always a content id: a mission id (`apollo-11`), 
 
 Pattern: `{component}-{entity-id?}-{element}`
 
-| Type              | Pattern                      | Example                                                                              |
-| ----------------- | ---------------------------- | ------------------------------------------------------------------------------------ |
-| Container         | `{component}`                | `tour-panel`, `event-card`, `hub`, `extra-sheet`, `about-dialog`                     |
-| Container element | `{component}-{element}`      | `tour-next`, `event-card-title`, `timeline-play`, `clock-time`, `about-dialog-close` |
-| Dynamic container | `{component}-{id}`           | `hub-mission-apollo-11`, `view-button-moon`, `chapter-landing`, `tour-dot-liftoff`   |
-| Dynamic child     | `{component}-{id}-{element}` | `hub-mission-apollo-11-tour`, `hub-mission-apollo-1-read`, `hub-extra-stages-open`   |
+| Type              | Pattern                      | Example                                                                                                                      |
+| ----------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Container         | `{component}`                | `welcome`, `tour-panel`, `event-card`, `hub`, `extra-sheet`, `about-dialog`                                                  |
+| Container element | `{component}-{element}`      | `welcome-tour`, `welcome-all-missions`, `tour-next`, `event-card-title`, `timeline-play`, `clock-time`, `about-dialog-close` |
+| Dynamic container | `{component}-{id}`           | `hub-mission-apollo-11`, `view-button-moon`, `chapter-landing`, `tour-dot-liftoff`                                           |
+| Dynamic child     | `{component}-{id}-{element}` | `hub-mission-apollo-11-tour`, `hub-mission-apollo-1-read`, `hub-extra-stages-open`                                           |
 
 `<body data-testid="site">` is the page itself: it carries the state classes `is-ready`, `is-welcome`, `is-touring`, and `no-3d`.
 
@@ -63,7 +63,6 @@ Pattern: `{component}-{entity-id?}-{element}`
 | `site` (body)                        | classes `is-ready`, `is-welcome`, `is-touring`, `no-3d` |
 | `tour-panel`                         | `data-phase`: `off`, `traveling`, `stopped`, `finished` |
 | `sheet`                              | `data-state`: `compact`, `expanded`                     |
-| `hub`                                | `data-mode`: `welcome`, `return`                        |
 | `extra-sheet`                        | `data-extra`: the open extra's id                       |
 | `view-button-<view>`, `scale-toggle` | `aria-pressed`                                          |
 | `timeline-play`                      | `aria-label`: `Play`, `Pause`                           |
@@ -251,16 +250,17 @@ async skipTrip(): Promise<void> {
 
 Each page object is the documentation of the test ids in its part of the site. Keep every locator, used or not.
 
-| Page object      | Part of the site                                                                        | Methods                     |
-| ---------------- | --------------------------------------------------------------------------------------- | --------------------------- |
-| `MissionPage`    | `site`, header, view buttons and True scale, caption, the no-3D note, loading, messages | `waitForLoad()`             |
-| `ScenePage`      | the canvas, and the scene report                                                        | `waitForLoad()`, `report()` |
-| `TourPanelPage`  | the tour panel and its ending                                                           | `skipTrip()`                |
-| `EventCardPage`  | the card and the sheet it sits in                                                       | none                        |
-| `TimelinePage`   | Play, the clock, the scrubber, chapters, speed                                          | none                        |
-| `HubPage`        | the mission list (welcome and reopened)                                                 | `waitForLoad()`             |
-| `DialogsPage`    | About this mission, How this is drawn, Sources and credits, a memorial page             | none                        |
-| `ExtraSheetPage` | the full-screen sheet an extra opens in                                                 | `waitForLoad()`             |
+| Page object      | Part of the site                                                                                 | Methods                     |
+| ---------------- | ------------------------------------------------------------------------------------------------ | --------------------------- |
+| `MissionPage`    | `site`, header, view buttons and True scale, caption, the no-3D note, loading, messages          | `waitForLoad()`             |
+| `ScenePage`      | the canvas, and the scene report                                                                 | `waitForLoad()`, `report()` |
+| `TourPanelPage`  | the tour panel and its ending                                                                    | `skipTrip()`                |
+| `EventCardPage`  | the card and the sheet it sits in                                                                | none                        |
+| `TimelinePage`   | Play, the clock, the scrubber, chapters, speed                                                   | none                        |
+| `WelcomePage`    | the welcome: the mission on show, Take the tour, Explore on my own, All missions, the no-3D note | `waitForLoad()`             |
+| `HubPage`        | the mission list, opened from the welcome or the header                                          | `waitForLoad()`             |
+| `DialogsPage`    | About this mission, How this is drawn, Sources and credits, a memorial page                      | none                        |
+| `ExtraSheetPage` | the full-screen sheet an extra opens in                                                          | `waitForLoad()`             |
 
 ---
 
@@ -493,7 +493,7 @@ await expect(tourPage.panel).toHaveAttribute('data-phase', 'stopped', { timeout:
 
 ## 5. Setting Up Through the Address, and Reading the Scene
 
-There is no API to set data up with. The counterpart is the address: a deep link puts the site at any mission, moment, and view at once (`src/app/deep-link.ts` lists every value). **NEVER set a starting place up through the interface.** Clicking through the welcome to reach a mission's 3D view is slow and tests the welcome by accident; only a test of that journey (`explore.test.ts`) does it.
+There is no API to set data up with. The counterpart is the address: a deep link puts the site at any mission, moment, and view at once (`src/app/deep-link.ts` lists every value). **NEVER set a starting place up through the interface.** Clicking through the welcome to reach a mission's 3D view is slow and tests the welcome by accident; only the tests of those journeys (`welcome.test.ts`, `explore.test.ts`) do it. The mission list has no address of its own, so a test that needs it opens it from the welcome's All missions (`missions.test.ts`).
 
 ### URLS (tests/utils/vars.ts)
 
@@ -509,7 +509,7 @@ function address(place: Place): string {
 
 /** The addresses specs open. Each puts the site straight where the test begins. */
 export const URLS = {
-  /** The welcome: the mission list over the mission's 3D view. */
+  /** The welcome: the mission on show, and the ways in, over its 3D view. */
   WELCOME: (mission: string) => address({ mission }),
   /** The guided tour, from its first stop. */
   TOUR: (mission: string) => address({ mission, start: 'tour' }),
@@ -670,9 +670,9 @@ async waitForLoad(): Promise<void> {
 Wait for the **observable effect**, not for time to pass:
 
 ```typescript
-// After choosing Explore - the welcome closes
-await hubPage.missionExplore(MISSIONS.DEFAULT).click();
-await expect(hubPage.hub).toBeHidden();
+// After choosing Explore on my own - the welcome closes
+await welcomePage.explore.click();
+await expect(welcomePage.welcome).toBeHidden();
 await expect(missionPage.site).not.toHaveClass(/\bis-welcome\b/);
 
 // After Next - the tour sets off, then arrives by itself
@@ -739,12 +739,13 @@ tests/
 ├── e2e/                        # Specs
 │   ├── deep-links.test.ts      # A deep link opens the right place (desktop)
 │   ├── dialogs.test.ts         # A dialog opens and gives focus back
-│   ├── explore.test.ts         # Choose Explore, look through the views, True scale, Play
+│   ├── explore.test.ts         # Choose Explore on my own, look through the views, True scale, Play
 │   ├── extras.test.ts          # Every extra opens and closes (desktop)
 │   ├── missions.test.ts        # Every mission opens in the Ship view (desktop)
 │   ├── no-webgl.test.ts        # Without WebGL the mission can still be read (desktop)
 │   ├── scene.test.ts           # What the scene draws, at moments it has drawn wrong before
 │   ├── tour.test.ts            # Take the guided tour
+│   ├── welcome.test.ts         # Arrive: the scene framed beside the welcome, All missions and back, take the tour
 │   ├── report/                 # HTML report (git-ignored)
 │   └── results/                # Traces of failed tests (git-ignored)
 ├── pages/                      # Page objects (locators + complex methods)
@@ -755,7 +756,8 @@ tests/
 │   ├── MissionPage.ts
 │   ├── ScenePage.ts
 │   ├── TimelinePage.ts
-│   └── TourPanelPage.ts
+│   ├── TourPanelPage.ts
+│   └── WelcomePage.ts
 ├── fixtures/
 │   └── index.ts                # sitePage: fails a test on console errors and uncaught errors
 ├── utils/
@@ -788,7 +790,7 @@ npm run test:e2e -- --project=chrome-desktop tests/e2e/scene.test.ts
 npm run test:e2e -- --grep "Deep links"
 ```
 
-The config starts the server itself and reuses one that is already running. It drives the installed Google Chrome, so there is nothing to download: never run `npx playwright install`. The whole suite runs 46 tests (39 on the desktop, 7 on the phone, where the desktop-only ones are skipped) in about 50 seconds on a laptop; most of that is drawing 3D scenes in software.
+The config starts the server itself and reuses one that is already running. It drives the installed Google Chrome, so there is nothing to download: never run `npx playwright install`. The whole suite runs 48 tests (40 on the desktop, 8 on the phone, where the desktop-only ones are skipped) in about 50 seconds on a laptop; most of that is drawing 3D scenes in software.
 
 ---
 

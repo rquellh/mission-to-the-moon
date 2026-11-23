@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures';
 import { HubPage } from '../pages/HubPage';
 import { MissionPage } from '../pages/MissionPage';
 import { ScenePage } from '../pages/ScenePage';
+import { WelcomePage } from '../pages/WelcomePage';
 import { followedShip } from '../utils/scene-report';
 import { FLIGHT_IDS, MISSIONS, URLS } from '../utils/vars';
 
@@ -16,11 +17,15 @@ test.describe('Every mission opens', () => {
 
   test('the flight list here matches the mission list on the site', async ({ sitePage }) => {
     const missionPage = new MissionPage(sitePage);
+    const welcomePage = new WelcomePage(sitePage);
     const hubPage = new HubPage(sitePage);
 
-    await test.step('Open the mission list', async () => {
+    // The list has no address of its own, so it is opened the way a visitor opens it.
+    await test.step('Open the mission list from the welcome', async () => {
       await sitePage.goto(URLS.WELCOME(MISSIONS.DEFAULT));
       await missionPage.waitForLoad();
+      await welcomePage.waitForLoad();
+      await welcomePage.allMissions.click();
       await hubPage.waitForLoad();
     });
 

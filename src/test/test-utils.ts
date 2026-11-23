@@ -52,8 +52,8 @@ export type User = ReturnType<typeof userEvent.setup>;
 
 export interface MountOptions {
   /**
-   * How the visit begins, as the address's `start=` does: the mission list
-   * (the default, as a plain address opens), the guided tour, or exploring.
+   * How the visit begins, as the address's `start=` does: the welcome (the
+   * default, as a plain address opens), the guided tour, or exploring.
    */
   start?: 'welcome' | 'tour' | 'explore';
   /** Open paused at this event of the mission and explore from there, as `?event=` does. */

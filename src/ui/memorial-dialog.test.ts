@@ -17,8 +17,14 @@ import {
   type User,
 } from '../test/test-utils.ts';
 
-const openApollo1 = (user: User): Promise<void> =>
+const readApollo1 = (user: User): Promise<void> =>
   user.click(screen.getByRole('button', { name: 'Read about Apollo 1' }));
+
+/** Open the mission list from the welcome, then Apollo 1's page from the list. */
+async function openApollo1(user: User): Promise<void> {
+  await user.click(screen.getByRole('button', { name: 'All missions' }));
+  await readApollo1(user);
+}
 
 describe('the memorial page', () => {
   describe('loading', () => {
@@ -124,7 +130,7 @@ describe('the memorial page', () => {
       await user.keyboard('{Escape}');
 
       expect(screen.queryByRole('dialog', { name: 'Apollo 1' })).not.toBeInTheDocument();
-      expect(screen.getByRole('dialog', { name: 'Mission to the Moon' })).toBeVisible();
+      expect(screen.getByRole('dialog', { name: 'All missions' })).toBeVisible();
     });
 
     it('ignores a page that arrives after it was closed', async () => {
@@ -135,8 +141,12 @@ describe('the memorial page', () => {
         loadMemorial: () => (answers.shift() ?? later<Memorial>()).promise,
       });
       await openApollo1(user);
-      await user.click(screen.getByRole('button', { name: 'Close' }));
-      await openApollo1(user);
+      await user.click(
+        within(screen.getByRole('dialog', { name: 'Apollo 1' })).getByRole('button', {
+          name: 'Close',
+        }),
+      );
+      await readApollo1(user);
       const page = screen.getByRole('dialog', { name: 'Apollo 1' });
 
       closedEarly.resolve(await loadMemorial('apollo-1'));

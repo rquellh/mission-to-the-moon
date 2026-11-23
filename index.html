@@ -214,7 +214,71 @@
       </section>
     </div>
 
-    <!-- The mission picker: the welcome, and reopened from the mission's name in the header. -->
+    <!-- The welcome: the first thing a visitor sees. The mission on show, the ways into it, and "All missions". -->
+    <section
+      class="welcome"
+      id="welcome"
+      hidden
+      aria-labelledby="welcome-title"
+      data-testid="welcome"
+    >
+      <p class="welcome__site" id="welcome-site">Mission to the Moon</p>
+      <div class="welcome__body">
+        <div class="welcome__intro">
+          <h2
+            class="welcome__title"
+            id="welcome-title"
+            tabindex="-1"
+            data-testid="welcome-title"
+          ></h2>
+          <p class="welcome__summary" id="welcome-summary" data-testid="welcome-summary"></p>
+          <p class="welcome__dates" id="welcome-dates" data-testid="welcome-dates"></p>
+          <!-- Without a 3D view, the note that says so (and Reload, when it may help). -->
+          <p class="welcome__note" id="welcome-note" hidden data-testid="welcome-note"></p>
+        </div>
+        <div class="welcome__actions">
+          <!-- The line under "Take the tour" sits inside the button on a phone and under both buttons on a wide screen. -->
+          <button
+            type="button"
+            class="button button--primary button--large welcome__tour"
+            id="welcome-tour"
+            aria-labelledby="welcome-tour-label"
+            aria-describedby="welcome-tour-stops"
+            data-testid="welcome-tour"
+          >
+            <span class="welcome__tour-text">
+              <span class="welcome__tour-label" id="welcome-tour-label">Take the tour</span>
+              <span class="welcome__stops" id="welcome-tour-stops"></span>
+            </span>
+          </button>
+          <button
+            type="button"
+            class="button button--quiet button--large welcome__explore"
+            id="welcome-explore"
+            data-testid="welcome-explore"
+          >
+            Explore on my own
+          </button>
+        </div>
+        <button
+          type="button"
+          class="welcome__all"
+          id="welcome-all-missions"
+          aria-haspopup="dialog"
+          aria-labelledby="welcome-all-missions-name"
+          aria-describedby="welcome-all-missions-line"
+          data-testid="welcome-all-missions"
+        >
+          <span class="welcome__all-text">
+            <span class="welcome__all-name" id="welcome-all-missions-name">All missions</span>
+            <span class="welcome__all-line" id="welcome-all-missions-line"></span>
+          </span>
+          <span class="welcome__count" id="welcome-all-missions-count" aria-hidden="true"></span>
+        </button>
+      </div>
+    </section>
+
+    <!-- The list of every mission, opened from the welcome and from the mission's name in the header. -->
     <dialog
       class="hub"
       id="hub"
@@ -224,16 +288,13 @@
     >
       <div class="hub__head">
         <div class="hub__intro">
-          <h2 class="hub__title" id="hub-title" tabindex="-1" data-testid="hub-title">
-            Mission to the Moon
-          </h2>
+          <h2 class="hub__title" id="hub-title" data-testid="hub-title">All missions</h2>
           <p class="hub__lede" id="hub-lede" data-testid="hub-lede"></p>
         </div>
         <button
           type="button"
           class="button button--quiet hub__close"
           id="hub-close"
-          hidden
           data-testid="hub-close"
         >
           Close

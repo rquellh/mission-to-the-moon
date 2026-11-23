@@ -30,14 +30,15 @@ describe('the mission interface', () => {
       expect(screen.getByRole('button', { name: 'Sources and credits' })).toBeInTheDocument();
     });
 
-    it('welcomes the visitor with the mission list', async () => {
+    it('welcomes the visitor with the mission on show, and keeps the rest back until they choose', async () => {
       await mountMission('apollo-11');
 
-      const list = screen.getByRole('dialog', { name: 'Mission to the Moon' });
-      expect(list).toBeVisible();
+      const welcome = screen.getByRole('region', { name: 'Ride along on Apollo 11' });
+      expect(welcome).toBeVisible();
       expect(
-        within(list).getByRole('heading', { level: 2, name: 'Mission to the Moon' }),
+        within(welcome).getByRole('heading', { level: 2, name: 'Ride along on Apollo 11' }),
       ).toHaveFocus();
+      expect(document.body).toHaveClass('is-welcome');
       expect(document.title).toBe('Mission to the Moon');
     });
   });
@@ -46,9 +47,8 @@ describe('the mission interface', () => {
     it('starts at the first event with Play ready to press', async () => {
       const { user } = await mountMission('apollo-11');
 
-      await user.click(screen.getByRole('button', { name: 'Explore Apollo 11' }));
+      await user.click(screen.getByRole('button', { name: 'Explore on my own' }));
 
-      expect(screen.queryByRole('dialog', { name: 'Mission to the Moon' })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Play' })).toHaveFocus();
       const timeline = screen.getByRole('region', { name: 'Timeline' });
       expect(within(timeline).getByText('00:00:00')).toBeInTheDocument();
@@ -72,7 +72,7 @@ describe('the mission interface', () => {
 
       await user.click(screen.getByRole('button', { name: /all missions$/ }));
 
-      expect(screen.getByRole('dialog', { name: 'Mission to the Moon' })).toBeVisible();
+      expect(screen.getByRole('dialog', { name: 'All missions' })).toBeVisible();
       expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: 'Close' }));
@@ -135,14 +135,21 @@ describe('the mission interface', () => {
 
   describe('without a 3D view', () => {
     it('shows the note in its place, leaves out the view buttons, and says so in the mission list', async () => {
-      await mountMission('gemini-8', { no3D: { note: copy.errors.noWebGL, offerReload: false } });
+      const { user } = await mountMission('gemini-8', {
+        no3D: { note: copy.errors.noWebGL, offerReload: false },
+        start: 'explore',
+      });
 
-      expect(screen.getByText(copy.errors.noWebGL)).toBeVisible();
+      // The welcome says it too, but it has gone by now.
+      const [inPlace, onTheWelcome] = screen.getAllByText(copy.errors.noWebGL);
+      expect(inPlace).toBeVisible();
+      expect(onTheWelcome).not.toBeVisible();
       expect(screen.queryByRole('button', { name: 'Earth' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument();
-      expect(
-        screen.getByRole('dialog', { name: 'Mission to the Moon' }),
-      ).toHaveAccessibleDescription(
+
+      await user.click(screen.getByRole('button', { name: /all missions$/ }));
+
+      expect(screen.getByRole('dialog', { name: 'All missions' })).toHaveAccessibleDescription(
         /^Choose a flight and follow it, from liftoff to splashdown\. This browser can’t show the 3D view/,
       );
     });

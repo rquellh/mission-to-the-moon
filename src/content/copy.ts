@@ -2,6 +2,12 @@ import { EARTH_MOON_DISTANCE_IN_EARTH_WIDTHS } from './physical-constants';
 
 const SITE_TITLE = 'Mission to the Moon';
 
+/** The name of the list of every mission, wherever a button opens it. */
+const ALL_MISSIONS = 'All missions';
+
+/** Leaving the guided way in to roam the mission freely. */
+const EXPLORE_ON_MY_OWN = 'Explore on my own';
+
 /** How to move the 3D view, the second half of the canvas label. */
 const CANVAS_CONTROLS =
   'Drag or swipe to turn the view; scroll or pinch to zoom. When focused, arrow keys turn the view and the plus and minus keys zoom.';
@@ -29,8 +35,24 @@ export const copy = {
   loading: 'Loading the 3D view…',
   loadingMission: (missionName: string) => `Loading ${missionName}…`,
 
-  /** The mission picker: the first thing a visitor sees, and reachable from the header. */
+  /** The first screen: the mission on show, the ways into it, and the way to every other mission. */
+  welcome: {
+    title: (missionName: string) => `Ride along on ${missionName}`,
+    tour: 'Take the tour',
+    /** Under "Take the tour": how many stops the tour makes. */
+    stops: (count: number) =>
+      `${count} ${count === 1 ? 'stop' : 'stops'}, from liftoff to splashdown`,
+    explore: EXPLORE_ON_MY_OWN,
+    allMissions: ALL_MISSIONS,
+    /** Under "All missions": the programs and the years the list covers, for example "Gemini and Apollo, 1965 to 1972". */
+    span: (programs: string, years: string) => `${programs}, ${years}`,
+    /** The number beside "All missions", read out. */
+    count: (count: number) => `${count} ${count === 1 ? 'mission' : 'missions'}`,
+  },
+
+  /** The list of every mission: opened from the welcome, and from the mission's name in the header. */
   hub: {
+    title: ALL_MISSIONS,
     lede: 'Choose a flight and ride along in 3D, from liftoff to splashdown.',
     /** The same, when this browser has no 3D view. */
     ledeNo3D:
@@ -89,7 +111,7 @@ export const copy = {
     sourcesFull: 'Sources and credits',
     /** Spoken after the mission's name on the button that opens the mission picker. */
     missions: 'all missions',
-    missionsHint: 'All missions',
+    missionsHint: ALL_MISSIONS,
   },
 
   views: {
@@ -197,7 +219,7 @@ export const copy = {
     endTitle: 'That’s the tour!',
     endText:
       'Now it’s your turn. Press play, drag the timeline, or pick a chapter. Use the arrows on each card to step through every event.',
-    endExplore: 'Explore on my own',
+    endExplore: EXPLORE_ON_MY_OWN,
     endAgain: 'Start the tour again',
     ended: 'Tour ended. You are exploring on your own.',
   },
@@ -302,6 +324,6 @@ export const copy = {
       `${missionName} did not load. Check your connection and reload the page, or choose another mission.`,
     missionUnnamed:
       'This mission did not load. Check your connection and reload the page, or choose another mission.',
-    allMissions: 'All missions',
+    allMissions: ALL_MISSIONS,
   },
 } as const;

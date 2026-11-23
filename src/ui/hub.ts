@@ -4,19 +4,9 @@ import type { ExtraMeta } from '../extras/types';
 import { button, byId, el, hiddenText } from './dom';
 import { formatYears, summaryDates, yearOf } from './format';
 
-export type HubMode = 'welcome' | 'return';
-
-/** An entry in the list: a mission (or memorial) or an extra. */
-export type HubTarget = { mission: string } | { extra: string };
-
-const keyOf = (target: HubTarget): string =>
-  'mission' in target ? `mission:${target.mission}` : `extra:${target.extra}`;
-
 export interface HubOptions {
   /** The flight whose scene is loaded behind the hub, or null when none could be loaded. */
   currentId: string | null;
-  /** Its name, for the page title once the hub closes. */
-  currentName?: string;
   /** The opening line, when it should differ from the usual one (without a 3D view). */
   lede?: string;
   /** The mission list, in date order. */
@@ -27,7 +17,7 @@ export interface HubOptions {
   onTour(): void;
   /** Explore the loaded mission, in place. */
   onExplore(): void;
-  /** The hub closed without a choice after being reopened: carry on where the visitor was. */
+  /** The hub closed without a choice: carry on where the visitor was. */
   onReturn(): void;
   /** Open a memorial page over the hub; focus goes back to `from` when it closes. */
   onMemorial(id: string, from: HTMLElement): void;
@@ -41,21 +31,11 @@ export interface HubOptions {
 
 export interface Hub {
   /**
-   * The first thing a visitor sees, over the bare 3D view. The rest of the
-   * interface is hidden; the 3D view can still be turned. Leaving without a
-   * choice (Escape) explores the loaded mission. The list scrolls to the
-   * entry `reveal` names, or to the loaded mission.
-   */
-  welcome(reveal?: HubTarget): void;
-  /**
-   * Reopen over the interface as a modal dialog. Leaving without a choice
-   * (Close, Escape, or a click outside) returns to where the visitor was.
+   * Open as a modal dialog over the page, scrolled to the loaded mission.
+   * Leaving without a choice (Close, Escape, or a click outside) returns to
+   * where the visitor was, with focus on `returnTo`.
    */
   open(returnTo: HTMLElement): void;
-  /** How the hub is open now, or null when it is closed. */
-  readonly mode: HubMode | null;
-  /** The button that opens an entry (Explore, Read, or Open), so focus can come back to it. */
-  actionFor(target: HubTarget): HTMLButtonElement | null;
 }
 
 /**
@@ -107,15 +87,13 @@ function programHeading(program: Program, group: readonly MissionSummary[]): HTM
  * follow in two small, quieter groups and open over the page in place.
  */
 export function setUpHub(options: HubOptions): Hub {
-  const { currentId, currentName, summaries, isDraft, onTour, onExplore, onReturn, onMemorial } =
-    options;
+  const { currentId, summaries, isDraft, onTour, onExplore, onReturn, onMemorial } = options;
   const { extras, isExtraDraft, onExtra } = options;
   const dialog = byId('hub', HTMLDialogElement);
-  const title = byId('hub-title', HTMLHeadingElement);
   const list = byId('hub-list', HTMLDivElement);
   const closeButton = byId('hub-close', HTMLButtonElement);
 
-  title.textContent = copy.siteTitle;
+  byId('hub-title', HTMLHeadingElement).textContent = copy.hub.title;
   const memorials = summaries
     .filter((summary) => summary.kind === 'memorial')
     .map((summary) => summary.name);
@@ -126,29 +104,25 @@ export function setUpHub(options: HubOptions): Hub {
   byId('hub-lede', HTMLParagraphElement).textContent = lede;
   closeButton.textContent = copy.close;
 
-  let mode: HubMode | null = null;
+  let isOpen = false;
   let choice: (() => void) | null = null;
   let returnTo: HTMLElement | null = null;
+  // While the hub is open the tab shows the site's title; closing gives it back what it said before.
+  let titleBefore = '';
 
   /**
    * Put the page back after the hub closes, then do what was chosen, or what
    * leaving without a choice means. Runs once per opening.
    */
   const finish = (): void => {
-    if (mode === null) return;
-    const was = mode;
+    if (!isOpen) return;
     const action = choice;
-    mode = null;
+    isOpen = false;
     choice = null;
-    dialog.dataset['mode'] = '';
-    document.body.classList.remove('is-welcome');
-    document.removeEventListener('keydown', onKey);
-    document.title = currentName ? copy.pageTitle(currentName) : copy.siteTitle;
+    document.title = titleBefore;
 
     if (action) {
       action();
-    } else if (was === 'welcome') {
-      onExplore();
     } else {
       if (returnTo?.isConnected) returnTo.focus();
       onReturn();
@@ -169,26 +143,18 @@ export function setUpHub(options: HubOptions): Hub {
     close();
   };
 
-  const onKey = (event: KeyboardEvent): void => {
-    // The welcome is not modal, so Escape is handled here rather than by the
-    // browser. A dialog open over it (a memorial page) takes Escape for itself.
-    if (event.key !== 'Escape' || mode !== 'welcome') return;
-    if (document.querySelector('dialog.dialog[open]')) return;
-    event.preventDefault();
-    close();
-  };
-
   /* The list ---------------------------------------------------------- */
-  const entries = new Map<string, HTMLLIElement>();
-  const actions = new Map<string, HTMLButtonElement>();
+  let loaded: HTMLLIElement | null = null;
 
   const entry = (shown: MissionSummary): HTMLLIElement => {
     const memorial = shown.kind === 'memorial';
     const item = el('li', memorial ? 'hub__entry hub__entry--memorial' : 'hub__entry');
     item.setAttribute('data-testid', `hub-mission-${shown.id}`);
     const isCurrent = shown.id === currentId;
-    if (isCurrent) item.setAttribute('aria-current', 'true');
-    entries.set(keyOf({ mission: shown.id }), item);
+    if (isCurrent) {
+      item.setAttribute('aria-current', 'true');
+      loaded = item;
+    }
 
     // The name (with any mark) over the dates, and the actions beside them.
     const heading = el('div', 'hub__heading');
@@ -207,7 +173,6 @@ export function setUpHub(options: HubOptions): Hub {
       read.setAttribute('aria-haspopup', 'dialog');
       read.addEventListener('click', () => onMemorial(shown.id, read));
       buttons.append(read);
-      actions.set(keyOf({ mission: shown.id }), read);
     } else {
       const go = (start: 'tour' | 'explore'): void => {
         if (isCurrent) choose(start === 'tour' ? onTour : onExplore);
@@ -227,7 +192,6 @@ export function setUpHub(options: HubOptions): Hub {
       explore.setAttribute('aria-label', copy.hub.exploreMission(shown.name));
       explore.addEventListener('click', () => go('explore'));
       buttons.append(explore);
-      actions.set(keyOf({ mission: shown.id }), explore);
     }
 
     const top = el('div', 'hub__top');
@@ -251,8 +215,6 @@ export function setUpHub(options: HubOptions): Hub {
   const extraEntry = (meta: ExtraMeta): HTMLLIElement => {
     const item = el('li', 'hub__entry hub__entry--extra');
     item.setAttribute('data-testid', `hub-extra-${meta.id}`);
-    const key = keyOf({ extra: meta.id });
-    entries.set(key, item);
     const heading = el('div', 'hub__heading');
     const name = el('h4', 'hub__name', meta.title);
     if (isExtraDraft(meta))
@@ -263,7 +225,6 @@ export function setUpHub(options: HubOptions): Hub {
     open.setAttribute('aria-label', copy.hub.openExtra(meta.title));
     open.setAttribute('aria-haspopup', 'dialog');
     open.addEventListener('click', () => onExtra(meta.id, open));
-    actions.set(key, open);
     const buttons = el('div', 'hub__actions');
     buttons.append(open);
     const top = el('div', 'hub__top');
@@ -285,19 +246,17 @@ export function setUpHub(options: HubOptions): Hub {
   }
   list.replaceChildren(...sections);
 
-  /** Scroll the list so an entry (the loaded mission, unless another is named) sits in the middle. */
-  const reveal = (to?: HubTarget): void => {
+  /** Scroll the list so the loaded mission sits in the middle. */
+  const reveal = (): void => {
     list.scrollTop = 0;
-    const loaded = currentId ? entries.get(keyOf({ mission: currentId })) : undefined;
-    const target = (to ? entries.get(keyOf(to)) : undefined) ?? loaded;
-    if (!target) return;
-    const box = target.getBoundingClientRect();
+    if (!loaded) return;
+    const box = loaded.getBoundingClientRect();
     const frame = list.getBoundingClientRect();
     list.scrollTop = Math.max(0, box.top - frame.top - (list.clientHeight - box.height) / 2);
   };
 
   /* Opening and closing ------------------------------------------------ */
-  // Escape on the reopened (modal) hub.
+  // Escape.
   dialog.addEventListener('cancel', (event) => {
     event.preventDefault();
     close();
@@ -305,9 +264,9 @@ export function setUpHub(options: HubOptions): Hub {
   // Anything else that closes it.
   dialog.addEventListener('close', finish);
 
-  // Reopened over the interface: a click outside the box closes it.
+  // A click outside the box closes it.
   dialog.addEventListener('click', (event) => {
-    if (mode !== 'return' || event.target !== dialog) return;
+    if (event.target !== dialog) return;
     const box = dialog.getBoundingClientRect();
     const outside =
       event.clientX < box.left ||
@@ -320,39 +279,19 @@ export function setUpHub(options: HubOptions): Hub {
 
   // Coming back to this page from another mission's: put the visitor back where they were.
   window.addEventListener('pageshow', (event) => {
-    if (event.persisted && mode === 'return') close();
+    if (event.persisted && isOpen) close();
   });
 
-  const show = (next: HubMode): void => {
-    mode = next;
-    dialog.dataset['mode'] = next;
-    closeButton.hidden = next === 'welcome';
-    document.title = copy.siteTitle;
-  };
-
   return {
-    welcome(to) {
-      if (dialog.open) return;
-      show('welcome');
-      document.body.classList.add('is-welcome');
-      document.addEventListener('keydown', onKey);
-      dialog.show();
-      reveal(to);
-      title.focus({ preventScroll: true });
-    },
     open(from) {
       if (dialog.open) return;
-      show('return');
+      isOpen = true;
       returnTo = from;
+      titleBefore = document.title;
+      document.title = copy.siteTitle;
       dialog.showModal();
       reveal();
       closeButton.focus({ preventScroll: true });
-    },
-    get mode() {
-      return mode;
-    },
-    actionFor(target) {
-      return actions.get(keyOf(target)) ?? null;
     },
   };
 }

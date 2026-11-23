@@ -1,10 +1,10 @@
 import { test, expect } from '../fixtures';
 import { DialogsPage } from '../pages/DialogsPage';
 import { EventCardPage } from '../pages/EventCardPage';
-import { HubPage } from '../pages/HubPage';
 import { MissionPage } from '../pages/MissionPage';
 import { ScenePage } from '../pages/ScenePage';
 import { TimelinePage } from '../pages/TimelinePage';
+import { WelcomePage } from '../pages/WelcomePage';
 import { EVENTS, MISSIONS, URLS } from '../utils/vars';
 
 /**
@@ -57,26 +57,26 @@ test.describe('Deep links', () => {
     });
   });
 
-  test('an unknown mission opens the welcome over the default mission', async ({ sitePage }) => {
+  test('an unknown mission opens the welcome for the default mission', async ({ sitePage }) => {
     const missionPage = new MissionPage(sitePage);
-    const hubPage = new HubPage(sitePage);
+    const welcomePage = new WelcomePage(sitePage);
 
     await test.step('Open a link to a mission the site does not have', async () => {
       await sitePage.goto(URLS.WELCOME(MISSIONS.UNKNOWN));
       await missionPage.waitForLoad();
-      await hubPage.waitForLoad();
+      await welcomePage.waitForLoad();
     });
 
-    await test.step('The default mission is loaded, under its welcome', async () => {
-      await expect(hubPage.hub).toHaveAttribute('data-mode', 'welcome');
+    await test.step('The default mission is loaded, and the welcome features it', async () => {
+      await expect(missionPage.site).toHaveClass(/\bis-welcome\b/);
       await expect(missionPage.missionName).toHaveText('Apollo 11');
-      await expect(hubPage.mission(MISSIONS.DEFAULT)).toHaveAttribute('aria-current', 'true');
+      await expect(welcomePage.title).toHaveText('Ride along on Apollo 11');
     });
   });
 
-  test('a memorial link opens its page over the mission list', async ({ sitePage }) => {
+  test('a memorial link opens its page over the welcome', async ({ sitePage }) => {
     const missionPage = new MissionPage(sitePage);
-    const hubPage = new HubPage(sitePage);
+    const welcomePage = new WelcomePage(sitePage);
     const dialogsPage = new DialogsPage(sitePage);
 
     await test.step('Open the link to the Apollo 1 memorial', async () => {
@@ -91,9 +91,15 @@ test.describe('Deep links', () => {
       await expect(dialogsPage.memorialBody).not.toBeEmpty();
     });
 
-    await test.step('The mission list is under it, at the memorial', async () => {
-      await expect(hubPage.hub).toHaveAttribute('data-mode', 'welcome');
-      await expect(hubPage.missionRead(MISSIONS.MEMORIAL)).toBeAttached();
+    await test.step('The welcome is under it', async () => {
+      await expect(missionPage.site).toHaveClass(/\bis-welcome\b/);
+      await expect(welcomePage.welcome).toBeVisible();
+    });
+
+    await test.step('Closing the page gives focus to All missions on the welcome', async () => {
+      await dialogsPage.memorialClose.click();
+      await expect(dialogsPage.memorial).toBeHidden();
+      await expect(welcomePage.allMissions).toBeFocused();
     });
   });
 });
