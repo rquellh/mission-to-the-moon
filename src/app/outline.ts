@@ -41,10 +41,12 @@ export function sourcesCitedBy(bundle: MissionBundle): Set<string> {
       for (const item of value) visit(item);
       return;
     }
-    const record = value as Record<string, unknown>;
     // A citation is the only shape with both a source and a locator.
-    if (typeof record['source'] === 'string' && typeof record['locator'] === 'string') found.add(record['source']);
-    for (const item of Object.values(record)) visit(item);
+    if ('source' in value && 'locator' in value && typeof value.source === 'string' && typeof value.locator === 'string') {
+      found.add(value.source);
+    }
+    const items: unknown[] = Object.values(value);
+    for (const item of items) visit(item);
   };
   visit(bundle);
   return found;

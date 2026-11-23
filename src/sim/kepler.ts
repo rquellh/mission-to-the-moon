@@ -223,6 +223,12 @@ function stumpffC3(psi: number): number {
   return 1 / 6 - psi / 120;
 }
 
+/** The velocities at the two ends of a Lambert arc: leaving r1 (v1) and arriving at r2 (v2). */
+export interface LambertVelocities {
+  v1: Vec3;
+  v2: Vec3;
+}
+
 /**
  * Lambert's problem: the velocities at r1 and r2 of the conic that leaves r1
  * and reaches r2 after `tof` seconds, going the short way around (less than
@@ -235,7 +241,7 @@ export function solveLambert(
   tof: number,
   mu: number,
   shortWay: boolean,
-): { v1: Vec3; v2: Vec3 } {
+): LambertVelocities {
   const r1Mag = length(r1);
   const r2Mag = length(r2);
   const cosDnu = dot(r1, r2) / (r1Mag * r2Mag);

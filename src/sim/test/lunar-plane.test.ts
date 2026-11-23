@@ -10,6 +10,7 @@ import { flight as apollo11 } from "../../content/missions/apollo-11/flight.ts";
 import { EARTH_MOON_DISTANCE } from "../../content/physical-constants.ts";
 import { elapsedToSeconds, type Cited, type ElapsedTime } from "../../content/types.ts";
 import { buildFlightPath } from "../build.ts";
+import type { GroundPoint } from "../frames.ts";
 import type { FlightPlan, Phase } from "../types.ts";
 import { pathProblems } from "./path-checks.ts";
 
@@ -43,7 +44,7 @@ function pos(path: Built, ship: string, t: number): number[] {
 }
 
 /** Selenographic latitude and longitude under a position (true scale), degrees. */
-function overMoon(p: number[]): { latitude: number; longitude: number } {
+function overMoon(p: number[]): GroundPoint {
   const x = p[0]! - EARTH_MOON_DISTANCE;
   return { latitude: Math.atan2(p[1]!, Math.hypot(x, p[2]!)) / DEG, longitude: Math.atan2(p[2]!, -x) / DEG };
 }
@@ -113,10 +114,8 @@ describe("Lunar orbits tilted through a published point, on a flight that never 
   function orbitOnly(withTime: boolean): FlightPlan {
     const copy = structuredClone(apollo11) as FlightPlan;
     copy.ships = [copy.ships.find((s) => s.id === "csm")!];
-    copy.lunarOrbitPlane = {
-      site: { latitude: fake(-11.66), longitude: fake(169.16) },
-      ...(withTime ? { time: fake("080:11:53.63" as ElapsedTime) } : {}),
-    };
+    copy.lunarOrbitPlane = { site: { latitude: fake(-11.66), longitude: fake(169.16) } };
+    if (withTime) copy.lunarOrbitPlane.time = fake("080:11:53.63" as ElapsedTime);
     return copy;
   }
   const flight = orbitOnly(true);

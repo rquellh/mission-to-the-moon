@@ -48,11 +48,11 @@ const NMC_GEMINI = "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id
  * The PDF page of a printed page of the report: each section's pages run
  * on from a fixed offset in the scan (page 4-13 is PDF page 91).
  */
-const PDF_OFFSET: Record<string, number> = { "1": 35, "2": 37, "3": 39, "4": 78, "5": 116, "6": 235, "7": 259, "9": 370 };
+const PDF_OFFSET = new Map([["1", 35], ["2", 37], ["3", 39], ["4", 78], ["5", 116], ["6", 235], ["7", 259], ["9", 370]]);
 
 function pdfPage(printed: string): number {
   const [section = "", page = ""] = printed.split("-");
-  const offset = PDF_OFFSET[section];
+  const offset = PDF_OFFSET.get(section);
   if (offset === undefined) throw new Error(`No PDF offset recorded for printed page ${printed}`);
   return offset + Number(page);
 }

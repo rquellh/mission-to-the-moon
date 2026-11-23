@@ -197,13 +197,9 @@ const RETRO_ADAPTER = report(
  * header), steady, or changing evenly to `to` by the ship's next change.
  */
 function roll(rate: number, citations: Citations, to?: { rate: number; citations: Citations }): VehicleMotion[] {
-  return [
-    {
-      kind: "roll",
-      rate: { value: rate, citations },
-      ...(to ? { rateTo: { value: to.rate, citations: to.citations } } : {}),
-    },
-  ];
+  const motion: VehicleMotion = { kind: "roll", rate: { value: rate, citations } };
+  if (to) motion.rateTo = { value: to.rate, citations: to.citations };
+  return [motion];
 }
 
 /* The roll while docked. */

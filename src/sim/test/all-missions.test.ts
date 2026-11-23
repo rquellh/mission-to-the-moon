@@ -13,8 +13,8 @@
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { existsSync, readdirSync } from "node:fs";
-import { SOURCE_GROUPS, SOURCES } from "../../content/sources.ts";
-import { elapsedToSeconds, type ElapsedTime, type Mission, type MissionSummary } from "../../content/types.ts";
+import { SOURCE_GROUPS, SOURCES, type Source } from "../../content/sources.ts";
+import { elapsedToSeconds, type ElapsedTime, type Memorial, type Mission, type MissionSummary } from "../../content/types.ts";
 import type { LeftBehind, VehicleChange } from "../../content/vehicle-types.ts";
 import { buildFlightPath } from "../build.ts";
 import { AnchoredOrbit } from "../segments.ts";
@@ -24,8 +24,16 @@ import { continuityProblems, endProblems, phaseProblems, stretchProblems, surfac
 const MISSIONS = new URL("../../content/missions/", import.meta.url);
 const PUBLIC = new URL("../../../public/", import.meta.url);
 
-/** A module's exports, loaded by path. */
-type Exports = Record<string, unknown>;
+/** A mission file's exports, loaded by path: each file has some of these. */
+interface Exports {
+  summary?: MissionSummary;
+  story?: Mission;
+  flight?: FlightPlan;
+  vehicle?: readonly VehicleChange[];
+  leftBehind?: readonly LeftBehind[];
+  sources?: Readonly<Record<string, Source>>;
+  memorial?: Memorial;
+}
 
 async function load(id: string, file: string): Promise<Exports | undefined> {
   const url = new URL(`${id}/${file}`, MISSIONS);
@@ -60,7 +68,7 @@ const folders = readdirSync(MISSIONS, { withFileTypes: true })
 const flights: FlightFolder[] = [];
 const memorials: MemorialFolder[] = [];
 for (const id of folders) {
-  const summary = (await load(id, "summary.ts"))?.summary as MissionSummary | undefined;
+  const summary = (await load(id, "summary.ts"))?.summary;
   const flight = await load(id, "flight.ts");
   if (flight) {
     const story = await load(id, "story.ts");
@@ -69,8 +77,8 @@ for (const id of folders) {
       id,
       story: story?.story as Mission,
       flight: flight.flight as FlightPlan,
-      vehicle: (vehicle?.vehicle ?? []) as readonly VehicleChange[],
-      leftBehind: (vehicle?.leftBehind ?? []) as readonly LeftBehind[],
+      vehicle: vehicle?.vehicle ?? [],
+      leftBehind: vehicle?.leftBehind ?? [],
       summary,
       sources: await load(id, "sources.ts"),
     };
@@ -92,38 +100,57 @@ for (const id of folders) {
 
 interface Found {
   where: string;
-  value: Record<string, unknown>;
+  value: object;
 }
 
 /** Every plain object inside `root` (arrays and nested objects), with a path to it. */
 function walk(root: unknown, where: string, out: Found[] = []): Found[] {
   if (Array.isArray(root)) root.forEach((item, i) => walk(item, `${where}[${i}]`, out));
   else if (root && typeof root === "object") {
-    const value = root as Record<string, unknown>;
-    out.push({ where, value });
-    for (const [key, child] of Object.entries(value)) walk(child, `${where}.${key}`, out);
+    out.push({ where, value: root });
+    for (const [key, child] of Object.entries(root)) walk(child, `${where}.${key}`, out);
   }
   return out;
 }
 
-function citationsIn(root: unknown, where: string): Found[] {
-  return walk(root, where).filter(({ value }) => typeof value.source === "string" && typeof value.locator === "string");
+/** A citation found inside the content: the path to it, and the source it names. */
+interface FoundCitation {
+  where: string;
+  source: string;
 }
 
-function photosIn(root: unknown, where: string): Found[] {
-  return walk(root, where).filter(({ value }) => typeof value.src === "string" && typeof value.alt === "string" && typeof value.width === "number");
+function citationsIn(root: unknown, where: string): FoundCitation[] {
+  return walk(root, where).flatMap(({ where: at, value }) =>
+    "source" in value && typeof value.source === "string" && "locator" in value && typeof value.locator === "string"
+      ? [{ where: at, source: value.source }]
+      : [],
+  );
+}
+
+/** A photo found inside the content: the path to it, and its file under public/. */
+interface FoundPhoto {
+  where: string;
+  src: string;
+}
+
+function photosIn(root: unknown, where: string): FoundPhoto[] {
+  return walk(root, where).flatMap(({ where: at, value }) =>
+    "src" in value && typeof value.src === "string" && "alt" in value && typeof value.alt === "string" && "width" in value && typeof value.width === "number"
+      ? [{ where: at, src: value.src }]
+      : [],
+  );
 }
 
 function unknownSources(root: unknown, where: string): string[] {
   return citationsIn(root, where)
-    .filter(({ value }) => !(value.source as string in SOURCES))
-    .map(({ where: at, value }) => `${at}: unknown source "${value.source as string}"`);
+    .filter(({ source }) => !(source in SOURCES))
+    .map(({ where: at, source }) => `${at}: unknown source "${source}"`);
 }
 
 function missingPhotos(root: unknown, where: string): string[] {
   return photosIn(root, where)
-    .filter(({ value }) => !existsSync(new URL(value.src as string, PUBLIC)))
-    .map(({ where: at, value }) => `${at}: public/${value.src as string} does not exist`);
+    .filter(({ src }) => !existsSync(new URL(src, PUBLIC)))
+    .map(({ where: at, src }) => `${at}: public/${src} does not exist`);
 }
 
 /**
@@ -136,9 +163,10 @@ const RAW_SECONDS = /(\d[\d,]*(?:\.\d+)?)[\s-]*(?:seconds?|secs?)\b/gi;
 function rawDurations(root: unknown, where: string): string[] {
   const problems: string[] = [];
   for (const { where: at, value } of walk(root, where)) {
-    if (typeof value.short !== "string") continue;
+    if (!("short" in value) || typeof value.short !== "string") continue;
+    const texts = { short: value.short, more: "more" in value ? value.more : undefined };
     for (const level of ["short", "more"] as const) {
-      const text = value[level];
+      const text = texts[level];
       if (typeof text !== "string") continue;
       for (const match of text.matchAll(RAW_SECONDS)) {
         const seconds = Number(match[1]!.replace(/,/g, ""));
@@ -189,7 +217,7 @@ describe("all missions: sources", () => {
   it("source ids are unique across the shared list and every mission's sources.ts", () => {
     const seen = new Map<string, string>();
     const problems: string[] = [];
-    const groups: [string, Readonly<Record<string, unknown>>][] = [
+    const groups: [string, Readonly<Record<string, Source>>][] = [
       ["shared", SOURCE_GROUPS.shared],
       ...Object.entries(SOURCE_GROUPS.missions),
     ];

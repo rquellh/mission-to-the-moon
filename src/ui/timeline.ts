@@ -88,17 +88,17 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
   };
   input.addEventListener('keydown', (event) => {
     const step = story.duration * ARROW_STEP;
-    const actions: Record<string, () => void> = {
-      ArrowRight: () => player.seekStory(player.storyTime + step),
-      ArrowUp: () => player.seekStory(player.storyTime + step),
-      ArrowLeft: () => player.seekStory(player.storyTime - step),
-      ArrowDown: () => player.seekStory(player.storyTime - step),
-      PageUp: () => seekEvent(1),
-      PageDown: () => seekEvent(-1),
-      Home: () => player.seekStory(0),
-      End: () => player.seekStory(story.duration),
-    };
-    const action = actions[event.key];
+    const actions = new Map<string, () => void>([
+      ['ArrowRight', () => player.seekStory(player.storyTime + step)],
+      ['ArrowUp', () => player.seekStory(player.storyTime + step)],
+      ['ArrowLeft', () => player.seekStory(player.storyTime - step)],
+      ['ArrowDown', () => player.seekStory(player.storyTime - step)],
+      ['PageUp', () => seekEvent(1)],
+      ['PageDown', () => seekEvent(-1)],
+      ['Home', () => player.seekStory(0)],
+      ['End', () => player.seekStory(story.duration)],
+    ]);
+    const action = actions.get(event.key);
     if (!action || event.altKey || event.ctrlKey || event.metaKey) return;
     event.preventDefault();
     action();

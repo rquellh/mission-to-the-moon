@@ -14,10 +14,15 @@ import type { Citation, Cited, ElapsedTime, Mission, MissionEvent } from '../../
 import type { LeftBehind, VehicleChange, VehiclePart } from '../../content/vehicle-types';
 import type { FlightPlan, Phase, ShipPlan } from '../../sim/types';
 
-/** The mark on every invented value. */
-const INVENTED = { source: 'dev-fixture', locator: 'INVENTED for a scene test; not a fact' } as unknown as Citation;
+/**
+ * The mark on every invented value. A citation must name a registered
+ * source, so it names one (as the made-up values in src/sim/test do) and
+ * says the value is not from it.
+ */
+const INVENTED: Citation = { source: 'gemini-chronology', locator: 'INVENTED for a scene test; not a fact, and not from this source' };
 
-function invented<T>(value: T): Cited<T> {
+/** A value marked INVENTED. */
+export function invented<T>(value: T): Cited<T> {
   return { value, citations: [INVENTED] };
 }
 
@@ -29,7 +34,7 @@ function clock(hours: number): ElapsedTime {
   return `${String(h).padStart(3, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` as ElapsedTime;
 }
 
-/** A bare event at a time (the scene reads only event times). */
+/** A bare event at a time (the scene reads only event times). Its view, Earth, is one every flight has. */
 function event(hours: number, index: number): MissionEvent {
   return {
     id: `dev-${index}`,
@@ -38,12 +43,13 @@ function event(hours: number, index: number): MissionEvent {
     elapsed: clock(hours),
     text: { short: 'Test event' },
     citations: [INVENTED],
-  } as unknown as MissionEvent;
+    view: 'earth',
+  };
 }
 
-/** A mission story with only what the scene reads: where it goes and when its events are. */
+/** Gemini 8's story with the id, destination, and events changed (the scene reads only where a mission goes and when its events are). */
 function story(id: string, destination: Mission['destination'], hours: readonly number[]): Mission {
-  return { id, destination, events: hours.map(event) } as unknown as Mission;
+  return { ...gemini8.mission, id, destination, events: hours.map(event) };
 }
 
 const GEMINI: readonly VehiclePart[] = ['gemini-equipment-section', 'gemini-retro-section', 'gemini-reentry-module'];
@@ -96,8 +102,14 @@ function longOrbit(): MissionBundle {
   return { mission: story('dev-long-orbit', 'earth-orbit', hours), flight, vehicle, leftBehind: [] };
 }
 
-/** The models a pair test can give its two ships. */
-const PAIR_MODELS: Record<string, { launch: readonly VehiclePart[]; orbit: readonly VehiclePart[] }> = {
+/** A model a pair test can give a ship: its parts at launch and in orbit. */
+interface PairModel {
+  launch: readonly VehiclePart[];
+  orbit: readonly VehiclePart[];
+}
+
+/** The models a pair test can give its two ships, by the name in the address (?main=, ?target=). */
+const PAIR_MODELS = new Map<string, PairModel>(Object.entries({
   gemini: { launch: ['titan-first-stage', 'titan-second-stage', ...GEMINI], orbit: GEMINI },
   agena: { launch: ['atlas', 'agena', 'agena-shroud'], orbit: ['agena'] },
   atda: { launch: ['atlas', 'atda', 'atda-shroud'], orbit: ['atda', 'atda-shroud'] },
@@ -110,7 +122,7 @@ const PAIR_MODELS: Record<string, { launch: readonly VehiclePart[]; orbit: reado
     orbit: ['service-module', 'command-module'],
   },
   lm: { launch: ['atlas', 'agena'], orbit: ['lm-descent-stage', 'lm-ascent-stage'] },
-};
+}));
 
 /**
  * Two ships keeping station (INVENTED): Gemini 8's flight with its docking
@@ -128,8 +140,8 @@ function pair(mainModel: string, targetModel: string, facing: 'forward' | 'backw
     phase.kind === 'docked' ? { kind: 'station', label: 'Station keeping (INVENTED)', start: phase.start, end: phase.end, target: phase.target } : phase,
   ) as [Phase, ...Phase[]];
   const flight: FlightPlan = { ...plan, missionId: 'dev-pair', ships: [{ ...crew, phases }, target] };
-  const main = PAIR_MODELS[mainModel] ?? PAIR_MODELS['gemini']!;
-  const other = PAIR_MODELS[targetModel] ?? PAIR_MODELS['agena']!;
+  const main = PAIR_MODELS.get(mainModel) ?? PAIR_MODELS.get('gemini')!;
+  const other = PAIR_MODELS.get(targetModel) ?? PAIR_MODELS.get('agena')!;
   const crewOrbit = crew.phases[1]!;
   const station = crew.phases.find((phase) => phase.kind === 'rendezvous')!;
   const targetOrbit = target.phases[1]!;

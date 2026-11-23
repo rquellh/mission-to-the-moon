@@ -22,7 +22,7 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://localhost:${port}/`;
 /** Software WebGL, so the scene draws without a graphics card (as tools/screenshot.mjs does). */
 const WEBGL_IN_SOFTWARE = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 
-export default defineConfig({
+const config = defineConfig({
   testDir: './e2e',
 
   fullyParallel: true,
@@ -32,10 +32,6 @@ export default defineConfig({
 
   // Retry on the build server only, for the odd slow frame.
   retries: process.env.CI ? 2 : 0,
-
-  // Each page draws a 3D scene in software, which keeps a processor core busy.
-  // On a laptop Playwright picks the count (half the cores).
-  ...(process.env.CI ? { workers: 2 } : {}),
 
   reporter: process.env.CI
     ? [['github'], ['list'], ['html', { outputFolder: 'e2e/report', open: 'never' }]]
@@ -78,3 +74,9 @@ export default defineConfig({
     timeout: 60_000,
   },
 });
+
+// Each page draws a 3D scene in software, which keeps a processor core busy.
+// On a laptop Playwright picks the count (half the cores).
+if (process.env.CI) config.workers = 2;
+
+export default config;

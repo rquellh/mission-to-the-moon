@@ -304,11 +304,10 @@ function makePage(cdp, sessionId, options) {
       nativeVirtualKeyCode: spec.keyCode,
       modifiers,
     };
-    await send('Input.dispatchKeyEvent', {
-      ...base,
-      type: spec.text ? 'keyDown' : 'rawKeyDown',
-      ...(spec.text ? { text: spec.text, unmodifiedText: spec.text } : {}),
-    });
+    const down = spec.text
+      ? { ...base, type: 'keyDown', text: spec.text, unmodifiedText: spec.text }
+      : { ...base, type: 'rawKeyDown' };
+    await send('Input.dispatchKeyEvent', down);
     await send('Input.dispatchKeyEvent', { ...base, type: 'keyUp' });
   };
 

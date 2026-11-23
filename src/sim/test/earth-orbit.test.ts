@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import type { Cited, ElapsedTime } from "../../content/types.ts";
 import { EARTH_AXIAL_TILT_RAD, EARTH_EQUATORIAL_RADIUS_KM, EARTH_MEAN_RADIUS_KM, NAUTICAL_MILE_KM } from "../../content/physical-constants.ts";
 import { buildFlightPath } from "../build.ts";
-import { bodyFixedLatLon } from "../frames.ts";
+import { bodyFixedLatLon, type GroundPoint } from "../frames.ts";
 import type { FlightPlan, Phase } from "../types.ts";
 
 function fake<T>(value: T): Cited<T> {
@@ -65,7 +65,7 @@ function plan(phases: Phase[]): FlightPlan {
 }
 
 /** Ground point under the capsule at time t, from a plan that just keeps orbiting. */
-function groundPointOnOrbit(t: number): { latitude: number; longitude: number } {
+function groundPointOnOrbit(t: number): GroundPoint {
   const orbitOnly = buildFlightPath(plan([...launchPhases, orbitPhase(20_000)]));
   const p = [0, 0, 0];
   orbitOnly.position("capsule", t, 1, p);

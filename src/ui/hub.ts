@@ -86,7 +86,7 @@ function programHeading(program: Program, group: readonly MissionSummary[]): HTM
   const heading = el('h3', 'hub__program-title');
   heading.id = `hub-program-${program}`;
   heading.append(el('span', 'hub__program-name', copy.hub.programs[program]));
-  const years = group.map((summary) => yearOf(summary.date)).filter((year): year is number => year !== null);
+  const years = group.flatMap((summary) => yearOf(summary.date) ?? []);
   if (years.length) {
     const first = Math.min(...years);
     const last = Math.max(...years);

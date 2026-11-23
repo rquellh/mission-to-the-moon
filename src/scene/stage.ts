@@ -297,6 +297,22 @@ function indexAtValue(values: Float64Array, value: number): number {
   return lo + (b > a ? (value - a) / (b - a) : 0);
 }
 
+/** The two turns OrbitControls keeps between the camera's up and the world's up (its own `_quat` and `_quatInverse`). */
+interface OrbitUpTurns {
+  /** From the camera's up to the world's up. */
+  toWorldUp: Quaternion;
+  /** The way back. */
+  fromWorldUp: Quaternion;
+}
+
+/** The orbit controls' two turns (see setCameraUp), or null when this three.js version does not have them. */
+function orbitUpTurns(controls: OrbitControls): OrbitUpTurns | null {
+  if (!('_quat' in controls) || !('_quatInverse' in controls)) return null;
+  const { _quat: toWorldUp, _quatInverse: fromWorldUp } = controls;
+  if (!(toWorldUp instanceof Quaternion) || !(fromWorldUp instanceof Quaternion)) return null;
+  return { toWorldUp, fromWorldUp };
+}
+
 /** Per-ship state for the current frame. */
 interface ShipState extends ShipPose {
   readonly id: string;
@@ -649,7 +665,7 @@ export class Stage implements Director {
 
     this.handleResize();
     // While developing, the stage can be looked at from the browser console (for checking the scene).
-    if (import.meta.env.DEV) (window as unknown as { stage?: Stage }).stage = this;
+    if (import.meta.env.DEV) window.stage = this;
   }
 
   /** Create the stage. Throws WebGLUnavailableError if WebGL 2 is missing. */
@@ -1025,10 +1041,7 @@ export class Stage implements Director {
    * of a flight that stays in Earth orbit; for a Moon flight, each long stay
    * in lunar orbit.
    */
-  private revolutionsOf(polyline: { readonly times: Float64Array; readonly truePositions: Float32Array }): {
-    revolutions: Float64Array;
-    runs: Array<readonly [number, number]>;
-  } {
+  private revolutionsOf(polyline: { readonly times: Float64Array; readonly truePositions: Float32Array }): Pick<PathFade, 'revolutions' | 'runs'> {
     const n = polyline.times.length;
     const revolutions = new Float64Array(n);
     const moon = [0, 0, 0];
@@ -1226,7 +1239,7 @@ export class Stage implements Director {
   }
 
   /** A few hundred points along every path, for framing the journey view (and an Earth-orbit flight's Earth view). */
-  private sampleJourney(): { readable: Float32Array; true: Float32Array } {
+  private sampleJourney(): Record<ScaleMode, Float32Array> {
     const readable: number[] = [];
     const real: number[] = [];
     for (const ship of this.path.ships) {
@@ -1657,10 +1670,10 @@ export class Stage implements Director {
   private setCameraUp(up: Vector3): void {
     if (this.camera.up.distanceToSquared(up) < 1e-14) return;
     this.camera.up.copy(up);
-    const internals = this.controls as unknown as { _quat?: Quaternion; _quatInverse?: Quaternion };
-    if (internals._quat && internals._quatInverse) {
-      internals._quat.setFromUnitVectors(up, this.worldUp);
-      internals._quatInverse.copy(internals._quat).invert();
+    const turns = orbitUpTurns(this.controls);
+    if (turns) {
+      turns.toWorldUp.setFromUnitVectors(up, this.worldUp);
+      turns.fromWorldUp.copy(turns.toWorldUp).invert();
     }
   }
 
@@ -1773,17 +1786,17 @@ export class Stage implements Director {
   /** Arrow keys turn the view and +/- zoom while the canvas has focus. */
   private handleKey(event: KeyboardEvent): void {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
-    const actions: Record<string, () => void> = {
-      ArrowLeft: () => this.controls.rotateLeft(KEY_ROTATE_STEP),
-      ArrowRight: () => this.controls.rotateLeft(-KEY_ROTATE_STEP),
-      ArrowUp: () => this.controls.rotateUp(KEY_ROTATE_STEP),
-      ArrowDown: () => this.controls.rotateUp(-KEY_ROTATE_STEP),
-      '+': () => this.controls.dollyIn(KEY_ZOOM_STEP),
-      '=': () => this.controls.dollyIn(KEY_ZOOM_STEP),
-      '-': () => this.controls.dollyOut(KEY_ZOOM_STEP),
-      _: () => this.controls.dollyOut(KEY_ZOOM_STEP),
-    };
-    const action = actions[event.key];
+    const actions = new Map<string, () => void>([
+      ['ArrowLeft', () => this.controls.rotateLeft(KEY_ROTATE_STEP)],
+      ['ArrowRight', () => this.controls.rotateLeft(-KEY_ROTATE_STEP)],
+      ['ArrowUp', () => this.controls.rotateUp(KEY_ROTATE_STEP)],
+      ['ArrowDown', () => this.controls.rotateUp(-KEY_ROTATE_STEP)],
+      ['+', () => this.controls.dollyIn(KEY_ZOOM_STEP)],
+      ['=', () => this.controls.dollyIn(KEY_ZOOM_STEP)],
+      ['-', () => this.controls.dollyOut(KEY_ZOOM_STEP)],
+      ['_', () => this.controls.dollyOut(KEY_ZOOM_STEP)],
+    ]);
+    const action = actions.get(event.key);
     if (!action) return;
     event.preventDefault();
     this.handleControlStart();
@@ -2845,5 +2858,12 @@ export class Stage implements Director {
 
   private notify(): void {
     for (const listener of this.listeners) listener(this);
+  }
+}
+
+declare global {
+  interface Window {
+    /** The stage, while developing only, to look at the scene from the browser console. */
+    stage?: Stage;
   }
 }

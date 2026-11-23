@@ -13,7 +13,7 @@ import { EARTH_MEAN_RADIUS_KM, NAUTICAL_MILE_KM } from "../../content/physical-c
 import { buildFlightPath } from "../build.ts";
 import { bodyFixedLatLon } from "../frames.ts";
 import { AnchoredOrbit } from "../segments.ts";
-import type { FlightPlan, Phase } from "../types.ts";
+import type { Fix, FlightPlan, Phase } from "../types.ts";
 import { pathProblems } from "./path-checks.ts";
 
 function fake<T>(value: T): Cited<T> {
@@ -47,7 +47,7 @@ const sky: FlightPlan["sky"] = [
 
 const TARGET_ORBIT = { apoapsis: fake(162), periapsis: fake(160), sense: fake<"prograde">("prograde") };
 
-function chaserPhases(splashdown: { latitude: Cited<number>; longitude: Cited<number> }): Phase[] {
+function chaserPhases(splashdown: Fix): Phase[] {
   return [
     { kind: "ascent", label: "Launch", body: "earth", start: clock(0), end: clock(INSERTION), site: { latitude: fake(28.5), longitude: fake(-80.6) }, azimuth: fake(82) },
     { kind: "orbit", label: "First orbit", body: "earth", start: clock(INSERTION), end: clock(NC), apoapsis: fake(161), periapsis: fake(87), inclination: fake(28.9), sense: fake("prograde") },
@@ -72,7 +72,7 @@ function chaserPhases(splashdown: { latitude: Cited<number>; longitude: Cited<nu
   ];
 }
 
-function plan(splashdown: { latitude: Cited<number>; longitude: Cited<number> }): FlightPlan {
+function plan(splashdown: Fix): FlightPlan {
   return {
     missionId: "test",
     sky,
@@ -113,7 +113,7 @@ function rangeNm(path: Built, t: number): number {
 }
 
 /** Where the separated chaser would be nine minutes before landing if it flew on: a natural splashdown point. */
-function naturalSplash(): { latitude: Cited<number>; longitude: Cited<number> } {
+function naturalSplash(): Fix {
   const flight = plan({ latitude: fake(0), longitude: fake(0) });
   const chaser = flight.ships[0];
   const phases = chaser.phases.slice(0, 8) as Phase[];
