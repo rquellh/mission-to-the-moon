@@ -1,0 +1,56 @@
+name: Playwright
+
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+# A newer push to a pull request replaces the older run. When deploy.yml runs
+# these tests, they wait in a line of their own, never the deployment's.
+concurrency:
+  group: playwright-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # A rule on the repository requires this job, by the name `playwright`,
+  # before anything merges into main. Rename it and every pull request waits
+  # forever on a check that never reports; change the rule's check name with it.
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # The browser tests drive Google Chrome. GitHub's machines come with it;
+      # fetch it only if one does not.
+      - name: Find Chrome
+        run: google-chrome --version || npx playwright install chrome
+
+      - name: Test the built site in a browser
+        run: npx playwright test -c tests/playwright.e2e.config.ts
+        env:
+          E2E_TARGET: preview
+
+      - name: Keep the browser test report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-test-report
+          path: |
+            tests/e2e/report
+            tests/e2e/results
+          retention-days: 7

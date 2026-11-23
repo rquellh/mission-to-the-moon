@@ -59,7 +59,9 @@ npm test          # the content, flight math, and interface tests
 npm run test:e2e  # the browser tests
 ```
 
-The site uses relative paths, so `dist/` works from any subpath. Each mission, and the 3D code, is built as its own file and fetched only when needed. Pushing to `main` tests, builds, and deploys the site to GitHub Pages through `.github/workflows/deploy.yml` (turn on Pages with "GitHub Actions" as the source in the repository settings). A failing test stops the publish. A pull request runs the same tests and publishes nothing.
+The site uses relative paths, so `dist/` works from any subpath. Each mission, and the 3D code, is built as its own file and fetched only when needed. A pull request runs two workflows from `.github/workflows/` side by side: `vitest.yml` runs the content, flight math, and interface tests, and `playwright.yml` builds the site and runs the browser tests against the build. It publishes nothing. Pushing to `main` runs `deploy.yml`, which runs both sets of tests again, builds the site, and publishes it to GitHub Pages only if both pass (turn on Pages with "GitHub Actions" as the source in the repository settings).
+
+`main` is protected: a repository rule (Settings → Rules) requires the `vitest` and `playwright` checks to pass before a commit reaches `main`, so changes go through a pull request and a direct push of untested work is turned away.
 
 ## Tests
 

@@ -1,0 +1,36 @@
+name: Vitest
+
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+# A newer push to a pull request replaces the older run. When deploy.yml runs
+# these tests, they wait in a line of their own, never the deployment's.
+concurrency:
+  group: vitest-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # A rule on the repository requires this job, by the name `vitest`, before
+  # anything merges into main. Rename it and every pull request waits forever
+  # on a check that never reports; change the rule's check name with it.
+  vitest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test the content, the flight math, and the interface
+        run: npm test
