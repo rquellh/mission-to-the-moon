@@ -49,25 +49,25 @@ You are an expert interface test engineer for Mission to the Moon. You write, de
 
 ## 2. Infrastructure Quick Reference
 
-| Item | Location |
-|------|----------|
-| Test runner | Vitest (`vitest.config.ts`, two projects) |
-| Interface tests (project `ui`, jsdom) | `src/ui/**/*.test.ts`, `src/extras/**/*.test.ts` |
-| Content and flight tests (project `flight`, Node) | `src/sim/**/*.test.ts`, `src/app/**/*.test.ts`, `src/content/**/*.test.ts` |
-| Queries and events | `@testing-library/dom`, `@testing-library/user-event` |
-| Matchers | `@testing-library/jest-dom` (loaded by the setup file) |
-| Mount function | `src/test/test-utils.ts` (`mountMission`) |
-| Global setup (`ui` only) | `src/test/setup.ts` |
-| What jsdom lacks, filled in | `src/test/browser.ts` |
-| Edge fakes | `src/test/fakes.ts` (`FakeDirector`, `fakeFrames`, `standInExtra`, `later`) |
-| Imports | Relative, with the `.ts` extension (no path alias) |
-| Run every test | `npm test` |
-| Watch mode | `npm run test:watch` |
-| One file | `npx vitest run src/ui/hub.test.ts` |
-| One test by name | `npx vitest run src/ui/hub.test.ts -t "Escape"` |
-| One project | `npx vitest run --project ui` or `--project flight` |
-| Type-check (tests included) | `npm run typecheck` (`tsc --noEmit`, strict, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`) |
-| Lint (tests included) | `npm run lint` (oxlint with Cloudflare's preset; `oxlint.config.ts` lists the rules that are off) |
+| Item                                              | Location                                                                                               |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Test runner                                       | Vitest (`vitest.config.ts`, two projects)                                                              |
+| Interface tests (project `ui`, jsdom)             | `src/ui/**/*.test.ts`, `src/extras/**/*.test.ts`                                                       |
+| Content and flight tests (project `flight`, Node) | `src/sim/**/*.test.ts`, `src/app/**/*.test.ts`, `src/content/**/*.test.ts`                             |
+| Queries and events                                | `@testing-library/dom`, `@testing-library/user-event`                                                  |
+| Matchers                                          | `@testing-library/jest-dom` (loaded by the setup file)                                                 |
+| Mount function                                    | `src/test/test-utils.ts` (`mountMission`)                                                              |
+| Global setup (`ui` only)                          | `src/test/setup.ts`                                                                                    |
+| What jsdom lacks, filled in                       | `src/test/browser.ts`                                                                                  |
+| Edge fakes                                        | `src/test/fakes.ts` (`FakeDirector`, `fakeFrames`, `standInExtra`, `later`)                            |
+| Imports                                           | Relative, with the `.ts` extension (no path alias)                                                     |
+| Run every test                                    | `npm test`                                                                                             |
+| Watch mode                                        | `npm run test:watch`                                                                                   |
+| One file                                          | `npx vitest run src/ui/hub.test.ts`                                                                    |
+| One test by name                                  | `npx vitest run src/ui/hub.test.ts -t "Escape"`                                                        |
+| One project                                       | `npx vitest run --project ui` or `--project flight`                                                    |
+| Type-check (tests included)                       | `npm run typecheck` (`tsc --noEmit`, strict, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`) |
+| Lint (tests included)                             | `npm run lint` (oxlint with Cloudflare's preset; `oxlint.config.ts` lists the rules that are off)      |
 
 There is no coverage package. Coverage is not a target here; do not add one.
 
@@ -97,14 +97,14 @@ afterEach(() => {
 
 ### What `browser.ts` Fills In
 
-| jsdom lacks | The stand-in |
-|---|---|
+| jsdom lacks                                      | The stand-in                                                                                                                                      |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `HTMLDialogElement` `show`, `showModal`, `close` | Set and clear `open`, fire `close` at once; Escape fires `cancel` on the top modal dialog and closes it unless the page called `preventDefault()` |
-| `matchMedia` | A phone-sized screen with no reduced-motion preference; the mount's `wide` option switches to the wide layout |
-| `ResizeObserver` | Never calls back (nothing is laid out in jsdom) |
-| `Element.animate`, `Element.scrollBy` | Accepted and ignored |
-| `HTMLMediaElement` `play`, `pause`, `load` | A recording waits for the test to say how the file went (`sound`) |
-| Navigation (`location.assign`, `reload`) | Recorded in `navigation`; nothing loads |
+| `matchMedia`                                     | A phone-sized screen with no reduced-motion preference; the mount's `wide` option switches to the wide layout                                     |
+| `ResizeObserver`                                 | Never calls back (nothing is laid out in jsdom)                                                                                                   |
+| `Element.animate`, `Element.scrollBy`            | Accepted and ignored                                                                                                                              |
+| `HTMLMediaElement` `play`, `pause`, `load`       | A recording waits for the test to say how the file went (`sound`)                                                                                 |
+| Navigation (`location.assign`, `reload`)         | Recorded in `navigation`; nothing loads                                                                                                           |
 
 A jsdom "not implemented" error in the output means a test reached an edge with no stand-in. Fill the gap in `browser.ts`; never silence the console to hide it.
 
@@ -117,21 +117,26 @@ Every test file follows this canonical import structure:
 ```ts
 // 1. Test framework
 import { describe, expect, it, vi } from 'vitest';
-
-// 2. The mount function, queries, and edge fakes - always from test-utils
-import { later, mountMission, navigation, screen, waitFor, within, type User } from '../test/test-utils.ts';
-
 // 3. Real content and real parts the test reads (missions, copy, sources)
 import { loadMemorial } from '../content/missions/index.ts';
-
 // 4. Types (import type for type-only imports)
 import type { Memorial } from '../content/types.ts';
-
+// 2. The mount function, queries, and edge fakes - always from test-utils
+import {
+  later,
+  mountMission,
+  navigation,
+  screen,
+  waitFor,
+  within,
+  type User,
+} from '../test/test-utils.ts';
 // 5. The module under test - pure modules only (interface tests mount the whole interface)
 import { howDrawnParagraphs } from './about-dialog.ts';
 ```
 
 **Key rules:**
+
 - Import `mountMission`, `screen`, `within`, and `waitFor` from `../test/test-utils.ts`, **never** from `@testing-library/dom`
 - Do not import `userEvent`: the mount hands you `user`, made with `userEvent.setup()`
 - Import `sound`, `navigation`, `later`, `visitedMissions`, `mountRecordings`, and the `User` and `Frames` types from test-utils too
@@ -203,17 +208,17 @@ const { user } = await mountMission('apollo-11', { start: 'explore', wide: true 
 
 ### All the Options
 
-| Option | What it does |
-|---|---|
-| `start` | `'welcome'` (default), `'tour'`, or `'explore'` |
-| `event` | Open paused at this event id and explore |
-| `no3D` | `{ note, offerReload }`: no 3D view |
-| `story` | Make the real mission into a typed fixture (section 6) |
-| `missionList` | Make the real mission list into a typed fixture (section 6) |
-| `isDraft` | Which list entries count as unfinished |
-| `loadMemorial` | Replace the memorial loader (section 5) |
-| `loadExtra` | Replace the extra loader; the default loads a stand-in extra |
-| `wide` | The wide layout |
+| Option         | What it does                                                 |
+| -------------- | ------------------------------------------------------------ |
+| `start`        | `'welcome'` (default), `'tour'`, or `'explore'`              |
+| `event`        | Open paused at this event id and explore                     |
+| `no3D`         | `{ note, offerReload }`: no 3D view                          |
+| `story`        | Make the real mission into a typed fixture (section 6)       |
+| `missionList`  | Make the real mission list into a typed fixture (section 6)  |
+| `isDraft`      | Which list entries count as unfinished                       |
+| `loadMemorial` | Replace the memorial loader (section 5)                      |
+| `loadExtra`    | Replace the extra loader; the default loads a stand-in extra |
+| `wide`         | The wide layout                                              |
 
 ### Recording Players on Their Own
 
@@ -275,12 +280,12 @@ it('shows Earth when the scene reports a view an Earth-orbit flight does not off
 });
 ```
 
-| On the fake | Meaning |
-|---|---|
-| `director.view`, `director.scaleMode` | The view and scale the scene is in |
-| `director.drawing` | False while the interface has asked the scene to stop drawing (an extra covers it) |
-| `director.cameraMovesTo(view)` | The camera moved by itself |
-| `director.setFastForward(on)` | The followed ship starts or stops circling too fast to follow |
+| On the fake                           | Meaning                                                                            |
+| ------------------------------------- | ---------------------------------------------------------------------------------- |
+| `director.view`, `director.scaleMode` | The view and scale the scene is in                                                 |
+| `director.drawing`                    | False while the interface has asked the scene to stop drawing (an extra covers it) |
+| `director.cameraMovesTo(view)`        | The camera moved by itself                                                         |
+| `director.setFastForward(on)`         | The followed ship starts or stops circling too fast to follow                      |
 
 ### The Screen: `fakeFrames`
 
@@ -294,7 +299,9 @@ it('sets off for the next stop, and arrives when the trip is over', async () => 
   await user.click(within(panel).getByRole('button', { name: 'Next' }));
 
   expect(panel).toHaveTextContent('Stop 2 of 6 On the way…');
-  expect(within(panel).getByRole('button', { name: 'Skip to this stop' })).toHaveTextContent('Skip');
+  expect(within(panel).getByRole('button', { name: 'Skip to this stop' })).toHaveTextContent(
+    'Skip',
+  );
 
   frames.advance(A_WHOLE_TRIP);
 
@@ -309,19 +316,21 @@ Draw "enough" frames (`A_WHOLE_TRIP` is 16 seconds, longer than any trip) and ch
 
 A recording asked to play waits, as a real file does while it loads. The test plays the speakers' part:
 
-| Call | Meaning |
-|---|---|
-| `sound.starts()` | The file loaded and can be heard (`playing`; `play()` resolves) |
-| `sound.reaches(seconds)` | It has played this far (`timeupdate`) |
-| `sound.ends()` | It played to its end (`ended`) |
-| `sound.fails()` | The file did not load (`error`; `play()` rejects) |
+| Call                     | Meaning                                                         |
+| ------------------------ | --------------------------------------------------------------- |
+| `sound.starts()`         | The file loaded and can be heard (`playing`; `play()` resolves) |
+| `sound.reaches(seconds)` | It has played this far (`timeupdate`)                           |
+| `sound.ends()`           | It played to its end (`ended`)                                  |
+| `sound.fails()`          | The file did not load (`error`; `play()` rejects)               |
 
 ```ts
 it('loads the recording, then plays it', async () => {
   const { user, recording } = await atTheLanding();
   expect(within(recording).getByText('0:15')).toBeInTheDocument();
 
-  await user.click(within(recording).getByRole('button', { name: 'Play the recording, 15 seconds' }));
+  await user.click(
+    within(recording).getByRole('button', { name: 'Play the recording, 15 seconds' }),
+  );
 
   const toggle = within(recording).getByRole('button', { name: 'Pause the recording' });
   expect(toggle).toHaveTextContent('Loading…');
@@ -395,7 +404,7 @@ it('says it is loading until the page arrives', async () => {
 });
 ```
 
-The answer is the real memorial (`loadMemorial` from the registry): only *when* it arrives is controlled.
+The answer is the real memorial (`loadMemorial` from the registry): only _when_ it arrives is controlled.
 
 ### Per-Test Overrides for Failures
 
@@ -418,7 +427,9 @@ it('says the extra did not load and offers to reload it here', async () => {
 
   await user.click(within(sheet).getByRole('button', { name: 'Reload' }));
 
-  expect(navigation.address).toBe('http://localhost:3000/?mission=apollo-11&event=liftoff&extra=stages');
+  expect(navigation.address).toBe(
+    'http://localhost:3000/?mission=apollo-11&event=liftoff&extra=stages',
+  );
 });
 ```
 
@@ -431,7 +442,9 @@ it('ignores a page that arrives after it was closed', async () => {
   const closedEarly = later<Memorial>();
   const openedAgain = later<Memorial>();
   const answers = [closedEarly, openedAgain];
-  const { user } = await mountMission('apollo-11', { loadMemorial: () => (answers.shift() ?? later<Memorial>()).promise });
+  const { user } = await mountMission('apollo-11', {
+    loadMemorial: () => (answers.shift() ?? later<Memorial>()).promise,
+  });
   await openApollo1(user);
   await user.click(screen.getByRole('button', { name: 'Close' }));
   await openApollo1(user);
@@ -458,15 +471,15 @@ Every override lasts for its own test only: each test mounts afresh, and the set
 
 The data is the real content. Pick missions that differ in the way the test needs:
 
-| Need | Mission |
-|---|---|
-| A Moon flight with two craft, a landing, recordings, call signs | `apollo-11`, `apollo-17` |
-| Earth orbit, two craft, an event before liftoff, a spin, no call signs | `gemini-8` |
-| A short tour (6 stops), one craft | `gemini-3` |
-| Sources borrowed from other missions | `gemini-7` (from Gemini 6A and Gemini 8) |
-| A Moon flight with no landing, one craft | `apollo-8` |
-| A memorial page | `apollo-1` (opened from the mission list) |
-| A hands-on extra on an event | `liftoff` on most flights ("Drop the stages"); `docking` on Gemini 8 ("Dock two spacecraft") |
+| Need                                                                   | Mission                                                                                      |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| A Moon flight with two craft, a landing, recordings, call signs        | `apollo-11`, `apollo-17`                                                                     |
+| Earth orbit, two craft, an event before liftoff, a spin, no call signs | `gemini-8`                                                                                   |
+| A short tour (6 stops), one craft                                      | `gemini-3`                                                                                   |
+| Sources borrowed from other missions                                   | `gemini-7` (from Gemini 6A and Gemini 8)                                                     |
+| A Moon flight with no landing, one craft                               | `apollo-8`                                                                                   |
+| A memorial page                                                        | `apollo-1` (opened from the mission list)                                                    |
+| A hands-on extra on an event                                           | `liftoff` on most flights ("Drop the stages"); `docking` on Gemini 8 ("Dock two spacecraft") |
 
 Assert with the content's own words, written out: `'The Eagle has landed'`, `'Stop 1 of 6'`, `'102:45:39'`. When the test passes text in (a no-3D note), take it from `copy` (`src/content/copy.ts`) as the site does.
 
@@ -489,7 +502,9 @@ await mountMission('apollo-11', { story: withoutLiftoff });
 ```ts
 /** The real list, with Gemini 7 as a flight that has no tour (every real flight has one). */
 const gemini7WithoutATour = (summaries: readonly MissionSummary[]): MissionSummary[] =>
-  summaries.map((summary) => (summary.id === 'gemini-7' ? { ...summary, hasTour: false } : summary));
+  summaries.map((summary) =>
+    summary.id === 'gemini-7' ? { ...summary, hasTour: false } : summary,
+  );
 
 await mountMission('apollo-11', { missionList: gemini7WithoutATour });
 ```
@@ -498,7 +513,12 @@ A pure helper takes its fixture directly:
 
 ```ts
 /** A flight with no landing and no splashdown: none of the real ones, so a typed fixture. */
-const noLandingNoSplashdown: FlightOutline = { ships: 1, landsOnMoon: false, splashdown: false, turns: false };
+const noLandingNoSplashdown: FlightOutline = {
+  ships: 1,
+  landsOnMoon: false,
+  splashdown: false,
+  turns: false,
+};
 ```
 
 With `exactOptionalPropertyTypes` on, leave an optional field out by deleting it from a copy, not by setting it to `undefined`:
@@ -513,6 +533,7 @@ function withoutLaunch(mission: Mission): Mission {
 ```
 
 **Rules for data:**
+
 - Real missions first; a fixture only for an edge no mission has
 - Build fixtures from a real mission with spread, so everything else stays real
 - Type every fixture with the content types (`Mission`, `MissionSummary`, `Memorial`, `FlightOutline`, `Citation`)
@@ -557,7 +578,9 @@ it('steps to the next and previous events', async () => {
   expect(within(card).getByRole('button', { name: 'Previous event' })).toBeDisabled();
 
   await user.click(within(card).getByRole('button', { name: 'Next event' }));
-  expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent('First stage separates');
+  expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent(
+    'First stage separates',
+  );
 });
 ```
 
@@ -578,7 +601,10 @@ await user.keyboard('{End}');
 await user.keyboard('{Escape}');
 
 // A select, by the option's text
-await user.selectOptions(within(timeline).getByRole('combobox', { name: 'Jump to a chapter' }), 'Splashdown');
+await user.selectOptions(
+  within(timeline).getByRole('combobox', { name: 'Jump to a chapter' }),
+  'Splashdown',
+);
 
 // Open a folded Sources list
 await user.click(within(sources).getByText('Sources (7)'));
@@ -596,14 +622,14 @@ The scene, the speakers, and the screen act on their own. Those are calls on the
 
 Use the highest-priority query that works:
 
-| Priority | Query | When to use |
-|----------|-------|-------------|
-| 1 | `getByRole` | Buttons, links, headings, dialogs, regions, sliders, comboboxes, figures, statuses |
-| 2 | `getByLabelText` | Form fields with a label |
-| 3 | `getByPlaceholderText` | Inputs with placeholder text (none on this site yet) |
-| 4 | `getByText` | Text that is not a control: a date line, a note, a transcript |
-| 5 | `getByDisplayValue` | A control's current value |
-| 6 | `getByTestId` | Never in interface tests (below) |
+| Priority | Query                  | When to use                                                                        |
+| -------- | ---------------------- | ---------------------------------------------------------------------------------- |
+| 1        | `getByRole`            | Buttons, links, headings, dialogs, regions, sliders, comboboxes, figures, statuses |
+| 2        | `getByLabelText`       | Form fields with a label                                                           |
+| 3        | `getByPlaceholderText` | Inputs with placeholder text (none on this site yet)                               |
+| 4        | `getByText`            | Text that is not a control: a date line, a note, a transcript                      |
+| 5        | `getByDisplayValue`    | A control's current value                                                          |
+| 6        | `getByTestId`          | Never in interface tests (below)                                                   |
 
 ### `getByTestId` Is for the Browser Tests
 
@@ -613,38 +639,38 @@ Use the highest-priority query that works:
 
 ```ts
 // Dialogs, by their titles
-screen.getByRole('dialog', { name: 'Mission to the Moon' })   // the mission list
-screen.getByRole('dialog', { name: 'About Apollo 11' })
+screen.getByRole('dialog', { name: 'Mission to the Moon' }); // the mission list
+screen.getByRole('dialog', { name: 'About Apollo 11' });
 
 // Landmarks and groups named in index.html
-screen.getByRole('region', { name: 'Timeline' })
-screen.getByRole('region', { name: 'Guided tour' })
-screen.getByRole('group', { name: 'Look at' })
-within(timeline).getByRole('group', { name: 'Chapters' })
+screen.getByRole('region', { name: 'Timeline' });
+screen.getByRole('region', { name: 'Guided tour' });
+screen.getByRole('group', { name: 'Look at' });
+within(timeline).getByRole('group', { name: 'Chapters' });
 
 // The event card is an article; its title is its only level-3 heading
 const card = screen.getByRole('article');
-within(card).getByRole('heading', { level: 3 })
+within(card).getByRole('heading', { level: 3 });
 
 // Controls
-within(timeline).getByRole('slider', { name: 'Mission time' })
-within(timeline).getByRole('combobox', { name: 'Speed' })
-within(card).getByRole('region', { name: 'Recording' })
-within(recording).getByRole('status')
+within(timeline).getByRole('slider', { name: 'Mission time' });
+within(timeline).getByRole('combobox', { name: 'Speed' });
+within(card).getByRole('region', { name: 'Recording' });
+within(recording).getByRole('status');
 
 // The mission on show in the list
-within(missionList()).getByRole('listitem', { current: true })
+within(missionList()).getByRole('listitem', { current: true });
 
 // A folded Sources list is a group; the photo is a figure
-within(card).getByRole('group')
-within(card).getByRole('figure')
+within(card).getByRole('group');
+within(card).getByRole('figure');
 ```
 
 **Names with hidden words.** A link that opens a new tab ends with hidden words, and the mission's button ends with ", all missions". Match the start or the end with a regular expression:
 
 ```ts
-within(photo).getByRole('link', { name: /^Original/ })
-screen.getByRole('button', { name: /all missions$/ })
+within(photo).getByRole('link', { name: /^Original/ });
+screen.getByRole('button', { name: /all missions$/ });
 ```
 
 ---
@@ -737,10 +763,9 @@ describe('announcements', () => {
     await user.click(screen.getByRole('button', { name: 'Next event' }));
     settle(frames);
 
-    expect(screen.getByText('In orbit around Earth, 11 minutes after liftoff, day 1 of the flight.')).toHaveAttribute(
-      'aria-live',
-      'polite',
-    );
+    expect(
+      screen.getByText('In orbit around Earth, 11 minutes after liftoff, day 1 of the flight.'),
+    ).toHaveAttribute('aria-live', 'polite');
     expect(screen.queryByText(/^First stage separates,/)).not.toBeInTheDocument();
   });
 });
@@ -750,20 +775,20 @@ describe('announcements', () => {
 
 ### Common Matchers Reference
 
-| Matcher | Use for |
-|---------|---------|
-| `.toBeInTheDocument()` | The element exists |
-| `.toBeVisible()` | It exists and can be seen (not `hidden`, not folded away) |
-| `.toHaveTextContent('text')` | It contains the text (whitespace normalized) |
-| `.toHaveAccessibleName('name')` | What a screen reader calls it |
-| `.toHaveAccessibleDescription(text)` | Its description (`aria-describedby`) |
-| `.toHaveAttribute('aria-pressed', 'true')` | Pressed, expanded, and current states |
-| `.toHaveFocus()` | Keyboard focus is on it |
-| `.toBeDisabled()` / `.toBeEnabled()` | A control can or cannot be used |
-| `.toHaveDisplayValue('2×')` | The option a select shows |
-| `.toHaveClass('is-touring')` | A state the page marks with a class |
-| `.toEqual([...])` | Lists of names, the device's stored visits |
-| `.not.toBeInTheDocument()` | It does not exist (with `queryBy*`) |
+| Matcher                                    | Use for                                                   |
+| ------------------------------------------ | --------------------------------------------------------- |
+| `.toBeInTheDocument()`                     | The element exists                                        |
+| `.toBeVisible()`                           | It exists and can be seen (not `hidden`, not folded away) |
+| `.toHaveTextContent('text')`               | It contains the text (whitespace normalized)              |
+| `.toHaveAccessibleName('name')`            | What a screen reader calls it                             |
+| `.toHaveAccessibleDescription(text)`       | Its description (`aria-describedby`)                      |
+| `.toHaveAttribute('aria-pressed', 'true')` | Pressed, expanded, and current states                     |
+| `.toHaveFocus()`                           | Keyboard focus is on it                                   |
+| `.toBeDisabled()` / `.toBeEnabled()`       | A control can or cannot be used                           |
+| `.toHaveDisplayValue('2×')`                | The option a select shows                                 |
+| `.toHaveClass('is-touring')`               | A state the page marks with a class                       |
+| `.toEqual([...])`                          | Lists of names, the device's stored visits                |
+| `.not.toBeInTheDocument()`                 | It does not exist (with `queryBy*`)                       |
 
 ---
 
@@ -783,7 +808,9 @@ it("does not let an extra change the site's own values", () => {
   extraStore('patches').set('visited-missions', ['apollo-13']);
 
   expect(extraStore('patches').get('visited-missions')).toEqual(['apollo-8']);
-  expect(warn).toHaveBeenCalledWith('"visited-missions" is kept by the site; extras can read it but not change it.');
+  expect(warn).toHaveBeenCalledWith(
+    '"visited-missions" is kept by the site; extras can read it but not change it.',
+  );
 });
 ```
 
@@ -832,21 +859,32 @@ Every test file follows this order. Here is `src/ui/extra-sheet.test.ts`, trimme
 
 // ── Imports ──────────────────────────────────
 import { describe, expect, it, vi } from 'vitest';
-import { mountMission, navigation, screen, sound, within } from '../test/test-utils.ts';
-import { meta as stages } from '../extras/stages/meta.ts';
 import type { Mission } from '../content/types.ts';
+import { meta as stages } from '../extras/stages/meta.ts';
 import type { Extra } from '../extras/types.ts';
+import { mountMission, navigation, screen, sound, within } from '../test/test-utils.ts';
 
 // ── Typed fixtures and tiny fakes ────────────
-const tinyStages: Extra = { meta: stages, mount(host, context, params) { /* ... */ } };
+const tinyStages: Extra = {
+  meta: stages,
+  mount(host, context, params) {
+    /* ... */
+  },
+};
 const loadTinyStages = (): Promise<Extra> => Promise.resolve(tinyStages);
-const tryItOnTheLanding = (mission: Mission): Mission => ({ /* ... */ });
+const tryItOnTheLanding = (mission: Mission): Mission => ({/* ... */});
 
 // ── Test suites ──────────────────────────────
 describe('the extras sheet', () => {
-  describe('opening', () => { /* ... */ });
-  describe('closing', () => { /* ... */ });
-  describe('failing to load', () => { /* ... */ });
+  describe('opening', () => {
+    /* ... */
+  });
+  describe('closing', () => {
+    /* ... */
+  });
+  describe('failing to load', () => {
+    /* ... */
+  });
 });
 ```
 
@@ -863,17 +901,17 @@ Each test reads in three steps, separated by blank lines: mount (and get to the 
 
 ### Standard Behavioral Describe Groupings
 
-| Grouping | When to use |
-|----------|-------------|
-| `rendering` | What a part shows for a mission, and what it leaves out |
-| `opening` / `closing` | A dialog or sheet coming and going, focus, the tab title |
-| `loading` / `failing to load` | A loader's waiting, answer, and failure |
-| `choosing` | Picking an entry, a view, a chapter |
-| `stepping` / `traveling` | The card's Previous and Next; the tour's trips and Skip |
-| `exploring` / `touring` / `during the tour` | States of the whole interface |
-| `the ending` / `leaving` | The tour's end and the ways out of it |
-| `announcements` | What screen readers hear (fake timers allowed here) |
-| Domain groups | `photo`, `sources`, `try it`, `recording`, `true scale`, `one at a time` |
+| Grouping                                    | When to use                                                              |
+| ------------------------------------------- | ------------------------------------------------------------------------ |
+| `rendering`                                 | What a part shows for a mission, and what it leaves out                  |
+| `opening` / `closing`                       | A dialog or sheet coming and going, focus, the tab title                 |
+| `loading` / `failing to load`               | A loader's waiting, answer, and failure                                  |
+| `choosing`                                  | Picking an entry, a view, a chapter                                      |
+| `stepping` / `traveling`                    | The card's Previous and Next; the tour's trips and Skip                  |
+| `exploring` / `touring` / `during the tour` | States of the whole interface                                            |
+| `the ending` / `leaving`                    | The tour's end and the ways out of it                                    |
+| `announcements`                             | What screen readers hear (fake timers allowed here)                      |
+| Domain groups                               | `photo`, `sources`, `try it`, `recording`, `true scale`, `one at a time` |
 
 ---
 
@@ -904,7 +942,10 @@ A builder that returns elements (a citation list) is tested on the element it re
 it("links to the citation's own page, or else to the source's", () => {
   const list = citationList([TIMELINE, WHOLE_CATALOG]);
 
-  expect(within(list).getByRole('link', { name: /^Apollo 11 Timeline/ })).toHaveAttribute('href', TIMELINE.url);
+  expect(within(list).getByRole('link', { name: /^Apollo 11 Timeline/ })).toHaveAttribute(
+    'href',
+    TIMELINE.url,
+  );
   expect(within(list).getByRole('link', { name: /^NSSDCA Master Catalog/ })).toHaveAttribute(
     'href',
     SOURCES['nssdca-master-catalog'].url,
@@ -941,7 +982,7 @@ import { story as gemini8 } from '../content/missions/gemini-8/story.ts';
 ```ts
 // WRONG - a page that is not the real one, wired differently from the site
 document.body.innerHTML = '<article id="card"></article>';
-setUpEventCard({ /* ... */ });
+setUpEventCard({/* ... */});
 
 // CORRECT - the real page, the real interface, the real mission
 await mountMission('apollo-11', { event: 'landing' });
@@ -1024,7 +1065,9 @@ expect(screen.getByText('Fast forward')).not.toBeVisible();
 
 ```ts
 // WRONG - one interface test per mission, for a rule about the content
-for (const id of allMissionIds) { /* mount and check every card */ }
+for (const id of allMissionIds) {
+  /* mount and check every card */
+}
 
 // CORRECT - the rule once, for every mission, in src/sim/test/all-missions.test.ts;
 // the interface test uses one or two missions that differ
@@ -1039,7 +1082,9 @@ expect(secondsTaken).toBe(5);
 
 // CORRECT - draw enough frames, then check it arrived
 frames.advance(A_WHOLE_TRIP);
-expect(within(screen.getByRole('region', { name: 'Timeline' })).getByText('01:33:00')).toBeInTheDocument();
+expect(
+  within(screen.getByRole('region', { name: 'Timeline' })).getByText('01:33:00'),
+).toBeInTheDocument();
 ```
 
 ---

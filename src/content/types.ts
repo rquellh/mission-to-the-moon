@@ -10,7 +10,7 @@
  * The flight path (orbits, burns, landing and splashdown points) is described
  * separately, by the flight plan types in src/sim/.
  */
-import type { SourceId } from "./sources.ts";
+import type { SourceId } from './sources.ts';
 
 /** Where a fact comes from: a registered source and the exact place in it. */
 export interface Citation {
@@ -67,13 +67,13 @@ export type ElapsedTime = `${number}:${number}:${number}`;
 
 /** Converts an elapsed time to seconds on the mission clock (negative before liftoff). */
 export function elapsedToSeconds(elapsed: ElapsedTime): number {
-  const before = elapsed.trim().startsWith("-");
-  const [hours = 0, minutes = 0, seconds = 0] = elapsed.replace("-", "").split(":").map(Number);
+  const before = elapsed.trim().startsWith('-');
+  const [hours = 0, minutes = 0, seconds = 0] = elapsed.replace('-', '').split(':').map(Number);
   const total = hours * 3600 + minutes * 60 + seconds;
   return before ? -total : total;
 }
 
-export type Program = "gemini" | "apollo";
+export type Program = 'gemini' | 'apollo';
 
 export interface CrewMember {
   name: string;
@@ -123,7 +123,7 @@ export interface AudioClip {
  * Where the camera looks while an event is featured. A presentation hint,
  * not a fact: "journey" shows Earth and Moon together.
  */
-export type EventView = "earth" | "moon" | "spacecraft" | "journey";
+export type EventView = 'earth' | 'moon' | 'spacecraft' | 'journey';
 
 /** A named stretch of a mission, used to group events and to jump around the timeline. */
 export interface Chapter {
@@ -175,12 +175,12 @@ export interface Mission {
   /** For example "Apollo 11". */
   name: string;
   /** "memorial" is for Apollo 1, which has no flight to show. */
-  kind: "flight" | "memorial";
+  kind: 'flight' | 'memorial';
   /**
    * How far the flight went. It decides which camera views the site offers:
    * a flight that stayed in Earth orbit has no Moon view (see src/app/views.ts).
    */
-  destination: "earth-orbit" | "moon";
+  destination: 'earth-orbit' | 'moon';
   summary: Fact;
   crew: Cited<CrewMember[]>;
   /**
@@ -217,9 +217,9 @@ export interface MissionSummary {
   /** For example "Apollo 11". */
   name: string;
   /** "memorial" is for Apollo 1, which has a page of remembrance and no flight. */
-  kind: "flight" | "memorial";
+  kind: 'flight' | 'memorial';
   /** Flights only: the same as the story's destination. */
-  destination?: "earth-orbit" | "moon";
+  destination?: 'earth-orbit' | 'moon';
   /** The short level of the story's summary, word for word. */
   blurb: string;
   /** Launch, universal time as ISO 8601. For a memorial, the day it remembers. */
@@ -229,7 +229,7 @@ export interface MissionSummary {
   /** True when the story has tour stops. */
   hasTour: boolean;
   /** "draft" keeps an unfinished mission out of the published list. */
-  status: "ready" | "draft";
+  status: 'ready' | 'draft';
 }
 
 /** A page of remembrance for a crew that did not fly (Apollo 1). */

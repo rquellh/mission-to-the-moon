@@ -9,14 +9,23 @@
  * Never compare pictures or read pixels. If a test needs something the
  * report cannot say, add it to the report.
  */
-import type { SceneBox, SceneLeftBehind, ScenePart, SceneReport, SceneShip } from '../../src/scene/report';
+import type {
+  SceneBox,
+  SceneLeftBehind,
+  ScenePart,
+  SceneReport,
+  SceneShip,
+} from '../../src/scene/report';
 
 export type { SceneBox, SceneReport } from '../../src/scene/report';
 
 /** A ship of the flight by its id ("csm", "lm", "gemini", ...). */
 export function shipOf(report: SceneReport, id: string): SceneShip {
   const ship = report.ships.find((candidate) => candidate.id === id);
-  if (!ship) throw new Error(`The scene has no ship "${id}"; it has ${report.ships.map((s) => s.id).join(', ')}.`);
+  if (!ship)
+    throw new Error(
+      `The scene has no ship "${id}"; it has ${report.ships.map((s) => s.id).join(', ')}.`,
+    );
   return ship;
 }
 
@@ -29,7 +38,10 @@ export function followedShip(report: SceneReport): SceneShip {
 export function partOf(report: SceneReport, shipId: string, name: string): ScenePart {
   const ship = shipOf(report, shipId);
   const part = ship.parts.find((candidate) => candidate.name === name);
-  if (!part) throw new Error(`Ship "${shipId}" has no part "${name}" now; it has ${ship.parts.map((p) => p.name).join(', ')}.`);
+  if (!part)
+    throw new Error(
+      `Ship "${shipId}" has no part "${name}" now; it has ${ship.parts.map((p) => p.name).join(', ')}.`,
+    );
   return part;
 }
 

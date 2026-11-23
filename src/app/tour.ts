@@ -1,4 +1,9 @@
-import { elapsedToSeconds, type EventView, type Mission, type MissionEvent } from '../content/types.ts';
+import {
+  elapsedToSeconds,
+  type EventView,
+  type Mission,
+  type MissionEvent,
+} from '../content/types.ts';
 import type { Director, Player } from './contract.ts';
 import { nearestView } from './views.ts';
 

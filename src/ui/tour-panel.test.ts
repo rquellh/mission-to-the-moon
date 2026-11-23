@@ -37,15 +37,21 @@ describe('the tour panel', () => {
       await user.click(within(panel).getByRole('button', { name: 'Next' }));
 
       expect(panel).toHaveTextContent('Stop 2 of 6 On the way…');
-      expect(within(panel).getByRole('button', { name: 'Skip to this stop' })).toHaveTextContent('Skip');
-      expect(screen.getByRole('heading', { level: 3, name: 'The first orbit change' })).toBeInTheDocument();
+      expect(within(panel).getByRole('button', { name: 'Skip to this stop' })).toHaveTextContent(
+        'Skip',
+      );
+      expect(
+        screen.getByRole('heading', { level: 3, name: 'The first orbit change' }),
+      ).toBeInTheDocument();
 
       frames.advance(A_WHOLE_TRIP);
 
       expect(panel).toHaveTextContent('Stop 2 of 6');
       expect(panel).not.toHaveTextContent('On the way…');
       expect(within(panel).getByRole('button', { name: 'Next' })).toBeEnabled();
-      expect(within(screen.getByRole('region', { name: 'Timeline' })).getByText('01:33:00')).toBeInTheDocument();
+      expect(
+        within(screen.getByRole('region', { name: 'Timeline' })).getByText('01:33:00'),
+      ).toBeInTheDocument();
     });
 
     it('skips the rest of the trip and arrives at once', async () => {
@@ -58,7 +64,9 @@ describe('the tour panel', () => {
 
       expect(panel).toHaveTextContent('Stop 2 of 6');
       expect(panel).not.toHaveTextContent('On the way…');
-      expect(within(screen.getByRole('region', { name: 'Timeline' })).getByText('01:33:00')).toBeInTheDocument();
+      expect(
+        within(screen.getByRole('region', { name: 'Timeline' })).getByText('01:33:00'),
+      ).toBeInTheDocument();
     });
 
     it('goes back to the stop before', async () => {
@@ -100,7 +108,9 @@ describe('the tour panel', () => {
 
       expect(screen.queryByRole('region', { name: 'Guided tour' })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Play' })).toHaveFocus();
-      expect(screen.getByRole('heading', { level: 3, name: 'Molly Brown comes aboard' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 3, name: 'Molly Brown comes aboard' }),
+      ).toBeInTheDocument();
     });
 
     it('starts the tour again from the first stop', async () => {
@@ -128,7 +138,9 @@ describe('the tour panel', () => {
       const timeline = screen.getByRole('region', { name: 'Timeline' });
       expect(within(timeline).getByText('01:33:00')).toBeInTheDocument();
       expect(within(timeline).getByRole('button', { name: 'Play' })).toHaveFocus();
-      expect(within(screen.getByRole('article')).getByRole('button', { name: 'Next event' })).toBeEnabled();
+      expect(
+        within(screen.getByRole('article')).getByRole('button', { name: 'Next event' }),
+      ).toBeEnabled();
     });
   });
 });

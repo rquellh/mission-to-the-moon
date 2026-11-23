@@ -40,7 +40,10 @@ export function storyIntervalLength(interval: number, options: StoryTimeOptions 
 }
 
 /** Builds a story clock from any list of mission times (sorted or not). */
-export function createStoryTime(times: readonly number[], options: StoryTimeOptions = {}): StoryTime {
+export function createStoryTime(
+  times: readonly number[],
+  options: StoryTimeOptions = {},
+): StoryTime {
   const keys = [...new Set(times.filter((t) => Number.isFinite(t)))].sort((a, b) => a - b);
   const story: number[] = [0];
   for (let i = 1; i < keys.length; i++) {

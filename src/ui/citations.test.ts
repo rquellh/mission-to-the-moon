@@ -4,9 +4,9 @@
  * link goes.
  */
 import { describe, expect, it } from 'vitest';
-import { within } from '../test/test-utils.ts';
 import { SOURCES } from '../content/sources.ts';
 import type { Citation } from '../content/types.ts';
+import { within } from '../test/test-utils.ts';
 import { citationList, externalLink, sourcesBlock } from './citations.ts';
 
 const TIMELINE: Citation = {
@@ -33,7 +33,9 @@ describe('citationList', () => {
     const list = citationList([TIMELINE, WHOLE_CATALOG, SUMMARY]);
 
     // One row per source, with its places in a list of their own inside it.
-    const [numbers, catalog] = within(list).getAllByRole('listitem').filter((item) => item.parentElement === list);
+    const [numbers, catalog] = within(list)
+      .getAllByRole('listitem')
+      .filter((item) => item.parentElement === list);
     expect(numbers).toHaveTextContent(SOURCES['apollo-by-the-numbers'].title);
     expect(within(numbers!).getAllByRole('link')).toHaveLength(2);
     expect(catalog).toHaveTextContent(SOURCES['nssdca-master-catalog'].title);
@@ -42,7 +44,10 @@ describe('citationList', () => {
   it("links to the citation's own page, or else to the source's", () => {
     const list = citationList([TIMELINE, WHOLE_CATALOG]);
 
-    expect(within(list).getByRole('link', { name: /^Apollo 11 Timeline/ })).toHaveAttribute('href', TIMELINE.url);
+    expect(within(list).getByRole('link', { name: /^Apollo 11 Timeline/ })).toHaveAttribute(
+      'href',
+      TIMELINE.url,
+    );
     expect(within(list).getByRole('link', { name: /^NSSDCA Master Catalog/ })).toHaveAttribute(
       'href',
       SOURCES['nssdca-master-catalog'].url,

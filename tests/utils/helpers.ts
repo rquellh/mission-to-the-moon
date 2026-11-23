@@ -13,7 +13,10 @@ import type { Page } from '@playwright/test';
 export async function withoutWebGL(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const getContext = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args: unknown[]) {
+    HTMLCanvasElement.prototype.getContext = function (
+      this: HTMLCanvasElement,
+      ...args: unknown[]
+    ) {
       const [kind] = args;
       if (typeof kind === 'string' && kind.toLowerCase().includes('webgl')) return null;
       return getContext.apply(this, args as Parameters<typeof getContext>);

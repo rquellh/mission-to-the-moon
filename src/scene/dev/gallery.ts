@@ -48,32 +48,42 @@ import {
 import type { Director, StoryMap } from '../../app/contract';
 import { MissionPlayer } from '../../app/player';
 import { elapsedToSeconds, type ElapsedTime, type EventView } from '../../content/types';
-import type { LeftBehind, VehicleChange, VehicleLayout, VehiclePart } from '../../content/vehicle-types';
+import type {
+  LeftBehind,
+  VehicleChange,
+  VehicleLayout,
+  VehiclePart,
+} from '../../content/vehicle-types';
 import { buildFlightPath, createStoryTime } from '../../sim';
 import { SHIP_AMBIENT_INTENSITY, SHIP_COLORS, SHIP_SUN_INTENSITY } from '../config';
+import { COLORS, createMiniView, createMoon, createVehicle, stackHeights } from '../kit';
 import { Stage } from '../stage';
 import { buildFleet, type PoseContext } from '../vehicles';
-import { COLORS, createMiniView, createMoon, createVehicle, stackHeights } from '../kit';
 import { fixture, invented } from './fixtures';
 
-const PRESETS = new Map(Object.entries({
-  'saturn-ib':
-    'm=launch:saturn-ib-first-stage+third-stage+adapter+service-module+command-module+escape-tower&m=launch:first-stage+aft-interstage+second-stage+third-stage+adapter+lm-descent-stage+lm-ascent-stage+service-module+command-module+escape-tower&dir=up&yaw=20&pitch=8',
-  'apollo-7': 'm=alone:service-module+command-module&m=alone:third-stage+adapter&yaw=40&pitch=20',
-  atda: 'm=alone:atda+atda-shroud&m=alone:atda&m=launch:atlas+atda+atda-shroud&m=launch:atlas+agena+agena-shroud&yaw=30&pitch=10',
-  spacewalk:
-    'm=alone:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+spacewalker&m=alone:service-module+command-module+spacewalker&yaw=25&pitch=25',
-  // Gemini IV's spacewalker close up, rolled about as the ship view rolls it.
-  'walker-close': 'm=alone:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+spacewalker+gas-gun&close=1&yaw=-10&pitch=8&roll=-15',
-  rover: 'm=alone:lm-descent-stage+lm-ascent-stage&left=lunar-rover&site=1&yaw=20&pitch=25',
-  'rover-after-liftoff': 'left=lm-descent-stage+lunar-rover&yaw=20&pitch=25',
-  'apollo-13':
-    'm=alone:service-module-damaged+command-module&m=docked:lm-descent-stage+lm-ascent-stage+command-module&m=alone:service-module-damaged&yaw=15&pitch=10',
-  'gemini-targets': 'm=docked:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+agena&m=docked:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+atda&yaw=30&pitch=15',
-  standup:
-    'm=alone:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+standup-spacewalker&m=docked:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+agena+standup-spacewalker&m=alone:service-module+command-module+standup-spacewalker&yaw=-25&pitch=30',
-  warnings: 'm=alone:lunar-rover&m=launch:titan-first-stage+titan-second-stage+spacewalker&m=alone:third-stage+gemini-main-parachute',
-}));
+const PRESETS = new Map(
+  Object.entries({
+    'saturn-ib':
+      'm=launch:saturn-ib-first-stage+third-stage+adapter+service-module+command-module+escape-tower&m=launch:first-stage+aft-interstage+second-stage+third-stage+adapter+lm-descent-stage+lm-ascent-stage+service-module+command-module+escape-tower&dir=up&yaw=20&pitch=8',
+    'apollo-7': 'm=alone:service-module+command-module&m=alone:third-stage+adapter&yaw=40&pitch=20',
+    atda: 'm=alone:atda+atda-shroud&m=alone:atda&m=launch:atlas+atda+atda-shroud&m=launch:atlas+agena+agena-shroud&yaw=30&pitch=10',
+    spacewalk:
+      'm=alone:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+spacewalker&m=alone:service-module+command-module+spacewalker&yaw=25&pitch=25',
+    // Gemini IV's spacewalker close up, rolled about as the ship view rolls it.
+    'walker-close':
+      'm=alone:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+spacewalker+gas-gun&close=1&yaw=-10&pitch=8&roll=-15',
+    rover: 'm=alone:lm-descent-stage+lm-ascent-stage&left=lunar-rover&site=1&yaw=20&pitch=25',
+    'rover-after-liftoff': 'left=lm-descent-stage+lunar-rover&yaw=20&pitch=25',
+    'apollo-13':
+      'm=alone:service-module-damaged+command-module&m=docked:lm-descent-stage+lm-ascent-stage+command-module&m=alone:service-module-damaged&yaw=15&pitch=10',
+    'gemini-targets':
+      'm=docked:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+agena&m=docked:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+atda&yaw=30&pitch=15',
+    standup:
+      'm=alone:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+standup-spacewalker&m=docked:gemini-equipment-section+gemini-retro-section+gemini-reentry-module+agena+standup-spacewalker&m=alone:service-module+command-module+standup-spacewalker&yaw=-25&pitch=30',
+    warnings:
+      'm=alone:lunar-rover&m=launch:titan-first-stage+titan-second-stage+spacewalker&m=alone:third-stage+gemini-main-parachute',
+  }),
+);
 
 const params = new URLSearchParams(window.location.search);
 const preset = PRESETS.get(params.get('preset') ?? '');
@@ -106,7 +116,10 @@ else showModels();
 function showKit(): void {
   canvas.remove();
   const box = document.createElement('div');
-  box.style.cssText = 'position:fixed;inset:0;display:flex;flex-direction:' + (window.innerWidth < 700 ? 'column' : 'row') + ';gap:6px;padding:40px 6px 6px;box-sizing:border-box';
+  box.style.cssText =
+    'position:fixed;inset:0;display:flex;flex-direction:' +
+    (window.innerWidth < 700 ? 'column' : 'row') +
+    ';gap:6px;padding:40px 6px 6px;box-sizing:border-box';
   const make = (): HTMLCanvasElement => {
     const c = document.createElement('canvas');
     c.tabIndex = 0;
@@ -134,12 +147,23 @@ function showKit(): void {
     view.dispose();
     scratch.remove();
   }
-  label.dataset['title'] = `kit: createMiniView + createVehicle (top or left), createMoon + addMarker + turnTo (bottom or right)${cycles ? `; ${cycles} views opened and disposed first` : ''}`;
+  label.dataset['title'] =
+    `kit: createMiniView + createVehicle (top or left), createMoon + addMarker + turnTo (bottom or right)${cycles ? `; ${cycles} views opened and disposed first` : ''}`;
   label.textContent = label.dataset['title'];
 
   // A Saturn IB, its first stage drifting away and coming back.
   const rocketView = createMiniView(a, { stars: true });
-  const rocket = createVehicle({ layout: 'launch', parts: ['saturn-ib-first-stage', 'third-stage', 'adapter', 'service-module', 'command-module', 'escape-tower'] });
+  const rocket = createVehicle({
+    layout: 'launch',
+    parts: [
+      'saturn-ib-first-stage',
+      'third-stage',
+      'adapter',
+      'service-module',
+      'command-module',
+      'escape-tower',
+    ],
+  });
   rocketView.scene.add(rocket.object);
   rocketView.frame(new Vector3(0, rocket.top / 2, 0), rocket.top * 0.6);
   let clock = 0;
@@ -194,11 +218,20 @@ function showModels(): void {
     return change;
   });
   const leftParts = (params.get('left') ?? '').split(/[+ ,]/).filter(Boolean) as VehiclePart[];
-  const leftBehind: LeftBehind[] = leftParts.map((part) => ({ part, ship: 'site', at: AT, label: `left behind: ${part}` }));
+  const leftBehind: LeftBehind[] = leftParts.map((part) => ({
+    part,
+    ship: 'site',
+    at: AT,
+    label: `left behind: ${part}`,
+  }));
   label.dataset['title'] = [
-    ...changes.map((c, i) => `${i + 1}. ${c.layout}: ${c.parts.join(' + ')}${c.facing ? ` (${c.facing})` : ''}`),
+    ...changes.map(
+      (c, i) => `${i + 1}. ${c.layout}: ${c.parts.join(' + ')}${c.facing ? ` (${c.facing})` : ''}`,
+    ),
     leftParts.length ? `left behind: ${leftParts.join(' + ')}` : '',
-    changes.length === 0 && leftParts.length === 0 ? `presets: ${[...PRESETS.keys()].join(', ')}` : '',
+    changes.length === 0 && leftParts.length === 0
+      ? `presets: ${[...PRESETS.keys()].join(', ')}`
+      : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -222,10 +255,13 @@ function showModels(): void {
     () => 0,
   );
   // The glow behind each model only with &halo=1.
-  for (const model of fleet.ships) scene.add(...(params.get('halo') === '1' ? [model.halo] : []), model.root);
+  for (const model of fleet.ships)
+    scene.add(...(params.get('halo') === '1' ? [model.halo] : []), model.root);
   for (const part of fleet.leftBehind) scene.add(part.root);
 
-  const turn = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), -yaw).multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), pitch));
+  const turn = new Quaternion()
+    .setFromAxisAngle(new Vector3(0, 1, 0), -yaw)
+    .multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), pitch));
   const context: PoseContext = {
     time: 1,
     storyTime: 100,
@@ -249,7 +285,12 @@ function showModels(): void {
     const top = up === 'up' ? new Vector3(0, 0, 1) : new Vector3(0, 1, 0);
     // A roll about the long axis (as the ship view rolls a spacewalker's side toward the camera).
     top.applyAxisAngle(forward, roll);
-    return { exists: true, position: new Vector3(), forward: forward.applyQuaternion(turn), up: top.applyQuaternion(turn) };
+    return {
+      exists: true,
+      position: new Vector3(),
+      forward: forward.applyQuaternion(turn),
+      up: top.applyQuaternion(turn),
+    };
   });
   const siteUp = new Vector3(0, 1, 0).applyQuaternion(turn);
   const siteFront = new Vector3(1, 0, 0).applyQuaternion(turn);
@@ -262,7 +303,8 @@ function showModels(): void {
       model.update(poses[i]!, context);
       return visibleBox(model.root);
     });
-    for (const part of fleet.leftBehind) part.update(true, new Vector3(), siteUp, siteFront, context);
+    for (const part of fleet.leftBehind)
+      part.update(true, new Vector3(), siteUp, siteFront, context);
     return boxes;
   };
 
@@ -294,7 +336,8 @@ function showModels(): void {
     context.unitsPerPixel = unitsPerPixel;
     context.metersPerPixel = unitsPerPixel;
     fleet.ships.forEach((model, i) => model.update(poses[i]!, context));
-    for (const part of fleet.leftBehind) part.update(true, sitePosition, siteUp, siteFront, context);
+    for (const part of fleet.leftBehind)
+      part.update(true, sitePosition, siteUp, siteFront, context);
   };
   finalPose(1);
   const all = new Box3();
@@ -307,7 +350,8 @@ function showModels(): void {
     for (const model of fleet.ships) {
       model.root.traverse((node) => {
         const figure = node.children[0];
-        if (figure && (node.name === 'spacewalker' || node.name === 'standup-spacewalker')) figures.union(visibleBox(figure));
+        if (figure && (node.name === 'spacewalker' || node.name === 'standup-spacewalker'))
+          figures.union(visibleBox(figure));
       });
     }
     if (!figures.isEmpty()) all.copy(figures).expandByScalar(0.25);
@@ -351,7 +395,8 @@ function visibleBox(root: Object3D): Box3 {
     if (!(child instanceof Mesh) && !(child instanceof LineSegments)) return;
     if (!shown(child)) return;
     child.geometry.computeBoundingBox();
-    if (child.geometry.boundingBox) box.union(part.copy(child.geometry.boundingBox).applyMatrix4(child.matrixWorld));
+    if (child.geometry.boundingBox)
+      box.union(part.copy(child.geometry.boundingBox).applyMatrix4(child.matrixWorld));
   });
   return box;
 }
@@ -370,7 +415,11 @@ async function showFlight(name: string): Promise<void> {
     label.textContent = `The test flight could not be built: ${String(error)}`;
     throw error;
   }
-  const storyTime = createStoryTime([path.start, path.end, ...mission.events.map((e) => elapsedToSeconds(e.elapsed))]);
+  const storyTime = createStoryTime([
+    path.start,
+    path.end,
+    ...mission.events.map((e) => elapsedToSeconds(e.elapsed)),
+  ]);
   const story: StoryMap = {
     duration: storyTime.length,
     toStory: (seconds) => storyTime.toStory(seconds),
@@ -393,7 +442,13 @@ async function showFlight(name: string): Promise<void> {
     onContextRestored: () => undefined,
   });
   stage.setReducedMotion(params.get('reduced') === '1');
-  const views = new Map<string, EventView>([['earth', 'earth'], ['moon', 'moon'], ['spacecraft', 'spacecraft'], ['ship', 'spacecraft'], ['journey', 'journey']]);
+  const views = new Map<string, EventView>([
+    ['earth', 'earth'],
+    ['moon', 'moon'],
+    ['spacecraft', 'spacecraft'],
+    ['ship', 'spacecraft'],
+    ['journey', 'journey'],
+  ]);
   const view = views.get(params.get('view') ?? '');
   if (view) stage.setView(view);
   await stage.load(() => undefined);
@@ -406,13 +461,21 @@ async function showFlight(name: string): Promise<void> {
     const sign = s < 0 ? '-' : '';
     const a = Math.abs(s);
     const time = `${sign}${String(Math.floor(a / 3600)).padStart(3, '0')}:${String(Math.floor((a % 3600) / 60)).padStart(2, '0')}:${String(a % 60).padStart(2, '0')}`;
-    label.textContent = [`${name} ${time} ${player.playing ? 'playing' : 'paused'} ${player.rate}x ${director.view}`, ...notes].join('\n');
+    label.textContent = [
+      `${name} ${time} ${player.playing ? 'playing' : 'paused'} ${player.rate}x ${director.view}`,
+      ...notes,
+    ].join('\n');
   };
   player.subscribe(status);
   director.subscribe(status);
   status();
   window.addEventListener('keydown', (event) => {
-    const byKey = new Map<string, EventView>([['1', 'earth'], ['2', 'moon'], ['3', 'spacecraft'], ['4', 'journey']]);
+    const byKey = new Map<string, EventView>([
+      ['1', 'earth'],
+      ['2', 'moon'],
+      ['3', 'spacecraft'],
+      ['4', 'journey'],
+    ]);
     const keyView = byKey.get(event.key);
     if (event.key === ' ') {
       event.preventDefault();

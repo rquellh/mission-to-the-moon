@@ -8,8 +8,8 @@
  * not a fact about any flight; it is never shown on the site.
  */
 import { bundle as apollo11 } from '../../content/missions/apollo-11/index';
-import { bundle as gemini8 } from '../../content/missions/gemini-8/index';
 import type { MissionBundle } from '../../content/missions/bundle';
+import { bundle as gemini8 } from '../../content/missions/gemini-8/index';
 import type { Citation, Cited, ElapsedTime, Mission, MissionEvent } from '../../content/types';
 import type { LeftBehind, VehicleChange, VehiclePart } from '../../content/vehicle-types';
 import type { FlightPlan, Phase, ShipPlan } from '../../sim/types';
@@ -19,7 +19,10 @@ import type { FlightPlan, Phase, ShipPlan } from '../../sim/types';
  * source, so it names one (as the made-up values in src/sim/test do) and
  * says the value is not from it.
  */
-const INVENTED: Citation = { source: 'gemini-chronology', locator: 'INVENTED for a scene test; not a fact, and not from this source' };
+const INVENTED: Citation = {
+  source: 'gemini-chronology',
+  locator: 'INVENTED for a scene test; not a fact, and not from this source',
+};
 
 /** A value marked INVENTED. */
 export function invented<T>(value: T): Cited<T> {
@@ -52,9 +55,20 @@ function story(id: string, destination: Mission['destination'], hours: readonly 
   return { ...gemini8.mission, id, destination, events: hours.map(event) };
 }
 
-const GEMINI: readonly VehiclePart[] = ['gemini-equipment-section', 'gemini-retro-section', 'gemini-reentry-module'];
+const GEMINI: readonly VehiclePart[] = [
+  'gemini-equipment-section',
+  'gemini-retro-section',
+  'gemini-reentry-module',
+];
 
-function change(ship: string, at: Cited<ElapsedTime>, label: string, layout: VehicleChange['layout'], parts: readonly VehiclePart[], extra: Partial<VehicleChange> = {}): VehicleChange {
+function change(
+  ship: string,
+  at: Cited<ElapsedTime>,
+  label: string,
+  layout: VehicleChange['layout'],
+  parts: readonly VehiclePart[],
+  extra: Partial<VehicleChange> = {},
+): VehicleChange {
   return { ship, at, label, layout, parts, ...extra };
 }
 
@@ -74,11 +88,18 @@ function longOrbit(): MissionBundle {
   const plan = gemini8.flight;
   const crew = ship(plan, 'gemini');
   const [ascent, firstOrbit] = crew.phases;
-  if (!ascent || !firstOrbit || firstOrbit.kind !== 'orbit') throw new Error('Unexpected Gemini 8 plan');
+  if (!ascent || !firstOrbit || firstOrbit.kind !== 'orbit')
+    throw new Error('Unexpected Gemini 8 plan');
   const phases: [Phase, ...Phase[]] = [
     ascent,
     { ...firstOrbit, label: 'Ten days in orbit (INVENTED)', end: invented(clock(240)) },
-    { kind: 'burn', label: 'Retrofire (INVENTED)', body: 'earth', start: invented(clock(240)), end: invented('240:00:30' as ElapsedTime) },
+    {
+      kind: 'burn',
+      label: 'Retrofire (INVENTED)',
+      body: 'earth',
+      start: invented(clock(240)),
+      end: invented('240:00:30' as ElapsedTime),
+    },
     {
       kind: 'entry',
       label: 'Entry (INVENTED)',
@@ -90,16 +111,48 @@ function longOrbit(): MissionBundle {
   const flight: FlightPlan = { ...plan, missionId: 'dev-long-orbit', ships: [{ ...crew, phases }] };
   const hours = [0, 0.1, ...Array.from({ length: 20 }, (_, k) => 12 * (k + 1)), 48.5, 240.4];
   const vehicle: VehicleChange[] = [
-    change('gemini', ascent.start, 'Lift-off', 'launch', ['titan-first-stage', 'titan-second-stage', ...GEMINI]),
-    change('gemini', invented('000:02:35' as ElapsedTime), 'Staging', 'launch', ['titan-second-stage', ...GEMINI]),
+    change('gemini', ascent.start, 'Lift-off', 'launch', [
+      'titan-first-stage',
+      'titan-second-stage',
+      ...GEMINI,
+    ]),
+    change('gemini', invented('000:02:35' as ElapsedTime), 'Staging', 'launch', [
+      'titan-second-stage',
+      ...GEMINI,
+    ]),
     change('gemini', firstOrbit.start, 'In orbit', 'alone', GEMINI, { facing: 'forward' }),
-    change('gemini', invented(clock(48)), 'Spacewalk (INVENTED)', 'alone', [...GEMINI, 'spacewalker'], { facing: 'forward' }),
-    change('gemini', invented(clock(49)), 'Back inside (INVENTED)', 'alone', GEMINI, { facing: 'forward' }),
-    change('gemini', invented(clock(50)), 'Standing in the hatch (INVENTED)', 'alone', [...GEMINI, 'standup-spacewalker'], { facing: 'forward' }),
-    change('gemini', invented(clock(51)), 'Hatch closed (INVENTED)', 'alone', GEMINI, { facing: 'forward' }),
-    change('gemini', invented('240:00:45' as ElapsedTime), 'Entry', 'alone', ['gemini-reentry-module']),
+    change(
+      'gemini',
+      invented(clock(48)),
+      'Spacewalk (INVENTED)',
+      'alone',
+      [...GEMINI, 'spacewalker'],
+      { facing: 'forward' },
+    ),
+    change('gemini', invented(clock(49)), 'Back inside (INVENTED)', 'alone', GEMINI, {
+      facing: 'forward',
+    }),
+    change(
+      'gemini',
+      invented(clock(50)),
+      'Standing in the hatch (INVENTED)',
+      'alone',
+      [...GEMINI, 'standup-spacewalker'],
+      { facing: 'forward' },
+    ),
+    change('gemini', invented(clock(51)), 'Hatch closed (INVENTED)', 'alone', GEMINI, {
+      facing: 'forward',
+    }),
+    change('gemini', invented('240:00:45' as ElapsedTime), 'Entry', 'alone', [
+      'gemini-reentry-module',
+    ]),
   ];
-  return { mission: story('dev-long-orbit', 'earth-orbit', hours), flight, vehicle, leftBehind: [] };
+  return {
+    mission: story('dev-long-orbit', 'earth-orbit', hours),
+    flight,
+    vehicle,
+    leftBehind: [],
+  };
 }
 
 /** A model a pair test can give a ship: its parts at launch and in orbit. */
@@ -109,20 +162,36 @@ interface PairModel {
 }
 
 /** The models a pair test can give its two ships, by the name in the address (?main=, ?target=). */
-const PAIR_MODELS = new Map<string, PairModel>(Object.entries({
-  gemini: { launch: ['titan-first-stage', 'titan-second-stage', ...GEMINI], orbit: GEMINI },
-  agena: { launch: ['atlas', 'agena', 'agena-shroud'], orbit: ['agena'] },
-  atda: { launch: ['atlas', 'atda', 'atda-shroud'], orbit: ['atda', 'atda-shroud'] },
-  stage: {
-    launch: ['saturn-ib-first-stage', 'third-stage', 'adapter', 'service-module', 'command-module', 'escape-tower'],
-    orbit: ['third-stage', 'adapter'],
-  },
-  csm: {
-    launch: ['saturn-ib-first-stage', 'third-stage', 'adapter', 'service-module', 'command-module', 'escape-tower'],
-    orbit: ['service-module', 'command-module'],
-  },
-  lm: { launch: ['atlas', 'agena'], orbit: ['lm-descent-stage', 'lm-ascent-stage'] },
-}));
+const PAIR_MODELS = new Map<string, PairModel>(
+  Object.entries({
+    gemini: { launch: ['titan-first-stage', 'titan-second-stage', ...GEMINI], orbit: GEMINI },
+    agena: { launch: ['atlas', 'agena', 'agena-shroud'], orbit: ['agena'] },
+    atda: { launch: ['atlas', 'atda', 'atda-shroud'], orbit: ['atda', 'atda-shroud'] },
+    stage: {
+      launch: [
+        'saturn-ib-first-stage',
+        'third-stage',
+        'adapter',
+        'service-module',
+        'command-module',
+        'escape-tower',
+      ],
+      orbit: ['third-stage', 'adapter'],
+    },
+    csm: {
+      launch: [
+        'saturn-ib-first-stage',
+        'third-stage',
+        'adapter',
+        'service-module',
+        'command-module',
+        'escape-tower',
+      ],
+      orbit: ['service-module', 'command-module'],
+    },
+    lm: { launch: ['atlas', 'agena'], orbit: ['lm-descent-stage', 'lm-ascent-stage'] },
+  }),
+);
 
 /**
  * Two ships keeping station (INVENTED): Gemini 8's flight with its docking
@@ -132,14 +201,30 @@ const PAIR_MODELS = new Map<string, PairModel>(Object.entries({
  * module and its spent stage...). `facing` turns the main ship blunt end
  * first during the station keeping.
  */
-function pair(mainModel: string, targetModel: string, facing: 'forward' | 'backward'): MissionBundle {
+function pair(
+  mainModel: string,
+  targetModel: string,
+  facing: 'forward' | 'backward',
+): MissionBundle {
   const plan = gemini8.flight;
   const crew = ship(plan, 'gemini');
   const target = ship(plan, 'agena');
   const phases = crew.phases.map((phase): Phase =>
-    phase.kind === 'docked' ? { kind: 'station', label: 'Station keeping (INVENTED)', start: phase.start, end: phase.end, target: phase.target } : phase,
+    phase.kind === 'docked'
+      ? {
+          kind: 'station',
+          label: 'Station keeping (INVENTED)',
+          start: phase.start,
+          end: phase.end,
+          target: phase.target,
+        }
+      : phase,
   ) as [Phase, ...Phase[]];
-  const flight: FlightPlan = { ...plan, missionId: 'dev-pair', ships: [{ ...crew, phases }, target] };
+  const flight: FlightPlan = {
+    ...plan,
+    missionId: 'dev-pair',
+    ships: [{ ...crew, phases }, target],
+  };
   const main = PAIR_MODELS.get(mainModel) ?? PAIR_MODELS.get('gemini')!;
   const other = PAIR_MODELS.get(targetModel) ?? PAIR_MODELS.get('agena')!;
   const crewOrbit = crew.phases[1]!;
@@ -157,7 +242,12 @@ function pair(mainModel: string, targetModel: string, facing: 'forward' | 'backw
 
 /** Apollo 11 with a rover parked at Tranquility Base from the first moonwalk on (INVENTED: Apollo 11 had no rover). */
 function apollo11WithRover(): MissionBundle {
-  const rover: LeftBehind = { part: 'lunar-rover', ship: 'lm', at: invented('109:30:00' as ElapsedTime), label: 'Rover parked (INVENTED)' };
+  const rover: LeftBehind = {
+    part: 'lunar-rover',
+    ship: 'lm',
+    at: invented('109:30:00' as ElapsedTime),
+    label: 'Rover parked (INVENTED)',
+  };
   return { ...apollo11, leftBehind: [...apollo11.leftBehind, rover] };
 }
 
@@ -170,15 +260,40 @@ function apollo11WithRover(): MissionBundle {
  */
 function apollo13Ending(): MissionBundle {
   const LM: readonly VehiclePart[] = ['lm-descent-stage', 'lm-ascent-stage'];
-  const kept = apollo11.vehicle.filter((c) => c.ship !== 'csm' || elapsedSeconds(c.at.value) < 128 * 3600);
-  const tail = apollo11.vehicle.filter((c) => c.ship === 'csm' && elapsedSeconds(c.at.value) > 195 * 3600);
-  const separation = apollo11.vehicle.find((c) => c.ship === 'csm' && c.label.startsWith('Command module separates'))!;
+  const kept = apollo11.vehicle.filter(
+    (c) => c.ship !== 'csm' || elapsedSeconds(c.at.value) < 128 * 3600,
+  );
+  const tail = apollo11.vehicle.filter(
+    (c) => c.ship === 'csm' && elapsedSeconds(c.at.value) > 195 * 3600,
+  );
+  const separation = apollo11.vehicle.find(
+    (c) => c.ship === 'csm' && c.label.startsWith('Command module separates'),
+  )!;
   const vehicle: VehicleChange[] = [
     ...kept,
-    change('csm', invented('128:03:00' as ElapsedTime), 'Docked all the way home (INVENTED)', 'docked', [...LM, 'service-module', 'command-module']),
-    change('csm', invented(clock(150)), 'Service module damaged (INVENTED)', 'docked', [...LM, 'service-module-damaged', 'command-module']),
-    change('csm', separation.at, 'Service module cast off (INVENTED)', 'docked', [...LM, 'command-module']),
-    change('csm', invented('194:55:00' as ElapsedTime), 'Lunar module cast off (INVENTED)', 'alone', ['command-module']),
+    change(
+      'csm',
+      invented('128:03:00' as ElapsedTime),
+      'Docked all the way home (INVENTED)',
+      'docked',
+      [...LM, 'service-module', 'command-module'],
+    ),
+    change('csm', invented(clock(150)), 'Service module damaged (INVENTED)', 'docked', [
+      ...LM,
+      'service-module-damaged',
+      'command-module',
+    ]),
+    change('csm', separation.at, 'Service module cast off (INVENTED)', 'docked', [
+      ...LM,
+      'command-module',
+    ]),
+    change(
+      'csm',
+      invented('194:55:00' as ElapsedTime),
+      'Lunar module cast off (INVENTED)',
+      'alone',
+      ['command-module'],
+    ),
     ...tail,
   ];
   return { ...apollo11, vehicle, leftBehind: [] };
@@ -201,7 +316,11 @@ export function fixture(name: string, params: URLSearchParams): MissionBundle {
     case 'long-orbit':
       return longOrbit();
     case 'pair':
-      return pair(params.get('main') ?? 'gemini', params.get('target') ?? 'agena', params.get('facing') === 'backward' ? 'backward' : 'forward');
+      return pair(
+        params.get('main') ?? 'gemini',
+        params.get('target') ?? 'agena',
+        params.get('facing') === 'backward' ? 'backward' : 'forward',
+      );
     case 'apollo-11-rover':
       return apollo11WithRover();
     case 'apollo-13-ending':

@@ -9,7 +9,7 @@
  * heights compare truly and the shapes only roughly; the person's height
  * (1.8 meters) is an illustration.
  */
-import "./rockets.css";
+import './rockets.css';
 import {
   Box3,
   CapsuleGeometry,
@@ -21,15 +21,28 @@ import {
   PlaneGeometry,
   SphereGeometry,
   Vector3,
-} from "three";
-import type { MissionBundle } from "../../content/missions/bundle.ts";
-import type { Citation, MissionSummary } from "../../content/types.ts";
-import { createMiniView, createVehicle, disposeObject, type MiniView, type Vehicle } from "../../scene/kit.ts";
-import { sourcesBlock } from "../../ui/citations.ts";
-import { button, el } from "../../ui/dom.ts";
-import type { Extra, ExtraContext, ExtraMount } from "../types.ts";
-import { meta } from "./meta.ts";
-import { ROCKETS, heightMeters, liftoffParts, metersText, rocketOf, type Rocket } from "./rockets.ts";
+} from 'three';
+import type { MissionBundle } from '../../content/missions/bundle.ts';
+import type { Citation, MissionSummary } from '../../content/types.ts';
+import {
+  createMiniView,
+  createVehicle,
+  disposeObject,
+  type MiniView,
+  type Vehicle,
+} from '../../scene/kit.ts';
+import { sourcesBlock } from '../../ui/citations.ts';
+import { button, el } from '../../ui/dom.ts';
+import type { Extra, ExtraContext, ExtraMount } from '../types.ts';
+import { meta } from './meta.ts';
+import {
+  ROCKETS,
+  heightMeters,
+  liftoffParts,
+  metersText,
+  rocketOf,
+  type Rocket,
+} from './rockets.ts';
 
 /** The person beside the rockets, meters: an illustration for scale, not a cited height. */
 const PERSON_HEIGHT = 1.8;
@@ -58,42 +71,42 @@ interface Flights {
   missing: number;
 }
 
-const listFormat = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" });
+const listFormat = new Intl.ListFormat('en-US', { style: 'long', type: 'conjunction' });
 
 function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams): ExtraMount {
   const { signal } = context;
 
   /* The page. */
-  const root = el("div", "rk");
-  const stage = el("div", "rk__stage");
-  const canvas = el("canvas", "rk__canvas");
-  canvas.setAttribute("role", "img");
+  const root = el('div', 'rk');
+  const stage = el('div', 'rk__stage');
+  const canvas = el('canvas', 'rk__canvas');
+  canvas.setAttribute('role', 'img');
   canvas.setAttribute(
-    "aria-label",
-    `Three rockets side by side at their true heights: ${ROCKETS.map((r) => `${r.name}, ${r.height.printed} feet`).join("; ")}; and a person, for scale.`,
+    'aria-label',
+    `Three rockets side by side at their true heights: ${ROCKETS.map((r) => `${r.name}, ${r.height.printed} feet`).join('; ')}; and a person, for scale.`,
   );
-  const labels = el("div", "rk__labels");
-  labels.setAttribute("aria-hidden", "true");
-  const personLabel = el("div", "rk__label rk__label--person", "Person →");
+  const labels = el('div', 'rk__labels');
+  labels.setAttribute('aria-hidden', 'true');
+  const personLabel = el('div', 'rk__label rk__label--person', 'Person →');
   labels.append(personLabel);
   stage.append(canvas, labels);
 
-  const side = el("div", "rk__side");
+  const side = el('div', 'rk__side');
   const intro = el(
-    "p",
-    "extra-note rk__intro",
-    "These three rockets launched the crews on this site. They stand side by side at their true heights. The small figure at the far left is a person, for scale. Tap a rocket to learn about it.",
+    'p',
+    'extra-note rk__intro',
+    'These three rockets launched the crews on this site. They stand side by side at their true heights. The small figure at the far left is a person, for scale. Tap a rocket to learn about it.',
   );
-  const choices = el("div", "segmented rk__choices");
-  choices.setAttribute("role", "group");
-  choices.setAttribute("aria-label", "Choose a rocket");
-  const status = el("p", "extra-note rk__status", "Loading the rockets…");
-  const card = el("section", "extra-panel rk__card");
+  const choices = el('div', 'segmented rk__choices');
+  choices.setAttribute('role', 'group');
+  choices.setAttribute('aria-label', 'Choose a rocket');
+  const status = el('p', 'extra-note rk__status', 'Loading the rockets…');
+  const card = el('section', 'extra-panel rk__card');
   card.hidden = true;
   // Said on screen, as the header comment explains.
   const note = el(
-    "p",
-    "extra-note rk__note",
+    'p',
+    'extra-note rk__note',
     `Simplified: each rocket is a simple model, stretched to its true height, so the heights compare truly but the shapes are only close. The person is ${PERSON_HEIGHT} meters (about 6 feet) tall, an example for scale.`,
   );
   side.append(intro, choices, status, card, note);
@@ -101,10 +114,13 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
   host.append(root);
 
   const stands: Stand[] = ROCKETS.map((rocket) => {
-    const choice = button("segmented__item rk__choice", rocket.name);
-    choice.setAttribute("aria-pressed", "false");
-    const label = el("div", "rk__label");
-    label.append(el("span", "rk__label-name", rocket.name), el("span", "rk__label-height", `${rocket.height.printed} ft`));
+    const choice = button('segmented__item rk__choice', rocket.name);
+    choice.setAttribute('aria-pressed', 'false');
+    const label = el('div', 'rk__label');
+    label.append(
+      el('span', 'rk__label-name', rocket.name),
+      el('span', 'rk__label-height', `${rocket.height.printed} ft`),
+    );
     label.hidden = true;
     choices.append(choice);
     labels.append(label);
@@ -117,9 +133,13 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
     view = createMiniView(canvas);
   } catch {
     view = null;
-    stage.classList.add("rk__stage--none");
+    stage.classList.add('rk__stage--none');
     stage.replaceChildren(
-      el("p", "extra-note", "This browser cannot draw 3D pictures, so the rockets are not shown. Choose a rocket to read about it."),
+      el(
+        'p',
+        'extra-note',
+        'This browser cannot draw 3D pictures, so the rockets are not shown. Choose a rocket to read about it.',
+      ),
     );
   }
 
@@ -149,7 +169,10 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
   }
   const toScreen = (point: Vector3): ScreenPoint => {
     point.project((view as MiniView).camera);
-    return { x: ((point.x + 1) / 2) * canvas.clientWidth, y: ((1 - point.y) / 2) * canvas.clientHeight };
+    return {
+      x: ((point.x + 1) / 2) * canvas.clientWidth,
+      y: ((1 - point.y) / 2) * canvas.clientHeight,
+    };
   };
   const placeLabels = (): void => {
     if (!view) return;
@@ -165,7 +188,11 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
       let high = Infinity;
       let low = -Infinity;
       for (let i = 0; i < 8; i += 1) {
-        corner.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z);
+        corner.set(
+          i & 1 ? box.max.x : box.min.x,
+          i & 2 ? box.max.y : box.min.y,
+          i & 4 ? box.max.z : box.min.z,
+        );
         const p = toScreen(corner);
         left = Math.min(left, p.x);
         right = Math.max(right, p.x);
@@ -239,7 +266,11 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
     ground.position.set(width / 2 - 0.5, 0, 0);
     view.scene.add(ground);
     // The kit's frame sets the near plane and the controls; fit() then places the camera.
-    view.frame(new Vector3(width / 2 - 0.5, tallest / 2, 0), Math.max(tallest, width) / 2, LOOK_FROM);
+    view.frame(
+      new Vector3(width / 2 - 0.5, tallest / 2, 0),
+      Math.max(tallest, width) / 2,
+      LOOK_FROM,
+    );
     row = { left: -0.5, right: width - 0.5, height: tallest };
     // Turn a little either way and look from a little higher, never from below the ground.
     view.controls.minPolarAngle = Math.PI / 2 - 0.6;
@@ -256,14 +287,20 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
   const byProgram = new Map<string, Promise<{ bundles: MissionBundle[]; missing: number }>>();
 
   /** Every flight's story in a program, loaded once, when one of its rockets is first chosen. */
-  const programBundles = (program: string): Promise<{ bundles: MissionBundle[]; missing: number }> => {
+  const programBundles = (
+    program: string,
+  ): Promise<{ bundles: MissionBundle[]; missing: number }> => {
     let loading = byProgram.get(program);
     if (!loading) {
-      const flights = context.summaries.filter((s: MissionSummary) => s.kind === "flight" && s.program === program);
-      loading = Promise.allSettled(flights.map((s) => context.loadBundle(s.id))).then((results) => ({
-        bundles: results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : [])),
-        missing: results.filter((r) => r.status === "rejected").length,
-      }));
+      const flights = context.summaries.filter(
+        (s: MissionSummary) => s.kind === 'flight' && s.program === program,
+      );
+      loading = Promise.allSettled(flights.map((s) => context.loadBundle(s.id))).then(
+        (results) => ({
+          bundles: results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : [])),
+          missing: results.filter((r) => r.status === 'rejected').length,
+        }),
+      );
       byProgram.set(program, loading);
     }
     return loading;
@@ -281,75 +318,111 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
 
   const showCard = (stand: Stand): void => {
     const { rocket } = stand;
-    const heading = el("h3", "extra-heading", rocket.name);
+    const heading = el('h3', 'extra-heading', rocket.name);
     heading.id = `rk-name-${rocket.id}`;
-    card.setAttribute("aria-labelledby", heading.id);
-    const height = el("p", "extra-text rk__height");
-    height.append(el("strong", undefined, `${rocket.height.printed} feet`), " tall with its spacecraft on top, as launched.");
-    const meters = el("p", "extra-note rk__meters", `That is ${metersText(rocket)} (our conversion from feet).`);
-    const flights = el("p", "extra-text rk__flights", "Finding the flights it launched…");
-    const about = el("p", "extra-text rk__about", rocket.about.text.short);
+    card.setAttribute('aria-labelledby', heading.id);
+    const height = el('p', 'extra-text rk__height');
+    height.append(
+      el('strong', undefined, `${rocket.height.printed} feet`),
+      ' tall with its spacecraft on top, as launched.',
+    );
+    const meters = el(
+      'p',
+      'extra-note rk__meters',
+      `That is ${metersText(rocket)} (our conversion from feet).`,
+    );
+    const flights = el('p', 'extra-text rk__flights', 'Finding the flights it launched…');
+    const about = el('p', 'extra-text rk__about', rocket.about.text.short);
     const sources = (extra: Citation[] = []): HTMLDetailsElement =>
-      sourcesBlock([...rocket.height.citations, ...rocket.about.citations, ...extra], rocket.height.discrepancy, rocket.about.discrepancy);
+      sourcesBlock(
+        [...rocket.height.citations, ...rocket.about.citations, ...extra],
+        rocket.height.discrepancy,
+        rocket.about.discrepancy,
+      );
     const block = sources();
     card.replaceChildren(heading, height, meters, flights, about, block);
     card.hidden = false;
     void flightsOf(rocket).then((found) => {
       if (signal.aborted || chosen !== stand) return;
-      const list = found.names.length > 0 ? listFormat.format(found.names) : "none of the flights that could be loaded";
+      const list =
+        found.names.length > 0
+          ? listFormat.format(found.names)
+          : 'none of the flights that could be loaded';
       flights.textContent = `On this site it launched ${list}.`;
-      if (found.missing > 0) flights.append(" ", el("span", "extra-note", "Some flights could not be loaded, so this list may be short."));
+      if (found.missing > 0)
+        flights.append(
+          ' ',
+          el('span', 'extra-note', 'Some flights could not be loaded, so this list may be short.'),
+        );
       block.replaceWith(sources(found.citations));
     });
   };
 
-  const choose = (stand: Stand, how: "visitor" | "first"): void => {
+  const choose = (stand: Stand, how: 'visitor' | 'first'): void => {
     chosen = stand;
     for (const s of stands) {
-      s.choice.setAttribute("aria-pressed", String(s === stand));
-      s.label.classList.toggle("is-chosen", s === stand);
+      s.choice.setAttribute('aria-pressed', String(s === stand));
+      s.label.classList.toggle('is-chosen', s === stand);
     }
     showCard(stand);
-    if (how === "visitor") context.announce(`${stand.rocket.name}: ${stand.rocket.height.printed} feet tall.`);
+    if (how === 'visitor')
+      context.announce(`${stand.rocket.name}: ${stand.rocket.height.printed} feet tall.`);
   };
-  for (const stand of stands) stand.choice.addEventListener("click", () => choose(stand, "visitor"), { signal });
+  for (const stand of stands)
+    stand.choice.addEventListener('click', () => choose(stand, 'visitor'), { signal });
 
   // A tap (not a drag) on a rocket, or just above it on its label, chooses it.
   let down: { x: number; y: number; time: number } | null = null;
-  canvas.addEventListener("pointerdown", (e) => (down = { x: e.offsetX, y: e.offsetY, time: performance.now() }), { signal });
-  canvas.addEventListener("pointercancel", () => (down = null), { signal });
   canvas.addEventListener(
-    "pointerup",
+    'pointerdown',
+    (e) => (down = { x: e.offsetX, y: e.offsetY, time: performance.now() }),
+    { signal },
+  );
+  canvas.addEventListener('pointercancel', () => (down = null), { signal });
+  canvas.addEventListener(
+    'pointerup',
     (e) => {
       const start = down;
       down = null;
-      if (!start || Math.hypot(e.offsetX - start.x, e.offsetY - start.y) > 8 || performance.now() - start.time > 600) return;
+      if (
+        !start ||
+        Math.hypot(e.offsetX - start.x, e.offsetY - start.y) > 8 ||
+        performance.now() - start.time > 600
+      )
+        return;
       const slack = 12;
       const hits = onScreen.filter(
-        (s) => e.offsetX >= s.left - slack && e.offsetX <= s.right + slack && e.offsetY >= s.top - 48 && e.offsetY <= s.bottom + slack,
+        (s) =>
+          e.offsetX >= s.left - slack &&
+          e.offsetX <= s.right + slack &&
+          e.offsetY >= s.top - 48 &&
+          e.offsetY <= s.bottom + slack,
       );
-      const middle = (s: (typeof onScreen)[number]): number => Math.abs(e.offsetX - (s.left + s.right) / 2);
+      const middle = (s: (typeof onScreen)[number]): number =>
+        Math.abs(e.offsetX - (s.left + s.right) / 2);
       const hit = hits.sort((a, b) => middle(a) - middle(b))[0];
-      if (hit) choose(hit.stand, "visitor");
+      if (hit) choose(hit.stand, 'visitor');
     },
     { signal },
   );
 
   /* Loading: the three part lists, then the picture; the first card follows the mission behind the sheet. */
   void (async () => {
-    const results = await Promise.allSettled(ROCKETS.map((rocket) => context.loadBundle(rocket.partsFrom)));
+    const results = await Promise.allSettled(
+      ROCKETS.map((rocket) => context.loadBundle(rocket.partsFrom)),
+    );
     if (signal.aborted) return;
     const failed: string[] = [];
     results.forEach((result, i) => {
       const stand = stands[i];
       if (!stand) return;
-      const parts = result.status === "fulfilled" ? liftoffParts(result.value) : null;
+      const parts = result.status === 'fulfilled' ? liftoffParts(result.value) : null;
       if (!parts) {
-        if (result.status === "rejected") console.warn(result.reason);
+        if (result.status === 'rejected') console.warn(result.reason);
         failed.push(stand.rocket.name);
         return;
       }
-      if (view) stand.vehicle = createVehicle({ layout: "launch", parts });
+      if (view) stand.vehicle = createVehicle({ layout: 'launch', parts });
     });
     standUp();
     if (failed.length > 0) {
@@ -358,8 +431,8 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
     } else {
       status.hidden = true;
     }
-    let first = stands.find((s) => s.rocket.id === "saturn-v");
-    const wanted = params.get("mission") ?? context.missionId;
+    let first = stands.find((s) => s.rocket.id === 'saturn-v');
+    const wanted = params.get('mission') ?? context.missionId;
     try {
       const rocket = rocketOf(await context.loadBundle(wanted));
       first = stands.find((s) => s.rocket === rocket) ?? first;
@@ -367,7 +440,7 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
       // Not a flight with a story: start with the Saturn V.
     }
     if (signal.aborted || chosen) return;
-    if (first) choose(first, "first");
+    if (first) choose(first, 'first');
   })();
 
   return {

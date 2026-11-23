@@ -1,3 +1,4 @@
+import type { MissionBundle } from '../content/missions/bundle.ts';
 /**
  * Extras: hands-on moments and things to look through, beside the missions.
  *
@@ -107,8 +108,7 @@
  * values to test `params`). Check it at 390x844 and 1280x720 with
  * `node tools/screenshot.mjs`, with --reduced-motion, and by keyboard alone.
  */
-import type { EventView, MissionSummary } from "../content/types.ts";
-import type { MissionBundle } from "../content/missions/bundle.ts";
+import type { EventView, MissionSummary } from '../content/types.ts';
 
 export interface ExtraMeta {
   /** The folder name, for example "stages". */
@@ -118,11 +118,11 @@ export interface ExtraMeta {
   /** One plain sentence for the list. */
   blurb: string;
   /** "hands-on": something to try. "explore": something to look through. */
-  kind: "hands-on" | "explore";
+  kind: 'hands-on' | 'explore';
   /** Position in its group in the list (lower first). */
   order: number;
   /** "draft" keeps an unfinished extra off the published list. */
-  status: "ready" | "draft";
+  status: 'ready' | 'draft';
 }
 
 /** Where `openMission` should start the mission. */
@@ -134,7 +134,7 @@ export interface OpenMissionOptions {
   /** The camera view to start in. */
   view?: EventView;
   /** Begin with the guided tour or exploring, skipping the mission list. */
-  start?: "tour" | "explore";
+  start?: 'tour' | 'explore';
 }
 
 /** What the interface gives an extra. */
@@ -173,5 +173,9 @@ export interface Extra {
    * Draws itself into `host`, the body of a full-screen sheet. `params`
    * carries the address's other values (for example mission and event).
    */
-  mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams): ExtraMount | Promise<ExtraMount>;
+  mount(
+    host: HTMLElement,
+    context: ExtraContext,
+    params: URLSearchParams,
+  ): ExtraMount | Promise<ExtraMount>;
 }

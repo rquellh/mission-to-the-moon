@@ -9,7 +9,8 @@ export type HubMode = 'welcome' | 'return';
 /** An entry in the list: a mission (or memorial) or an extra. */
 export type HubTarget = { mission: string } | { extra: string };
 
-const keyOf = (target: HubTarget): string => ('mission' in target ? `mission:${target.mission}` : `extra:${target.extra}`);
+const keyOf = (target: HubTarget): string =>
+  'mission' in target ? `mission:${target.mission}` : `extra:${target.extra}`;
 
 export interface HubOptions {
   /** The flight whose scene is loaded behind the hub, or null when none could be loaded. */
@@ -106,7 +107,8 @@ function programHeading(program: Program, group: readonly MissionSummary[]): HTM
  * follow in two small, quieter groups and open over the page in place.
  */
 export function setUpHub(options: HubOptions): Hub {
-  const { currentId, currentName, summaries, isDraft, onTour, onExplore, onReturn, onMemorial } = options;
+  const { currentId, currentName, summaries, isDraft, onTour, onExplore, onReturn, onMemorial } =
+    options;
   const { extras, isExtraDraft, onExtra } = options;
   const dialog = byId('hub', HTMLDialogElement);
   const title = byId('hub-title', HTMLHeadingElement);
@@ -114,7 +116,9 @@ export function setUpHub(options: HubOptions): Hub {
   const closeButton = byId('hub-close', HTMLButtonElement);
 
   title.textContent = copy.siteTitle;
-  const memorials = summaries.filter((summary) => summary.kind === 'memorial').map((summary) => summary.name);
+  const memorials = summaries
+    .filter((summary) => summary.kind === 'memorial')
+    .map((summary) => summary.name);
   const opening = options.lede ?? copy.hub.lede;
   const lede = memorials.length
     ? `${opening} ${copy.hub.ledeMemorial(new Intl.ListFormat('en-US').format(memorials), memorials.length)}`
@@ -251,7 +255,8 @@ export function setUpHub(options: HubOptions): Hub {
     entries.set(key, item);
     const heading = el('div', 'hub__heading');
     const name = el('h4', 'hub__name', meta.title);
-    if (isExtraDraft(meta)) name.append(' ', el('span', 'hub__mark hub__mark--draft', copy.hub.draft));
+    if (isExtraDraft(meta))
+      name.append(' ', el('span', 'hub__mark hub__mark--draft', copy.hub.draft));
     heading.append(name, el('p', 'hub__summary', meta.blurb));
     const open = button('button hub__open', copy.hub.open);
     open.setAttribute('data-testid', `hub-extra-${meta.id}-open`);
@@ -305,7 +310,10 @@ export function setUpHub(options: HubOptions): Hub {
     if (mode !== 'return' || event.target !== dialog) return;
     const box = dialog.getBoundingClientRect();
     const outside =
-      event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
+      event.clientX < box.left ||
+      event.clientX > box.right ||
+      event.clientY < box.top ||
+      event.clientY > box.bottom;
     if (outside) close();
   });
   closeButton.addEventListener('click', close);

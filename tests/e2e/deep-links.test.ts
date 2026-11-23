@@ -44,7 +44,9 @@ test.describe('Deep links', () => {
     const { APOLLO_11_LANDING: landing, APOLLO_11_FIRST_STEP: firstStep } = EVENTS;
 
     await test.step('Open a link with both the landing and the time of the first step', async () => {
-      await sitePage.goto(URLS.LINK({ mission: landing.mission, event: landing.id, t: firstStep.clock }));
+      await sitePage.goto(
+        URLS.LINK({ mission: landing.mission, event: landing.id, t: firstStep.clock }),
+      );
       await missionPage.waitForLoad();
     });
 

@@ -11,7 +11,9 @@ import { TOUR, URLS } from '../utils/vars';
  * tests' business (src/app/tour.test.ts), so nothing here times one.
  */
 test.describe('Guided tour', () => {
-  test('a visitor follows the tour from stop to stop, skips a trip, and leaves', async ({ sitePage }) => {
+  test('a visitor follows the tour from stop to stop, skips a trip, and leaves', async ({
+    sitePage,
+  }) => {
     // A trip takes 5 to 14 seconds, and longer on a busy machine drawing in software.
     test.slow();
     const missionPage = new MissionPage(sitePage);

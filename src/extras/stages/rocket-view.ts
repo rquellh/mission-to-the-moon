@@ -23,9 +23,9 @@ import {
   Vector3,
   type Material,
   type Object3D,
-} from "three";
-import type { VehiclePart } from "../../content/vehicle-types.ts";
-import { createGlow, createMiniView, createVehicle, type Vehicle } from "../../scene/kit.ts";
+} from 'three';
+import type { VehiclePart } from '../../content/vehicle-types.ts';
+import { createGlow, createMiniView, createVehicle, type Vehicle } from '../../scene/kit.ts';
 
 export interface RocketView {
   /** Stand a new stack of these parts on the pad, framed, and draw it. */
@@ -99,7 +99,10 @@ interface Leaving {
 }
 
 /** Throws when the browser cannot draw WebGL. */
-export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () => boolean): RocketView {
+export function createRocketView(
+  canvas: HTMLCanvasElement,
+  reducedMotion: () => boolean,
+): RocketView {
   const view = createMiniView(canvas, { controls: false });
   const background = new Color().copy(HAZE);
   view.scene.background = background;
@@ -160,7 +163,9 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
     const vertical = MathUtils.degToRad(view.camera.fov / 2);
     const horizontal = Math.atan(Math.tan(vertical) * view.camera.aspect);
     const width = Math.max(box.max.x - box.min.x, box.max.z - box.min.z);
-    const distance = Math.max((high - low) / 2 / Math.tan(vertical), (width * 1.2) / Math.tan(horizontal)) + width / 2;
+    const distance =
+      Math.max((high - low) / 2 / Math.tan(vertical), (width * 1.2) / Math.tan(horizontal)) +
+      width / 2;
     return { y: (low + high) / 2, distance };
   };
   const place = (): void => {
@@ -263,7 +268,7 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
     show(parts, label) {
       clearLineup();
       clearRocket();
-      rocket = createVehicle({ layout: "launch", parts });
+      rocket = createVehicle({ layout: 'launch', parts });
       view.scene.add(rocket.object);
       length = Math.max(1, rocket.length);
       goal = visibleBox(rocket.object);
@@ -276,7 +281,7 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
       background.copy(HAZE);
       climbing = false;
       glow.visible = false;
-      canvas.setAttribute("aria-label", label);
+      canvas.setAttribute('aria-label', label);
       snap();
       view.requestRender();
     },
@@ -305,14 +310,14 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
       background.copy(HAZE);
       climbing = false;
       glow.visible = false;
-      canvas.setAttribute("aria-label", label);
+      canvas.setAttribute('aria-label', label);
       snap();
       view.requestRender();
     },
     setLineupRocket(index, parts) {
       const row = lineup;
       if (!row || index < 0 || index >= row.vehicles.length || row.vehicles[index]) return;
-      const vehicle = createVehicle({ layout: "launch", parts });
+      const vehicle = createVehicle({ layout: 'launch', parts });
       vehicle.setHeight(LINEUP_HEIGHT);
       view.scene.add(vehicle.object);
       row.vehicles[index] = vehicle;
@@ -320,7 +325,9 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
       view.requestRender();
     },
     highlight(index) {
-      lineup?.materials.forEach((material, place) => material.color.setHex(place === index ? PAD_MARKED : PAD));
+      lineup?.materials.forEach((material, place) =>
+        material.color.setHex(place === index ? PAD_MARKED : PAD),
+      );
       view.requestRender();
     },
     clear() {
@@ -349,7 +356,9 @@ export function createRocketView(canvas: HTMLCanvasElement, reducedMotion: () =>
               own.push(made);
               return made;
             };
-            mesh.material = Array.isArray(mesh.material) ? mesh.material.map(copy) : copy(mesh.material);
+            mesh.material = Array.isArray(mesh.material)
+              ? mesh.material.map(copy)
+              : copy(mesh.material);
           });
         }
       }

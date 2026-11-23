@@ -9,8 +9,8 @@
  *
  * Pure TypeScript: no three.js, no DOM.
  */
-export { buildFlightPath } from "./build.ts";
-export { createStoryTime, storyIntervalLength } from "./story-time.ts";
-export type { StoryTime, StoryTimeOptions } from "./story-time.ts";
-export { READABLE_MOON_DISTANCE, toReadable } from "./warp.ts";
-export type * from "./types.ts";
+export { buildFlightPath } from './build.ts';
+export { createStoryTime, storyIntervalLength } from './story-time.ts';
+export type { StoryTime, StoryTimeOptions } from './story-time.ts';
+export { READABLE_MOON_DISTANCE, toReadable } from './warp.ts';
+export type * from './types.ts';

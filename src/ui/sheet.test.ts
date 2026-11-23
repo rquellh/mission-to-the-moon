@@ -31,18 +31,26 @@ describe('the card sheet', () => {
 
       await user.click(screen.getByRole('button', { name: 'Take the tour of Apollo 11' }));
 
-      expect(screen.getByRole('button', { name: 'Show the whole card' })).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByRole('button', { name: 'Show the whole card' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
     });
   });
 
   describe('tapping the card', () => {
     it('opens the compact card on a phone', async () => {
       const { user } = await mountMission('apollo-11', { start: 'explore' });
-      const [line] = within(screen.getByRole('article')).getAllByText(/^A Saturn V rocket lifts Apollo 11 off/);
+      const [line] = within(screen.getByRole('article')).getAllByText(
+        /^A Saturn V rocket lifts Apollo 11 off/,
+      );
 
       await user.click(line!);
 
-      expect(screen.getByRole('button', { name: 'Show less of the card' })).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('button', { name: 'Show less of the card' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
     });
 
     it("leaves the card as it is when one of the card's buttons is pressed", async () => {
@@ -50,16 +58,24 @@ describe('the card sheet', () => {
 
       await user.click(screen.getByRole('button', { name: 'Next event' }));
 
-      expect(screen.getByRole('button', { name: 'Show the whole card' })).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByRole('button', { name: 'Show the whole card' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
     });
 
     it('does nothing in the wide layout, where the card always shows everything', async () => {
       const { user } = await mountMission('apollo-11', { start: 'explore', wide: true });
-      const [line] = within(screen.getByRole('article')).getAllByText(/^A Saturn V rocket lifts Apollo 11 off/);
+      const [line] = within(screen.getByRole('article')).getAllByText(
+        /^A Saturn V rocket lifts Apollo 11 off/,
+      );
 
       await user.click(line!);
 
-      expect(screen.getByRole('button', { name: 'Show the whole card' })).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByRole('button', { name: 'Show the whole card' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
     });
   });
 });

@@ -93,7 +93,7 @@ export function createEarth(texture: Texture, detail: 'low' | 'high'): Earth {
   tilt.rotation.set(-EARTH_AXIAL_TILT_RAD, 0, 0, 'YXZ');
   root.add(tilt);
 
-  const segments = detail === 'high' ? [128, 64] as const : [72, 40] as const;
+  const segments = detail === 'high' ? ([128, 64] as const) : ([72, 40] as const);
   // Matte (Lambert): no shiny sheen where the ground is seen edge-on near the horizon.
   const globeMaterial = new MeshLambertMaterial({ map: texture });
   const nightSide = addNightSide(globeMaterial, NIGHT_TINT);

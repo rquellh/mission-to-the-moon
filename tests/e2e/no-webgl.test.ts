@@ -13,7 +13,9 @@ import { MISSIONS, URLS } from '../utils/vars';
 test.describe('Without WebGL', () => {
   test.skip(({ isMobile }) => isMobile, 'The fallback does not depend on the screen.');
 
-  test('the site says there is no 3D view, and the card and Play still work', async ({ sitePage }) => {
+  test('the site says there is no 3D view, and the card and Play still work', async ({
+    sitePage,
+  }) => {
     const missionPage = new MissionPage(sitePage);
     const cardPage = new EventCardPage(sitePage);
     const timelinePage = new TimelinePage(sitePage);
@@ -44,7 +46,9 @@ test.describe('Without WebGL', () => {
       clockBefore = clockSeconds(await timelinePage.clockTime.innerText());
       await timelinePage.play.click();
       await expect(timelinePage.play).toHaveAttribute('aria-label', 'Pause');
-      await expect.poll(async () => clockSeconds(await timelinePage.clockTime.innerText())).toBeGreaterThan(clockBefore);
+      await expect
+        .poll(async () => clockSeconds(await timelinePage.clockTime.innerText()))
+        .toBeGreaterThan(clockBefore);
     });
   });
 });

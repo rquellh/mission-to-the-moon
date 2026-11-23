@@ -14,15 +14,30 @@ import { outlineOf, sourcesCitedBy } from './outline.ts';
 
 describe('outlineOf', () => {
   it('Apollo 11: two ships, a Moon landing, and a splashdown', () => {
-    expect(outlineOf(apollo11)).toEqual({ ships: 2, landsOnMoon: true, splashdown: true, turns: false });
+    expect(outlineOf(apollo11)).toEqual({
+      ships: 2,
+      landsOnMoon: true,
+      splashdown: true,
+      turns: false,
+    });
   });
 
   it('Apollo 8: one ship around the Moon and home, with no landing', () => {
-    expect(outlineOf(apollo8)).toEqual({ ships: 1, landsOnMoon: false, splashdown: true, turns: false });
+    expect(outlineOf(apollo8)).toEqual({
+      ships: 1,
+      landsOnMoon: false,
+      splashdown: true,
+      turns: false,
+    });
   });
 
   it('Gemini 8: two ships in Earth orbit, and a published spin', () => {
-    expect(outlineOf(gemini8)).toEqual({ ships: 2, landsOnMoon: false, splashdown: true, turns: true });
+    expect(outlineOf(gemini8)).toEqual({
+      ships: 2,
+      landsOnMoon: false,
+      splashdown: true,
+      turns: true,
+    });
   });
 });
 

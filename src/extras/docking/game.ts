@@ -15,7 +15,7 @@
  */
 
 /** Where a push from the thruster buttons goes. */
-export type Thrust = "up" | "down" | "left" | "right" | "forward" | "back";
+export type Thrust = 'up' | 'down' | 'left' | 'right' | 'forward' | 'back';
 
 /** The toy's numbers: generous, slow, and made up. */
 export const RULES = {
@@ -51,9 +51,7 @@ export interface Flight {
 }
 
 /** What happened when the nose reached the cone. */
-export type Contact =
-  | { kind: "docked" }
-  | { kind: "bump"; tooFast: boolean; offCenter: boolean };
+export type Contact = { kind: 'docked' } | { kind: 'bump'; tooFast: boolean; offCenter: boolean };
 
 /** A fresh start: a short way back, a little off to one side, drifting slowly. */
 export function startFlight(): Flight {
@@ -70,22 +68,22 @@ export function startFlight(): Flight {
 /** One push. It keeps going until pushed the other way. */
 export function push(flight: Flight, thrust: Thrust): void {
   switch (thrust) {
-    case "up":
+    case 'up':
       flight.pushesY += 1;
       break;
-    case "down":
+    case 'down':
       flight.pushesY -= 1;
       break;
-    case "right":
+    case 'right':
       flight.pushesX += 1;
       break;
-    case "left":
+    case 'left':
       flight.pushesX -= 1;
       break;
-    case "forward":
+    case 'forward':
       flight.pushesClosing += 1;
       break;
-    case "back":
+    case 'back':
       flight.pushesClosing -= 1;
       break;
   }
@@ -132,7 +130,7 @@ export function advance(flight: Flight, seconds: number): Contact | null {
   if (flight.pushesClosing <= 0) return null;
   const tooFast = isTooFast(flight);
   const offCenterNow = !isLinedUp(flight);
-  if (!tooFast && !offCenterNow) return { kind: "docked" };
+  if (!tooFast && !offCenterNow) return { kind: 'docked' };
   flight.pushesClosing = -1;
-  return { kind: "bump", tooFast, offCenter: offCenterNow };
+  return { kind: 'bump', tooFast, offCenter: offCenterNow };
 }

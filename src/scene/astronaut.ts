@@ -90,7 +90,12 @@ export const GAS_GUN: VehiclePart = 'gas-gun';
 
 /** A spacewalker's materials, for the suit of `era`. */
 export function walkerLook(era: SuitEra): WalkerLook {
-  const material = (color: number, roughness: number, metalness = 0, emissive = 0): MeshStandardMaterial =>
+  const material = (
+    color: number,
+    roughness: number,
+    metalness = 0,
+    emissive = 0,
+  ): MeshStandardMaterial =>
     new MeshStandardMaterial({ color, roughness, metalness, emissive, transparent: true });
   const gemini = era === 'gemini';
   return {
@@ -234,21 +239,48 @@ const FLOATING: Pose = {
 /** Standing in a hatch: upright, the forearms forward over the hatch's front rim. */
 const STANDING: Pose = {
   head: { nod: 8, turn: 0, tilt: 0 },
-  right: { shoulder: { flex: 22, out: 8, twist: 32 }, elbow: 78, hip: { flex: 0, out: 3, twist: 0 }, knee: 0, ankle: 0 },
-  left: { shoulder: { flex: 16, out: 10, twist: 30 }, elbow: 84, hip: { flex: 0, out: 3, twist: 0 }, knee: 0, ankle: 0 },
+  right: {
+    shoulder: { flex: 22, out: 8, twist: 32 },
+    elbow: 78,
+    hip: { flex: 0, out: 3, twist: 0 },
+    knee: 0,
+    ankle: 0,
+  },
+  left: {
+    shoulder: { flex: 16, out: 10, twist: 30 },
+    elbow: 84,
+    hip: { flex: 0, out: 3, twist: 0 },
+    knee: 0,
+    ankle: 0,
+  },
 };
 
 /** Standing on the porch: upright, knees a little bent, the arms forward (AS9-19-2994 shows one reaching out). */
 const PORCH: Pose = {
   head: { nod: 10, turn: -10, tilt: 0 },
-  right: { shoulder: { flex: 42, out: 20, twist: 18 }, elbow: 55, hip: { flex: 10, out: 5, twist: 0 }, knee: 16, ankle: -6 },
-  left: { shoulder: { flex: 20, out: 16, twist: 24 }, elbow: 62, hip: { flex: 6, out: 5, twist: 0 }, knee: 10, ankle: -4 },
+  right: {
+    shoulder: { flex: 42, out: 20, twist: 18 },
+    elbow: 55,
+    hip: { flex: 10, out: 5, twist: 0 },
+    knee: 16,
+    ankle: -6,
+  },
+  left: {
+    shoulder: { flex: 20, out: 16, twist: 24 },
+    elbow: 62,
+    hip: { flex: 6, out: 5, twist: 0 },
+    knee: 10,
+    ankle: -4,
+  },
 };
 
 const POSES: Record<WalkerPose, Pose> = { floating: FLOATING, standing: STANDING, porch: PORCH };
 
 /** The right arm holding the gas gun up and out to the side, as Ed White holds it in S65-34635. */
-const GUN_ARM = { shoulder: { flex: 30, out: 70, twist: -55 }, elbow: 50 } satisfies Pick<Side, 'shoulder' | 'elbow'>;
+const GUN_ARM = { shoulder: { flex: 30, out: 70, twist: -55 }, elbow: 50 } satisfies Pick<
+  Side,
+  'shoulder' | 'elbow'
+>;
 
 const DEG = Math.PI / 180;
 
@@ -270,7 +302,11 @@ function swing(group: Group, side: 1 | -1, s: Swing): void {
 /* Shapes, shared by key.                                              */
 /* ------------------------------------------------------------------ */
 
-function cached(cache: Map<string, BufferGeometry>, key: string, make: () => BufferGeometry): BufferGeometry {
+function cached(
+  cache: Map<string, BufferGeometry>,
+  key: string,
+  make: () => BufferGeometry,
+): BufferGeometry {
   let geometry = cache.get(key);
   if (!geometry) {
     geometry = make();
@@ -280,7 +316,13 @@ function cached(cache: Map<string, BufferGeometry>, key: string, make: () => Buf
 }
 
 /** A limb segment hanging from its joint (the origin) along -Y: rounded at both ends, radius `r1` at the joint tapering to `r2` at `length`. */
-function limb(cache: Map<string, BufferGeometry>, r1: number, r2: number, length: number, segments = 12): BufferGeometry {
+function limb(
+  cache: Map<string, BufferGeometry>,
+  r1: number,
+  r2: number,
+  length: number,
+  segments = 12,
+): BufferGeometry {
   return cached(cache, `walker:limb:${r1}:${r2}:${length}:${segments}`, () => {
     const points: Vector2[] = [];
     const steps = 3;
@@ -308,7 +350,13 @@ function torsoGeometry(cache: Map<string, BufferGeometry>): BufferGeometry {
 }
 
 /** A sphere scaled to (x, y, z) radii. */
-function ellipsoid(cache: Map<string, BufferGeometry>, x: number, y: number, z: number, segments = 12): BufferGeometry {
+function ellipsoid(
+  cache: Map<string, BufferGeometry>,
+  x: number,
+  y: number,
+  z: number,
+  segments = 12,
+): BufferGeometry {
   return cached(cache, `walker:ellipsoid:${x}:${y}:${z}:${segments}`, () => {
     const geometry = new SphereGeometry(1, segments, Math.max(6, Math.round(segments * 0.66)));
     geometry.scale(x, y, z);
@@ -320,9 +368,21 @@ function ellipsoid(cache: Map<string, BufferGeometry>, x: number, y: number, z: 
 const HELMET_SCALE = new Vector3(1, 1.05, 1.1);
 
 /** The helmet's shell, `grow` times its radius, from the crown down to `bottom` radians (pi: the whole shell). */
-function helmetShell(cache: Map<string, BufferGeometry>, grow: number, bottom: number): BufferGeometry {
+function helmetShell(
+  cache: Map<string, BufferGeometry>,
+  grow: number,
+  bottom: number,
+): BufferGeometry {
   return cached(cache, `walker:helmet:${grow}:${bottom}`, () => {
-    const geometry = new SphereGeometry(BODY.helmetR * grow, 24, Math.round((12 * bottom) / Math.PI), 0, Math.PI * 2, 0, bottom);
+    const geometry = new SphereGeometry(
+      BODY.helmetR * grow,
+      24,
+      Math.round((12 * bottom) / Math.PI),
+      0,
+      Math.PI * 2,
+      0,
+      bottom,
+    );
     geometry.scale(HELMET_SCALE.x, HELMET_SCALE.y, HELMET_SCALE.z);
     return geometry;
   });
@@ -357,7 +417,11 @@ function onVisor(span: VisorSpan, grow: number, k: number, a: number, out: Vecto
 }
 
 /** The visor: a patch of the helmet's surface, `grow` times its radius, over `span`, with a rounded outline. */
-function visorGeometry(cache: Map<string, BufferGeometry>, span: VisorSpan, grow: number): BufferGeometry {
+function visorGeometry(
+  cache: Map<string, BufferGeometry>,
+  span: VisorSpan,
+  grow: number,
+): BufferGeometry {
   return cached(cache, `walker:visor:${span.phi}:${span.top}:${span.bottom}:${grow}`, () => {
     const rings = 6;
     const around = 36;
@@ -368,7 +432,13 @@ function visorGeometry(cache: Map<string, BufferGeometry>, span: VisorSpan, grow
     const add = (k: number, a: number): void => {
       onVisor(span, grow, k, a, point);
       positions.push(point.x, point.y, point.z);
-      normal.set(point.x / HELMET_SCALE.x ** 2, point.y / HELMET_SCALE.y ** 2, point.z / HELMET_SCALE.z ** 2).normalize();
+      normal
+        .set(
+          point.x / HELMET_SCALE.x ** 2,
+          point.y / HELMET_SCALE.y ** 2,
+          point.z / HELMET_SCALE.z ** 2,
+        )
+        .normalize();
       normals.push(normal.x, normal.y, normal.z);
     };
     add(0, 0);
@@ -380,7 +450,15 @@ function visorGeometry(cache: Map<string, BufferGeometry>, span: VisorSpan, grow
     const at = (i: number, j: number): number => 1 + (i - 1) * around + (j % around);
     for (let j = 0; j < around; j += 1) index.push(0, at(1, j), at(1, j + 1));
     for (let i = 1; i < rings; i += 1) {
-      for (let j = 0; j < around; j += 1) index.push(at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j), at(i + 1, j + 1), at(i, j + 1));
+      for (let j = 0; j < around; j += 1)
+        index.push(
+          at(i, j),
+          at(i + 1, j),
+          at(i + 1, j + 1),
+          at(i, j),
+          at(i + 1, j + 1),
+          at(i, j + 1),
+        );
     }
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
@@ -394,13 +472,19 @@ function visorGeometry(cache: Map<string, BufferGeometry>, span: VisorSpan, grow
 function visorRim(cache: Map<string, BufferGeometry>, span: VisorSpan): BufferGeometry {
   return cached(cache, `walker:visor-rim:${span.phi}:${span.top}:${span.bottom}`, () => {
     const points: Vector3[] = [];
-    for (let j = 0; j < 24; j += 1) points.push(onVisor(span, 1.022, 1, (j / 24) * Math.PI * 2, new Vector3()));
+    for (let j = 0; j < 24; j += 1)
+      points.push(onVisor(span, 1.022, 1, (j / 24) * Math.PI * 2, new Vector3()));
     return new TubeGeometry(new CatmullRomCurve3(points, true, 'centripetal'), 40, 0.009, 4, true);
   });
 }
 
 /** A ring lying flat (around Y). */
-function torus(cache: Map<string, BufferGeometry>, radius: number, tube: number, around = 20): BufferGeometry {
+function torus(
+  cache: Map<string, BufferGeometry>,
+  radius: number,
+  tube: number,
+  around = 20,
+): BufferGeometry {
   return cached(cache, `walker:torus:${radius}:${tube}:${around}`, () => {
     const geometry = new TorusGeometry(radius, tube, around > 16 ? 6 : 4, around);
     geometry.rotateX(Math.PI / 2);
@@ -408,21 +492,64 @@ function torus(cache: Map<string, BufferGeometry>, radius: number, tube: number,
   });
 }
 
-function roundedBox(cache: Map<string, BufferGeometry>, w: number, h: number, d: number, r: number, segments = 1): BufferGeometry {
-  return cached(cache, `walker:rbox:${w}:${h}:${d}:${r}:${segments}`, () => new RoundedBoxGeometry(w, h, d, segments, r));
+function roundedBox(
+  cache: Map<string, BufferGeometry>,
+  w: number,
+  h: number,
+  d: number,
+  r: number,
+  segments = 1,
+): BufferGeometry {
+  return cached(
+    cache,
+    `walker:rbox:${w}:${h}:${d}:${r}:${segments}`,
+    () => new RoundedBoxGeometry(w, h, d, segments, r),
+  );
 }
 
-function capsule(cache: Map<string, BufferGeometry>, radius: number, length: number): BufferGeometry {
-  return cached(cache, `walker:capsule:${radius}:${length}`, () => new CapsuleGeometry(radius, length, 2, 8));
+function capsule(
+  cache: Map<string, BufferGeometry>,
+  radius: number,
+  length: number,
+): BufferGeometry {
+  return cached(
+    cache,
+    `walker:capsule:${radius}:${length}`,
+    () => new CapsuleGeometry(radius, length, 2, 8),
+  );
 }
 
-function bottle(cache: Map<string, BufferGeometry>, radius: number, length: number): BufferGeometry {
-  return cached(cache, `walker:bottle:${radius}:${length}`, () => new CylinderGeometry(radius, radius, length, 10));
+function bottle(
+  cache: Map<string, BufferGeometry>,
+  radius: number,
+  length: number,
+): BufferGeometry {
+  return cached(
+    cache,
+    `walker:bottle:${radius}:${length}`,
+    () => new CylinderGeometry(radius, radius, length, 10),
+  );
 }
 
 /** A strap laid over the torso through `points`, as a thin tube. */
-function strap(cache: Map<string, BufferGeometry>, key: string, points: Vector3[], closed = false): BufferGeometry {
-  return cached(cache, `walker:strap:${key}`, () => new TubeGeometry(new CatmullRomCurve3(points, closed, 'centripetal'), closed ? 32 : 28, 0.011, 4, closed));
+function strap(
+  cache: Map<string, BufferGeometry>,
+  key: string,
+  points: Vector3[],
+  closed = false,
+): BufferGeometry {
+  return cached(
+    cache,
+    `walker:strap:${key}`,
+    () =>
+      new TubeGeometry(
+        new CatmullRomCurve3(points, closed, 'centripetal'),
+        closed ? 32 : 28,
+        0.011,
+        4,
+        closed,
+      ),
+  );
 }
 
 function place(geometry: BufferGeometry, material: Material, x = 0, y = 0, z = 0): Mesh {
@@ -443,7 +570,11 @@ export interface Walker {
 }
 
 /** Build an astronaut in `look`'s materials, posed and dressed by `options`. */
-export function buildWalker(cache: Map<string, BufferGeometry>, look: WalkerLook, options: WalkerOptions): Walker {
+export function buildWalker(
+  cache: Map<string, BufferGeometry>,
+  look: WalkerLook,
+  options: WalkerOptions,
+): Walker {
   const pose = POSES[options.pose];
   const gemini = options.era === 'gemini';
   const figure = new Group();
@@ -451,10 +582,18 @@ export function buildWalker(cache: Map<string, BufferGeometry>, look: WalkerLook
   // Torso, neck ring, and helmet.
   figure.add(place(torsoGeometry(cache), look.suit));
   const neck = joint(figure, 0, BODY.neckY, 0);
-  neck.rotation.set(pose.head.nod * DEG * 0.35, pose.head.turn * DEG * 0.3, pose.head.tilt * DEG * 0.3);
+  neck.rotation.set(
+    pose.head.nod * DEG * 0.35,
+    pose.head.turn * DEG * 0.3,
+    pose.head.tilt * DEG * 0.3,
+  );
   neck.add(place(torus(cache, 0.112, 0.03), look.metal, 0, 0.005, 0));
   const head = joint(neck, 0, 0, 0.01);
-  head.rotation.set(pose.head.nod * DEG * 0.65, pose.head.turn * DEG * 0.7, pose.head.tilt * DEG * 0.7);
+  head.rotation.set(
+    pose.head.nod * DEG * 0.65,
+    pose.head.turn * DEG * 0.7,
+    pose.head.tilt * DEG * 0.7,
+  );
   addHelmet(cache, head, look, gemini, options.redHelmet === true);
 
   // Arms.
@@ -474,7 +613,9 @@ export function buildWalker(cache: Map<string, BufferGeometry>, look: WalkerLook
     // The glove: a wrist ring, a mitten (palm toward the body), and a thumb forward.
     wrist.add(place(torus(cache, 0.058, 0.013, 14), look.metal, 0, 0.01, 0));
     wrist.add(place(ellipsoid(cache, 0.05, 0.072, 0.036, 10), look.glove, 0, -0.07, 0.006));
-    wrist.add(place(ellipsoid(cache, 0.018, 0.032, 0.02, 8), look.glove, -side * 0.026, -0.05, 0.03));
+    wrist.add(
+      place(ellipsoid(cache, 0.018, 0.032, 0.02, 8), look.glove, -side * 0.026, -0.05, 0.03),
+    );
     if (side < 0) rightArm = { shoulder, elbow, hand: wrist };
   }
 
@@ -500,7 +641,13 @@ export function buildWalker(cache: Map<string, BufferGeometry>, look: WalkerLook
   let tetherPoint: Vector3;
   if (gemini) {
     const front = onTorso(0, 0.31, 1);
-    const chestPack = place(roundedBox(cache, 0.21, 0.15, 0.075, 0.022), look.metal, 0.01, 0.31, front.z + 0.03);
+    const chestPack = place(
+      roundedBox(cache, 0.21, 0.15, 0.075, 0.022),
+      look.metal,
+      0.01,
+      0.31,
+      front.z + 0.03,
+    );
     chestPack.rotation.x = 0.12;
     figure.add(chestPack);
     tetherPoint = new Vector3(0.04, 0.245, front.z + 0.05);
@@ -530,18 +677,36 @@ export function buildWalker(cache: Map<string, BufferGeometry>, look: WalkerLook
 }
 
 /** The helmet on its neck joint: a white shell, the gold visor across its front, a gray fitting on each side. */
-function addHelmet(cache: Map<string, BufferGeometry>, head: Group, look: WalkerLook, gemini: boolean, red: boolean): void {
+function addHelmet(
+  cache: Map<string, BufferGeometry>,
+  head: Group,
+  look: WalkerLook,
+  gemini: boolean,
+  red: boolean,
+): void {
   const helmet = joint(head, 0, BODY.helmetUp, 0.005);
   helmet.add(place(helmetShell(cache, 1, Math.PI), look.suit));
   // Apollo's visor is larger (AS16-113-18339, AS9-19-2994) than Gemini's (S65-34635).
-  const span: VisorSpan = gemini ? { phi: 1.0, top: 0.98, bottom: 2.02 } : { phi: 1.18, top: 0.86, bottom: 2.18 };
-  helmet.add(place(visorGeometry(cache, span, 1.022), look.visor), place(visorRim(cache, span), look.metal));
+  const span: VisorSpan = gemini
+    ? { phi: 1.0, top: 0.98, bottom: 2.02 }
+    : { phi: 1.18, top: 0.86, bottom: 2.18 };
+  helmet.add(
+    place(visorGeometry(cache, span, 1.022), look.visor),
+    place(visorRim(cache, span), look.metal),
+  );
   if (red) helmet.add(place(helmetShell(cache, 1.012, 1.45), look.accent));
-  for (const side of [1, -1]) helmet.add(place(ellipsoid(cache, 0.016, 0.03, 0.03, 8), look.metal, side * BODY.helmetR, -0.005, 0.03));
+  for (const side of [1, -1])
+    helmet.add(
+      place(ellipsoid(cache, 0.016, 0.03, 0.03, 8), look.metal, side * BODY.helmetR, -0.005, 0.03),
+    );
 }
 
 /** Gemini's dark straps: one around the waist and one over each shoulder, front to back (S65-34635, S66-54455). */
-function addGeminiStraps(cache: Map<string, BufferGeometry>, figure: Group, look: WalkerLook): void {
+function addGeminiStraps(
+  cache: Map<string, BufferGeometry>,
+  figure: Group,
+  look: WalkerLook,
+): void {
   const belt: Vector3[] = [];
   for (let i = 0; i < 16; i += 1) {
     const a = (i / 16) * Math.PI * 2;
@@ -587,7 +752,12 @@ export function holdGasGun(gun: Object3D, held: boolean): void {
  * origin, unturned (the ship model shows or hides it whole), held upright
  * in the figure's frame whatever the arm's pose.
  */
-function gasGun(cache: Map<string, BufferGeometry>, look: WalkerLook, figure: Group, hand: Group): Group {
+function gasGun(
+  cache: Map<string, BufferGeometry>,
+  look: WalkerLook,
+  figure: Group,
+  hand: Group,
+): Group {
   const node = new Group();
   node.name = GAS_GUN;
   node.userData['tether'] = look.tether;

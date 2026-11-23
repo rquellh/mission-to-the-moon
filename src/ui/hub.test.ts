@@ -3,12 +3,14 @@
  * it is grouped and marked, what choosing an entry does, and the ways out.
  */
 import { describe, expect, it } from 'vitest';
-import { mountMission, navigation, screen, visitedMissions, within } from '../test/test-utils.ts';
 import type { MissionSummary } from '../content/types.ts';
+import { mountMission, navigation, screen, visitedMissions, within } from '../test/test-utils.ts';
 
 /** The real list, with Gemini 7 as a flight that has no tour (every real flight has one). */
 const gemini7WithoutATour = (summaries: readonly MissionSummary[]): MissionSummary[] =>
-  summaries.map((summary) => (summary.id === 'gemini-7' ? { ...summary, hasTour: false } : summary));
+  summaries.map((summary) =>
+    summary.id === 'gemini-7' ? { ...summary, hasTour: false } : summary,
+  );
 
 const missionList = (): HTMLElement => screen.getByRole('dialog', { name: 'Mission to the Moon' });
 
@@ -24,10 +26,21 @@ describe('the mission list', () => {
       const list = missionList();
 
       const gemini = within(list).getByRole('region', { name: /^Gemini/ });
-      expect(within(gemini).getByRole('heading', { level: 3 })).toHaveTextContent('Gemini 1965–1966');
-      expect(namesIn(gemini).slice(0, 6)).toEqual(['Gemini 3', 'Gemini 4', 'Gemini 5', 'Gemini 7', 'Gemini 6A', 'Gemini 8']);
+      expect(within(gemini).getByRole('heading', { level: 3 })).toHaveTextContent(
+        'Gemini 1965–1966',
+      );
+      expect(namesIn(gemini).slice(0, 6)).toEqual([
+        'Gemini 3',
+        'Gemini 4',
+        'Gemini 5',
+        'Gemini 7',
+        'Gemini 6A',
+        'Gemini 8',
+      ]);
       const apollo = within(list).getByRole('region', { name: /^Apollo/ });
-      expect(within(apollo).getByRole('heading', { level: 3 })).toHaveTextContent('Apollo 1967–1972');
+      expect(within(apollo).getByRole('heading', { level: 3 })).toHaveTextContent(
+        'Apollo 1967–1972',
+      );
       expect(namesIn(apollo)[0]).toBe('Apollo 1');
     });
 
@@ -43,7 +56,9 @@ describe('the mission list', () => {
       await mountMission('apollo-11');
 
       const showing = within(missionList()).getByRole('listitem', { current: true });
-      expect(within(showing).getByRole('heading', { level: 4 })).toHaveTextContent('Apollo 11 Now showing');
+      expect(within(showing).getByRole('heading', { level: 4 })).toHaveTextContent(
+        'Apollo 11 Now showing',
+      );
     });
 
     it('offers Read for the memorial, and the tour only on a flight that has one', async () => {
@@ -51,17 +66,27 @@ describe('the mission list', () => {
       const list = missionList();
 
       expect(within(list).getByRole('button', { name: 'Read about Apollo 1' })).toBeInTheDocument();
-      expect(within(list).queryByRole('button', { name: 'Explore Apollo 1' })).not.toBeInTheDocument();
+      expect(
+        within(list).queryByRole('button', { name: 'Explore Apollo 1' }),
+      ).not.toBeInTheDocument();
       expect(within(list).getByRole('button', { name: 'Explore Gemini 7' })).toBeInTheDocument();
-      expect(within(list).queryByRole('button', { name: 'Take the tour of Gemini 7' })).not.toBeInTheDocument();
-      expect(within(list).getByRole('button', { name: 'Take the tour of Gemini 6A' })).toBeInTheDocument();
+      expect(
+        within(list).queryByRole('button', { name: 'Take the tour of Gemini 7' }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(list).getByRole('button', { name: 'Take the tour of Gemini 6A' }),
+      ).toBeInTheDocument();
     });
 
     it('marks an unfinished mission as a draft', async () => {
       await mountMission('apollo-11', { isDraft: (summary) => summary.id === 'apollo-17' });
 
-      expect(within(missionList()).getByRole('heading', { level: 4, name: 'Apollo 17 Draft' })).toBeInTheDocument();
-      expect(within(missionList()).getByRole('heading', { level: 4, name: 'Apollo 16' })).toBeInTheDocument();
+      expect(
+        within(missionList()).getByRole('heading', { level: 4, name: 'Apollo 17 Draft' }),
+      ).toBeInTheDocument();
+      expect(
+        within(missionList()).getByRole('heading', { level: 4, name: 'Apollo 16' }),
+      ).toBeInTheDocument();
     });
 
     it('lists the extras in two groups under the missions', async () => {
@@ -91,7 +116,7 @@ describe('the mission list', () => {
       expect(navigation.address).toBeNull();
     });
 
-    it("opens another mission at its own address, starting the way chosen", async () => {
+    it('opens another mission at its own address, starting the way chosen', async () => {
       const { user } = await mountMission('apollo-11');
 
       await user.click(screen.getByRole('button', { name: 'Take the tour of Gemini 8' }));

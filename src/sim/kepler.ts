@@ -5,17 +5,7 @@
  * Units are whatever the caller uses consistently; the model uses
  * kilometers and seconds.
  */
-import {
-  addScaled,
-  cross,
-  dot,
-  length,
-  normalize,
-  scale,
-  sub,
-  vec3,
-  type Vec3,
-} from "./vec.ts";
+import { addScaled, cross, dot, length, normalize, scale, sub, vec3, type Vec3 } from './vec.ts';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -45,7 +35,8 @@ export function ellipticTrueFromMean(M: number, e: number): number {
 export function ellipticMeanFromTrue(nu: number, e: number): number {
   const k = Math.round(nu / TWO_PI);
   const nw = nu - k * TWO_PI;
-  const E = 2 * Math.atan2(Math.sqrt(1 - e) * Math.sin(nw / 2), Math.sqrt(1 + e) * Math.cos(nw / 2));
+  const E =
+    2 * Math.atan2(Math.sqrt(1 - e) * Math.sin(nw / 2), Math.sqrt(1 + e) * Math.cos(nw / 2));
   return E - e * Math.sin(E) + k * TWO_PI;
 }
 
@@ -247,7 +238,7 @@ export function solveLambert(
   const cosDnu = dot(r1, r2) / (r1Mag * r2Mag);
   const tm = shortWay ? 1 : -1;
   const A = tm * Math.sqrt(r1Mag * r2Mag * (1 + cosDnu));
-  if (Math.abs(A) < 1e-12) throw new Error("Lambert: the two points are opposite each other");
+  if (Math.abs(A) < 1e-12) throw new Error('Lambert: the two points are opposite each other');
 
   let psi = 0;
   let c2 = 0.5;

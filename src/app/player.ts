@@ -48,7 +48,8 @@ export function tripShape(elapsed: number, seconds: number): TripProgress {
   const ramp = Math.min(0.5, TRIP_EASE_SECONDS / seconds);
   // The top speed, in trips per unit of u, that makes the whole trip come to exactly 1.
   const top = 1 / (1 - ramp);
-  const rampShare = (x: number): number => top * (x / 2 - (ramp / (2 * Math.PI)) * Math.sin((Math.PI * x) / ramp));
+  const rampShare = (x: number): number =>
+    top * (x / 2 - (ramp / (2 * Math.PI)) * Math.sin((Math.PI * x) / ramp));
   const rampSlope = (x: number): number => (top * (1 - Math.cos((Math.PI * x) / ramp))) / 2;
   if (u < ramp) return { share: rampShare(u), pace: rampSlope(u) / seconds };
   if (u > 1 - ramp) return { share: 1 - rampShare(1 - u), pace: rampSlope(1 - u) / seconds };
@@ -75,7 +76,12 @@ export class MissionPlayer implements Player {
   private readonly now: () => number;
 
   /** `now` is real time in milliseconds, on the same clock as animation frames; tests pass their own. */
-  constructor(start: number, end: number, story: StoryMap, now: () => number = () => performance.now()) {
+  constructor(
+    start: number,
+    end: number,
+    story: StoryMap,
+    now: () => number = () => performance.now(),
+  ) {
     this.start = start;
     this.end = end;
     this.story = story;
@@ -191,7 +197,8 @@ export class MissionPlayer implements Player {
         this.isPlaying = false;
         this.frame = null;
       } else {
-        this.storyNow = trip.from + (trip.to - trip.from) * tripShape(trip.elapsed, trip.seconds).share;
+        this.storyNow =
+          trip.from + (trip.to - trip.from) * tripShape(trip.elapsed, trip.seconds).share;
         this.frame = requestAnimationFrame(this.step);
       }
       this.notify();

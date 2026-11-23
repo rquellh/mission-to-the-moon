@@ -1,18 +1,21 @@
-import { describe, it } from "vitest";
-import assert from "node:assert/strict";
-import { flight as apollo11Flight } from "../../content/missions/apollo-11/flight.ts";
-import { elapsedToSeconds } from "../../content/types.ts";
-import { createStoryTime, storyIntervalLength } from "../story-time.ts";
+import assert from 'node:assert/strict';
+import { describe, it } from 'vitest';
+import { flight as apollo11Flight } from '../../content/missions/apollo-11/flight.ts';
+import { elapsedToSeconds } from '../../content/types.ts';
+import { createStoryTime, storyIntervalLength } from '../story-time.ts';
 
 /** Every phase boundary of every ship, as the timeline might pass them. */
 const keyTimes = apollo11Flight.ships.flatMap((ship) =>
-  ship.phases.flatMap((phase) => [elapsedToSeconds(phase.start.value), elapsedToSeconds(phase.end.value)]),
+  ship.phases.flatMap((phase) => [
+    elapsedToSeconds(phase.start.value),
+    elapsedToSeconds(phase.end.value),
+  ]),
 );
 
-describe("story time", () => {
+describe('story time', () => {
   const story = createStoryTime(keyTimes);
 
-  it("gives each interval a watchable length", () => {
+  it('gives each interval a watchable length', () => {
     const keys = story.keyTimes;
     let total = 0;
     for (let i = 1; i < keys.length; i++) {
@@ -26,7 +29,7 @@ describe("story time", () => {
     assert.ok(storyIntervalLength(1) < 2.1);
   });
 
-  it("round-trips between mission time and story time", () => {
+  it('round-trips between mission time and story time', () => {
     const start = story.keyTimes[0]!;
     const end = story.keyTimes[story.keyTimes.length - 1]!;
     for (let k = 0; k <= 5000; k++) {
@@ -39,7 +42,7 @@ describe("story time", () => {
     }
   });
 
-  it("is monotone and clamps outside the key times", () => {
+  it('is monotone and clamps outside the key times', () => {
     let prev = -Infinity;
     for (let t = -100; t < 800_000; t += 97) {
       const s = story.toStory(t);
@@ -51,7 +54,7 @@ describe("story time", () => {
     assert.equal(story.toMission(-5), story.keyTimes[0]);
   });
 
-  it("accepts unsorted times with duplicates, and degenerate lists", () => {
+  it('accepts unsorted times with duplicates, and degenerate lists', () => {
     const a = createStoryTime([300, 100, 100, 200]);
     assert.deepEqual([...a.keyTimes], [100, 200, 300]);
     const empty = createStoryTime([]);

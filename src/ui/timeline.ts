@@ -1,7 +1,14 @@
 import type { Player } from '../app/contract';
 import { copy } from '../content/copy';
 import { button, byId, el, setText } from './dom';
-import { flightDay, formatElapsed, formatMonthDay, formatTimeOfDay, isBeforeLiftoff, speakMissionTime } from './format';
+import {
+  flightDay,
+  formatElapsed,
+  formatMonthDay,
+  formatTimeOfDay,
+  isBeforeLiftoff,
+  speakMissionTime,
+} from './format';
 import { icon } from './icons';
 import type { MissionIndex } from './mission-index';
 
@@ -172,7 +179,8 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
       left: chapterButton.offsetLeft,
       width: chapterButton.clientWidth,
       natural:
-        (chapterButton.firstElementChild?.scrollWidth ?? 0) + parseFloat(getComputedStyle(chapterButton).paddingLeft),
+        (chapterButton.firstElementChild?.scrollWidth ?? 0) +
+        parseFloat(getComputedStyle(chapterButton).paddingLeft),
     }));
     const box = boxes[featured]!;
     const grows = box.natural > box.width + 1;
@@ -216,7 +224,10 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
     play.classList.toggle('play--playing', player.playing);
 
     setText(met, formatElapsed(time));
-    setText(since, isBeforeLiftoff(time) ? copy.timeline.beforeLiftoff : copy.timeline.sinceLiftoff);
+    setText(
+      since,
+      isBeforeLiftoff(time) ? copy.timeline.beforeLiftoff : copy.timeline.sinceLiftoff,
+    );
     // On a long flight, which day it is means more than the hours alone.
     const dayNumber = index.countsDays ? flightDay(time) : null;
     day.hidden = dayNumber === null;
@@ -224,7 +235,9 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
     // "Jul 20, 1969 20:17:39 UTC". The year has its own span so a phone can
     // leave it out to make room for the day (the header shows the year).
     const date = index.utcAt(time);
-    const utcKey = date ? `${formatMonthDay(date)}|${date.getUTCFullYear()}|${formatTimeOfDay(date)}` : '';
+    const utcKey = date
+      ? `${formatMonthDay(date)}|${date.getUTCFullYear()}|${formatTimeOfDay(date)}`
+      : '';
     if (utcKey !== shownUtc) {
       shownUtc = utcKey;
       if (date) {

@@ -44,10 +44,15 @@ import {
   type ScaleMode,
 } from './config';
 import { createEarth, type Earth } from './earth';
-import { fitDistance, interpolatePose, type CameraPose, type ClearArea, type SphereLike } from './framing';
+import {
+  fitDistance,
+  interpolatePose,
+  type CameraPose,
+  type ClearArea,
+  type SphereLike,
+} from './framing';
 import { createMarkers, type MarkerPoint, type MarkerSet } from './markers';
 import { createMoon, type Moon } from './moon';
-import type { SceneBox, SceneReport } from './report';
 import {
   createOrbitRing,
   createPathLine,
@@ -57,9 +62,9 @@ import {
   type PathFade,
   type PathLine,
 } from './path-lines';
+import type { SceneBox, SceneReport } from './report';
 import { createStarfield, type Starfield } from './stars';
 import { chooseTextureTier, loadStageTextures, type TextureTier } from './textures';
-import { webGL2Available } from './webgl';
 import { easeInOutCubic, Tween } from './tween';
 import {
   buildFleet,
@@ -70,6 +75,7 @@ import {
   type ShipModel,
   type ShipPose,
 } from './vehicles';
+import { webGL2Available } from './webgl';
 
 export interface StageOptions {
   /** The flight path, from buildFlightPath. */
@@ -549,7 +555,12 @@ export class Stage implements Director {
   private walkLevel = 0;
   private walkWanted = 0;
   private walkPrimed = false;
-  private readonly walkPose: ShipPose = { exists: false, position: new Vector3(), forward: new Vector3(1, 0, 0), up: new Vector3(0, 1, 0) };
+  private readonly walkPose: ShipPose = {
+    exists: false,
+    position: new Vector3(),
+    forward: new Vector3(1, 0, 0),
+    up: new Vector3(0, 1, 0),
+  };
   private readonly fastFrom: CameraPose = { position: new Vector3(), target: new Vector3() };
   private readonly fastTo: CameraPose = { position: new Vector3(), target: new Vector3() };
   private readonly fastPose: CameraPose = { position: new Vector3(), target: new Vector3() };
@@ -586,7 +597,12 @@ export class Stage implements Director {
       throw new WebGLUnavailableError();
     }
     try {
-      this.renderer = new WebGLRenderer({ canvas, antialias: true, stencil: true, powerPreference: 'default' });
+      this.renderer = new WebGLRenderer({
+        canvas,
+        antialias: true,
+        stencil: true,
+        powerPreference: 'default',
+      });
     } catch (error) {
       throw new WebGLUnavailableError(error);
     }
@@ -618,7 +634,9 @@ export class Stage implements Director {
     this.viewNow = homeView(options.mission);
     this.orbitMission = options.mission.destination === 'earth-orbit';
     this.journeyPoints = this.sampleJourney();
-    this.journeyCenter.readable.copy(this.boundsCenter(this.journeyPoints.readable, MOON_DISTANCE.readable));
+    this.journeyCenter.readable.copy(
+      this.boundsCenter(this.journeyPoints.readable, MOON_DISTANCE.readable),
+    );
     this.journeyCenter.true.copy(this.boundsCenter(this.journeyPoints.true, MOON_DISTANCE.true));
 
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
@@ -633,7 +651,11 @@ export class Stage implements Director {
       new AmbientLight(0xffffff, AMBIENT_INTENSITY),
       this.moonAnchor,
     );
-    this.shipScene.add(this.shipSun, this.shipSun.target, new AmbientLight(0xffffff, SHIP_AMBIENT_INTENSITY));
+    this.shipScene.add(
+      this.shipSun,
+      this.shipSun.target,
+      new AmbientLight(0xffffff, SHIP_AMBIENT_INTENSITY),
+    );
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
@@ -659,9 +681,11 @@ export class Stage implements Director {
       this.syncLoop();
     });
     this.listen(canvas, 'keydown', (event) => this.handleKey(event as KeyboardEvent));
-    this.cleanups.push(this.player.subscribe(() => {
-      this.needsRender = true;
-    }));
+    this.cleanups.push(
+      this.player.subscribe(() => {
+        this.needsRender = true;
+      }),
+    );
 
     this.handleResize();
     // While developing, the stage can be looked at from the browser console (for checking the scene).
@@ -828,7 +852,10 @@ export class Stage implements Director {
         return {
           id: ship.id,
           box: model ? this.boxOnCanvas(model.root) : null,
-          parts: names.map((name) => ({ name, box: model ? this.boxOnCanvas(model.root, name) : null })),
+          parts: names.map((name) => ({
+            name,
+            box: model ? this.boxOnCanvas(model.root, name) : null,
+          })),
         };
       }),
       leftBehind: (this.fleet?.leftBehind ?? []).map((part) => ({
@@ -838,7 +865,11 @@ export class Stage implements Director {
       })),
       labels: this.labels.map((label, i) => {
         const opacity = label.visible ? (label.material as SpriteMaterial).opacity : 0;
-        return { text: this.options.leftBehind[i]?.label ?? '', opacity, box: opacity > 0 ? this.labelBox(label) : null };
+        return {
+          text: this.options.leftBehind[i]?.label ?? '',
+          opacity,
+          box: opacity > 0 ? this.labelBox(label) : null,
+        };
       }),
     };
   }
@@ -865,9 +896,16 @@ export class Stage implements Director {
         if (box) {
           for (let k = 0; k < 8; k += 1) {
             corner
-              .set(k & 1 ? box.max.x : box.min.x, k & 2 ? box.max.y : box.min.y, k & 4 ? box.max.z : box.min.z)
+              .set(
+                k & 1 ? box.max.x : box.min.x,
+                k & 2 ? box.max.y : box.min.y,
+                k & 4 ? box.max.z : box.min.z,
+              )
               .applyMatrix4(node.matrixWorld);
-            if (this.v2.subVectors(corner, this.camera.position).dot(this.cameraForward) <= this.camera.near) {
+            if (
+              this.v2.subVectors(corner, this.camera.position).dot(this.cameraForward) <=
+              this.camera.near
+            ) {
               behind = true;
               continue;
             }
@@ -963,8 +1001,18 @@ export class Stage implements Director {
       for (const ship of [followed, ...this.ships.filter((other) => other !== followed)]) {
         const readable = [0, 0, 0];
         const real = [0, 0, 0];
-        if (!this.path.position(ship.id, t, 0, readable) || !this.path.position(ship.id, t, 1, real)) continue;
-        points.push({ readable, true: real, color: ship.color, eventIndex: index, group: this.ships.indexOf(ship) });
+        if (
+          !this.path.position(ship.id, t, 0, readable) ||
+          !this.path.position(ship.id, t, 1, real)
+        )
+          continue;
+        points.push({
+          readable,
+          true: real,
+          color: ship.color,
+          eventIndex: index,
+          group: this.ships.indexOf(ship),
+        });
         break;
       }
     });
@@ -979,15 +1027,31 @@ export class Stage implements Director {
         if (phase.kind === 'ascent' && phase.body === 'earth') {
           const local = this.earthSite(ship.id, phaseStart(phase), 1);
           if (!local) continue;
-          earthPoints.push({ readable: local.toArray(), true: local.toArray(), color: 0xffffff, eventIndex: -1 });
+          earthPoints.push({
+            readable: local.toArray(),
+            true: local.toArray(),
+            color: 0xffffff,
+            eventIndex: -1,
+          });
           ship.launch ??= { time: phaseStart(phase), local };
         } else if (phase.kind === 'entry' || (phase.kind === 'descent' && phase.body === 'earth')) {
           const local = this.earthSite(ship.id, phaseEnd(phase), -1);
-          if (local) earthPoints.push({ readable: local.toArray(), true: local.toArray(), color: 0xffffff, eventIndex: -1 });
+          if (local)
+            earthPoints.push({
+              readable: local.toArray(),
+              true: local.toArray(),
+              color: 0xffffff,
+              eventIndex: -1,
+            });
         } else if (phase.kind === 'descent') {
           const site = this.moonSite(ship.id, phaseEnd(phase));
           if (!site) continue;
-          moonPoints.push({ readable: site.offset.toArray(), true: site.offset.toArray(), color: 0xffffff, eventIndex: -1 });
+          moonPoints.push({
+            readable: site.offset.toArray(),
+            true: site.offset.toArray(),
+            color: 0xffffff,
+            eventIndex: -1,
+          });
           if (!this.landings.has(ship.id)) this.landings.set(ship.id, site);
         }
       }
@@ -1001,16 +1065,20 @@ export class Stage implements Director {
     }
 
     // The spacecraft.
-    this.fleet = buildFleet(
-      this.ships,
-      this.options.vehicle,
-      this.options.leftBehind,
-      (moment) => elapsedToSeconds(moment.at.value),
+    this.fleet = buildFleet(this.ships, this.options.vehicle, this.options.leftBehind, (moment) =>
+      elapsedToSeconds(moment.at.value),
     );
     for (const ship of this.fleet.ships) this.shipScene.add(ship.halo, ship.root);
     this.companionMarkers = this.ships.map((ship) => {
       const marker = new Sprite(
-        new SpriteMaterial({ map: this.dotTexture(), color: ship.color, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false }),
+        new SpriteMaterial({
+          map: this.dotTexture(),
+          color: ship.color,
+          transparent: true,
+          depthTest: false,
+          depthWrite: false,
+          sizeAttenuation: false,
+        }),
       );
       marker.visible = false;
       marker.renderOrder = 10;
@@ -1019,7 +1087,13 @@ export class Stage implements Director {
     });
     for (const part of this.fleet.leftBehind) this.shipScene.add(part.root);
     this.pointer = new Sprite(
-      new SpriteMaterial({ map: this.arrowTexture(), transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false }),
+      new SpriteMaterial({
+        map: this.arrowTexture(),
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        sizeAttenuation: false,
+      }),
     );
     this.pointer.visible = false;
     this.pointer.renderOrder = 12;
@@ -1031,7 +1105,8 @@ export class Stage implements Director {
     this.stations = this.findStations();
 
     const ratio = this.renderer.getPixelRatio();
-    for (const set of [this.eventMarkers, this.earthSites, this.moonSites]) set?.setPixelRatio(ratio);
+    for (const set of [this.eventMarkers, this.earthSites, this.moonSites])
+      set?.setPixelRatio(ratio);
   }
 
   /**
@@ -1041,7 +1116,10 @@ export class Stage implements Director {
    * of a flight that stays in Earth orbit; for a Moon flight, each long stay
    * in lunar orbit.
    */
-  private revolutionsOf(polyline: { readonly times: Float64Array; readonly truePositions: Float32Array }): Pick<PathFade, 'revolutions' | 'runs'> {
+  private revolutionsOf(polyline: {
+    readonly times: Float64Array;
+    readonly truePositions: Float32Array;
+  }): Pick<PathFade, 'revolutions' | 'runs'> {
     const n = polyline.times.length;
     const revolutions = new Float64Array(n);
     const moon = [0, 0, 0];
@@ -1069,7 +1147,8 @@ export class Stage implements Director {
       b.fromArray(p2, 3 * i).sub(center);
       const la = a.length();
       const lb = b.length();
-      if (la > 1e-9 && lb > 1e-9) total += Math.acos(MathUtils.clamp(a.dot(b) / (la * lb), -1, 1)) / (Math.PI * 2);
+      if (la > 1e-9 && lb > 1e-9)
+        total += Math.acos(MathUtils.clamp(a.dot(b) / (la * lb), -1, 1)) / (Math.PI * 2);
       revolutions[i] = total;
     }
     const runs: Array<readonly [number, number]> = [];
@@ -1085,7 +1164,11 @@ export class Stage implements Director {
       if (low && first < 0) first = i;
       if (!low && first >= 0) {
         const last = i - 1;
-        if ((revolutions[last] ?? 0) - (revolutions[first] ?? 0) > LONG_LUNAR_STAY_REVOLUTIONS && runs.length < 4) runs.push([first, last]);
+        if (
+          (revolutions[last] ?? 0) - (revolutions[first] ?? 0) > LONG_LUNAR_STAY_REVOLUTIONS &&
+          runs.length < 4
+        )
+          runs.push([first, last]);
         first = -1;
       }
     }
@@ -1114,7 +1197,9 @@ export class Stage implements Director {
         } else if (phase.kind === 'rendezvous' && phase.alongside) {
           const next = phases[k + 1];
           const docks = next?.kind === 'docked' && next.target === phase.target;
-          const paired = this.pairings.some((pairing) => pairing.target.id === phase.target && chaser === this.main);
+          const paired = this.pairings.some(
+            (pairing) => pairing.target.id === phase.target && chaser === this.main,
+          );
           if (docks && paired) return;
           from = elapsedToSeconds(phase.alongside.value);
           target = phase.target;
@@ -1126,7 +1211,12 @@ export class Stage implements Director {
         const to = phaseEnd(phase);
         const middle = (from + to) / 2;
         const followed = this.followedAt(middle);
-        const anchor = followed === chaser || followed === other ? followed : chaser === this.main || other !== this.main ? chaser : other;
+        const anchor =
+          followed === chaser || followed === other
+            ? followed
+            : chaser === this.main || other !== this.main
+              ? chaser
+              : other;
         spans.push({
           anchor,
           mover: anchor === chaser ? other : chaser,
@@ -1369,7 +1459,8 @@ export class Stage implements Director {
         continue;
       }
       ship.position.fromArray(this.scratch);
-      if (this.path.direction(ship.id, t, this.mix, this.scratch)) ship.forward.fromArray(this.scratch);
+      if (this.path.direction(ship.id, t, this.mix, this.scratch))
+        ship.forward.fromArray(this.scratch);
       this.radialUp(ship.position, ship.up);
       // Down on Earth (a capsule floating after splashdown): it came down, so it stays heat shield down.
       const phase = this.path.phaseAt(ship.id, t);
@@ -1412,7 +1503,11 @@ export class Stage implements Director {
       case 'earth':
         return out.set(0, 0, 0);
       case 'moon':
-        return out.set(MOON_DISTANCE.readable + (MOON_DISTANCE.true - MOON_DISTANCE.readable) * mix, 0, 0);
+        return out.set(
+          MOON_DISTANCE.readable + (MOON_DISTANCE.true - MOON_DISTANCE.readable) * mix,
+          0,
+          0,
+        );
       case 'spacecraft':
         return out.copy(this.followed.position);
       case 'journey':
@@ -1423,7 +1518,11 @@ export class Stage implements Director {
   /** Bodies for framing and occlusion. */
   private moonSphere(mix: number): SphereLike {
     return {
-      center: new Vector3(MOON_DISTANCE.readable + (MOON_DISTANCE.true - MOON_DISTANCE.readable) * mix, 0, 0),
+      center: new Vector3(
+        MOON_DISTANCE.readable + (MOON_DISTANCE.true - MOON_DISTANCE.readable) * mix,
+        0,
+        0,
+      ),
       radius: MOON_RADIUS,
     };
   }
@@ -1452,13 +1551,29 @@ export class Stage implements Director {
             width: Math.max(0.2, this.clear.width - (2 * SHIP_EDGE_PX) / this.cssWidth),
             height: Math.max(0.2, this.clear.height - (2 * SHIP_EDGE_PX) / this.cssHeight),
           };
-          const distance = fitDistance(this.camera, center, direction, spheres, 1.06, clear, this.worldUp);
+          const distance = fitDistance(
+            this.camera,
+            center,
+            direction,
+            spheres,
+            1.06,
+            clear,
+            this.worldUp,
+          );
           return out.copy(direction).multiplyScalar(distance);
         }
         if (ship.exists && ship.position.distanceTo(center) < radius * (1 + NEAR_BODY_RADII)) {
           spheres.push({ center: ship.position.clone(), radius: radius * 0.12 });
         }
-        const distance = fitDistance(this.camera, center, direction, spheres, 1.2, this.clear, this.worldUp);
+        const distance = fitDistance(
+          this.camera,
+          center,
+          direction,
+          spheres,
+          1.2,
+          this.clear,
+          this.worldUp,
+        );
         return out.copy(direction).multiplyScalar(distance);
       }
       case 'spacecraft': {
@@ -1466,7 +1581,10 @@ export class Stage implements Director {
         this.chaseFrameFor(ship, this.chaseFrame);
         this.chaseReady = true;
         this.chaseDistance = this.chaseAutoDistance(ship);
-        return out.copy(this.chaseDirection).applyQuaternion(this.chaseFrame).multiplyScalar(this.chaseDistance * this.chaseZoom);
+        return out
+          .copy(this.chaseDirection)
+          .applyQuaternion(this.chaseFrame)
+          .multiplyScalar(this.chaseDistance * this.chaseZoom);
       }
     }
   }
@@ -1509,7 +1627,15 @@ export class Stage implements Director {
     // From the +Z side, raised toward ecliptic north: +X (the Moon) is to the right.
     const elevation = MathUtils.degToRad(JOURNEY_ELEVATION_DEG);
     const direction = new Vector3(0, Math.sin(elevation), Math.cos(elevation));
-    const distance = fitDistance(this.camera, center, direction, spheres, 1.05, clear, this.worldUp);
+    const distance = fitDistance(
+      this.camera,
+      center,
+      direction,
+      spheres,
+      1.05,
+      clear,
+      this.worldUp,
+    );
     return out.copy(direction).multiplyScalar(distance);
   }
 
@@ -1565,7 +1691,11 @@ export class Stage implements Director {
     if (normal.dot(preferred) < 0) normal.negate();
     const tilt = MathUtils.degToRad(ORBIT_VIEW_TILT_DEG);
     // (No turning away from the Moon here: that could turn the view edge on to the orbits.)
-    out.copy(normal).multiplyScalar(Math.cos(tilt)).addScaledVector(radial, Math.sin(tilt)).normalize();
+    out
+      .copy(normal)
+      .multiplyScalar(Math.cos(tilt))
+      .addScaledVector(radial, Math.sin(tilt))
+      .normalize();
     return true;
   }
 
@@ -1583,7 +1713,11 @@ export class Stage implements Director {
     const side = this.v1.copy(direction).addScaledVector(away, -cos);
     if (side.lengthSq() < 1e-8) side.set(0, 0, 1);
     side.normalize();
-    direction.copy(away).multiplyScalar(Math.cos(minAngle)).addScaledVector(side, Math.sin(minAngle)).normalize();
+    direction
+      .copy(away)
+      .multiplyScalar(Math.cos(minAngle))
+      .addScaledVector(side, Math.sin(minAngle))
+      .normalize();
   }
 
   /**
@@ -1597,7 +1731,9 @@ export class Stage implements Director {
     const nearMoon = toMoon / MOON_RADIUS < toEarth / EARTH_RADIUS;
     const height = nearMoon ? toMoon / MOON_RADIUS : toEarth / EARTH_RADIUS;
     const weight = 1 - smoothstep(1.5, 5, height);
-    up.copy(ship.up).multiplyScalar(weight).add(this.v2.set(0, 1 - weight, 0));
+    up.copy(ship.up)
+      .multiplyScalar(weight)
+      .add(this.v2.set(0, 1 - weight, 0));
     if (up.lengthSq() < 1e-8) up.set(0, 1, 0);
     up.normalize();
 
@@ -1636,20 +1772,24 @@ export class Stage implements Director {
     this.controls.minDistance = 0;
     this.controls.maxDistance = Infinity;
     this.cameraTween?.cancel();
-    this.cameraTween = new Tween(durationMs, (t) => {
-      // The destination moves with its anchor (a ship, or the Moon as the scale changes).
-      const anchorMix = this.viewNow === 'journey' ? toMix : this.mix;
-      this.viewAnchor(this.tweenTo.target, anchorMix);
-      this.destinationOffset(this.v1);
-      this.tweenTo.position.copy(this.tweenTo.target).add(this.v1);
-      interpolatePose(this.tweenFrom, this.tweenTo, t, this.tweenPose);
-      // Roll from the old "up" to the new one along the way.
-      this.desiredUp(this.v1);
-      this.upTurn.setFromUnitVectors(this.tweenFromUp, this.v1);
-      this.upStep.identity().slerp(this.upTurn, t);
-      this.setCameraUp(this.v1.copy(this.tweenFromUp).applyQuaternion(this.upStep));
-      this.applyPose(this.tweenPose);
-    }, easeInOutCubic);
+    this.cameraTween = new Tween(
+      durationMs,
+      (t) => {
+        // The destination moves with its anchor (a ship, or the Moon as the scale changes).
+        const anchorMix = this.viewNow === 'journey' ? toMix : this.mix;
+        this.viewAnchor(this.tweenTo.target, anchorMix);
+        this.destinationOffset(this.v1);
+        this.tweenTo.position.copy(this.tweenTo.target).add(this.v1);
+        interpolatePose(this.tweenFrom, this.tweenTo, t, this.tweenPose);
+        // Roll from the old "up" to the new one along the way.
+        this.desiredUp(this.v1);
+        this.upTurn.setFromUnitVectors(this.tweenFromUp, this.v1);
+        this.upStep.identity().slerp(this.upTurn, t);
+        this.setCameraUp(this.v1.copy(this.tweenFromUp).applyQuaternion(this.upStep));
+        this.applyPose(this.tweenPose);
+      },
+      easeInOutCubic,
+    );
     this.needsRender = true;
   }
 
@@ -1658,7 +1798,8 @@ export class Stage implements Director {
    * stands upright with the ground below), otherwise ecliptic north.
    */
   private desiredUp(out: Vector3): Vector3 {
-    if (this.viewNow === 'spacecraft' && this.chaseReady) return out.set(0, 1, 0).applyQuaternion(this.chaseFrame);
+    if (this.viewNow === 'spacecraft' && this.chaseReady)
+      return out.set(0, 1, 0).applyQuaternion(this.chaseFrame);
     return out.set(0, 1, 0);
   }
 
@@ -1683,7 +1824,9 @@ export class Stage implements Director {
       out.copy(this.chaseDirection);
       // During a spacewalk, from more to the side, so a figure standing along the craft is seen whole.
       if (this.walkLevel > 0) out.lerp(SPACEWALK_VIEW, easeInOutCubic(this.walkLevel)).normalize();
-      return out.applyQuaternion(this.chaseFrame).multiplyScalar(this.chaseDistance * this.chaseZoom);
+      return out
+        .applyQuaternion(this.chaseFrame)
+        .multiplyScalar(this.chaseDistance * this.chaseZoom);
     }
     return out.copy(this.settledOffset);
   }
@@ -1755,7 +1898,10 @@ export class Stage implements Director {
       const radius = this.viewNow === 'moon' ? MOON_RADIUS : EARTH_FRAME_RADIUS;
       this.controls.minDistance = radius * MIN_DISTANCE_FACTOR;
     }
-    this.controls.maxDistance = Math.max(MAX_DISTANCE[this.mode], this.settledOffset.length() * 1.5);
+    this.controls.maxDistance = Math.max(
+      MAX_DISTANCE[this.mode],
+      this.settledOffset.length() * 1.5,
+    );
   }
 
   private readonly handleControlStart = (): void => {
@@ -1827,7 +1973,12 @@ export class Stage implements Director {
     const x = ((p.x + 1) / 2) * this.cssWidth;
     const y = ((1 - p.y) / 2) * this.cssHeight;
     const i = this.clearInsets;
-    return x >= i.left + margin && x <= this.cssWidth - i.right - margin && y >= i.top + margin && y <= this.cssHeight - i.bottom - margin;
+    return (
+      x >= i.left + margin &&
+      x <= this.cssWidth - i.right - margin &&
+      y >= i.top + margin &&
+      y <= this.cssHeight - i.bottom - margin
+    );
   }
 
   /**
@@ -1841,7 +1992,12 @@ export class Stage implements Director {
     if (!pointer) return;
     pointer.visible = false;
     const ship = this.subject();
-    if ((this.viewNow !== 'earth' && this.viewNow !== 'moon') || !ship.exists || this.occluded(ship.position)) return;
+    if (
+      (this.viewNow !== 'earth' && this.viewNow !== 'moon') ||
+      !ship.exists ||
+      this.occluded(ship.position)
+    )
+      return;
     if (this.inClearArea(ship.position, SHIP_EDGE_PX)) return;
     const p = this.v1.copy(ship.position).project(this.camera);
     // Behind the camera, the projection is mirrored.
@@ -1854,10 +2010,15 @@ export class Stage implements Director {
     const halfW = (this.cssWidth - i.left - i.right) / 2 - POINTER_INSET_PX;
     const halfH = (this.cssHeight - i.top - i.bottom) / 2 - POINTER_INSET_PX;
     if (halfW <= 0 || halfH <= 0 || (dx === 0 && dy === 0)) return;
-    const t = Math.min(dx !== 0 ? halfW / Math.abs(dx) : Infinity, dy !== 0 ? halfH / Math.abs(dy) : Infinity);
+    const t = Math.min(
+      dx !== 0 ? halfW / Math.abs(dx) : Infinity,
+      dy !== 0 ? halfH / Math.abs(dy) : Infinity,
+    );
     const x = cx + dx * t;
     const y = cy + dy * t;
-    pointer.position.set((x / this.cssWidth) * 2 - 1, 1 - (y / this.cssHeight) * 2, 0.5).unproject(this.camera);
+    pointer.position
+      .set((x / this.cssWidth) * 2 - 1, 1 - (y / this.cssHeight) * 2, 0.5)
+      .unproject(this.camera);
     pointer.scale.setScalar((2 * POINTER_PX * tanHalf) / this.cssHeight);
     const material = pointer.material as SpriteMaterial;
     // The arrow is drawn pointing up; turn it toward the ship (screen y runs down).
@@ -1922,7 +2083,14 @@ export class Stage implements Director {
       lines.forEach((l, k) => g.fillText(l, width / 2, 2 * ratio + k * 16 * ratio));
     }
     const sprite = new Sprite(
-      new SpriteMaterial({ map: new CanvasTexture(canvas), transparent: true, opacity: 0, depthTest: false, depthWrite: false, sizeAttenuation: false }),
+      new SpriteMaterial({
+        map: new CanvasTexture(canvas),
+        transparent: true,
+        opacity: 0,
+        depthTest: false,
+        depthWrite: false,
+        sizeAttenuation: false,
+      }),
     );
     sprite.center.set(0.5, 1);
     sprite.userData['aspect'] = canvas.width / Math.max(1, canvas.height);
@@ -1989,7 +2157,8 @@ export class Stage implements Director {
         this.chaseDistance = auto;
       } else {
         this.chaseFrame.slerp(this.q1, 1 - Math.exp(-dt / CHASE_TURN_SECONDS));
-        this.chaseDistance += (auto - this.chaseDistance) * (1 - Math.exp(-dt / CHASE_DISTANCE_SECONDS));
+        this.chaseDistance +=
+          (auto - this.chaseDistance) * (1 - Math.exp(-dt / CHASE_DISTANCE_SECONDS));
       }
     }
 
@@ -2138,7 +2307,8 @@ export class Stage implements Director {
     this.updateClearArea();
     for (const line of this.lines) line.setResolution(width, height);
     this.ring?.setResolution(width, height);
-    for (const set of [this.eventMarkers, this.earthSites, this.moonSites]) set?.setPixelRatio(ratio);
+    for (const set of [this.eventMarkers, this.earthSites, this.moonSites])
+      set?.setPixelRatio(ratio);
     this.reframeAfterLayout();
     // Draw right away so the canvas never shows a stretched frame.
     if (this.earth && this.drawing) this.renderFrame(0);
@@ -2191,7 +2361,8 @@ export class Stage implements Director {
     const step = Number.isNaN(this.lastStory) ? 0 : Math.abs(story - this.lastStory);
     // `speed` is the pace right now: the chosen rate, or a tour trip's own pace,
     // which runs faster than the rate in the middle of a long trip.
-    const jumped = step > (playing ? Math.max(0.3, this.player.speed * 0.25) : 1e-9) || (!playing && step > 0);
+    const jumped =
+      step > (playing ? Math.max(0.3, this.player.speed * 0.25) : 1e-9) || (!playing && step > 0);
     const paused = this.wasPlaying && !playing;
     this.lastStory = story;
     this.wasPlaying = playing;
@@ -2207,7 +2378,9 @@ export class Stage implements Director {
     if (worldChanged) this.updateShips();
     const fastForward = this.updateFastForward(dt, jumped);
     const level = this.followed.fastForward;
-    const shown = this.player.playing && (this.fastForwardShown ? level > FAST_FORWARD_OFF : level > FAST_FORWARD_ON);
+    const shown =
+      this.player.playing &&
+      (this.fastForwardShown ? level > FAST_FORWARD_OFF : level > FAST_FORWARD_ON);
     if (shown !== this.fastForwardShown) {
       this.fastForwardShown = shown;
       this.notify();
@@ -2215,7 +2388,15 @@ export class Stage implements Director {
     const offsetMoving = this.updateViewOffset(dt);
     const cameraMoved = this.updateCamera(dt, jumped, paused);
 
-    if (animating || worldChanged || fastForward || offsetMoving || cameraMoved || this.needsRender || this.shipsTurning()) {
+    if (
+      animating ||
+      worldChanged ||
+      fastForward ||
+      offsetMoving ||
+      cameraMoved ||
+      this.needsRender ||
+      this.shipsTurning()
+    ) {
       this.renderFrame(dt, jumped);
     }
   };
@@ -2248,7 +2429,10 @@ export class Stage implements Director {
 
   /** Room drawn between two ships this many meters apart, in CSS pixels (see PAIR_GAP_MIN_PX). */
   private roomFor(meters: number): number {
-    return PAIR_GAP_MIN_PX + (PAIR_GAP_MAX_PX - PAIR_GAP_MIN_PX) * (1 - Math.exp(-meters / PAIR_GAP_DISTANCE_M));
+    return (
+      PAIR_GAP_MIN_PX +
+      (PAIR_GAP_MAX_PX - PAIR_GAP_MIN_PX) * (1 - Math.exp(-meters / PAIR_GAP_DISTANCE_M))
+    );
   }
 
   /**
@@ -2284,7 +2468,8 @@ export class Stage implements Director {
         let moment: PairMoment | null = null;
         for (const candidate of pairing.moments) {
           if (candidate.alone !== index) continue;
-          if (!moment || Math.abs(candidate.time - t) < Math.abs(moment.time - t)) moment = candidate;
+          if (!moment || Math.abs(candidate.time - t) < Math.abs(moment.time - t))
+            moment = candidate;
         }
         if (!moment) continue;
         const meters = this.metersApart(target, this.main, t);
@@ -2297,10 +2482,26 @@ export class Stage implements Director {
           const from = toStory(pairing.alongside ?? moment.time);
           arranged = smoothstep(from - PAIR_ARRANGE_STORY_SECONDS, from, story);
         } else {
-          arranged = 1 - smoothstep(PAIR_CLOSE_STORY_SECONDS, PAIR_CLOSE_STORY_SECONDS + PAIR_ARRANGE_STORY_SECONDS, storyApart);
+          arranged =
+            1 -
+            smoothstep(
+              PAIR_CLOSE_STORY_SECONDS,
+              PAIR_CLOSE_STORY_SECONDS + PAIR_ARRANGE_STORY_SECONDS,
+              storyApart,
+            );
         }
         const closing = smoothstep(0, PAIR_CLOSE_STORY_SECONDS, storyApart);
-        consider({ anchor: this.main, mover: target, arranged, gapPixels: closing * this.roomFor(meters), moment, opening: 1 }, meters);
+        consider(
+          {
+            anchor: this.main,
+            mover: target,
+            arranged,
+            gapPixels: closing * this.roomFor(meters),
+            moment,
+            opening: 1,
+          },
+          meters,
+        );
       }
     }
     for (const span of this.stations) {
@@ -2310,16 +2511,40 @@ export class Stage implements Director {
       let arranged: number;
       if (story < from) arranged = smoothstep(from - PAIR_ARRANGE_STORY_SECONDS, from, story);
       else if (story <= to) arranged = 1;
-      else arranged = 1 - smoothstep(to + PAIR_CLOSE_STORY_SECONDS, to + PAIR_CLOSE_STORY_SECONDS + PAIR_ARRANGE_STORY_SECONDS, story);
+      else
+        arranged =
+          1 -
+          smoothstep(
+            to + PAIR_CLOSE_STORY_SECONDS,
+            to + PAIR_CLOSE_STORY_SECONDS + PAIR_ARRANGE_STORY_SECONDS,
+            story,
+          );
       if (arranged <= 0) continue;
       const meters = this.metersApart(span.anchor, span.mover, t);
       if (!Number.isFinite(meters)) continue;
       // Parting from docked, the gap opens; closing in to dock, it closes.
       // Timed by story time or by mission time, whichever is further along, so it reads at any playback pace.
-      const since = Math.max((story - from) / PAIR_CLOSE_STORY_SECONDS, (t - span.from) / STATION_OPEN_MISSION_SECONDS);
-      const until = Math.max((to - story) / PAIR_CLOSE_STORY_SECONDS, (span.to - t) / STATION_OPEN_MISSION_SECONDS);
-      const opening = (span.opens ? smoothstep(0, 1, since) : 1) * (span.closes ? smoothstep(0, 1, until) : 1);
-      consider({ anchor: span.anchor, mover: span.mover, arranged, gapPixels: this.roomFor(meters), moment: null, opening }, meters);
+      const since = Math.max(
+        (story - from) / PAIR_CLOSE_STORY_SECONDS,
+        (t - span.from) / STATION_OPEN_MISSION_SECONDS,
+      );
+      const until = Math.max(
+        (to - story) / PAIR_CLOSE_STORY_SECONDS,
+        (span.to - t) / STATION_OPEN_MISSION_SECONDS,
+      );
+      const opening =
+        (span.opens ? smoothstep(0, 1, since) : 1) * (span.closes ? smoothstep(0, 1, until) : 1);
+      consider(
+        {
+          anchor: span.anchor,
+          mover: span.mover,
+          arranged,
+          gapPixels: this.roomFor(meters),
+          moment: null,
+          opening,
+        },
+        meters,
+      );
     }
     return best;
   }
@@ -2347,7 +2572,8 @@ export class Stage implements Director {
     const cos = MathUtils.clamp(real.dot(dock), -1, 1);
     const angle = Math.acos(cos) * a;
     const across = this.v3.copy(dock).addScaledVector(real, -cos);
-    if (across.lengthSq() < 1e-8) across.copy(anchor.up).addScaledVector(real, -anchor.up.dot(real));
+    if (across.lengthSq() < 1e-8)
+      across.copy(anchor.up).addScaledVector(real, -anchor.up.dot(real));
     if (across.lengthSq() < 1e-8) across.set(0, 1, 0).addScaledVector(real, -real.y);
     across.normalize();
     const direction = real.multiplyScalar(Math.cos(angle)).addScaledVector(across, Math.sin(angle));
@@ -2357,7 +2583,10 @@ export class Stage implements Director {
 
   /** The world direction a ship's face looks (see ShipFace), into `out`. */
   private faceDirection(ship: ShipState, face: ShipFace, out: Vector3): Vector3 {
-    return out.copy(face.axis === 'up' ? ship.up : ship.forward).multiplyScalar(face.sign).normalize();
+    return out
+      .copy(face.axis === 'up' ? ship.up : ship.forward)
+      .multiplyScalar(face.sign)
+      .normalize();
   }
 
   /** A turn standing for a ship pose: +Y along `forward`, +Z toward `up` (made square to it). */
@@ -2377,7 +2606,14 @@ export class Stage implements Director {
    * `anchor`: its face toward the anchor, against `toMover` (the anchor's
    * face direction), with its top on the anchor's side.
    */
-  private facingPose(anchor: ShipState, mover: ShipState, toMover: Vector3, face: ShipFace, arranged: number, out: ShipPose): void {
+  private facingPose(
+    anchor: ShipState,
+    mover: ShipState,
+    toMover: Vector3,
+    face: ShipFace,
+    arranged: number,
+    out: ShipPose,
+  ): void {
     const back = this.f4.copy(toMover).negate();
     const forward = this.f5;
     const up = this.f6;
@@ -2385,12 +2621,14 @@ export class Stage implements Director {
       // The lunar module: its top toward the anchor, its front along the anchor's travel.
       up.copy(back);
       forward.copy(anchor.forward).addScaledVector(up, -anchor.forward.dot(up));
-      if (forward.lengthSq() < 1e-6) forward.copy(anchor.up).addScaledVector(up, -anchor.up.dot(up));
+      if (forward.lengthSq() < 1e-6)
+        forward.copy(anchor.up).addScaledVector(up, -anchor.up.dot(up));
     } else {
       // Nose (or docking end) toward the anchor, the top toward the anchor's top.
       forward.copy(back).multiplyScalar(face.sign);
       up.copy(anchor.up).addScaledVector(forward, -anchor.up.dot(forward));
-      if (up.lengthSq() < 1e-6) up.copy(anchor.forward).addScaledVector(forward, -anchor.forward.dot(forward));
+      if (up.lengthSq() < 1e-6)
+        up.copy(anchor.forward).addScaledVector(forward, -anchor.forward.dot(forward));
     }
     this.poseTurn(mover.forward, mover.up, this.q2);
     this.poseTurn(forward, up, this.q3);
@@ -2421,7 +2659,6 @@ export class Stage implements Director {
     return this.dotMap;
   }
 
-
   /** How visible a ship's model is now (it fades out while many orbits pass in a moment). */
   private opacityOf(ship: ShipState): number {
     return 1 - ship.fastForward;
@@ -2438,13 +2675,18 @@ export class Stage implements Director {
     context.snap = snap;
     context.reducedMotion = this.reducedMotion;
     // Smaller clear areas (phones) get somewhat smaller models.
-    const clearPixels = Math.min(this.clear.width * this.cssWidth, this.clear.height * this.cssHeight);
+    const clearPixels = Math.min(
+      this.clear.width * this.cssWidth,
+      this.clear.height * this.cssHeight,
+    );
     const screenScale = MathUtils.clamp(Math.sqrt(clearPixels / 600), 0.75, 1);
     // The journey view is a small diagram: no model longer than JOURNEY_SHIP_MAX_PX.
     // Elsewhere every model stays inside the clear area around the point it is drawn at.
     const journey = this.viewNow === 'journey';
     context.maxPixels = journey ? JOURNEY_SHIP_MAX_PX : Infinity;
-    context.maxReachPixels = journey ? JOURNEY_SHIP_REACH_PX : Math.max(24, clearPixels / 2 - SHIP_EDGE_PX);
+    context.maxReachPixels = journey
+      ? JOURNEY_SHIP_REACH_PX
+      : Math.max(24, clearPixels / 2 - SHIP_EDGE_PX);
     this.camera.getWorldDirection(this.cameraForward);
     const tanHalf = Math.tan(MathUtils.degToRad(this.camera.fov) / 2);
     const subjectScale = this.orbitMission ? ORBIT_SUBJECT_SCALE : SUBJECT_SCALE;
@@ -2463,7 +2705,9 @@ export class Stage implements Director {
     this.walkWanted = walking ? 1 : 0;
     // At once on a jump, under reduced motion, and on the first frame (a link that opens during a spacewalk).
     if (snap || this.reducedMotion || !this.walkPrimed) this.walkLevel = this.walkWanted;
-    else this.walkLevel += (this.walkWanted - this.walkLevel) * (1 - Math.exp(-dt / SPACEWALK_SECONDS));
+    else
+      this.walkLevel +=
+        (this.walkWanted - this.walkLevel) * (1 - Math.exp(-dt / SPACEWALK_SECONDS));
     this.walkPrimed = true;
     if (Math.abs(this.walkLevel - this.walkWanted) < 0.002) this.walkLevel = this.walkWanted;
     /**
@@ -2478,10 +2722,15 @@ export class Stage implements Director {
       const index = model.shapeAt(t);
       let near = model.closeUpMetersPerPixel(index, SPACEWALK_REACH_SHARE * clearPixels);
       // Beside another craft (Gemini 10 at the old Agena), keep that one in frame too.
-      if (stationReach > 0 && ship === pair?.anchor) near = Math.max(near, (stationReach * pair.arranged) / (STATION_FIT_SHARE * clearPixels));
-      const base = context.metersPerPixel > 0 ? context.metersPerPixel : model.metersPerPixelOf(index, context);
+      if (stationReach > 0 && ship === pair?.anchor)
+        near = Math.max(near, (stationReach * pair.arranged) / (STATION_FIT_SHARE * clearPixels));
+      const base =
+        context.metersPerPixel > 0
+          ? context.metersPerPixel
+          : model.metersPerPixelOf(index, context);
       const e = easeInOutCubic(this.walkLevel);
-      if (near > 0 && base > 0 && near < base) context.metersPerPixel = MathUtils.lerp(base, near, e);
+      if (near > 0 && base > 0 && near < base)
+        context.metersPerPixel = MathUtils.lerp(base, near, e);
       // A close-up model needs no glow to be found; it centers on the spacewalk.
       context.glow = 1 - 0.85 * e;
       context.focus = e;
@@ -2501,17 +2750,28 @@ export class Stage implements Director {
       const walkerDirection = this.f5.copy(top);
       // +X of the model is forward x top (see ShipModel.update); the walker is `side` from the top toward it.
       if (Number.isFinite(side)) walkerDirection.applyAxisAngle(axis, side);
-      const angle = Math.atan2(this.f4.crossVectors(walkerDirection, toCamera).dot(axis), walkerDirection.dot(toCamera));
+      const angle = Math.atan2(
+        this.f4.crossVectors(walkerDirection, toCamera).dot(axis),
+        walkerDirection.dot(toCamera),
+      );
       walk.up.copy(top).applyAxisAngle(axis, 0.8 * e * angle);
       return walk;
     };
     const pair = this.pairNow();
     // In the ship view, how far each ship is a dot rather than a model (see COMPANION_MODEL_M).
     const companion = (ship: ShipState): number => {
-      if (this.viewNow !== 'spacecraft' || ship === this.followed || !ship.exists || !this.followed.exists) return 0;
+      if (
+        this.viewNow !== 'spacecraft' ||
+        ship === this.followed ||
+        !ship.exists ||
+        !this.followed.exists
+      )
+        return 0;
       if (pair && (pair.anchor === ship || pair.mover === ship)) return 0;
       const meters = this.metersApart(ship, this.followed, t);
-      return Number.isFinite(meters) ? smoothstep(COMPANION_MODEL_M, COMPANION_MARKER_M, meters) : 0;
+      return Number.isFinite(meters)
+        ? smoothstep(COMPANION_MODEL_M, COMPANION_MARKER_M, meters)
+        : 0;
     };
     const dotScale = (2 * COMPANION_MARKER_PX * tanHalf) / this.cssHeight;
     this.ships.forEach((ship, i) => {
@@ -2537,7 +2797,8 @@ export class Stage implements Director {
     if (pair && !pair.moment && anchorModel && moverModel) {
       const a = anchorModel.shapeAt(t);
       const m = moverModel.shapeAt(t);
-      stationGap = STATION_GAP_LENGTHS * Math.min(anchorModel.shapeLength(a), moverModel.shapeLength(m));
+      stationGap =
+        STATION_GAP_LENGTHS * Math.min(anchorModel.shapeLength(a), moverModel.shapeLength(m));
       stationReach = anchorModel.faceOf(a).distance + stationGap + moverModel.shapeLength(m);
     }
     let anchorUnits = 0;
@@ -2545,7 +2806,11 @@ export class Stage implements Director {
     if (anchorModel) {
       const ship = this.ships[anchorIndex] as ShipState;
       context.sizeScale = anchorSizeScale = sizeScaleOf(ship);
-      context.unitsPerPixel = anchorUnits = this.unitsPerPixelAt(ship.position, ship.exists, tanHalf);
+      context.unitsPerPixel = anchorUnits = this.unitsPerPixelAt(
+        ship.position,
+        ship.exists,
+        tanHalf,
+      );
       context.metersPerPixel = 0;
       context.opacity = this.opacityOf(ship) * (1 - companion(ship));
       if (pair && moverModel) {
@@ -2553,8 +2818,13 @@ export class Stage implements Director {
         const own = anchorModel.metersPerPixelOf(anchorModel.shapeAt(t), context);
         const together = pair.moment
           ? anchorModel.metersPerPixelOf(pair.moment.docked, context)
-          : Math.max(own, moverModel.metersPerPixelOf(moverModel.shapeAt(t), context), stationReach / (STATION_FIT_SHARE * clearPixels));
-        if (own > 0 && together > 0) context.metersPerPixel = MathUtils.lerp(own, together, pair.arranged);
+          : Math.max(
+              own,
+              moverModel.metersPerPixelOf(moverModel.shapeAt(t), context),
+              stationReach / (STATION_FIT_SHARE * clearPixels),
+            );
+        if (own > 0 && together > 0)
+          context.metersPerPixel = MathUtils.lerp(own, together, pair.arranged);
       }
       anchorModel.update(closeUp(ship, anchorModel, ship), context);
     }
@@ -2579,7 +2849,15 @@ export class Stage implements Director {
           // Where it will be docked, plus a little room.
           const minPixels = Math.abs(pair.moment.contact) / anchorScale + pair.gapPixels;
           this.dockDirection.copy(anchor.forward).multiplyScalar(pair.moment.contact >= 0 ? 1 : -1);
-          this.besideAnchor(anchor, ship, this.dockDirection, minPixels, w, anchorUnits, this.sitePosition);
+          this.besideAnchor(
+            anchor,
+            ship,
+            this.dockDirection,
+            minPixels,
+            w,
+            anchorUnits,
+            this.sitePosition,
+          );
           drawn.forward.lerpVectors(ship.forward, anchor.forward, w).normalize();
           drawn.up.lerpVectors(ship.up, anchor.up, w).normalize();
         } else {
@@ -2587,8 +2865,18 @@ export class Stage implements Director {
           const anchorFace = anchorModel.faceOf(anchorModel.shapeAt(t));
           const moverFace = model.faceOf(model.shapeAt(t));
           this.faceDirection(anchor, anchorFace, this.dockDirection);
-          const minPixels = (anchorFace.distance + moverFace.distance) / anchorScale + Math.max(pair.gapPixels, stationGap / anchorScale) * pair.opening;
-          this.besideAnchor(anchor, ship, this.dockDirection, minPixels, w, anchorUnits, this.sitePosition);
+          const minPixels =
+            (anchorFace.distance + moverFace.distance) / anchorScale +
+            Math.max(pair.gapPixels, stationGap / anchorScale) * pair.opening;
+          this.besideAnchor(
+            anchor,
+            ship,
+            this.dockDirection,
+            minPixels,
+            w,
+            anchorUnits,
+            this.sitePosition,
+          );
           this.facingPose(anchor, ship, this.dockDirection, moverFace, w, drawn);
         }
         drawn.exists = true;
@@ -2619,10 +2907,14 @@ export class Stage implements Director {
       // or, while the lander still stands there, like the lander.
       if (journey) context.maxPixels = JOURNEY_LEFT_BEHIND_MAX_PX;
       context.sizeScale =
-        screenScale * (this.viewNow === 'spacecraft' && this.followed.id === part.shipId ? SUBJECT_SCALE : 1);
+        screenScale *
+        (this.viewNow === 'spacecraft' && this.followed.id === part.shipId ? SUBJECT_SCALE : 1);
       const landerIndex = this.ships.findIndex((ship) => ship.id === part.shipId);
       const lander = models[landerIndex];
-      const standing = lander !== undefined && lander.root.visible && this.path.phaseAt(part.shipId, t)?.kind === 'surface';
+      const standing =
+        lander !== undefined &&
+        lander.root.visible &&
+        this.path.phaseAt(part.shipId, t)?.kind === 'surface';
       context.metersPerPixel = standing ? lander.drawnMetersPerPixel : 0;
       part.update(shown, this.sitePosition, this.siteUp, site?.front ?? this.worldUp, context);
       // While the lander still stands there, the part is not left behind yet: no label.
@@ -2642,7 +2934,10 @@ export class Stage implements Director {
   private updateLabels(tanHalf: number, dt: number, snap: boolean): void {
     const parts = this.fleet?.leftBehind ?? [];
     // Toward the bottom of the screen, in world space.
-    const down = this.screenDown.setFromMatrixColumn(this.camera.matrixWorld, 1).normalize().negate();
+    const down = this.screenDown
+      .setFromMatrixColumn(this.camera.matrixWorld, 1)
+      .normalize()
+      .negate();
     const ease = snap ? 1 : 1 - Math.exp(-dt / LABEL_FADE_SECONDS);
     for (let i = 0; i < parts.length; i += 1) {
       const part = parts[i] as LeftBehindModel;
@@ -2657,7 +2952,13 @@ export class Stage implements Director {
         material.opacity = 0;
         continue;
       }
-      const near = 1 - smoothstep(LABEL_NEAR_MOON_RADII[0], LABEL_NEAR_MOON_RADII[1], this.camera.position.distanceTo(site) / MOON_RADIUS);
+      const near =
+        1 -
+        smoothstep(
+          LABEL_NEAR_MOON_RADII[0],
+          LABEL_NEAR_MOON_RADII[1],
+          this.camera.position.distanceTo(site) / MOON_RADIUS,
+        );
       material.opacity += ((this.labelWanted[i] ? near : 0) - material.opacity) * ease;
       label.visible = material.opacity > 0.01;
       if (!label.visible) continue;
@@ -2717,7 +3018,11 @@ export class Stage implements Director {
     let changed = false;
     for (const ship of this.ships) {
       const revolutionsPerSecond = this.turnRate(ship, t) * pace;
-      const wanted = smoothstep(FAST_FORWARD_PACE * FAST_FORWARD_ONSET, FAST_FORWARD_PACE, revolutionsPerSecond);
+      const wanted = smoothstep(
+        FAST_FORWARD_PACE * FAST_FORWARD_ONSET,
+        FAST_FORWARD_PACE,
+        revolutionsPerSecond,
+      );
       const before = ship.fastForward;
       if (this.reducedMotion || jumped) ship.fastForward = wanted;
       else ship.fastForward += (wanted - before) * (1 - Math.exp(-dt / FAST_FORWARD_SECONDS));
@@ -2759,8 +3064,16 @@ export class Stage implements Director {
       const i = Math.min(Math.floor(index), times.length - 2);
       const u = index - i;
       for (let c = 0; c < 3; c += 1) {
-        const r = MathUtils.lerp(line.readablePositions[3 * i + c] ?? 0, line.readablePositions[3 * i + 3 + c] ?? 0, u);
-        const tr = MathUtils.lerp(line.truePositions[3 * i + c] ?? 0, line.truePositions[3 * i + 3 + c] ?? 0, u);
+        const r = MathUtils.lerp(
+          line.readablePositions[3 * i + c] ?? 0,
+          line.readablePositions[3 * i + 3 + c] ?? 0,
+          u,
+        );
+        const tr = MathUtils.lerp(
+          line.truePositions[3 * i + c] ?? 0,
+          line.truePositions[3 * i + 3 + c] ?? 0,
+          u,
+        );
         points[3 * k + c] = MathUtils.lerp(r, tr, this.mix);
       }
       this.v1.fromArray(points, 3 * k);
@@ -2800,9 +3113,14 @@ export class Stage implements Director {
       if (normal.lengthSq() < 1e-6) normal.copy(this.worldUp);
       normal.normalize();
       // From the north and sunlit side of the orbit, as the Earth view of an Earth-orbit flight looks.
-      if (normal.dot(this.f3.copy(this.sunDirection).multiplyScalar(0.6).add(this.worldUp)) < 0) normal.negate();
+      if (normal.dot(this.f3.copy(this.sunDirection).multiplyScalar(0.6).add(this.worldUp)) < 0)
+        normal.negate();
       const tilt = MathUtils.degToRad(FAST_FORWARD_TILT_DEG);
-      view.direction.copy(normal).multiplyScalar(Math.cos(tilt)).addScaledVector(radial, Math.sin(tilt)).normalize();
+      view.direction
+        .copy(normal)
+        .multiplyScalar(Math.cos(tilt))
+        .addScaledVector(radial, Math.sin(tilt))
+        .normalize();
       view.up.copy(normal).addScaledVector(view.direction, -normal.dot(view.direction)).normalize();
       view.active = true;
     }
@@ -2811,7 +3129,15 @@ export class Stage implements Director {
       { center: view.center, radius: bodyRadius },
       { center: view.center, radius: Math.max(bodyRadius, this.ringRadius) },
     ];
-    view.distance = fitDistance(this.camera, view.center, view.direction, spheres, 1.08, this.clear, view.up);
+    view.distance = fitDistance(
+      this.camera,
+      view.center,
+      view.direction,
+      spheres,
+      1.08,
+      this.clear,
+      view.up,
+    );
   }
 
   private renderFrame(dt: number, snap = false): void {

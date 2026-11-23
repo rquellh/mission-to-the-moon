@@ -1,10 +1,10 @@
 /* "Three rockets". Phone first: the rockets on top, the choices and card below. */
-[data-extra="rockets"] .rk {
+[data-extra='rockets'] .rk {
   display: grid;
   gap: 12px;
 }
 
-[data-extra="rockets"] .rk__stage {
+[data-extra='rockets'] .rk__stage {
   position: relative;
   height: clamp(300px, 56svh, 560px);
   overflow: hidden;
@@ -13,7 +13,7 @@
   background: #000;
 }
 
-[data-extra="rockets"] .rk__stage--none {
+[data-extra='rockets'] .rk__stage--none {
   display: grid;
   place-items: center;
   height: auto;
@@ -21,7 +21,7 @@
   background: var(--color-raised);
 }
 
-[data-extra="rockets"] .rk__canvas {
+[data-extra='rockets'] .rk__canvas {
   display: block;
   width: 100%;
   height: 100%;
@@ -29,11 +29,11 @@
   cursor: grab;
 }
 
-[data-extra="rockets"] .rk__canvas:active {
+[data-extra='rockets'] .rk__canvas:active {
   cursor: grabbing;
 }
 
-[data-extra="rockets"] .rk__labels {
+[data-extra='rockets'] .rk__labels {
   position: absolute;
   inset: 0;
   overflow: hidden;
@@ -41,7 +41,7 @@
 }
 
 /* Placed at the top of each rocket; the inner shift sets it just above, centered. */
-[data-extra="rockets"] .rk__label {
+[data-extra='rockets'] .rk__label {
   position: absolute;
   top: 0;
   left: 0;
@@ -55,87 +55,87 @@
   translate: -50% calc(-100% - 6px);
 }
 
-[data-extra="rockets"] .rk__label > span {
+[data-extra='rockets'] .rk__label > span {
   display: block;
 }
 
-[data-extra="rockets"] .rk__label-name {
+[data-extra='rockets'] .rk__label-name {
   color: var(--color-text);
   font-size: 0.75rem;
   font-weight: 650;
 }
 
-[data-extra="rockets"] .rk__label-height {
+[data-extra='rockets'] .rk__label-height {
   color: var(--color-text-muted);
   font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
 }
 
-[data-extra="rockets"] .rk__label.is-chosen .rk__label-name {
+[data-extra='rockets'] .rk__label.is-chosen .rk__label-name {
   color: var(--color-accent);
 }
 
-[data-extra="rockets"] .rk__label--person {
+[data-extra='rockets'] .rk__label--person {
   color: var(--color-text-muted);
   font-size: 0.8125rem;
   font-weight: 600;
   translate: calc(-100% - 6px) -50%;
 }
 
-[data-extra="rockets"] .rk__side {
+[data-extra='rockets'] .rk__side {
   display: grid;
   gap: 12px;
   align-content: start;
   min-width: 0;
 }
 
-[data-extra="rockets"] .rk__choices {
+[data-extra='rockets'] .rk__choices {
   flex: none;
 }
 
 /* Three equal buttons at every width (the site's wide layout sizes segments for its view buttons). */
-[data-extra="rockets"] .rk__choice {
+[data-extra='rockets'] .rk__choice {
   flex: 1 1 0;
   min-width: 0;
   padding: 0 4px;
 }
 
-[data-extra="rockets"] .rk__card .extra-heading {
+[data-extra='rockets'] .rk__card .extra-heading {
   margin-bottom: 4px;
 }
 
-[data-extra="rockets"] .rk__height strong {
+[data-extra='rockets'] .rk__height strong {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-[data-extra="rockets"] .rk__meters {
+[data-extra='rockets'] .rk__meters {
   margin-top: 2px;
 }
 
-[data-extra="rockets"] .rk__flights,
-[data-extra="rockets"] .rk__about {
+[data-extra='rockets'] .rk__flights,
+[data-extra='rockets'] .rk__about {
   margin-top: 10px;
   font-size: 0.9375rem;
 }
 
-[data-extra="rockets"] .rk__flights .extra-note {
+[data-extra='rockets'] .rk__flights .extra-note {
   display: block;
   margin-top: 4px;
 }
 
-[data-extra="rockets"] .rk__card .sources {
+[data-extra='rockets'] .rk__card .sources {
   margin-top: 12px;
 }
 
 @media (min-width: 860px), (min-width: 600px) and (orientation: landscape) {
-  [data-extra="rockets"] .rk {
+  [data-extra='rockets'] .rk {
     grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
     align-items: start;
     gap: 20px;
   }
 
-  [data-extra="rockets"] .rk__stage {
+  [data-extra='rockets'] .rk__stage {
     position: sticky;
     top: 0;
     height: max(320px, calc(100svh - 130px));

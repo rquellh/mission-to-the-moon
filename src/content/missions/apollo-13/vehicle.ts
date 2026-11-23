@@ -32,21 +32,21 @@
  * model switches parachutes there, and the site does not state them as
  * deployment times.
  */
-import type { Citation, Cited, ElapsedTime } from "../../types.ts";
-import type { LeftBehind, VehicleChange, VehiclePart } from "../../vehicle-types.ts";
+import type { Citation, Cited, ElapsedTime } from '../../types.ts';
+import type { LeftBehind, VehicleChange, VehiclePart } from '../../vehicle-types.ts';
 
 /* ------------------------------------------------------------------ */
 /* Citation helpers.                                                   */
 /* ------------------------------------------------------------------ */
 
-const ABN = "https://www.nasa.gov/wp-content/uploads/static/history/SP-4029/";
-const NMC_CSM = "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1970-029A";
-const AIR_TO_GROUND = "https://www.nasa.gov/wp-content/uploads/2026/01/as13-tec.pdf";
+const ABN = 'https://www.nasa.gov/wp-content/uploads/static/history/SP-4029/';
+const NMC_CSM = 'https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1970-029A';
+const AIR_TO_GROUND = 'https://www.nasa.gov/wp-content/uploads/2026/01/as13-tec.pdf';
 
 /** A row of the Apollo by the Numbers Apollo 13 Timeline, quoted as printed. */
 function timeline(row: string): Citation {
   return {
-    source: "apollo-by-the-numbers",
+    source: 'apollo-by-the-numbers',
     locator: `Apollo 13 Timeline, row "${row}"`,
     url: `${ABN}Apollo_13h_Timeline.htm`,
   };
@@ -57,36 +57,37 @@ function at(elapsed: ElapsedTime, citation: Citation, ...more: Citation[]): Cite
 }
 
 const TRANSPOSITION: Citation = {
-  source: "apollo-by-the-numbers",
+  source: 'apollo-by-the-numbers',
   locator:
     'Apollo 13 mission summary, "Translunar Phase" section: "At 003:06:38.9, the CSM was separated from the S-IVB stage ... Transposition and docking with the LM occurred at 003:19:08.8. The docked spacecraft were ejected from the S-IVB at 004:01:00.8"',
   url: `${ABN}Apollo_13a_Summary.htm`,
 };
 
 const PANEL_BLOWN_OFF: Citation = {
-  source: "apollo-by-the-numbers",
+  source: 'apollo-by-the-numbers',
   locator:
     'Apollo 13 mission summary, "How the Problem Occurred" section: the rapid expulsion of high-pressure oxygen "blew off the outer panel into bay 4 of the SM"',
   url: `${ABN}Apollo_13a_Summary.htm`,
 };
 
 const DAMAGE_SEEN: Citation = {
-  source: "apollo-13-mission-report",
+  source: 'apollo-13-mission-report',
   locator:
     'Section 8.9.4, "Service Module Separation and Photography" (printed pages 8-15 and 8-16, PDF pages 70 and 71): "The entire bay 4 outer panel was missing, and torn Mylar insulation was seen protruding from the bay"',
-  url: "https://ntrs.nasa.gov/api/citations/19710003598/downloads/19710003598.pdf",
+  url: 'https://ntrs.nasa.gov/api/citations/19710003598/downloads/19710003598.pdf',
 };
 
 const PARACHUTES: Citation = {
-  source: "nssdca-master-catalog",
+  source: 'nssdca-master-catalog',
   locator:
     '"Apollo 13 Command and Service Module (CSM)" (1970-029A), Spacecraft and Subsystems: the forward compartment held "the three 25.4 m diameter main parachutes, two 5 m drogue parachutes"',
   url: NMC_CSM,
 };
 
 const SPLASHDOWN_BY_PARACHUTE: Citation = {
-  source: "apollo-by-the-numbers",
-  locator: 'Apollo 13 mission summary, "Recovery" section: "The parachute system effected splashdown of the CM in the Pacific Ocean"',
+  source: 'apollo-by-the-numbers',
+  locator:
+    'Apollo 13 mission summary, "Recovery" section: "The parachute system effected splashdown of the CM in the Pacific Ocean"',
   url: `${ABN}Apollo_13a_Summary.htm`,
 };
 
@@ -94,10 +95,10 @@ const SPLASHDOWN_BY_PARACHUTE: Citation = {
 /* Parts lists.                                                        */
 /* ------------------------------------------------------------------ */
 
-const LUNAR_MODULE: readonly VehiclePart[] = ["lm-descent-stage", "lm-ascent-stage"];
-const CSM: readonly VehiclePart[] = ["service-module", "command-module"];
-const CSM_DAMAGED: readonly VehiclePart[] = ["service-module-damaged", "command-module"];
-const SPACECRAFT: readonly VehiclePart[] = ["adapter", ...LUNAR_MODULE, ...CSM];
+const LUNAR_MODULE: readonly VehiclePart[] = ['lm-descent-stage', 'lm-ascent-stage'];
+const CSM: readonly VehiclePart[] = ['service-module', 'command-module'];
+const CSM_DAMAGED: readonly VehiclePart[] = ['service-module-damaged', 'command-module'];
+const SPACECRAFT: readonly VehiclePart[] = ['adapter', ...LUNAR_MODULE, ...CSM];
 
 /* ------------------------------------------------------------------ */
 /* The changes, in time order for each ship.                           */
@@ -105,99 +106,110 @@ const SPACECRAFT: readonly VehiclePart[] = ["adapter", ...LUNAR_MODULE, ...CSM];
 
 export const vehicle: readonly VehicleChange[] = [
   {
-    ship: "csm",
-    at: at("000:00:00.65", {
-      source: "apollo-13-mission-report",
-      locator: 'Table 3-I, "Sequence of Events" (printed page 3-2, PDF page 13), "Lift-off - 19:13:00.65 G.m.t., April 11, 1970"',
-      url: "https://ntrs.nasa.gov/api/citations/19710003598/downloads/19710003598.pdf",
+    ship: 'csm',
+    at: at('000:00:00.65', {
+      source: 'apollo-13-mission-report',
+      locator:
+        'Table 3-I, "Sequence of Events" (printed page 3-2, PDF page 13), "Lift-off - 19:13:00.65 G.m.t., April 11, 1970"',
+      url: 'https://ntrs.nasa.gov/api/citations/19710003598/downloads/19710003598.pdf',
     }),
-    label: "Saturn V lifts off",
-    layout: "launch",
-    parts: ["first-stage", "aft-interstage", "second-stage", "third-stage", ...SPACECRAFT, "escape-tower"],
+    label: 'Saturn V lifts off',
+    layout: 'launch',
+    parts: [
+      'first-stage',
+      'aft-interstage',
+      'second-stage',
+      'third-stage',
+      ...SPACECRAFT,
+      'escape-tower',
+    ],
   },
   {
-    ship: "csm",
-    at: at("000:02:44.3", timeline("S-IC/S-II separation command.")),
-    label: "First stage separates",
-    layout: "launch",
-    parts: ["aft-interstage", "second-stage", "third-stage", ...SPACECRAFT, "escape-tower"],
+    ship: 'csm',
+    at: at('000:02:44.3', timeline('S-IC/S-II separation command.')),
+    label: 'First stage separates',
+    layout: 'launch',
+    parts: ['aft-interstage', 'second-stage', 'third-stage', ...SPACECRAFT, 'escape-tower'],
   },
   {
-    ship: "csm",
-    at: at("000:03:14.3", timeline("S-II aft interstage jettisoned.")),
-    label: "Second stage drops its aft interstage",
-    layout: "launch",
-    parts: ["second-stage", "third-stage", ...SPACECRAFT, "escape-tower"],
+    ship: 'csm',
+    at: at('000:03:14.3', timeline('S-II aft interstage jettisoned.')),
+    label: 'Second stage drops its aft interstage',
+    layout: 'launch',
+    parts: ['second-stage', 'third-stage', ...SPACECRAFT, 'escape-tower'],
   },
   {
-    ship: "csm",
-    at: at("000:03:21.0", timeline("Launch escape tower jettisoned.")),
-    label: "Launch escape tower jettisoned",
-    layout: "launch",
-    parts: ["second-stage", "third-stage", ...SPACECRAFT],
+    ship: 'csm',
+    at: at('000:03:21.0', timeline('Launch escape tower jettisoned.')),
+    label: 'Launch escape tower jettisoned',
+    layout: 'launch',
+    parts: ['second-stage', 'third-stage', ...SPACECRAFT],
   },
   {
-    ship: "csm",
-    at: at("000:09:53.50", timeline("S-II maximum Earth-fixed velocity; S-II/S-IVB separation command.")),
-    label: "Second stage separates",
-    layout: "launch",
-    parts: ["third-stage", ...SPACECRAFT],
+    ship: 'csm',
+    at: at(
+      '000:09:53.50',
+      timeline('S-II maximum Earth-fixed velocity; S-II/S-IVB separation command.'),
+    ),
+    label: 'Second stage separates',
+    layout: 'launch',
+    parts: ['third-stage', ...SPACECRAFT],
   },
   {
-    ship: "csm",
-    at: at("003:06:38.9", timeline("CSM separated from S-IVB."), TRANSPOSITION),
-    label: "Odyssey separates from the third stage and turns around",
-    layout: "transposition",
-    parts: ["third-stage", ...LUNAR_MODULE, ...CSM],
+    ship: 'csm',
+    at: at('003:06:38.9', timeline('CSM separated from S-IVB.'), TRANSPOSITION),
+    label: 'Odyssey separates from the third stage and turns around',
+    layout: 'transposition',
+    parts: ['third-stage', ...LUNAR_MODULE, ...CSM],
   },
   {
-    ship: "csm",
-    at: at("003:19:08.8", timeline("CSM docked with LM/S-IVB.")),
-    label: "Odyssey docks with Aquarius",
-    layout: "docked-on-stage",
-    parts: ["third-stage", ...LUNAR_MODULE, ...CSM],
+    ship: 'csm',
+    at: at('003:19:08.8', timeline('CSM docked with LM/S-IVB.')),
+    label: 'Odyssey docks with Aquarius',
+    layout: 'docked-on-stage',
+    parts: ['third-stage', ...LUNAR_MODULE, ...CSM],
   },
   {
-    ship: "csm",
-    at: at("004:01:00.8", timeline("CSM/LM ejected from S-IVB.")),
-    label: "Odyssey pulls Aquarius free of the third stage",
-    layout: "docked",
+    ship: 'csm',
+    at: at('004:01:00.8', timeline('CSM/LM ejected from S-IVB.')),
+    label: 'Odyssey pulls Aquarius free of the third stage',
+    layout: 'docked',
     parts: [...LUNAR_MODULE, ...CSM],
   },
   {
-    ship: "csm",
+    ship: 'csm',
     at: at(
-      "055:54:53.555",
+      '055:54:53.555',
       timeline(
-        "Telemetry loss for 1.8 seconds. Master caution and warning triggered by DC main bus B undervoltage. Alarm turned off in 6 seconds. Indications were that the cryogenic oxygen tank #2 lost pressure during this time period and the panel separated. It was at this time that the crew heard a loud bang.",
+        'Telemetry loss for 1.8 seconds. Master caution and warning triggered by DC main bus B undervoltage. Alarm turned off in 6 seconds. Indications were that the cryogenic oxygen tank #2 lost pressure during this time period and the panel separated. It was at this time that the crew heard a loud bang.',
       ),
       PANEL_BLOWN_OFF,
       DAMAGE_SEEN,
     ),
-    label: "Oxygen tank 2 fails and blows a side panel off the service module",
-    layout: "docked",
+    label: 'Oxygen tank 2 fails and blows a side panel off the service module',
+    layout: 'docked',
     parts: [...LUNAR_MODULE, ...CSM_DAMAGED],
   },
   {
-    ship: "csm",
-    at: at("138:01:48.0", timeline("SM separation."), DAMAGE_SEEN),
-    label: "The damaged service module is cast off",
-    layout: "docked",
-    parts: [...LUNAR_MODULE, "command-module"],
+    ship: 'csm',
+    at: at('138:01:48.0', timeline('SM separation.'), DAMAGE_SEEN),
+    label: 'The damaged service module is cast off',
+    layout: 'docked',
+    parts: [...LUNAR_MODULE, 'command-module'],
   },
   {
-    ship: "csm",
-    at: at("141:30:00.2", timeline("LM jettisoned.")),
-    label: "Aquarius is cast off",
-    layout: "alone",
-    parts: ["command-module"],
+    ship: 'csm',
+    at: at('141:30:00.2', timeline('LM jettisoned.')),
+    label: 'Aquarius is cast off',
+    layout: 'alone',
+    parts: ['command-module'],
   },
   {
-    ship: "csm",
+    ship: 'csm',
     at: at(
-      "142:49:17",
+      '142:49:17',
       {
-        source: "apollo-13-air-to-ground-transcript",
+        source: 'apollo-13-air-to-ground-transcript',
         locator:
           'Tape 95/5, page 757 (PDF page 764), 05 22 49 17 (5 days 22:49:17, that is 142:49:17), CMP: "We got two good drogues." (a reported time)',
         url: AIR_TO_GROUND,
@@ -205,16 +217,16 @@ export const vehicle: readonly VehicleChange[] = [
       PARACHUTES,
       SPLASHDOWN_BY_PARACHUTE,
     ),
-    label: "Drogue parachutes reported open",
-    layout: "alone",
-    parts: ["command-module", "drogue-parachutes"],
+    label: 'Drogue parachutes reported open',
+    layout: 'alone',
+    parts: ['command-module', 'drogue-parachutes'],
   },
   {
-    ship: "csm",
+    ship: 'csm',
     at: at(
-      "142:50:06",
+      '142:50:06',
       {
-        source: "apollo-13-air-to-ground-transcript",
+        source: 'apollo-13-air-to-ground-transcript',
         locator:
           'Tape 95/5, page 757 (PDF page 764), 05 22 50 06 (142:50:06), CC: "Odyssey, Houston. We show you on the mains. It really looks great." (a reported time)',
         url: AIR_TO_GROUND,
@@ -222,16 +234,16 @@ export const vehicle: readonly VehicleChange[] = [
       PARACHUTES,
       SPLASHDOWN_BY_PARACHUTE,
     ),
-    label: "Main parachutes reported open",
-    layout: "alone",
-    parts: ["command-module", "main-parachutes"],
+    label: 'Main parachutes reported open',
+    layout: 'alone',
+    parts: ['command-module', 'main-parachutes'],
   },
 
   {
-    ship: "lm",
-    at: at("003:19:08.8", timeline("CSM docked with LM/S-IVB.")),
-    label: "Docked to Odyssey, and drawn with it",
-    layout: "alone",
+    ship: 'lm',
+    at: at('003:19:08.8', timeline('CSM docked with LM/S-IVB.')),
+    label: 'Docked to Odyssey, and drawn with it',
+    layout: 'alone',
     parts: [],
   },
 ];

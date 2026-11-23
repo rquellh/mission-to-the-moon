@@ -38,7 +38,10 @@ function installDialogs(): void {
     modals.push(this);
   };
   // The browser fires "close" a moment later; the site never waits for it, so it fires at once here.
-  HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement, returnValue?: string): void {
+  HTMLDialogElement.prototype.close = function close(
+    this: HTMLDialogElement,
+    returnValue?: string,
+  ): void {
     if (!this.open) return;
     if (returnValue !== undefined) this.returnValue = returnValue;
     this.removeAttribute('open');

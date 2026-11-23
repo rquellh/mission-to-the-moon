@@ -20,7 +20,11 @@ const port = preview ? 4173 : 5173;
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://localhost:${port}/`;
 
 /** Software WebGL, so the scene draws without a graphics card (as tools/screenshot.mjs does). */
-const WEBGL_IN_SOFTWARE = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
+const WEBGL_IN_SOFTWARE = [
+  '--use-angle=swiftshader',
+  '--enable-unsafe-swiftshader',
+  '--ignore-gpu-blocklist',
+];
 
 const config = defineConfig({
   testDir: './e2e',
@@ -58,7 +62,11 @@ const config = defineConfig({
   projects: [
     {
       name: 'chrome-desktop',
-      use: { ...devices['Desktop Chrome'], channel: 'chrome', viewport: { width: 1280, height: 800 } },
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'chrome',
+        viewport: { width: 1280, height: 800 },
+      },
     },
     {
       name: 'chrome-phone',
@@ -67,7 +75,9 @@ const config = defineConfig({
   ],
 
   webServer: {
-    command: preview ? `npm run preview -- --port ${port} --strictPort` : `npm run dev -- --port ${port} --strictPort`,
+    command: preview
+      ? `npm run preview -- --port ${port} --strictPort`
+      : `npm run dev -- --port ${port} --strictPort`,
     cwd: '..',
     url: baseURL,
     reuseExistingServer: !process.env.CI,

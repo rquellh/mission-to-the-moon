@@ -57,25 +57,41 @@ describe('the timeline', () => {
       const { user } = await mountMission('apollo-11', { start: 'explore' });
       const timeline = timelineRegion();
       const chapters = within(timeline).getByRole('group', { name: 'Chapters' });
-      expect(within(chapters).getByRole('button', { name: 'Launch' })).toHaveAttribute('aria-current', 'step');
+      expect(within(chapters).getByRole('button', { name: 'Launch' })).toHaveAttribute(
+        'aria-current',
+        'step',
+      );
 
       await user.click(within(chapters).getByRole('button', { name: 'Landing' }));
 
       expect(within(timeline).getByText('102:33:05')).toBeInTheDocument();
-      expect(within(chapters).getByRole('button', { name: 'Landing' })).toHaveAttribute('aria-current', 'step');
-      expect(within(chapters).getByRole('button', { name: 'Launch' })).not.toHaveAttribute('aria-current');
-      expect(within(timeline).getByRole('combobox', { name: 'Jump to a chapter' })).toHaveDisplayValue('Landing');
+      expect(within(chapters).getByRole('button', { name: 'Landing' })).toHaveAttribute(
+        'aria-current',
+        'step',
+      );
+      expect(within(chapters).getByRole('button', { name: 'Launch' })).not.toHaveAttribute(
+        'aria-current',
+      );
+      expect(
+        within(timeline).getByRole('combobox', { name: 'Jump to a chapter' }),
+      ).toHaveDisplayValue('Landing');
     });
 
     it('jumps to a chapter chosen from the menu', async () => {
       const { user } = await mountMission('apollo-11', { start: 'explore' });
       const timeline = timelineRegion();
 
-      await user.selectOptions(within(timeline).getByRole('combobox', { name: 'Jump to a chapter' }), 'Splashdown');
+      await user.selectOptions(
+        within(timeline).getByRole('combobox', { name: 'Jump to a chapter' }),
+        'Splashdown',
+      );
 
       expect(within(timeline).getByText('195:12:06')).toBeInTheDocument();
       const chapters = within(timeline).getByRole('group', { name: 'Chapters' });
-      expect(within(chapters).getByRole('button', { name: 'Splashdown' })).toHaveAttribute('aria-current', 'step');
+      expect(within(chapters).getByRole('button', { name: 'Splashdown' })).toHaveAttribute(
+        'aria-current',
+        'step',
+      );
     });
   });
 
@@ -100,11 +116,17 @@ describe('the timeline', () => {
 
       await user.keyboard('{End}');
       expect(within(timeline).getByText('195:18:35')).toBeInTheDocument();
-      expect(scrubber).toHaveAttribute('aria-valuetext', '195 hours 18 minutes after liftoff, day 9 of the flight. Splashdown');
+      expect(scrubber).toHaveAttribute(
+        'aria-valuetext',
+        '195 hours 18 minutes after liftoff, day 9 of the flight. Splashdown',
+      );
 
       await user.keyboard('{Home}');
       expect(within(timeline).getByText('00:00:00')).toBeInTheDocument();
-      expect(scrubber).toHaveAttribute('aria-valuetext', 'at liftoff, day 1 of the flight. Liftoff');
+      expect(scrubber).toHaveAttribute(
+        'aria-valuetext',
+        'at liftoff, day 1 of the flight. Liftoff',
+      );
     });
 
     it('nudges the time forward and back with the arrow keys', async () => {
@@ -125,7 +147,11 @@ describe('the timeline', () => {
       const { user, frames } = await mountMission('apollo-11', { start: 'explore' });
       const timeline = timelineRegion();
       const speed = within(timeline).getByRole('combobox', { name: 'Speed' });
-      expect(within(speed).getAllByRole('option').map((option) => option.textContent)).toEqual(['½×', '1×', '2×', '4×']);
+      expect(
+        within(speed)
+          .getAllByRole('option')
+          .map((option) => option.textContent),
+      ).toEqual(['½×', '1×', '2×', '4×']);
       expect(speed).toHaveDisplayValue('1×');
 
       await user.selectOptions(speed, '2×');
@@ -141,7 +167,10 @@ describe('the timeline', () => {
       await mountMission('apollo-11', { start: 'tour' });
       const timeline = timelineRegion();
 
-      expect(timeline).toHaveAttribute('title', 'The timeline follows the tour. Exit the tour to use it.');
+      expect(timeline).toHaveAttribute(
+        'title',
+        'The timeline follows the tour. Exit the tour to use it.',
+      );
       expect(within(timeline).getByRole('button', { name: 'Play' })).toBeDisabled();
       expect(within(timeline).getByRole('slider', { name: 'Mission time' })).toBeDisabled();
       expect(within(timeline).getByRole('combobox', { name: 'Jump to a chapter' })).toBeDisabled();
@@ -155,7 +184,10 @@ describe('the timeline', () => {
       await user.click(screen.getByRole('button', { name: 'Exit tour' }));
 
       const timeline = timelineRegion();
-      expect(timeline).not.toHaveAttribute('title', 'The timeline follows the tour. Exit the tour to use it.');
+      expect(timeline).not.toHaveAttribute(
+        'title',
+        'The timeline follows the tour. Exit the tour to use it.',
+      );
       expect(within(timeline).getByRole('slider', { name: 'Mission time' })).toBeEnabled();
       expect(within(timeline).getByRole('button', { name: 'Landing' })).toBeEnabled();
     });

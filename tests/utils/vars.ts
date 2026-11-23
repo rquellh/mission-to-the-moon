@@ -75,8 +75,18 @@ export const TOUR = {
 
 /** Events and moments the tests open by address, with what the page shows there. */
 export const EVENTS = {
-  APOLLO_11_LANDING: { mission: 'apollo-11', id: 'landing', title: 'The Eagle has landed', clock: '102:45:39' },
-  APOLLO_11_FIRST_STEP: { mission: 'apollo-11', id: 'first-step', title: 'First step on the Moon', clock: '109:24:15' },
+  APOLLO_11_LANDING: {
+    mission: 'apollo-11',
+    id: 'landing',
+    title: 'The Eagle has landed',
+    clock: '102:45:39',
+  },
+  APOLLO_11_FIRST_STEP: {
+    mission: 'apollo-11',
+    id: 'first-step',
+    title: 'First step on the Moon',
+    clock: '109:24:15',
+  },
   /** The third moonwalk: the lander and the rover are on the Moon, and nothing has been left behind yet. */
   APOLLO_17_THIRD_MOONWALK: { mission: 'apollo-17', id: 'third-moonwalk' },
   /** The first American spacewalk: the astronaut floats out with his gas gun. */
@@ -117,9 +127,11 @@ export const URLS = {
   /** Exploring, from the first event, in a view if one is named. */
   EXPLORE: (mission: string, view?: EventView) => address({ mission, start: 'explore', view }),
   /** Paused at an event, in the event's own view unless one is named. */
-  EVENT: (mission: string, event: string, view?: EventView) => address({ mission, start: 'explore', event, view }),
+  EVENT: (mission: string, event: string, view?: EventView) =>
+    address({ mission, start: 'explore', event, view }),
   /** Paused at a mission time (HHH:MM:SS since liftoff). */
-  TIME: (mission: string, t: string, view?: EventView) => address({ mission, start: 'explore', t, view }),
+  TIME: (mission: string, t: string, view?: EventView) =>
+    address({ mission, start: 'explore', t, view }),
   /** Only the event or the time, as a shared link has them: no `start`. */
   LINK: (place: Place) => address(place),
   /** An extra, open over a mission. */

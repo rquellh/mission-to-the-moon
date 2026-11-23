@@ -6,10 +6,10 @@
  * and a sheet whose extra did not load.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { mountMission, navigation, screen, sound, within } from '../test/test-utils.ts';
-import { meta as stages } from '../extras/stages/meta.ts';
 import type { Mission } from '../content/types.ts';
+import { meta as stages } from '../extras/stages/meta.ts';
 import type { Extra } from '../extras/types.ts';
+import { mountMission, navigation, screen, sound, within } from '../test/test-utils.ts';
 
 /** A tiny extra: it says where it was opened, and can close itself or open another mission. */
 const tinyStages: Extra = {
@@ -35,24 +35,34 @@ const loadTinyStages = (): Promise<Extra> => Promise.resolve(tinyStages);
 /** Apollo 11 with "Try it" on the landing too, which has a recording (no real event has both). */
 const tryItOnTheLanding = (mission: Mission): Mission => ({
   ...mission,
-  events: mission.events.map((event) => (event.id === 'landing' ? { ...event, handsOn: 'stages' } : event)),
+  events: mission.events.map((event) =>
+    event.id === 'landing' ? { ...event, handsOn: 'stages' } : event,
+  ),
 });
 
 describe('the extras sheet', () => {
   describe('opening', () => {
     it('opens the extra for the moment it was opened from', async () => {
-      const { user } = await mountMission('apollo-11', { start: 'explore', loadExtra: loadTinyStages });
+      const { user } = await mountMission('apollo-11', {
+        start: 'explore',
+        loadExtra: loadTinyStages,
+      });
 
       await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
 
       const sheet = screen.getByRole('dialog', { name: 'Drop the stages' });
-      expect(await within(sheet).findByText('Opened over apollo-11, at liftoff')).toBeInTheDocument();
+      expect(
+        await within(sheet).findByText('Opened over apollo-11, at liftoff'),
+      ).toBeInTheDocument();
       expect(within(sheet).getByRole('button', { name: 'Close' })).toHaveFocus();
       expect(document.title).toBe('Drop the stages · Mission to the Moon');
     });
 
     it('rests the clock and the 3D view while open, and starts them again when it closes', async () => {
-      const { user, director } = await mountMission('apollo-11', { start: 'explore', loadExtra: loadTinyStages });
+      const { user, director } = await mountMission('apollo-11', {
+        start: 'explore',
+        loadExtra: loadTinyStages,
+      });
       await user.click(screen.getByRole('button', { name: 'Play' }));
 
       await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
@@ -74,7 +84,9 @@ describe('the extras sheet', () => {
         loadExtra: loadTinyStages,
       });
       const recording = screen.getByRole('region', { name: 'Recording' });
-      await user.click(within(recording).getByRole('button', { name: 'Play the recording, 15 seconds' }));
+      await user.click(
+        within(recording).getByRole('button', { name: 'Play the recording, 15 seconds' }),
+      );
       sound.starts();
 
       await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
@@ -85,7 +97,10 @@ describe('the extras sheet', () => {
 
   describe('closing', () => {
     it('closes when the extra asks, putting the page back as it was', async () => {
-      const { user } = await mountMission('apollo-11', { start: 'explore', loadExtra: loadTinyStages });
+      const { user } = await mountMission('apollo-11', {
+        start: 'explore',
+        loadExtra: loadTinyStages,
+      });
       const tryIt = screen.getByRole('button', { name: 'Try it: Drop the stages' });
       await user.click(tryIt);
       const sheet = screen.getByRole('dialog', { name: 'Drop the stages' });
@@ -99,7 +114,10 @@ describe('the extras sheet', () => {
     });
 
     it('lets the extra open another mission', async () => {
-      const { user } = await mountMission('apollo-11', { start: 'explore', loadExtra: loadTinyStages });
+      const { user } = await mountMission('apollo-11', {
+        start: 'explore',
+        loadExtra: loadTinyStages,
+      });
       await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
 
       await user.click(await screen.findByRole('button', { name: 'Fly Gemini 8' }));
@@ -125,7 +143,9 @@ describe('the extras sheet', () => {
 
       await user.click(within(sheet).getByRole('button', { name: 'Reload' }));
 
-      expect(navigation.address).toBe('http://localhost:3000/?mission=apollo-11&event=liftoff&extra=stages');
+      expect(navigation.address).toBe(
+        'http://localhost:3000/?mission=apollo-11&event=liftoff&extra=stages',
+      );
     });
 
     it('goes back to the mission', async () => {

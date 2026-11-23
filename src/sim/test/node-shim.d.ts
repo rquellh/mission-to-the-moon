@@ -3,7 +3,7 @@
  * project has no @types/node, and the tests only need these few calls.
  * Vitest runs the tests: `npm test`.
  */
-declare module "node:assert/strict" {
+declare module 'node:assert/strict' {
   interface Assert {
     (value: unknown, message?: string): asserts value;
     ok(value: unknown, message?: string): asserts value;
@@ -16,8 +16,8 @@ declare module "node:assert/strict" {
   export default assert;
 }
 
-declare module "node:fs" {
-  export function readFileSync(path: URL | string, encoding: "utf8"): string;
+declare module 'node:fs' {
+  export function readFileSync(path: URL | string, encoding: 'utf8'): string;
   export function existsSync(path: URL | string): boolean;
   export interface Dirent {
     name: string;

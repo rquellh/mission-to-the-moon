@@ -10,7 +10,11 @@ export function externalLink(href: string, text: string, className = 'link'): HT
   anchor.href = href;
   anchor.target = '_blank';
   anchor.rel = 'noopener noreferrer';
-  anchor.append(text, icon('external', 'icon icon--external'), hiddenText(` ${copy.opensInNewTab}`));
+  anchor.append(
+    text,
+    icon('external', 'icon icon--external'),
+    hiddenText(` ${copy.opensInNewTab}`),
+  );
   return anchor;
 }
 
@@ -39,7 +43,13 @@ export function citationList(citations: readonly Citation[]): HTMLUListElement {
     const places = el('ul', 'citations__places');
     for (const citation of group) {
       const place = el('li', 'citations__place');
-      place.append(externalLink(citation.url ?? source.url, citation.locator || source.title, 'link citations__link'));
+      place.append(
+        externalLink(
+          citation.url ?? source.url,
+          citation.locator || source.title,
+          'link citations__link',
+        ),
+      );
       places.append(place);
     }
     item.append(places);

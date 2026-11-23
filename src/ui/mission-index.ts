@@ -1,9 +1,4 @@
-import {
-  elapsedToSeconds,
-  type Chapter,
-  type Mission,
-  type MissionEvent,
-} from '../content/types';
+import { elapsedToSeconds, type Chapter, type Mission, type MissionEvent } from '../content/types';
 import { countsDays } from './format';
 
 /** A chapter with where it starts on the mission clock. */
