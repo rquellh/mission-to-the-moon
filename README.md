@@ -16,7 +16,7 @@
   <a href="DEVELOPING.md">Developing</a>
 </p>
 
-<p align="center"><a href="https://moon.ryanquellhorst.com/?mission=apollo-11&amp;t=102:45:40&amp;view=spacecraft"><img src="docs/images/apollo-11-landing.jpg" alt="Apollo 11 at the moment of landing: the lunar module Eagle sits on the Moon at the end of its descent path, the clock reads 102:45:40 since liftoff, and the card beside it carries the recording and the words of &quot;The Eagle has landed&quot;." width="888"></a></p>
+<p align="center"><a href="https://moon.ryanquellhorst.com/?mission=apollo-11&amp;t=102:45:40&amp;view=spacecraft"><img src="docs/images/apollo-11-landing.jpg" alt="Apollo 11 at the moment of landing: the lunar module Eagle sits on the Moon at the end of its descent path, and the card under it tells the moment, &quot;The Eagle has landed&quot;, with a button to hear the recording and the doors to Tell me more and Controls." width="888"></a></p>
 
 ## About
 
@@ -46,9 +46,9 @@ flight you haven't flown. **More to explore** adds one pick from each shelf: tha
 something to try, and something to explore.
 
 <p align="center">
-  <img src="docs/images/apollo-11-liftoff.jpg" alt="Apollo 11 two minutes after liftoff, with the Saturn V climbing away from Florida." width="32%">
-  <img src="docs/images/apollo-11-journey.jpg" alt="Apollo 11 sixty hours in, with the whole path from Earth to the Moon and back in view." width="32%">
-  <img src="docs/images/gemini-8-docking.jpg" alt="Gemini 8 docked to its Agena target above Earth, the first docking in orbit." width="32%">
+  <img src="docs/images/apollo-11-welcome.jpg" alt="The first screen: &quot;Ride along on Apollo 11&quot;, with Take the tour, Explore on my own, and All missions, beside the flight's path from Earth to the Moon." width="32%">
+  <img src="docs/images/gemini-8-docking.jpg" alt="Gemini 8 docked to its Agena target above Earth, with Tell me more open beside it: the full story of the first docking in orbit." width="32%">
+  <img src="docs/images/apollo-11-journey.jpg" alt="Apollo 11 sixty hours in, with the whole path from Earth to the Moon and back in view and Controls open: the timeline, the clock, and what the camera follows." width="32%">
 </p>
 
 ## The flights
