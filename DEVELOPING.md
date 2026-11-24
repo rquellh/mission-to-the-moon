@@ -52,7 +52,7 @@ The site is served at https://moon.ryanquellhorst.com/. That address is a custom
 There are three layers, each owning different things, so nothing is tested twice:
 
 - **Content and flight** (`src/sim/test/`, `src/app/*.test.ts`): what must be true of every mission, the flight path math, the mission clock, and the tour. Plain Node, no page.
-- **Interface** (`src/ui/*.test.ts`): the real interface over the real `index.html`, with a real mission and the real clock. Only the 3D scene and the screen's frames are replaced (`src/test/`).
+- **Interface** (`src/ui/*.test.ts`, and each extra's own in `src/extras/<id>/`): the real interface over the real `index.html`, with a real mission and the real clock. Only the 3D scene and the screen's frames are replaced (`src/test/`).
 - **Browser** (`tests/`): a few whole journeys in a real browser with the real 3D scene. The scene describes what it is drawing through `window.__missionScene()` (`src/scene/report.ts`), so a test can check that a craft is drawn and that nothing covers it without comparing pictures.
 
 ```sh
@@ -78,14 +78,14 @@ gallery.html                  Developer page for looking at spacecraft models (d
 public/textures/              Earth, Moon, and star textures (2K and 4K JPEGs)
 public/media/<mission>/       Mission photos and recordings from NASA, one folder per mission
 src/main.ts                   Starts the app, loads the chosen mission, and connects the pieces
-src/content/                  Shared facts and text: sources, physical constants, credits, interface copy
+src/content/                  Shared facts and text: sources, physical constants, credits, interface copy, mission patch images
 src/content/missions/<id>/    One folder per mission (see below)
 src/content/extras/           Sources cited only by an extra, one file per extra
-src/extras/<id>/              One folder per extra: a hands-on moment or something to explore
+src/extras/<id>/              One folder per extra: a hands-on moment or something to explore, with its own tests
 src/sim/                      Flight path math (plain TypeScript, no 3D code), with tests
-src/app/                      The mission clock, the tour, and the contract between scene and interface
+src/app/                      The mission clock, the tour, what the end of a flight (or of a run in an extra) suggests, and the contract between scene and interface
 src/scene/                    three.js scene: Earth, Moon, stars, paths, spacecraft, camera
-src/ui/                       Interface code: mission list, timeline, event cards, tour, dialogs, with tests
+src/ui/                       Interface code: first screen, mission list, the moment card and its two doors (Tell me more, Controls), tour, the end of a flight, dialogs, the extras' sheet and its "Up next", with tests
 src/test/                     What the interface tests share: the page setup and the stand-ins for the scene and the screen
 tests/                        Browser tests (Playwright): specs, page objects, helpers
 src/styles/                   CSS
@@ -112,7 +112,7 @@ Adding a mission means adding a folder. Nothing else needs editing: the mission 
 
 ### An extra
 
-An extra is a folder too: `src/extras/<id>/meta.ts` (its title, one-line description, and whether it is something to try or to explore) and `index.ts` (which draws it into a full-screen sheet). The contract is in the comment at the top of `src/extras/types.ts`. An extra that needs a 3D view uses only `src/scene/kit.ts`, which hands out the same spacecraft models and globes the missions use.
+An extra is a folder too: `src/extras/<id>/meta.ts` (its title, one-line description, and whether it is something to try or to explore) and `index.ts` (which draws it into a full-screen sheet). The contract is in the comment at the top of `src/extras/types.ts`, including how a hands-on extra ends a run with "Up next". An extra that needs a 3D view uses only `src/scene/kit.ts`, which hands out the same spacecraft models and globes the missions use.
 
 ### Scene and interface
 

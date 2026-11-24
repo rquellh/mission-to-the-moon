@@ -12,15 +12,8 @@ import {
 } from '../../content/types.ts';
 import type { DescentPhase, Phase, SurfacePhase } from '../../sim/types.ts';
 
-/** The six flights whose lunar modules landed on the Moon, in flight order. */
-export const LANDING_MISSIONS = [
-  'apollo-11',
-  'apollo-12',
-  'apollo-14',
-  'apollo-15',
-  'apollo-16',
-  'apollo-17',
-] as const;
+/** The six flights whose lunar modules landed on the Moon, in flight order (kept with the extra's meta). */
+export { LANDING_MISSIONS } from './meta.ts';
 
 /** The flight that was meant to land and did not. */
 export const MEANT_TO_LAND = 'apollo-13';

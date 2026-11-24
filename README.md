@@ -25,16 +25,25 @@ flights practiced the hard parts in Earth orbit. Eleven Apollo flights then test
 went around the Moon, and landed on it six times. Mission to the Moon lets you ride along on
 every one of them.
 
-Pick a mission and press play, or drag the timeline. The clock shows real mission time, and the
-trip is paced so every stretch is worth watching: you get the burns, the dockings, and the
-landings, without the days of coasting in between. Take the **Tour** to step through a mission's
-key moments, or **Explore** and roam on your own. Drag to turn the view, pinch or scroll to zoom,
-and choose what the camera follows: Earth, the ship, or the Moon. **True scale** shows how far
-apart everything really is.
+The site opens on one flight: Apollo 11, unless a link names another. **Take the tour** to step
+through its key moments, or **Explore on my own** and roam. **All missions** lists every flight.
 
-Each moment has a short card, a longer "Tell me more", a NASA photo where there is one, and the
-sources it came from. A few carry a real NASA recording of the moment, with every word written out
-beside the player.
+A card at the bottom of the screen always tells the moment on the clock, in a few words. Press
+its play button to fly the mission. The trip is paced so every stretch is worth watching: you get
+the burns, the dockings, and the landings, without the days of coasting in between. Drag to turn
+the view, and pinch or scroll to zoom.
+
+The card has two doors, and neither is needed to follow the flight. **Tell me more** opens the
+moment's records: its longer story, a NASA photo where there is one, and the sources it came from.
+A few moments carry a real NASA recording, with every word written out beside the player.
+**Controls** opens the tools for moving around: the timeline to drag, the clock with real mission
+time, the chapters, the speed, and what the camera follows (Earth, the ship, or the Moon).
+**True scale**, beside them, shows how far apart everything really is.
+
+Every flight ends by saying what's next. After the tour's last stop, or **Finish** once the clock
+reaches the end, the card shows the mission patch you just collected and one button to the next
+flight you haven't flown. **More to explore** adds one pick from each shelf: that flight,
+something to try, and something to explore.
 
 <p align="center">
   <img src="docs/images/apollo-11-liftoff.jpg" alt="Apollo 11 two minutes after liftoff, with the Saturn V climbing away from Florida." width="32%">
@@ -75,6 +84,11 @@ Under the missions are five things to try and explore:
 - [**Mission patches**](https://moon.ryanquellhorst.com/?extra=patches): a book of the crews' patches that fills in, in color, as you open each flight. The book is kept on your own device.
 
 A liftoff or docking card in a mission offers the matching one with a "Try it" button.
+
+The two hands-on ones end the same way, with **Up next**: one button back to the flight it was
+opened from, or, opened from the list, to the flight where it really happened. Under it are the
+other thing to try, something to explore, and **Try again**. On a phone the next step stays
+pinned at the bottom of the screen.
 
 <p align="center">
   <img src="docs/images/try-docking.jpg" alt="Dock two spacecraft: a Gemini's nose in the foreground, lined up on the docking cone of its Agena target." width="32%">

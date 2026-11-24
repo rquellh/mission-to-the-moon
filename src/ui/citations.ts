@@ -79,9 +79,21 @@ export function sourcesBlock(
     el('span', 'sources__label', `${copy.card.sources} (${countCitations(citations)})`),
     icon('chevron-down', 'icon sources__icon'),
   );
-  const notes = discrepancies.filter((text): text is string => Boolean(text)).map(discrepancyNote);
-  details.append(summary, citationList(citations), ...notes);
+  details.append(summary, ...sourcesList(citations, ...discrepancies));
   return details;
+}
+
+/**
+ * A fact's sources laid out in full, with no fold: every source and the
+ * exact place in it, then any notes on where the sources disagree. For a
+ * place that is already about sources, such as the Sources part of "Tell me more".
+ */
+export function sourcesList(
+  citations: readonly Citation[],
+  ...discrepancies: Array<string | undefined>
+): HTMLElement[] {
+  const notes = discrepancies.filter((text): text is string => Boolean(text)).map(discrepancyNote);
+  return [citationList(citations), ...notes];
 }
 
 /** The small-print note shown, under the sources, when sources disagree. */

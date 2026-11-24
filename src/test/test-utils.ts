@@ -52,8 +52,8 @@ export type User = ReturnType<typeof userEvent.setup>;
 
 export interface MountOptions {
   /**
-   * How the visit begins, as the address's `start=` does: the mission list
-   * (the default, as a plain address opens), the guided tour, or exploring.
+   * How the visit begins, as the address's `start=` does: the welcome (the
+   * default, as a plain address opens), the guided tour, or exploring.
    */
   start?: 'welcome' | 'tour' | 'explore';
   /** Open paused at this event of the mission and explore from there, as `?event=` does. */
@@ -70,8 +70,16 @@ export interface MountOptions {
   loadMemorial?: (id: string) => Promise<Memorial>;
   /** Load an extra. The default loads a stand-in for it (an extra's own code is tested on its own). */
   loadExtra?: (id: string) => Promise<Extra>;
-  /** The wide layout (the card is a side panel) instead of a phone's. */
+  /** The wide layout (the card floats at the bottom; "Tell me more" is a panel at the side) instead of a phone's. */
   wide?: boolean;
+  /**
+   * Open this extra once the visit has begun, as `?extra=` does: over the
+   * welcome (as an address naming only the extra opens it), or over the
+   * flight with `start` or `event` (as an address naming the mission does).
+   * Its params are the address's other values: the mission, with `start`
+   * and `event` when given.
+   */
+  extra?: string;
 }
 
 export interface MountedMission {
@@ -147,6 +155,20 @@ function makeUser(): User {
   });
 }
 
+/** The values an address opening an extra would also hold, as src/main.ts passes them on. */
+function extraParams(
+  id: string,
+  begin: 'welcome' | 'tour' | 'explore',
+  options: MountOptions,
+): URLSearchParams {
+  const params = new URLSearchParams();
+  if (begin === 'welcome') return params;
+  params.set('mission', id);
+  if (options.start && options.start !== 'welcome') params.set('start', options.start);
+  if (options.event) params.set('event', options.event);
+  return params;
+}
+
 /**
  * Mount the whole interface for a real mission, the way the site does, and
  * begin as `options.start` asks.
@@ -203,6 +225,7 @@ export async function mountMission(
   if (begin === 'tour') ui.tour();
   else if (begin === 'explore') ui.explore();
   else ui.welcome();
+  if (options.extra) ui.extra(options.extra, extraParams(id, begin, options));
 
   return { user: makeUser(), director, frames };
 }
@@ -222,6 +245,9 @@ export function mountRecordings(...clips: AudioClip[]): MountedRecordings {
   return { user: makeUser() };
 }
 
+/** Where the site keeps the missions visited on this device. */
+const VISITS_KEY = 'mission-to-the-moon/site/visited-missions';
+
 /** The ids of the missions this device has noted as visited, oldest first, as the site stores them. */
 export type VisitedMissions = readonly string[];
 
@@ -231,10 +257,18 @@ export type VisitedMissions = readonly string[];
  * list of ids fails the test.
  */
 export function visitedMissions(): VisitedMissions | undefined {
-  const raw = window.localStorage.getItem('mission-to-the-moon/site/visited-missions');
+  const raw = window.localStorage.getItem(VISITS_KEY);
   if (raw === null) return undefined;
   const stored: unknown = JSON.parse(raw);
   if (Array.isArray(stored) && stored.every((id): id is string => typeof id === 'string'))
     return stored;
   throw new Error(`The visited missions are stored as ${raw}, which is not a list of mission ids`);
+}
+
+/**
+ * Missions this device visited before the page opened, written to the
+ * device's storage the way the site writes them. Call it before mounting.
+ */
+export function rememberVisits(ids: readonly string[]): void {
+  window.localStorage.setItem(VISITS_KEY, JSON.stringify(ids));
 }

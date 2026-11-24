@@ -12,6 +12,6 @@ The same options work on the dev server address.
 - `mission` is a mission's id: `gemini-3` to `gemini-12` (with `gemini-6a` and `gemini-9a`), `apollo-7` to `apollo-17`, or `apollo-1` for the memorial page. Apollo 11 opens when it is left out.
 - `t` is mission time as hours:minutes:seconds. A minus sign means before liftoff.
 - `view` is `earth`, `moon`, `spacecraft`, or `journey`.
-- `start=tour` or `start=explore` skips the mission list.
+- `start=tour` or `start=explore` skips the first screen.
 - `event` opens a mission paused at one of its events, by the event's id.
 - `extra` opens one of the extras: `stages`, `docking`, `patches`, `landing-sites`, or `rockets`.

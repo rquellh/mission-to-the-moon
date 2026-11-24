@@ -1,8 +1,8 @@
 /**
- * "About this mission" and "How this is drawn": what each says for a real
- * mission, and that a section a mission has nothing for is left out. The
- * paragraphs of "How this is drawn" are picked by a pure function, tested
- * on its own at the end.
+ * "About this mission" and "How this is drawn", opened from the links at
+ * the end of "Tell me more": what each says for a real mission, and that a
+ * section a mission has nothing for is left out. The paragraphs of "How
+ * this is drawn" are picked by a pure function, tested on its own at the end.
  */
 import { describe, expect, it } from 'vitest';
 import { outlineOf } from '../app/outline.ts';
@@ -12,7 +12,7 @@ import { bundle as apollo8 } from '../content/missions/apollo-8/index.ts';
 import { bundle as apollo11 } from '../content/missions/apollo-11/index.ts';
 import { bundle as gemini3 } from '../content/missions/gemini-3/index.ts';
 import { bundle as gemini8 } from '../content/missions/gemini-8/index.ts';
-import { mountMission, screen, within } from '../test/test-utils.ts';
+import { mountMission, screen, within, type User } from '../test/test-utils.ts';
 import { howDrawnParagraphs } from './about-dialog.ts';
 
 /** A flight with no landing and no splashdown: none of the real ones, so a typed fixture. */
@@ -23,14 +23,20 @@ const noLandingNoSplashdown: FlightOutline = {
   turns: false,
 };
 
+/** Open "Tell me more" on the card, then one of the mission's own pages from the links at its end. */
+async function openFromTellMeMore(user: User, link: string): Promise<HTMLElement> {
+  await user.click(screen.getByRole('button', { name: 'Tell me more' }));
+  await user.click(screen.getByRole('button', { name: link }));
+  return screen.getByRole('dialog', { name: link });
+}
+
 describe('About this mission', () => {
   describe('opening', () => {
-    it('opens from the masthead, named for the mission', async () => {
+    it('opens from "Tell me more", named for the mission', async () => {
       const { user } = await mountMission('apollo-11', { start: 'explore' });
 
-      await user.click(screen.getByRole('button', { name: 'About this mission' }));
+      const about = await openFromTellMeMore(user, 'About Apollo 11');
 
-      const about = screen.getByRole('dialog', { name: 'About Apollo 11' });
       expect(within(about).getByRole('button', { name: 'Close' })).toHaveFocus();
     });
   });
@@ -38,9 +44,8 @@ describe('About this mission', () => {
   describe('rendering', () => {
     it('gives the dates and the launch', async () => {
       const { user } = await mountMission('apollo-11', { start: 'explore' });
-      await user.click(screen.getByRole('button', { name: 'About this mission' }));
 
-      const about = screen.getByRole('dialog', { name: 'About Apollo 11' });
+      const about = await openFromTellMeMore(user, 'About Apollo 11');
       expect(within(about).getByText('July 16–24, 1969')).toBeInTheDocument();
       expect(
         within(about).getByText(
@@ -51,9 +56,8 @@ describe('About this mission', () => {
 
     it('shows the crew portrait, says who is who, and names each person and their job', async () => {
       const { user } = await mountMission('apollo-11', { start: 'explore' });
-      await user.click(screen.getByRole('button', { name: 'About this mission' }));
 
-      const about = screen.getByRole('dialog', { name: 'About Apollo 11' });
+      const about = await openFromTellMeMore(user, 'About Apollo 11');
       expect(
         within(about).getByRole('heading', { level: 3, name: 'The crew' }),
       ).toBeInTheDocument();
@@ -69,9 +73,8 @@ describe('About this mission', () => {
 
     it("lists the spacecraft's names, what the crew did, and where the spacecraft is now", async () => {
       const { user } = await mountMission('apollo-11', { start: 'explore' });
-      await user.click(screen.getByRole('button', { name: 'About this mission' }));
 
-      const about = screen.getByRole('dialog', { name: 'About Apollo 11' });
+      const about = await openFromTellMeMore(user, 'About Apollo 11');
       expect(
         within(about).getByRole('heading', { level: 3, name: 'Spacecraft names' }),
       ).toBeInTheDocument();
@@ -94,9 +97,8 @@ describe('About this mission', () => {
 
     it('leaves out a section the mission has nothing for', async () => {
       const { user } = await mountMission('gemini-8', { start: 'explore' });
-      await user.click(screen.getByRole('button', { name: 'About this mission' }));
 
-      const about = screen.getByRole('dialog', { name: 'About Gemini 8' });
+      const about = await openFromTellMeMore(user, 'About Gemini 8');
       expect(
         within(about).getByRole('heading', { level: 3, name: 'The crew' }),
       ).toBeInTheDocument();
@@ -108,12 +110,11 @@ describe('About this mission', () => {
 });
 
 describe('How this is drawn', () => {
-  it('opens from the caption with the notes true of this flight', async () => {
+  it('opens from "Tell me more" with the notes true of this flight', async () => {
     const { user } = await mountMission('gemini-8', { start: 'explore' });
 
-    await user.click(screen.getByRole('button', { name: 'How this is drawn' }));
+    const note = await openFromTellMeMore(user, 'How this is drawn');
 
-    const note = screen.getByRole('dialog', { name: 'How this is drawn' });
     expect(within(note).getByText(copy.howDrawn.loops)).toBeInTheDocument();
     expect(within(note).queryByText(copy.howDrawn.heldStill)).not.toBeInTheDocument();
   });

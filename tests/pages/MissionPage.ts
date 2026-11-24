@@ -3,9 +3,10 @@ import type { EventView } from '../../src/content/types';
 
 /**
  * The mission's page around the 3D view: the header, the view buttons and
- * True scale, the caption, the note shown without a 3D view, and the
- * loading and error messages. The card, the tour, the timeline, the
- * mission list, and the dialogs have page objects of their own.
+ * True scale with its note (shown at the top left while Controls are open),
+ * the note shown without a 3D view, and the loading and error messages. The
+ * moment card, "Tell me more", the tour, Controls, the mission list, and
+ * the dialogs have page objects of their own.
  */
 export class MissionPage {
   readonly page: Page;
@@ -16,15 +17,11 @@ export class MissionPage {
   readonly missionsButton: Locator;
   readonly missionName: Locator;
   readonly missionDates: Locator;
-  readonly aboutButton: Locator;
-  readonly creditsButton: Locator;
-  // Views and scale
+  // Views and scale, shown with Controls
   readonly views: Locator;
   readonly viewButtons: Locator;
   readonly scaleToggle: Locator;
-  readonly caption: Locator;
   readonly scaleNote: Locator;
-  readonly howDrawnButton: Locator;
   // Without a 3D view
   readonly stageNote: Locator;
   readonly stageNoteText: Locator;
@@ -47,14 +44,10 @@ export class MissionPage {
     this.missionsButton = page.getByTestId('masthead-missions');
     this.missionName = page.getByTestId('masthead-mission-name');
     this.missionDates = page.getByTestId('masthead-mission-dates');
-    this.aboutButton = page.getByTestId('masthead-about');
-    this.creditsButton = page.getByTestId('masthead-credits');
     this.views = page.getByTestId('views');
     this.viewButtons = page.getByTestId('view-buttons');
     this.scaleToggle = page.getByTestId('scale-toggle');
-    this.caption = page.getByTestId('caption');
-    this.scaleNote = page.getByTestId('caption-scale-note');
-    this.howDrawnButton = page.getByTestId('caption-how-drawn');
+    this.scaleNote = page.getByTestId('scale-note');
     this.stageNote = page.getByTestId('stage-note');
     this.stageNoteText = page.getByTestId('stage-note-text');
     this.stageNoteReload = page.getByTestId('stage-note-reload');

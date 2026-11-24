@@ -254,8 +254,10 @@ h4 {
 }
 
 /* ------------------------------------------------------------------ */
-/* The interface layer. Phone first: header and view buttons on top,  */
-/* the event sheet and timeline docked at the bottom.                  */
+/* The interface layer. Phone first: the header on top, with "Look at" */
+/* and True scale under it while Controls are open; the moment card    */
+/* docked at the bottom, and "Tell me more" rising above it as one     */
+/* sheet with the card.                                                */
 /* ------------------------------------------------------------------ */
 
 .hud {
@@ -264,14 +266,14 @@ h4 {
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+  /* The card's row may shrink on a very short screen (the card then scrolls
+     inside itself), so nothing runs off the bottom. */
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, auto);
   grid-template-areas:
     'masthead'
     'views'
-    '.'
-    'caption'
-    'sheet'
-    'timeline';
+    'main'
+    'dock';
   pointer-events: none;
 }
 
@@ -374,29 +376,16 @@ body.is-welcome .hud {
   color: var(--color-text-muted);
 }
 
-.masthead__actions {
-  display: flex;
-  gap: 8px;
-  flex: none;
-  pointer-events: auto;
-}
+/* View controls: "Look at" and True scale, with Controls open ------- */
 
-.masthead__actions .button {
-  padding: 0 14px;
-  font-size: 0.875rem;
-}
-
-.wide-only {
-  display: none;
-}
-
-/* View controls ----------------------------------------------------- */
-
+/* Phone: the view buttons on one row, True scale and its note under them. */
 .views {
   grid-area: views;
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
-  padding: 10px var(--safe-right) 0 var(--safe-left);
+  padding: 8px var(--safe-right) 0 var(--safe-left);
 }
 
 .segmented {
@@ -409,6 +398,12 @@ body.is-welcome .hud {
   -webkit-backdrop-filter: var(--blur);
   backdrop-filter: var(--blur);
   pointer-events: auto;
+}
+
+/* The view switcher only: extras reuse .segmented and lay out their own rows. */
+.views .segmented {
+  flex: none;
+  max-width: 100%;
 }
 
 .segmented__item {
@@ -425,6 +420,12 @@ body.is-welcome .hud {
   font-weight: 600;
   cursor: pointer;
   transition: color 160ms ease-out;
+}
+
+.views .segmented__item {
+  flex: 0 0 auto;
+  min-width: 64px;
+  padding: 0 14px;
 }
 
 .segmented__item::before {
@@ -520,113 +521,284 @@ body.is-welcome .hud {
   background: var(--color-accent-ink);
 }
 
-/* Caption: the figure note under the 3D view ------------------------ */
-
-.caption {
-  grid-area: caption;
+/* True scale, with the note on what is drawn to scale beside it. */
+.views__scale {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 0 12px;
+  gap: 10px;
+  min-width: 0;
+}
+
+.views__note {
+  min-width: 0;
   margin: 0;
-  padding: 0 var(--safe-right) 4px var(--safe-left);
   font-size: 0.8125rem;
+  line-height: 1.3;
   color: var(--color-text-muted);
   text-shadow: 0 1px 8px rgb(0 0 0 / 0.95);
 }
 
-.caption__link {
-  /* Above the sheet handle's enlarged touch area, which reaches up under this link on phones. */
-  position: relative;
-  z-index: 1;
-  min-height: 44px;
-  margin: -8px 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-text);
-  font-size: inherit;
-  font-weight: 600;
-  text-decoration: underline;
-  text-decoration-color: var(--color-line-strong);
-  text-underline-offset: 3px;
-  cursor: pointer;
-  pointer-events: auto;
+/* Buttons that open something, and look pressed while it is open ---- */
+
+.dock__door .icon {
+  width: 16px;
+  height: 16px;
 }
 
-.caption__link:hover {
-  text-decoration-color: currentColor;
+.dock__door[aria-expanded='true'] {
+  border-color: var(--color-accent-line);
+  background: var(--color-accent-soft);
 }
 
-/* Phones: with the card expanded the 3D view is mostly covered, so its note
-   steps aside; on a short screen it would otherwise crowd the view buttons. */
-.hud:has(.sheet[data-state='expanded']) .caption {
+.dock__door[aria-expanded='true']:hover:not(:disabled) {
+  background: rgb(244 185 66 / 0.2);
+}
+
+.dock__door-open,
+.dock__door[aria-expanded='true'] .dock__door-closed {
   display: none;
 }
 
-/* Event sheet (phone) / side panel (wide) --------------------------- */
+.dock__door[aria-expanded='true'] .dock__door-open {
+  display: block;
+}
 
-.sheet {
-  grid-area: sheet;
+/* The moment card ---------------------------------------------------- */
+
+/* Phone: a sheet across the bottom. The story, then the photo beside its
+   buttons, then Play with where the flight is and Controls. */
+.dock {
+  container: dock / inline-size;
+  grid-area: dock;
   position: relative;
   display: flex;
   flex-direction: column;
-  /* On a short phone the sheet takes only the room left over (its card
-     scrolls), so the timeline never runs off the bottom of the screen. */
+  gap: 10px;
   min-height: 0;
-  max-height: 62dvh;
-  border-top: 1px solid var(--color-line);
+  max-height: 100%;
+  padding: 16px var(--safe-right) var(--safe-bottom) var(--safe-left);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.2) transparent;
+  border: 1px solid var(--color-line);
+  border-bottom: 0;
   border-radius: 18px 18px 0 0;
-  background: var(--color-surface-strong);
+  background: var(--color-surface);
   -webkit-backdrop-filter: var(--blur);
   backdrop-filter: var(--blur);
   box-shadow: 0 -10px 30px rgb(0 0 0 / 0.35);
   pointer-events: auto;
 }
 
-.sheet__handle {
-  position: relative;
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 18px 18px 0 0;
-  background: none;
-  cursor: pointer;
-  touch-action: none;
+/* The story: a museum label for the moment on the clock, its text always in full. */
+.card {
+  order: 1;
+  min-width: 0;
 }
 
-/* Reach above the sheet so the grab area is a full 44 pixels. */
-.sheet__handle::before {
+.card__eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.card__title {
+  margin: 2px 0 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.card__short {
+  max-width: 62ch;
+  margin: 10px 0 0;
+  overflow-wrap: break-word;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+/* The photo's small picture beside the buttons for the moment. */
+.dock__media {
+  order: 2;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.card__thumb {
+  flex: none;
+  width: 112px;
+  height: 96px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: #000;
+  cursor: pointer;
+}
+
+.card__thumb-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 160ms ease-out;
+}
+
+.card__thumb:hover .card__thumb-image {
+  opacity: 0.85;
+}
+
+.card__actions {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* On a phone the buttons fill their column, and a long name wraps inside its button. */
+.card__actions .button {
+  width: 100%;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  white-space: normal;
+  text-align: center;
+}
+
+.card__photo-credit {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* The credit is in "Tell me more" on a phone; the card has no room for it. */
+.dock .card__photo-credit {
+  display: none;
+}
+
+/* Play, where the flight is, its progress, and Controls. */
+.dock__transport {
+  order: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-line);
+}
+
+.dock__status {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.dock__where {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+}
+
+.dock__chapter {
+  font-size: 0.9375rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.dock__day {
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
+/* One segment per chapter, as long as the chapter is, filled up to now. */
+.dock__progress {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 1px;
+  min-width: 40px;
+  height: 3px;
+}
+
+.dock__segment {
+  position: relative;
+  flex: var(--span) 1 0;
+  min-width: 2px;
+  overflow: hidden;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 0.2);
+}
+
+.dock__segment::before {
   content: '';
   position: absolute;
-  inset: -22px 0 0;
+  inset: 0;
+  background: var(--color-accent);
+  transform: scaleX(var(--fill, 0));
+  transform-origin: left;
 }
 
-.sheet__grip {
-  width: 36px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgb(255 255 255 / 0.28);
-  transition: background-color 160ms ease-out;
-}
-
-.sheet__handle:hover .sheet__grip {
-  background: rgb(255 255 255 / 0.5);
-}
-
-.sheet__handle:focus-visible {
-  outline-offset: -3px;
-}
-
-/* Tour controls, at the top of the sheet. */
-.tour {
+.dock__controls {
   flex: none;
-  padding: 2px var(--safe-right) 12px var(--safe-left);
-  border-bottom: 1px solid var(--color-line);
+  margin-left: auto;
+}
+
+/* A short phone with Controls open: the card scrolls, and Play stays in reach at its bottom. */
+@media (max-height: 640px) {
+  .dock__transport {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    margin-bottom: calc(-1 * var(--safe-bottom));
+    padding-bottom: var(--safe-bottom);
+    background: var(--color-surface-solid);
+  }
+}
+
+/* With Controls open on a phone, the tools sit over Play and the clock, and the scrubber shows the progress. */
+.dock:has(> .tools:not([hidden])) .dock__transport {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.dock:has(> .tools:not([hidden])) .dock__progress {
+  display: none;
+}
+
+/* On the tour, its controls take the place of Play and Controls. */
+.is-touring .dock__transport {
+  display: none;
+}
+
+/* With "Tell me more" open on a phone, the records and the card are one
+   sheet: the records show the story, so the card keeps only Play. */
+.hud:has(> .records:not([hidden])) .dock {
+  border-top: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.hud:has(> .records:not([hidden])) .dock > .card,
+.hud:has(> .records:not([hidden])) .dock__media {
+  display: none;
+}
+
+/* Tour controls, in the card. */
+.tour {
+  order: 4;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-line);
 }
 
 /* Phone: a thin progress row, then Exit, the count, and Back and Next in one row. */
@@ -731,166 +903,472 @@ body.is-welcome .hud {
   }
 }
 
-.tour:not([hidden]) + .card {
-  padding-top: 12px;
+/* The end of the flight ---------------------------------------------- */
+
+/* It takes the moment's place in the card: the story, its buttons, Play,
+   where the flight is, and Controls step aside, and the progress strip
+   runs full along the top edge. Phone first: "Watch again" beside the
+   title, then the next flight and "More to explore", each the full width. */
+.ending {
+  order: 5;
+  min-width: 0;
 }
 
-.tour__ending {
-  padding: 6px 0 2px;
+.dock:has(> .ending:not([hidden])) {
+  padding-top: 15px;
 }
 
-.tour__end-title {
+.dock:has(> .ending:not([hidden])) .dock__transport {
+  display: contents;
+}
+
+.dock:has(> .ending:not([hidden])) .dock__progress {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  gap: 3px;
+  height: 3px;
+}
+
+.dock:has(> .ending:not([hidden])) .dock__segment {
+  border-radius: 0;
+}
+
+.dock:has(> .ending:not([hidden])) .dock__segment::before {
+  transform: none;
+}
+
+.ending__line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'again titles'
+    'next next'
+    'door door';
+  align-items: center;
+  gap: 12px;
+}
+
+/* Where Play was, and round like it, but quiet: the one amber button is the way on. */
+.ending__again {
+  grid-area: again;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 50%;
+  background: var(--color-raised);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color 160ms ease-out;
+}
+
+.ending__again:hover {
+  background: var(--color-hover);
+}
+
+.ending__titles {
+  grid-area: titles;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ending__eyebrow {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.ending__date {
+  white-space: nowrap;
+}
+
+.ending__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 650;
+  line-height: 1.25;
   letter-spacing: -0.01em;
   outline: none;
 }
 
-.tour__end-text {
-  max-width: 46ch;
-  margin: 8px 0 16px;
+.ending__collected {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.35;
   color: var(--color-text-muted);
 }
 
-.tour__end-actions {
-  display: flex;
-  flex-wrap: wrap;
+.ending__next {
+  grid-area: next;
   gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  font-size: 1.0625rem;
+  font-weight: 650;
 }
 
-/* The event card: a museum label for the moment on the clock. */
-.card {
-  flex: 1 1 auto;
-  min-height: 0;
-  padding: 2px var(--safe-right) 14px var(--safe-left);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgb(255 255 255 / 0.2) transparent;
+.ending__next .icon {
+  width: 20px;
+  height: 20px;
 }
 
-.card__head {
+.ending__door {
+  grid-area: door;
+  gap: 8px;
+  width: 100%;
+}
+
+.ending__door .icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* A mission's patch, round: in color with a thin amber ring once collected, grey and dimmed before. */
+.patch {
+  display: block;
+  flex: none;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.patch__image {
+  display: block;
+  width: 110%;
+  height: 110%;
+  margin: -5%;
+  object-fit: cover;
+}
+
+.patch--collected {
+  box-shadow: 0 0 0 1.5px var(--color-accent);
+}
+
+.patch--faded {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.patch--small {
+  width: 20px;
+  height: 20px;
+}
+
+.patch--large {
+  width: 56px;
+  height: 56px;
+  box-shadow:
+    0 0 0 2px var(--color-accent),
+    0 0 0 6px rgb(244 185 66 / 0.18);
+}
+
+/* "More to explore": on a phone, a taller sheet, no taller than it needs, with the scene above it. */
+.dock:has(.ending__more:not([hidden])) {
+  align-self: end;
+  max-height: min(100%, 31.5rem, 72dvh);
+  padding-top: 19px;
+}
+
+/* After a tour the quiet ways on take one more row; the sheet grows by that row rather than cut it off. */
+.dock:has(.ending__more:not([hidden]) .ending__actions--tour) {
+  max-height: min(100%, 35rem, 72dvh);
+}
+
+.ending__more {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 12px;
+  animation: appear 200ms ease-out both;
+}
+
+.ending__head {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
 
-.card__titles {
+.ending__head .ending__titles {
   flex: 1 1 auto;
-  min-width: 0;
 }
 
-.card__title {
-  margin: 0;
-  font-size: 1.1875rem;
+.ending__head .ending__title {
+  font-size: 1.25rem;
   font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
-.card__time {
-  margin: 4px 0 0;
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
+/* A wide card says it in a sentence; a phone keeps the short line. */
+.ending__sentence {
+  display: none;
 }
 
-.card__met {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text);
-}
-
-.card__utc {
-  display: block;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.75rem;
-  color: var(--color-text-faint);
-}
-
-.card__nav {
-  display: flex;
+.ending__less {
   flex: none;
-  gap: 6px;
+  width: 44px;
+  padding: 0;
 }
 
-.card__line {
-  margin: 8px 0 0;
-  overflow: hidden;
+.ending__less-label {
+  display: none;
+}
+
+.ending__shelves {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* One pick from each shelf. */
+.tile {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-raised);
+}
+
+.tile__shelf {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--color-text-muted);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  cursor: pointer;
 }
 
-.card__body {
-  padding-top: 14px;
-}
-
-.sheet[data-state='compact'] .card__body,
-.sheet[data-state='compact'] .card__utc {
-  display: none;
-}
-
-.sheet[data-state='expanded'] .card__line {
-  display: none;
-}
-
-/* On the tour, the compact card shows a little more of the text. */
-.is-touring .sheet[data-state='compact'] .card__line {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  white-space: normal;
-}
-
-.card__short {
-  max-width: 62ch;
+.tile__title {
   margin: 0;
   font-size: 1rem;
-  line-height: 1.55;
+  font-weight: 600;
+  line-height: 1.3;
+  text-wrap: pretty;
 }
 
-.card__photo {
-  margin: 18px 0 0;
+.tile__blurb {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
-.card__image {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: min(340px, 42vh);
-  border-radius: 8px;
-  background: #000;
-  object-fit: contain;
+/* The next flight: the recommended tile, tinted, with the one amber button. */
+.tile--next {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-areas:
+    'patch shelf'
+    'patch title'
+    'patch dates'
+    'blurb blurb'
+    'go go';
+  column-gap: 10px;
+  padding: 12px;
+  border-color: var(--color-accent-line);
+  background: var(--color-accent-soft);
 }
 
-.card__credit {
-  margin-top: 6px;
-  font-size: 0.75rem;
-  color: var(--color-text-faint);
+.tile--next:not(:has(> .tile__patch)) {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'shelf' 'title' 'dates' 'blurb' 'go';
 }
 
-/* "Try it": the event's hands-on extra. It sits outside the card body, so a
-   phone's compact card shows it too. A long title wraps inside the button. */
-.card__try {
+.tile__patch {
+  grid-area: patch;
+  align-self: center;
+  width: 40px;
+  height: 40px;
+}
+
+.tile--next .tile__shelf {
+  grid-area: shelf;
+}
+
+.tile--next .tile__title {
+  grid-area: title;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.tile__dates {
+  grid-area: dates;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
+/* The summary, cut to two lines the way the mission list cuts it. */
+.tile--next .tile__blurb {
+  grid-area: blurb;
+  display: -webkit-box;
   margin-top: 10px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
-.card__try-button {
-  max-width: 100%;
-  padding: 8px 16px;
-  white-space: normal;
-  text-align: left;
+.tile--next .tile__blurb--whole {
+  display: block;
+  margin-top: 4px;
+  overflow: visible;
+  -webkit-line-clamp: none;
+  line-clamp: none;
 }
 
-/* A recording: Play with its length, the words written out, and the credit. */
-.card__audio {
-  margin-top: 16px;
+.tile__go {
+  grid-area: go;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 10px;
+  font-size: 1rem;
+  font-weight: 650;
 }
 
+/* On a phone the other two picks are single rows, named, with a chevron: the whole row opens it. */
+.tile--extra {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 60px;
+  padding: 8px 44px 8px 12px;
+  transition: background-color 160ms ease-out;
+}
+
+.tile--extra:hover {
+  background: var(--color-hover);
+}
+
+.tile--extra .tile__blurb {
+  display: none;
+}
+
+.tile__open {
+  position: static;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.tile__open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 11px;
+}
+
+.tile__open:focus-visible {
+  outline: none;
+}
+
+.tile--extra:has(.tile__open:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.tile__open-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.tile__open .tile__chevron {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  translate: 0 -50%;
+  color: var(--color-text-muted);
+}
+
+/* The quiet ways on. A phone keeps Watch again and All missions, side by side. */
+.ending__actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* After a tour there are three: "Start the tour again" and "Explore on my own" share a row,
+   and All missions has its own. A label never wraps; a button with no room moves down a row. */
+.ending__actions--tour {
+  flex-wrap: wrap;
+}
+
+.ending__actions--tour .ending__action {
+  flex: 1 1 auto;
+  gap: 6px;
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
+.ending__actions--tour .ending__action--all {
+  flex-basis: 100%;
+}
+
+.ending__action {
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px 12px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 10px;
+  background: var(--color-raised);
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease-out,
+    color 160ms ease-out;
+}
+
+.ending__action:hover {
+  background: var(--color-hover);
+}
+
+.ending__action .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.ending__action--page,
+.ending__gap,
+.ending__count,
+.ending__action--all .icon {
+  display: none;
+}
+
+/* A recording: Play with its length, the words written out, and the credit.
+   The card's "Hear the recording" is the same recording, with one button. */
 .audio {
   padding: 10px 14px 12px;
   border: 1px solid var(--color-line);
@@ -904,17 +1382,44 @@ body.is-welcome .hud {
   gap: 12px;
 }
 
-.audio__toggle {
+.audio__toggle,
+.audio-mini__toggle {
   flex: none;
-  padding: 0 14px 0 10px;
+  gap: 8px;
+  padding: 0 14px 0 12px;
+  border-color: var(--color-accent-line);
+  background: var(--color-accent-soft);
+}
+
+.audio__toggle:hover:not(:disabled),
+.audio-mini__toggle:hover:not(:disabled) {
+  background: rgb(244 185 66 / 0.2);
+}
+
+.audio__toggle .icon,
+.audio-mini__toggle .icon {
+  width: 14px;
+  height: 14px;
+  color: var(--color-accent);
+}
+
+.audio-mini {
+  display: flex;
+}
+
+.audio-mini__toggle {
+  flex: 1 1 auto;
 }
 
 .audio__toggle .icon--pause,
-.audio--on .audio__toggle .icon--play {
+.audio-mini__toggle .icon--pause,
+.audio--on .audio__toggle .icon--play,
+.audio--on .audio-mini__toggle .icon--play {
   display: none;
 }
 
-.audio--on .audio__toggle .icon--pause {
+.audio--on .audio__toggle .icon--pause,
+.audio--on .audio-mini__toggle .icon--pause {
   display: block;
 }
 
@@ -922,8 +1427,13 @@ body.is-welcome .hud {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 0.8125rem;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--color-text-muted);
+}
+
+/* On a phone's card, the button leaves out the length (its spoken name keeps it). */
+.audio-mini .audio__time {
+  display: none;
 }
 
 .audio__bar {
@@ -975,6 +1485,7 @@ body.is-welcome .hud {
   color: var(--color-text-faint);
 }
 
+/* "Tell me more" in a memorial page, and in the extras. */
 .disclosure {
   display: inline-flex;
   align-items: center;
@@ -1008,17 +1519,25 @@ body.is-welcome .hud {
   transform: rotate(180deg);
 }
 
-.card__more {
-  max-width: 62ch;
-  padding-top: 12px;
+/* A photo with its credit: in "Tell me more", "About this mission", and a memorial page. */
+.card__photo {
+  margin: 18px 0 0;
 }
 
-.card__more-text {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: 0.9375rem;
-  line-height: 1.6;
-  color: var(--color-text);
+.card__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(340px, 42vh);
+  border-radius: 8px;
+  background: #000;
+  object-fit: contain;
+}
+
+.card__credit {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--color-text-faint);
 }
 
 /* Small print under a fact's sources, for where the sources disagree. It is
@@ -1099,28 +1618,220 @@ body.is-welcome .hud {
   padding: 12px 0;
 }
 
-/* Timeline ---------------------------------------------------------- */
+/* "Tell me more": the records of the moment ------------------------ */
 
-.timeline {
-  grid-area: timeline;
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  grid-template-areas:
-    'play clock speed'
-    'scrub scrub scrub'
-    'chapter chapter chapter';
-  align-items: center;
-  gap: 4px 12px;
-  padding: 8px var(--safe-right) var(--safe-bottom) var(--safe-left);
-  border-top: 1px solid var(--color-line);
-  background: var(--color-surface-strong);
+/* Phone: one sheet with the card, from under the header down to Play. The
+   head stays put while the rest scrolls, reference links last. */
+.records {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 6px;
+  border: 1px solid var(--color-line);
+  border-bottom: 0;
+  border-radius: 18px 18px 0 0;
+  background: var(--color-surface);
   -webkit-backdrop-filter: var(--blur);
   backdrop-filter: var(--blur);
+  box-shadow: 0 -10px 30px rgb(0 0 0 / 0.35);
   pointer-events: auto;
+  animation: appear 200ms ease-out both;
+}
+
+.records__head {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px var(--safe-right) 12px var(--safe-left);
+}
+
+.records__titles {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.records__eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.records__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  outline: none;
+}
+
+.records__time {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.records__utc {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.records__close {
+  flex: none;
+}
+
+.records__close-wide {
+  display: none;
+}
+
+.records__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.2) transparent;
+}
+
+.records__body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 0 var(--safe-right) 18px var(--safe-left);
+}
+
+.records__short,
+.records__story {
+  max-width: 62ch;
+  margin: 0;
+  overflow-wrap: break-word;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+.records__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.records__heading {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.records__photo {
+  margin: 0;
+}
+
+.records__section .citations {
+  margin: 0;
+}
+
+/* The mission's own pages: About, How this is drawn, Sources and credits. */
+.records__links {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0 calc(var(--safe-bottom) + 4px);
+  border-top: 1px solid var(--color-line);
+}
+
+.records__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px var(--safe-right) 6px var(--safe-left);
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease-out;
+}
+
+.records__link:hover {
+  background: var(--color-hover);
+}
+
+.records__link:focus-visible {
+  outline-offset: -2px;
+}
+
+.records__link-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.records__link-line {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.records__link-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted);
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Controls: the tools for moving through the flight ----------------- */
+
+/* Phone: previous, next, the chapter menu, and the speed; then the scrubber.
+   The clock goes to the card's status, next to Play. */
+.tools {
+  order: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-line);
+}
+
+.tools__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tools__step {
+  flex: none;
+  border-color: var(--color-line-strong);
 }
 
 .play {
-  grid-area: play;
+  flex: none;
   display: grid;
   place-items: center;
   width: 48px;
@@ -1145,6 +1856,12 @@ body.is-welcome .hud {
   transform: scale(0.96);
 }
 
+/* While the tour runs the clock, Play rests. */
+.play:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .play .icon {
   width: 22px;
   height: 22px;
@@ -1159,49 +1876,40 @@ body.is-welcome .hud {
   display: block;
 }
 
+/* The mission clock: the time over "since liftoff · Day 5" on a phone. */
 .clock {
-  grid-area: clock;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 4px;
   min-width: 0;
   margin: 0;
   line-height: 1.2;
 }
 
-.clock__line {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
 .clock__met {
-  min-width: 9ch;
+  flex-basis: 100%;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 1.3125rem;
+  font-size: 1.0625rem;
   font-weight: 500;
   letter-spacing: -0.01em;
 }
 
-.clock__since {
+.clock__since,
+.clock__day {
   font-size: 0.75rem;
+  line-height: 1.3;
   color: var(--color-text-muted);
   white-space: nowrap;
 }
 
-/* The day of the flight, on flights longer than two days, before the date. */
-.clock__day {
-  padding: 0 5px;
-  border: 1px solid var(--color-line-strong);
-  border-radius: 6px;
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  font-weight: 650;
-  line-height: 1.25;
-  color: var(--color-text);
+.clock__day::before {
+  content: '· ';
+  content: '· ' / '';
 }
 
-/* Fast forward: a quiet mark in the date's place while the ship circles too fast to follow. */
+/* Fast forward: a quiet mark by the clock while the ship circles too fast to follow. */
 .clock__fast {
   padding: 0 5px;
   border: 1px solid var(--color-accent-line);
@@ -1214,27 +1922,6 @@ body.is-welcome .hud {
   white-space: nowrap;
 }
 
-.clock__date--fast .clock__utc {
-  display: none;
-}
-
-/* Phones: the day takes the year's room; the header shows the year. */
-.clock__day:not([hidden]) ~ .clock__utc .clock__year {
-  display: none;
-}
-
-.clock__date {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 3px;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
 /* Chapter and speed menus. */
 .pick {
   position: relative;
@@ -1243,13 +1930,15 @@ body.is-welcome .hud {
 }
 
 .pick--chapter {
-  grid-area: chapter;
-  justify-self: start;
-  max-width: 100%;
+  flex: 1 1 auto;
+}
+
+.pick--chapter .pick__select {
+  width: 100%;
 }
 
 .pick--speed {
-  grid-area: speed;
+  flex: none;
 }
 
 .pick__select {
@@ -1257,7 +1946,7 @@ body.is-welcome .hud {
   max-width: 100%;
   min-height: 44px;
   padding: 0 34px 0 14px;
-  border: 1px solid var(--color-line);
+  border: 1px solid var(--color-line-strong);
   border-radius: 10px;
   background-color: var(--color-raised);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaa7a0' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 9.5 12 15l5.5-5.5'/%3E%3C/svg%3E");
@@ -1292,7 +1981,6 @@ body.is-welcome .hud {
 .scrubber {
   --inset: 11px;
   --progress: 0;
-  grid-area: scrub;
   position: relative;
   height: 44px;
 }
@@ -1411,7 +2099,6 @@ body.is-welcome .hud {
 
 /* Chapter names along the ruler (wide layout only). */
 .chapters {
-  grid-area: chapters;
   position: relative;
   display: none;
   height: 36px;
@@ -1424,7 +2111,7 @@ body.is-welcome .hud {
   left: calc(var(--at) * 100%);
   width: calc(var(--span) * 100%);
   height: 36px;
-  padding: 0 6px;
+  padding: 0 3px;
   border: 0;
   background: none;
   color: var(--color-text-faint);
@@ -1459,7 +2146,8 @@ body.is-welcome .hud {
   text-overflow: ellipsis;
 }
 
-/* The current chapter, or the one with keyboard focus, shows its whole name. */
+/* The current chapter, or the one with keyboard focus, shows its whole name.
+   Its backing matches the card, so it covers the names it grows over. */
 .chapters__item--featured {
   z-index: 2;
   width: var(--grow, calc(var(--span) * 100%));
@@ -1489,21 +2177,209 @@ body.is-welcome .hud {
   cursor: default;
 }
 
-/* While the tour drives the clock, the timeline only reports. */
-.timeline--locked .play,
-.timeline--locked .pick,
-.timeline--locked .chapters,
-.timeline--locked .scrubber__input {
-  opacity: 0.45;
+/* ------------------------------------------------------------------ */
+/* Welcome                                                             */
+/* ------------------------------------------------------------------ */
+
+/* Phone first: the site's name at the top, and the mission on show with the
+   ways in pinned to the bottom. No panel: the words sit on the 3D view, over
+   a soft shade that keeps them readable, and only the block itself takes
+   taps, so the view can still be turned around it. */
+.welcome {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  /* Room above for the site's name; a taller block scrolls inside itself. */
+  max-height: calc(100dvh - var(--safe-top) - 2.5rem);
+  padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
+  text-shadow: 0 1px 8px rgb(0 0 0 / 0.9);
 }
 
-.timeline--locked .scrubber__input {
-  cursor: default;
+.welcome::before {
+  content: '';
+  position: absolute;
+  inset: -104px 0 0;
+  z-index: -1;
+  background: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 0),
+    rgb(0 0 0 / 0.62) 136px,
+    rgb(0 0 0 / 0.82)
+  );
+  pointer-events: none;
 }
 
-/* On phones the tour needs the room more than the chapter menu does. */
-.timeline--locked .pick--chapter {
-  display: none;
+.welcome__site {
+  position: fixed;
+  top: calc(var(--safe-top) + 4px);
+  left: var(--safe-left);
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.welcome__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* Room for focus rings and text shadows at the edges, should it scroll. */
+  margin: -8px;
+  padding: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.2) transparent;
+}
+
+.welcome__title {
+  margin: 0;
+  font-size: 2.125rem;
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  /* Fill the first line before breaking ("Ride along on / Apollo 11"), and
+     never leave a mission's number alone on a line. */
+  text-wrap: pretty;
+  outline: none;
+}
+
+.welcome__summary {
+  max-width: 60ch;
+  margin: 10px 0 0;
+  font-size: 1rem;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.welcome__dates {
+  margin: 6px 0 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+/* Without a 3D view. */
+.welcome__note {
+  max-width: 60ch;
+  margin: 10px 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.welcome__reload {
+  margin-top: 10px;
+}
+
+.welcome__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* On a phone, the tour's length sits inside the button, under its name. */
+.welcome__tour {
+  min-height: 64px;
+  gap: 12px;
+  padding: 8px 18px;
+  text-shadow: none;
+}
+
+.welcome__tour .welcome__play {
+  width: 18px;
+  height: 18px;
+}
+
+.welcome__tour-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+}
+
+.welcome__tour-label {
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.welcome__stops {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.welcome__explore {
+  min-height: 48px;
+}
+
+/* "All missions": one quiet row under a rule, with the count and a chevron. */
+.welcome__all {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  margin-top: 16px;
+  padding: 6px 0;
+  border: 0;
+  border-top: 1px solid var(--color-line);
+  background: none;
+  color: var(--color-text);
+  text-align: left;
+  text-shadow: inherit;
+  cursor: pointer;
+}
+
+.welcome__all-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.welcome__all-name {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.welcome__all-line {
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  color: var(--color-text-muted);
+}
+
+.welcome__count {
+  flex: none;
+  padding: 1px 9px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.welcome__chevron {
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted);
+  filter: drop-shadow(0 1px 4px rgb(0 0 0 / 0.9));
+}
+
+.welcome__all:hover .welcome__chevron,
+.welcome__all:hover .welcome__count {
+  color: var(--color-text);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1511,8 +2387,7 @@ body.is-welcome .hud {
 /* ------------------------------------------------------------------ */
 
 /* Phone first: a sheet that rises over the 3D view and scrolls its list
-   inside itself. As the welcome it leaves the top of the view clear;
-   reopened from the header, it is a modal dialog over the interface. */
+   inside itself, as a modal dialog over the welcome or the interface. */
 .hub {
   position: fixed;
   inset: auto 0 0;
@@ -1535,11 +2410,7 @@ body.is-welcome .hud {
 .hub[open] {
   display: flex;
   flex-direction: column;
-  animation: rise 520ms var(--ease-out) both;
-}
-
-.hub[data-mode='return'] {
-  animation-duration: 320ms;
+  animation: rise 320ms var(--ease-out) both;
 }
 
 .hub::backdrop {
@@ -1565,7 +2436,6 @@ body.is-welcome .hud {
   font-weight: 750;
   line-height: 1.08;
   letter-spacing: -0.025em;
-  outline: none;
 }
 
 .hub__lede {
@@ -2124,6 +2994,178 @@ body.is-welcome .hud {
   gap: 8px;
 }
 
+/* "Up next": the end of a run in a hands-on extra (src/ui/up-next.ts), the
+   same family as the end of a flight. Phone first: the next step is pinned
+   at the bottom of the screen, within thumb reach, with the run again and
+   "More to explore" side by side under it. That door pulls it up into a
+   sheet: the next step as a tinted tile, one pick from each shelf as rows,
+   and the quiet actions. The page scrolls behind it, and keeps room at its
+   end (--up-next-room, measured by the sheet) so its last lines show. */
+.extra-host:has(.up-next) {
+  padding-bottom: calc(var(--safe-bottom) + 18px + var(--up-next-room, 0px));
+}
+
+.up-next {
+  container: up-next / inline-size;
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100dvh - 72px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px var(--safe-right) max(16px, env(safe-area-inset-bottom)) var(--safe-left);
+  border-top: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 18px 18px 0 0;
+  background: rgb(18 21 27 / 0.96);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  box-shadow: 0 -10px 30px rgb(0 0 0 / 0.45);
+}
+
+.up-next__grip {
+  flex: none;
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.3);
+}
+
+.up-next__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.up-next__less {
+  flex: none;
+  width: 44px;
+  padding: 0;
+}
+
+.up-next__less .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.up-next__step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Pinned, the title sits right under "Up next", and only the title and the button show. */
+.up-next.is-pinned .up-next__step {
+  margin-top: -8px;
+}
+
+.up-next.is-pinned .up-next__patch,
+.up-next.is-pinned .up-next__line,
+.up-next.is-pinned .up-next__sentence {
+  display: none;
+}
+
+.up-next__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.up-next__title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  outline: none;
+}
+
+.up-next__line {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.up-next__sentence {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.up-next__go {
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 18px;
+  font-size: 1.0625rem;
+  font-weight: 650;
+}
+
+/* Pulled up: the next step is the recommended tile, tinted, with its patch beside the title. */
+.up-next.is-open .up-next__step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-accent-line);
+  border-radius: 12px;
+  background: var(--color-accent-soft);
+}
+
+.up-next.is-open .up-next__step:not(:has(> .up-next__patch)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.up-next.is-open .up-next__title {
+  font-weight: 700;
+}
+
+.up-next.is-open .up-next__sentence,
+.up-next.is-open .up-next__go {
+  grid-column: 1 / -1;
+}
+
+.up-next.is-open .up-next__go {
+  min-height: 48px;
+  font-size: 1rem;
+}
+
+.up-next__patch {
+  width: 44px;
+  height: 44px;
+}
+
+.up-next__picks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.up-next__pick {
+  min-height: 56px;
+}
+
+/* The quiet actions share a row; a label never wraps, so a button with no room moves down a row. */
+.up-next__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.up-next__actions .ending__action {
+  flex: 1 1 0;
+  min-width: max-content;
+}
+
 @media (min-width: 860px), (min-width: 600px) and (orientation: landscape) {
   .dialog--full .dialog__head {
     padding-left: max(24px, env(safe-area-inset-left));
@@ -2132,6 +3174,117 @@ body.is-welcome .hud {
 
   .extra-host {
     --extra-gutter: 24px;
+    --up-next-room: 0px;
+  }
+
+  /* Wide, "Up next" sits in the extra's column, under the result: a softly tinted box with
+     "Up next", the title and its line (the patch beside them), the button, a rule, the picks,
+     and the quiet actions. */
+  .up-next {
+    position: static;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0;
+    max-height: none;
+    overflow: visible;
+    padding: 16px;
+    border: 1px solid rgb(244 185 66 / 0.4);
+    border-radius: 14px;
+    background: rgb(244 185 66 / 0.08);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .up-next__grip {
+    display: none;
+  }
+
+  .up-next__top,
+  .up-next__step {
+    display: contents;
+  }
+
+  .up-next__eyebrow {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .up-next__patch {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 48px;
+    height: 48px;
+    margin-right: 12px;
+  }
+
+  .up-next__titles {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: 2px;
+  }
+
+  .up-next__title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .up-next__line {
+    font-size: 0.875rem;
+  }
+
+  .up-next__sentence {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-top: 10px;
+    color: var(--color-text-muted);
+  }
+
+  .up-next__go {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    min-height: 48px;
+    margin-top: 12px;
+    font-size: 1rem;
+  }
+
+  .up-next__picks {
+    grid-column: 1 / -1;
+    grid-row: 5;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .up-next__actions {
+    grid-column: 1 / -1;
+    grid-row: 6;
+    gap: 4px;
+    margin: 12px 0 0 -10px;
+  }
+
+  .up-next__actions .ending__action {
+    flex: none;
+  }
+
+  /* With room, and no sentence to read first, the button stands beside the title, and the picks side by side. */
+  @container up-next (min-width: 30rem) {
+    .up-next__step:not(:has(> .up-next__sentence)) > .up-next__go {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+      width: auto;
+      margin: 0 0 0 16px;
+    }
+
+    .up-next__picks {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
   }
 
   .extra-sheet__failed,
@@ -2333,8 +3486,7 @@ body.is-welcome .hud {
 
 /* Without a 3D view: a short note in the space the view would take. */
 .stage-note {
-  grid-row: 3;
-  grid-column: 1;
+  grid-area: main;
   align-self: center;
   justify-self: center;
   display: flex;
@@ -2356,12 +3508,6 @@ body.is-welcome .hud {
   line-height: 1.5;
   text-align: center;
   color: var(--color-text-muted);
-}
-
-/* Without a 3D view there is nothing to point the camera at. */
-.no-3d .views,
-.no-3d .caption {
-  display: none;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2397,20 +3543,25 @@ body.is-welcome .hud {
 }
 
 /* ------------------------------------------------------------------ */
-/* Wide layout: the event card is a panel at the side, the timeline    */
-/* runs along the bottom. Keep in step with wideLayoutQuery() in dom.ts.*/
+/* Wide layout: the moment card floats at the bottom, centered in the  */
+/* room the records leave, and "Tell me more" is a panel at the side.  */
+/* Keep in step with wideLayoutQuery() in dom.ts.                      */
 /* ------------------------------------------------------------------ */
 
 @media (min-width: 860px), (min-width: 600px) and (orientation: landscape) {
+  :root {
+    --records-width: clamp(320px, 32vw, 416px);
+    --dock-margin: 24px;
+    --dock-bottom: max(28px, env(safe-area-inset-bottom));
+  }
+
   .hud {
-    grid-template-columns: minmax(0, 1fr) var(--panel-width);
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      'masthead sheet'
-      'views sheet'
-      '. sheet'
-      'caption sheet'
-      'timeline timeline';
+      'masthead records'
+      'views records'
+      'main records'
+      'dock records';
   }
 
   .masthead {
@@ -2432,63 +3583,228 @@ body.is-welcome .hud {
     font-size: 0.9375rem;
   }
 
+  /* "Look at" and True scale in one row, the note beside the switch. */
   .views {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
     padding: 12px 16px 0 max(24px, env(safe-area-inset-left));
   }
 
-  /* The view switcher only: extras reuse .segmented and lay out their own rows. */
-  .views .segmented {
-    flex: 0 1 auto;
-  }
-
   .views .segmented__item {
-    flex: 0 0 auto;
     min-width: 72px;
-    padding: 0 14px;
   }
 
-  .caption,
-  .hud:has(.sheet[data-state='expanded']) .caption {
-    display: flex;
-    padding: 0 16px 10px max(24px, env(safe-area-inset-left));
+  /* The card: centered at the bottom, in the room the records leave. */
+  .dock {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'play card thumb'
+      '. actions controls'
+      'tools tools tools'
+      'tour tour tour'
+      'ending ending ending';
+    column-gap: 16px;
+    row-gap: 0;
+    align-self: end;
+    justify-self: center;
+    width: min(760px, 100% - 2 * var(--dock-margin));
+    max-height: calc(100% - var(--dock-bottom));
+    margin-bottom: var(--dock-bottom);
+    padding: 19px 16px 16px;
+    border-bottom: 1px solid var(--color-line);
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
   }
 
-  .sheet {
-    max-height: none;
-    border-top: 0;
-    border-left: 1px solid var(--color-line);
-    border-radius: 0;
-    box-shadow: none;
-    padding-top: var(--safe-top);
+  .dock__media,
+  .dock__transport,
+  .is-touring .dock__transport {
+    display: contents;
   }
 
-  .sheet__handle {
-    display: none;
-  }
-
-  .tour {
-    padding: 8px max(24px, env(safe-area-inset-right)) 16px 24px;
+  .play {
+    grid-area: play;
+    align-self: start;
+    width: 56px;
+    height: 56px;
   }
 
   .card {
-    padding: 14px max(24px, env(safe-area-inset-right)) 28px 24px;
+    grid-area: card;
   }
 
-  .sheet[data-state] .card__body {
+  /* With no photo, the story takes the photo's room too. */
+  .dock:has(.card__thumb[hidden]) .card {
+    grid-column: 2 / 4;
+  }
+
+  .card__title {
+    margin-top: 4px;
+    font-size: 1.375rem;
+  }
+
+  .card__short {
+    margin-top: 4px;
+    font-size: 1rem;
+  }
+
+  .card__thumb {
+    grid-area: thumb;
+    align-self: start;
+    justify-self: end;
+    width: 104px;
+    height: 104px;
+  }
+
+  .card__actions {
+    grid-area: actions;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px 12px;
+    margin-top: 12px;
+  }
+
+  .card__actions .button {
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .card__actions .card__try {
+    white-space: normal;
+    text-align: left;
+  }
+
+  .audio-mini__toggle {
+    flex: none;
+  }
+
+  .audio-mini .audio__time {
+    display: inline;
+  }
+
+  .dock .card__photo-credit {
     display: block;
   }
 
-  .sheet[data-state] .card__line,
-  .is-touring .sheet[data-state] .card__line {
+  .dock__controls {
+    grid-area: controls;
+    align-self: center;
+    justify-self: end;
+    margin-top: 12px;
+    margin-left: 0;
+  }
+
+  .dock__status {
     display: none;
   }
 
+  /* The progress strip runs along the card's top edge. */
+  .dock__progress,
+  .dock:has(> .tools:not([hidden])) .dock__progress {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    display: flex;
+    gap: 3px;
+    height: 3px;
+  }
+
+  .dock__segment {
+    border-radius: 0;
+  }
+
+  /* The card keeps its own story while "Tell me more" is open beside it. */
+  .hud:has(> .records:not([hidden])) .dock {
+    border-top: 1px solid var(--color-line);
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+  }
+
+  .hud:has(> .records:not([hidden])) .dock > .card {
+    display: block;
+  }
+
+  .hud:has(> .records:not([hidden])) .dock__media {
+    display: contents;
+  }
+
+  /* Controls: previous, next, the clock, and the speed at the far right;
+     then the scrubber, with the chapters named under it. */
+  .tools {
+    grid-area: tools;
+    gap: 8px;
+    margin: 16px -16px -16px;
+    padding: 10px 16px 12px;
+  }
+
+  .tools__row {
+    gap: 12px;
+  }
+
+  .clock {
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    column-gap: 8px;
+  }
+
+  .clock__met {
+    flex-basis: auto;
+    font-size: 1.25rem;
+  }
+
+  .clock__since {
+    font-size: 0.75rem;
+  }
+
+  /* The day of the flight, on flights longer than two days. */
+  .clock__day {
+    padding: 0 6px;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 650;
+    line-height: 1.35;
+    color: var(--color-text);
+  }
+
+  .clock__day::before {
+    content: none;
+  }
+
+  .pick--chapter {
+    display: none;
+  }
+
+  .pick--speed {
+    margin-left: auto;
+  }
+
+  .chapters {
+    display: block;
+  }
+
+  .tick--chapter {
+    height: 19px;
+    background: rgb(255 255 255 / 0.2);
+  }
+
+  /* The tour: its own row along the bottom of the card. */
+  .tour {
+    grid-area: tour;
+    margin: 16px -16px -16px;
+    padding: 12px 16px;
+  }
+
   .tour__steps {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      'count count'
-      'progress progress'
-      'exit nav';
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: 'count progress exit nav';
+    gap: 12px;
   }
 
   .tour__count {
@@ -2497,75 +3813,423 @@ body.is-welcome .hud {
     gap: 8px;
   }
 
-  .tour__nav {
-    justify-self: end;
+  /* The end of the flight fills the card on its own, under the full progress strip. */
+  .ending {
+    grid-area: ending;
   }
 
-  .sheet[data-state] .card__utc {
+  .dock:has(> .ending:not([hidden])),
+  .dock:has(.ending__more:not([hidden])) {
+    max-height: calc(100% - var(--dock-bottom));
+    padding: 3px 0 0;
+  }
+
+  .ending__line {
+    grid-template-columns: 56px minmax(0, 1fr) auto auto;
+    grid-template-areas: 'again titles next door';
+    gap: 16px;
+    padding: 14px 16px;
+  }
+
+  .ending__again {
+    width: 56px;
+    height: 56px;
+  }
+
+  .ending__again .icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .ending__title {
+    font-size: 1.25rem;
+  }
+
+  .ending__collected {
+    gap: 8px;
+    font-size: 0.9375rem;
+  }
+
+  .patch--small {
+    width: 22px;
+    height: 22px;
+  }
+
+  .ending__next {
+    width: auto;
+    min-height: 48px;
+    padding: 0 18px;
+    font-size: 1rem;
+  }
+
+  .ending__next .icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .ending__door {
+    width: auto;
+  }
+
+  /* "More to explore": the card grows upward on its own footprint. */
+  .ending__more {
+    gap: 0;
+  }
+
+  .ending__head {
+    gap: 18px;
+    padding: 18px 24px 14px;
+  }
+
+  .patch--large {
+    width: 72px;
+    height: 72px;
+  }
+
+  .ending__head .ending__titles {
+    gap: 4px;
+  }
+
+  .ending__head .ending__title {
+    font-size: 1.5rem;
+  }
+
+  .ending__sentence {
+    display: block;
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.35;
+    color: var(--color-text-muted);
+  }
+
+  .ending__sentence span {
     display: block;
   }
 
-  .card__title {
-    font-size: 1.5rem;
-    line-height: 1.2;
-  }
-
-  .card__time {
-    margin-top: 6px;
-    font-size: 0.875rem;
-  }
-
-  .card__short {
-    font-size: 1.0625rem;
-  }
-
-  .card__body {
-    padding-top: 16px;
-  }
-
-  .timeline {
-    grid-template-columns: 48px auto minmax(0, 1fr) auto;
-    grid-template-rows: 44px 36px;
-    grid-template-areas:
-      'play clock scrub speed'
-      'play clock chapters speed';
-    gap: 0 20px;
-    padding: 10px max(24px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
-      max(24px, env(safe-area-inset-left));
-  }
-
-  .tick--chapter {
-    height: 19px;
-    background: rgb(255 255 255 / 0.2);
-  }
-
-  .play {
-    align-self: center;
-  }
-
-  .clock {
-    align-self: center;
-    min-width: 11.5rem;
-  }
-
-  .clock__met {
-    font-size: 1.5rem;
-  }
-
-  .clock__day:not([hidden]) ~ .clock__utc .clock__year {
-    display: inline;
-  }
-
-  .pick--chapter {
+  .ending__collected--short {
     display: none;
   }
 
-  .pick--speed {
-    align-self: center;
+  .ending__less {
+    align-self: flex-start;
+    width: auto;
+    padding: 0 16px;
+    gap: 8px;
   }
 
-  .chapters {
+  .ending__less .icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .ending__less-label {
+    display: inline;
+  }
+
+  .ending__shelves {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    padding: 0 24px 14px;
+  }
+
+  .tile--next {
+    grid-template-rows: auto auto auto auto 1fr;
+    grid-template-areas:
+      'shelf shelf'
+      'patch title'
+      'patch dates'
+      'blurb blurb'
+      'go go';
+    padding: 14px;
+  }
+
+  .tile--next:not(:has(> .tile__patch)) {
+    grid-template-areas: 'shelf' 'title' 'dates' 'blurb' 'go';
+  }
+
+  .tile--next .tile__shelf {
+    margin-bottom: 8px;
+  }
+
+  /* A third of the card's width holds about as much as two lines of the list. */
+  .tile--next .tile__blurb {
+    margin-top: 8px;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+
+  .tile--next .tile__blurb--whole {
+    -webkit-line-clamp: none;
+    line-clamp: none;
+  }
+
+  .tile__go {
+    align-self: end;
+    min-height: 44px;
+    margin-top: 8px;
+    font-size: 0.9375rem;
+  }
+
+  /* The end of a flight's picks stand as tiles with an Open button; "Up next" keeps them as rows. */
+  .ending__shelves .tile--extra {
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 14px;
+  }
+
+  .ending__shelves .tile--extra:hover {
+    background: var(--color-raised);
+  }
+
+  .ending__shelves .tile--extra .tile__title {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
+  .ending__shelves .tile--extra .tile__blurb {
     display: block;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    color: var(--color-text-muted);
+  }
+
+  .ending__shelves .tile__open {
+    width: 100%;
+    min-height: 44px;
+    margin-top: auto;
+    padding: 0 16px;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-raised);
+  }
+
+  .ending__shelves .tile__open::after {
+    content: none;
+  }
+
+  .ending__shelves .tile__open:focus-visible {
+    outline: 2px solid var(--color-accent);
+  }
+
+  .ending__shelves .tile--extra:has(.tile__open:focus-visible) {
+    outline: none;
+  }
+
+  .ending__shelves .tile__open-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+
+  .ending__shelves .tile__open .tile__chevron {
+    display: none;
+  }
+
+  .ending__actions {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 14px;
+    border-top: 1px solid var(--color-line);
+  }
+
+  /* Five ways on after a tour: a little closer together and smaller, so they keep to one row. */
+  .ending__actions--tour .ending__action {
+    flex: none;
+    padding: 0 6px;
+    font-size: 0.8125rem;
+  }
+
+  .ending__actions--tour .ending__action--all {
+    flex-basis: auto;
+  }
+
+  .ending__action {
+    flex: none;
+    gap: 6px;
+    padding: 0 10px;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    white-space: nowrap;
+  }
+
+  .ending__action:hover {
+    background: var(--color-hover);
+    color: var(--color-text);
+  }
+
+  .ending__action--page {
+    display: inline-flex;
+  }
+
+  .ending__gap {
+    display: block;
+    flex: 1 1 auto;
+  }
+
+  .ending__action--all {
+    color: var(--color-text);
+  }
+
+  .ending__count {
+    display: inline;
+    padding: 1px 9px;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ending__action--all .icon {
+    display: block;
+  }
+
+  /* "Tell me more": a floating panel in a column at the right. The head and
+     the reference links stay put; the parts between them scroll. */
+  .records {
+    grid-area: records;
+    width: var(--records-width);
+    margin: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+      max(20px, env(safe-area-inset-bottom)) 0;
+    border-bottom: 1px solid var(--color-line);
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+  }
+
+  .records__head {
+    padding: 20px 20px 16px 24px;
+  }
+
+  .records__titles {
+    gap: 6px;
+  }
+
+  .records__title {
+    font-size: 1.5rem;
+  }
+
+  .records__time {
+    font-size: 0.875rem;
+  }
+
+  .records__utc {
+    margin-top: 2px;
+    font-size: 0.8125rem;
+  }
+
+  .records__close-wide {
+    display: block;
+  }
+
+  .records__close-phone {
+    display: none;
+  }
+
+  .records__scroll {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .records__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 20px;
+    padding: 0 24px 20px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 0.2) transparent;
+  }
+
+  /* The card beside the panel shows the short text. */
+  .records__short {
+    display: none;
+  }
+
+  .records__story {
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  .records__links {
+    flex: none;
+    padding: 4px 0;
+  }
+
+  .records__link {
+    padding: 6px 24px;
+  }
+
+  /* A short window: the card sits lower, and the whole panel scrolls, head and links with it. */
+  @media (max-height: 560px) {
+    :root {
+      --dock-bottom: max(12px, env(safe-area-inset-bottom));
+    }
+
+    .records__scroll {
+      display: block;
+      overflow-y: auto;
+    }
+
+    .records__body {
+      overflow: visible;
+    }
+  }
+
+  /* A card squeezed by the panel beside it: the photo and its credit are in
+     the panel, so the card leaves them out, and the tour's row wraps. */
+  @container dock (max-width: 620px) {
+    .hud:has(> .records:not([hidden])) .card__thumb,
+    .hud:has(> .records:not([hidden])) .card__photo-credit {
+      display: none;
+    }
+
+    .hud:has(> .records:not([hidden])) .card {
+      grid-column: 2 / 4;
+    }
+
+    .tour__steps {
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas:
+        'count count'
+        'progress progress'
+        'exit nav';
+    }
+
+    .tour__nav {
+      justify-self: end;
+    }
+
+    /* The end of the flight: the title over the next flight and "More to explore", and the picks stacked. */
+    .ending__line {
+      grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-areas:
+        'again titles titles'
+        'next next door';
+      gap: 12px 16px;
+    }
+
+    .ending__next,
+    .ending__door {
+      width: 100%;
+    }
+
+    .ending__shelves {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ending__action--page {
+      display: none;
+    }
   }
 }
 
@@ -2605,19 +4269,118 @@ body.is-welcome .hud {
   }
 }
 
+/* Wide layout: the welcome stands at the right, centered top to bottom, so
+   the 3D view frames itself in the room to its left. */
+@media (min-width: 860px), (min-width: 600px) and (orientation: landscape) {
+  .welcome {
+    --welcome-margin: clamp(24px, 7vw, 100px);
+    top: 50%;
+    right: max(var(--welcome-margin), env(safe-area-inset-right));
+    bottom: auto;
+    left: auto;
+    width: min(440px, 52vw);
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom));
+    padding: 0;
+    transform: translateY(-50%);
+  }
+
+  .welcome::before {
+    display: none;
+  }
+
+  .welcome__site {
+    position: static;
+    margin: 0 0 10px;
+    pointer-events: auto;
+  }
+
+  .welcome__title {
+    font-size: 3.25rem;
+    line-height: 1.05;
+  }
+
+  .welcome__summary {
+    margin-top: 16px;
+    font-size: 1.125rem;
+    line-height: 1.45;
+  }
+
+  .welcome__dates {
+    font-size: 0.9375rem;
+  }
+
+  /* The two buttons side by side, and the tour's length on a line under both. */
+  .welcome__actions {
+    position: relative;
+    flex-direction: row;
+    gap: 12px;
+    margin-top: 28px;
+    padding-bottom: calc(12px + 0.875rem * 1.45);
+  }
+
+  .welcome__actions .button {
+    min-height: 56px;
+  }
+
+  .welcome__tour {
+    gap: 10px;
+    padding: 0 24px;
+  }
+
+  .welcome__tour .welcome__play {
+    width: 16px;
+    height: 16px;
+  }
+
+  .welcome__tour-label {
+    font-weight: 650;
+  }
+
+  .welcome__stops {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.45;
+    color: var(--color-text-muted);
+    text-shadow: 0 1px 8px rgb(0 0 0 / 0.9);
+    pointer-events: none;
+  }
+
+  .welcome__explore {
+    padding: 0 20px;
+    font-size: 1.0625rem;
+  }
+
+  .welcome__all {
+    gap: 16px;
+    margin-top: 36px;
+    padding: 8px 0;
+  }
+
+  .welcome__all-text {
+    gap: 2px;
+  }
+
+  .welcome__all-name {
+    font-size: 1.0625rem;
+  }
+
+  .welcome__all-line {
+    font-size: 0.875rem;
+  }
+
+  .welcome__count {
+    padding: 2px 10px;
+    color: var(--color-text-muted);
+  }
+}
+
 /* Short landscape screens: tighten the vertical rhythm. */
 @media (max-height: 500px) and (orientation: landscape) {
   .views {
     padding-top: 6px;
-  }
-
-  .caption,
-  .hud:has(.sheet[data-state='expanded']) .caption {
-    display: none;
-  }
-
-  .timeline {
-    padding-top: 4px;
   }
 
   .card__image {
@@ -2634,6 +4397,53 @@ body.is-welcome .hud {
 
   .hub__lede {
     margin-top: 4px;
+  }
+
+  .welcome__title {
+    font-size: 2rem;
+  }
+
+  .welcome__summary {
+    margin-top: 8px;
+    font-size: 1rem;
+  }
+
+  .welcome__actions {
+    margin-top: 16px;
+  }
+
+  .welcome__actions .button {
+    min-height: 48px;
+  }
+
+  .welcome__all {
+    min-height: 52px;
+    margin-top: 16px;
+  }
+
+  /* "More to explore" keeps to the names and the buttons, so a sliver of the scene stays in sight. */
+  .ending__head {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .patch--large {
+    width: 48px;
+    height: 48px;
+  }
+
+  .ending__head .ending__title {
+    font-size: 1.25rem;
+  }
+
+  .ending__sentence,
+  .tile--next .tile__blurb:not(.tile__blurb--whole),
+  .tile--extra .tile__blurb {
+    display: none;
+  }
+
+  .ending__collected--short {
+    display: flex;
   }
 }
 
@@ -2660,14 +4470,15 @@ body.is-welcome .hud {
   }
 }
 
-/* The narrowest phones: keep the four view buttons and the switch on one row. */
+/* The narrowest phones: keep the four view buttons on one row, and leave the story more room. */
 @media (max-width: 379px) {
   .views {
     gap: 6px;
   }
 
   .views .segmented__item {
-    padding: 0 2px;
+    min-width: 0;
+    padding: 0 10px;
     font-size: 0.8125rem;
   }
 
@@ -2680,14 +4491,23 @@ body.is-welcome .hud {
     padding: 0 10px 0 8px;
     font-size: 0.8125rem;
   }
-}
 
-/* Room for the site name and the longer button labels. */
-@media (min-width: 1100px) {
-  .wide-only {
-    display: inline;
+  .card__thumb {
+    width: 88px;
   }
 
+  /* The welcome leaves the 3D view a little more room. */
+  .welcome__title {
+    font-size: 1.75rem;
+  }
+
+  .welcome__summary {
+    font-size: 0.9375rem;
+  }
+}
+
+/* Room for the site name. */
+@media (min-width: 1100px) {
   .masthead__site {
     position: static;
     width: auto;

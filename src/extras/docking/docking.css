@@ -287,10 +287,6 @@
   font-weight: 700;
 }
 
-[data-extra='docking'] .docking__after-actions {
-  margin-top: 4px;
-}
-
 [data-extra='docking'] .docking__simple {
   font-size: 0.8125rem;
   color: var(--color-text-faint);

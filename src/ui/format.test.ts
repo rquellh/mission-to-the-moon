@@ -16,6 +16,7 @@ import {
   formatIsoDay,
   formatYears,
   missionDates,
+  monthOf,
   speakElapsed,
   summaryDates,
 } from './format.ts';
@@ -101,6 +102,14 @@ describe('formatYears', () => {
   it('writes a span of years, or one year', () => {
     expect(formatYears(1965, 1966)).toBe('1965–1966');
     expect(formatYears(1969, 1969)).toBe('1969');
+  });
+});
+
+describe('monthOf', () => {
+  it('writes the month and year in UTC, and nothing for what is not a date', () => {
+    expect(monthOf(gemini8.launch!.value.utc)).toBe('March 1966');
+    expect(monthOf('1968-12-31T23:30:00-05:00')).toBe('January 1969');
+    expect(monthOf('someday')).toBe('');
   });
 });
 

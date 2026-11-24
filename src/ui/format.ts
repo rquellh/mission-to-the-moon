@@ -100,17 +100,6 @@ export function formatDate(date: Date, style: 'long' | 'short' = 'long'): string
   return (style === 'long' ? longDate : shortDate).format(date);
 }
 
-const monthDay = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'UTC',
-  month: 'short',
-  day: 'numeric',
-});
-
-/** "Jul 20", in UTC. */
-export function formatMonthDay(date: Date): string {
-  return monthDay.format(date);
-}
-
 /** "20:17:39", in UTC. */
 export function formatTimeOfDay(date: Date): string {
   return timeOfDay.format(date);
@@ -135,6 +124,18 @@ export function summaryDates(summary: MissionSummary): string {
 export function yearOf(iso: string): number | null {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? null : date.getUTCFullYear();
+}
+
+const monthAndYear = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'UTC',
+  month: 'long',
+  year: 'numeric',
+});
+
+/** The month and year of an ISO 8601 date, in UTC: "March 1966". Empty when it does not read as a date. */
+export function monthOf(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? '' : monthAndYear.format(date);
 }
 
 /** "1965–1966", or "1969" for one year. */

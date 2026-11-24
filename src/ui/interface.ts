@@ -10,20 +10,23 @@ import { renderAbout, renderHowDrawn } from './about-dialog';
 import { pauseAllAudio } from './audio-player';
 import { renderCredits } from './credits-dialog';
 import { recordVisit } from './device-store';
-import { setUpDialog } from './dialogs';
+import { setUpDialog, type DialogHandle } from './dialogs';
+import { setUpDock } from './dock';
 import { byId, el, hiddenText, reducedMotionQuery } from './dom';
+import { setUpEnding, type EndingAfter } from './ending';
 import { setUpEventCard } from './event-card';
 import { setUpExtraSheet } from './extra-sheet';
 import { missionDates, speakMissionTime } from './format';
-import { setUpHub, type HubOptions, type HubTarget } from './hub';
+import { setUpHub, type HubOptions } from './hub';
 import { icon } from './icons';
 import { watchViewInsets } from './layout';
 import { setUpMemorial } from './memorial-dialog';
 import { MissionIndex } from './mission-index';
-import { setUpSheet } from './sheet';
+import { setUpRecords } from './records';
 import { setUpTimeline } from './timeline';
 import { focusTourNext, setUpTourPanel } from './tour-panel';
 import { setUpViewControls } from './view-controls';
+import { setUpWelcome, type WelcomeOptions } from './welcome';
 
 export interface InterfaceOptions {
   mission: Mission;
@@ -60,13 +63,13 @@ export interface InterfaceOptions {
 }
 
 export interface MissionInterface {
-  /** Show the mission picker over the 3D view, as the first thing a visitor sees, scrolled to an entry if one is named. */
-  welcome(reveal?: HubTarget): void;
-  /** Skip the picker and start exploring. */
+  /** Show the welcome over the 3D view, as the first thing a visitor sees. */
+  welcome(): void;
+  /** Skip the welcome and start exploring. */
   explore(): void;
-  /** Skip the picker and start the guided tour (or explore, if the mission has no tour). */
+  /** Skip the welcome and start the guided tour (or explore, if the mission has no tour). */
   tour(): void;
-  /** Open a memorial page, over the picker when it is showing. */
+  /** Open a memorial page, over the welcome when it is showing. */
   memorial(id: string): void;
   /** Open an extra in its full-screen sheet, with the address's other values as its params. */
   extra(id: string, params: URLSearchParams): void;
@@ -167,15 +170,23 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   renderAbout(mission);
   renderHowDrawn(mission, flight);
   renderCredits(credits, { mission, cited, summaries, extras });
-  const about = setUpDialog(byId('about-dialog', HTMLDialogElement));
-  const drawn = setUpDialog(byId('drawn-dialog', HTMLDialogElement));
-  const sources = setUpDialog(byId('credits-dialog', HTMLDialogElement));
-  const aboutButton = byId('about-button', HTMLButtonElement);
-  const creditsButton = byId('credits-button', HTMLButtonElement);
-  const drawnButton = byId('drawn-button', HTMLButtonElement);
-  aboutButton.addEventListener('click', () => about.open(aboutButton));
-  creditsButton.addEventListener('click', () => sources.open(creditsButton));
-  drawnButton.addEventListener('click', () => drawn.open(drawnButton));
+  // The mission's own pages open from the reference links at the end of "Tell me more" (and About and
+  // Sources and credits from the end of the flight too).
+  const dialogs = {
+    about: setUpDialog(byId('about-dialog', HTMLDialogElement)),
+    drawn: setUpDialog(byId('drawn-dialog', HTMLDialogElement)),
+    credits: setUpDialog(byId('credits-dialog', HTMLDialogElement)),
+  };
+  const dialogLinks: Array<[string, DialogHandle]> = [
+    ['records-about', dialogs.about],
+    ['records-how-drawn', dialogs.drawn],
+    ['records-credits', dialogs.credits],
+  ];
+  for (const [linkId, dialog] of dialogLinks) {
+    const link = byId(linkId, HTMLButtonElement);
+    link.append(icon('next', 'icon records__link-icon'));
+    link.addEventListener('click', () => dialog.open(link));
+  }
 
   /* View controls ---------------------------------------------------- */
   document.body.classList.toggle('no-3d', !has3D);
@@ -194,8 +205,8 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   }
 
   // Fast forward: the scene says when the ship circles too fast to follow.
-  // A quiet mark takes the date's place by the clock (the date spins too fast
-  // to read then), and screen readers hear why once, not on every lap.
+  // A quiet mark shows by the clock, and screen readers hear why once, not
+  // on every lap.
   const fastMark = byId('clock-fast', HTMLSpanElement);
   fastMark.textContent = copy.timeline.fastForward;
   let fastShown = false;
@@ -205,7 +216,6 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     if (fast === fastShown) return;
     fastShown = fast;
     fastMark.hidden = !fast;
-    fastMark.parentElement?.classList.toggle('clock__date--fast', fast);
     const now = performance.now();
     if (fast && now - fastSpokenAt > 60_000) {
       fastSpokenAt = now;
@@ -213,9 +223,11 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     }
   });
 
-  /* Event card, timeline, and tour ---------------------------------- */
-  const sheet = setUpSheet();
+  /* The moment card, its two doors, and the tour ---------------------- */
   const tour = new Tour(mission, player, director, { jumpStraight: () => motion.matches });
+  // The doors change what covers the 3D view; a resize alone may not show it (the card only moves).
+  const dock = setUpDock({ has3D, onLayout: () => remeasure() });
+  const records = setUpRecords({ index, reducedMotion: () => motion.matches });
 
   const describe = (eventIndex: number): string => {
     const event = index.events[eventIndex];
@@ -229,6 +241,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
 
   const card = setUpEventCard({
     index,
+    records,
     reducedMotion: () => motion.matches,
     onStep: (step) => {
       const target = Math.min(index.events.length - 1, Math.max(0, card.shown + step));
@@ -242,7 +255,18 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     // "Try it" only for an extra the list shows, so a draft stays hidden in a published build.
     extraTitle: (id) => extras.find((meta) => meta.id === id)?.title,
     onTryIt: (extraId, event, from) =>
-      extraSheet.open(extraId, new URLSearchParams({ mission: mission.id, event: event.id }), from),
+      extraSheet.open(
+        extraId,
+        new URLSearchParams({ mission: mission.id, event: event.id }),
+        'flight',
+        from,
+      ),
+    // The photo's small picture opens "Tell me more" and brings the photo into view.
+    onPhoto: () => {
+      dock.openRecords();
+      records.revealPhoto();
+    },
+    onFinish: () => showEnding('explore'),
   });
   const timeline = setUpTimeline(player, index);
 
@@ -270,19 +294,82 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     byId('play', HTMLButtonElement).focus({ preventScroll: true });
   };
 
+  /* The end of the flight ---------------------------------------------- */
+  // After the tour's last stop, or "Finish" at the end of the clock while exploring, the card says what's next.
+  let endedAfter: EndingAfter | null = null;
+  const ending = setUpEnding({
+    index,
+    summaries,
+    extras,
+    announce,
+    onWatchAgain: () => watchAgain(),
+    // After the tour: leave the ending and the tour, and explore from the last stop, with Play focused.
+    onExplore: () => {
+      hideEnding();
+      explore();
+    },
+    onExtra: (id, params, from) => extraSheet.open(id, params, 'flight', from),
+    onAbout: (from) => dialogs.about.open(from),
+    onCredits: (from) => dialogs.credits.open(from),
+    onAllMissions: (from) => openList(from),
+    onLayout: () => remeasure(),
+  });
+
+  // "Finish" is offered while exploring, once the clock has reached the end of the flight. The last
+  // moment is at the end, so the card keeps it there to be read until the visitor moves on.
+  const offerFinish = (): void => {
+    const atEnd = player.storyTime >= player.story.duration - 1e-6;
+    card.setFinishOffered(atEnd && !tour.active && endedAfter === null);
+  };
+  player.subscribe(offerFinish);
+  offerFinish();
+
+  const showEnding = (after: EndingAfter): void => {
+    endedAfter = after;
+    card.setHidden(true);
+    dock.setEnding(true);
+    offerFinish();
+    ending.show(after);
+  };
+  const hideEnding = (): void => {
+    if (endedAfter === null) return;
+    endedAfter = null;
+    ending.hide();
+    dock.setEnding(false);
+    card.setHidden(false);
+    offerFinish();
+  };
+
+  /** The flight from the beginning, or, after the tour, the tour from its first stop. */
+  const watchAgain = (): void => {
+    if (endedAfter === 'tour') {
+      // Leaving the tour's end hides the ending (see the tour's listener below).
+      tour.start(0);
+      focusTourNext();
+      return;
+    }
+    hideEnding();
+    player.seek(index.seconds[0] ?? player.start);
+    player.play();
+    byId('play', HTMLButtonElement).focus({ preventScroll: true });
+  };
+
   let tourPhase = tour.phase;
   tour.subscribe(() => {
     document.body.classList.toggle('is-touring', tour.active);
     timeline.setLocked(tour.active);
-    card.setTourMode(tour.active);
-    card.setHidden(tour.phase === 'finished');
+    dock.setTour(tour.active ? 'touring' : 'off');
+    // Past the last stop, the tour ends the way every flight does.
+    if (tour.phase === 'finished' && tourPhase !== 'finished') showEnding('tour');
+    if (tour.phase !== 'finished' && tourPhase === 'finished') hideEnding();
+    offerFinish();
     // Opening an extra pauses the clock, which would end a tour's travel early, so
     // "Try it" waits for the stop. At a stop the clock is already still.
     card.setTryItAllowed(tour.phase !== 'traveling');
     const stop = tour.stop;
     // On the way, the card already shows the stop it is heading for, so it
     // turns once as the trip begins rather than flicking through every event
-    // passed, which go by too quickly to read. The clock and the timeline show the way.
+    // passed, which go by too quickly to read. The scene shows the way.
     if (stop) card.show(index.events.indexOf(stop));
     if (tour.phase === 'stopped' && stop)
       announce(copy.tour.arrived(tour.index + 1, tour.total, stop.title));
@@ -290,28 +377,38 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     if (tour.phase === 'off' && tourPhase === 'traveling') card.show(index.eventAt(player.time));
     tourPhase = tour.phase;
   });
-  setUpTourPanel(tour, {
-    onExplore: explore,
-    onRestart: () => {
-      tour.start(0);
-      focusTourNext();
-    },
-  });
+  setUpTourPanel(tour, { onExplore: explore });
 
-  /* The mission picker ------------------------------------------------ */
-  // Starting a tour or exploring counts as a visit (the patch book reads it); the list alone does not.
+  /* The welcome ------------------------------------------------------- */
+  const welcomeOptions: WelcomeOptions = {
+    mission,
+    tourStops: tour.total,
+    summaries,
+    onTour: () => startTour(),
+    onExplore: () => startExploring(),
+    onAllMissions: (from) => openList(from),
+  };
+  // Without a 3D view, the welcome says so.
+  if (options.no3D) welcomeOptions.no3D = options.no3D;
+  const welcome = setUpWelcome(welcomeOptions);
+
+  // Starting a tour or exploring counts as a visit (the patch book reads it); the welcome and the list alone do not.
+  // The welcome goes first, so the interface is back on the screen before focus moves into it.
   const startTour = (): void => {
+    welcome.hide();
+    hideEnding();
     recordVisit(mission.id);
     if (tour.total === 0) {
       explore();
     } else {
-      sheet.setExpanded(false);
       tour.start(0);
       focusTourNext();
     }
     remeasure();
   };
   const startExploring = (): void => {
+    welcome.hide();
+    hideEnding();
     recordVisit(mission.id);
     explore();
     remeasure();
@@ -324,6 +421,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     load: loadExtra,
     titleOf: extraTitleOf,
     summaries,
+    extras,
     missionId: mission.id,
     loadBundle,
     announce,
@@ -338,20 +436,24 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
       if (resumeAfterExtra) player.play();
       resumeAfterExtra = false;
     },
+    // "All missions" at the end of a run opened from the list: back to the list (still open under an extra opened from it).
+    onAllMissions: (from) => {
+      if (!hub.showing) openList(from ?? hubButton);
+    },
   });
 
-  // Reopening the picker pauses the clock; closing it without a choice plays on.
+  /* The mission list -------------------------------------------------- */
+  // Opening the list pauses the clock; closing it without a choice plays on.
   let resumeAfterHub = false;
   const memorials = setUpMemorial({ load: loadMemorial, nameOf, addressOf });
   const hubOptions: HubOptions = {
     currentId: mission.id,
-    currentName: mission.name,
     summaries,
     isDraft,
     onMemorial: (id, from) => memorials.open(id, from),
     extras,
     isExtraDraft,
-    onExtra: (id, from) => extraSheet.open(id, new URLSearchParams(), from),
+    onExtra: (id, from) => extraSheet.open(id, new URLSearchParams(), 'list', from),
     onTour: startTour,
     onExplore: startExploring,
     onReturn: () => {
@@ -359,49 +461,50 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
       resumeAfterHub = false;
     },
   };
-  // Without a 3D view, the picker opens with a line that says so.
+  // Without a 3D view, the list opens with a line that says so.
   if (options.no3D) hubOptions.lede = copy.hub.ledeNo3D;
   const hub = setUpHub(hubOptions);
-  hubButton.addEventListener('click', () => {
+  const openList = (from: HTMLElement): void => {
     // A tour on its way to a stop arrives there when the clock pauses.
     resumeAfterHub = player.playing && !tour.active;
     player.pause();
     pauseAllAudio();
-    hub.open(hubButton);
-  });
+    hub.open(from);
+  };
+  hubButton.addEventListener('click', () => openList(hubButton));
 
   /* Tell the scene what the interface covers ------------------------- */
   const remeasure = watchViewInsets(
     [
       { element: byId('masthead', HTMLElement), side: 'top' },
+      // "Look at" and True scale, while Controls are open.
       { element: byId('views', HTMLDivElement), side: 'top' },
-      { element: byId('sheet', HTMLElement), side: (wide) => (wide ? 'right' : 'bottom') },
-      { element: byId('timeline', HTMLElement), side: 'bottom' },
-      // The picker frames the view only as the welcome; reopened, it sits over everything.
-      {
-        element: byId('hub', HTMLDialogElement),
-        side: (wide) => (hub.mode !== 'welcome' ? null : wide ? 'right' : 'bottom'),
-      },
+      { element: byId('dock', HTMLElement), side: 'bottom' },
+      // "Tell me more": a panel at the side on a wide screen, one sheet with the card on a phone.
+      { element: byId('records', HTMLElement), side: (wide) => (wide ? 'right' : 'bottom') },
+      // The welcome: beside the view on a wide screen, under it on a phone. It counts only
+      // while it shows, and the rest of the interface is hidden then.
+      { element: byId('welcome', HTMLElement), side: (wide) => (wide ? 'right' : 'bottom') },
     ],
     (insets) => director.setViewInsets(insets),
   );
 
   return {
-    welcome(reveal) {
-      hub.welcome(reveal);
+    welcome() {
+      welcome.show();
       remeasure();
     },
     explore: startExploring,
     tour: startTour,
     memorial(id) {
-      // Over the picker, focus goes back to the entry's Read button when the page closes.
-      const from = hub.mode ? hub.actionFor({ mission: id }) : null;
-      memorials.open(id, from);
+      // Over the welcome, focus goes to "All missions" when the page closes.
+      memorials.open(id, welcome.showing ? welcome.allMissions : null);
     },
     extra(id, params) {
-      // Over the picker, focus goes back to the entry's Open button when the sheet closes.
-      const from = hub.mode ? hub.actionFor({ extra: id }) : null;
-      extraSheet.open(id, params, from);
+      // Over the welcome there is no flight behind the sheet, as when it opens from the list,
+      // and focus goes to "All missions" when it closes. Otherwise the flight waits behind it.
+      if (welcome.showing) extraSheet.open(id, params, 'list', welcome.allMissions);
+      else extraSheet.open(id, params, 'flight');
     },
   };
 }

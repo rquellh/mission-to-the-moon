@@ -1,10 +1,10 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
- * The mission list: the welcome, and reopened from the mission's name in
- * the header. `hub` has `data-mode` welcome or return. Each mission is an
- * entry with Tour and Explore (or Read, for a memorial page); the extras
- * follow, each with Open.
+ * The mission list, titled "All missions": a modal dialog opened from the
+ * welcome's All missions (WelcomePage) and from the mission's name in the
+ * header. Each mission is an entry with Tour and Explore (or Read, for a
+ * memorial page); the extras follow, each with Open.
  */
 export class HubPage {
   readonly page: Page;

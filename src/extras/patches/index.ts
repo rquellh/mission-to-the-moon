@@ -11,6 +11,7 @@
  * patch it came from.
  */
 import './patches.css';
+import { flightsCollected } from '../../app/related.ts';
 import type { MissionSummary, Program } from '../../content/types.ts';
 import { externalLink, sourcesBlock } from '../../ui/citations.ts';
 import { button, el, hiddenText } from '../../ui/dom.ts';
@@ -73,8 +74,8 @@ export const extra: Extra = {
       const page = pageFor(summary.id);
       if (page) entries.push({ summary, page });
     }
-    const flights = entries.filter((entry) => entry.summary.kind === 'flight');
-    const collected = flights.filter((entry) => opened.has(entry.summary.id)).length;
+    // The same numbers the end of each flight shows, from the same rule.
+    const { collected, total } = flightsCollected(context.summaries, opened);
     const isFilled = (entry: Entry): boolean =>
       entry.summary.kind === 'memorial' || opened.has(entry.summary.id);
 
@@ -96,7 +97,7 @@ export const extra: Extra = {
         'Every flight has a page in this book. Open a mission, and its patch appears here in color.',
       ),
       el('p', 'extra-note', 'The book remembers the missions you open on this device.'),
-      el('p', 'patches__count', `${collected} of ${flights.length} flights collected`),
+      el('p', 'patches__count', `${collected} of ${total} flights collected`),
     );
     book.append(intro);
 

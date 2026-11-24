@@ -61,11 +61,13 @@ export const EXTRAS = [
 ] as const;
 
 /**
- * The guided tour the tests take: Gemini 6A's first three stops. Its first
- * trip is one of the shortest of any tour, which keeps the test quick.
+ * The guided tour the tests take: Gemini 6A, named by its first three stops,
+ * and how many it makes in all. Its first trip is one of the shortest of any
+ * tour, which keeps the test quick.
  */
 export const TOUR = {
   mission: 'gemini-6a',
+  stopCount: 10,
   stops: [
     { id: 'liftoff', title: 'Liftoff, at last' },
     { id: 'in-orbit', title: 'In orbit, far behind' },
@@ -87,10 +89,24 @@ export const EVENTS = {
     title: 'First step on the Moon',
     clock: '109:24:15',
   },
+  /** The last moment, at the end of the clock: Finish shows the end of the flight, which suggests Apollo 12 on a fresh device. */
+  APOLLO_11_SPLASHDOWN: {
+    mission: 'apollo-11',
+    id: 'splashdown',
+    title: 'Splashdown',
+    next: { mission: 'apollo-12', name: 'Apollo 12', firstTitle: 'Liftoff' },
+  },
   /** The third moonwalk: the lander and the rover are on the Moon, and nothing has been left behind yet. */
   APOLLO_17_THIRD_MOONWALK: { mission: 'apollo-17', id: 'third-moonwalk' },
   /** The first American spacewalk: the astronaut floats out with his gas gun. */
   GEMINI_4_FLOATING_OUT: { mission: 'gemini-4', id: 'floating-out' },
+  /** The first docking in orbit, where "Dock two spacecraft" opened from the list leads ("Fly Gemini 8"). */
+  GEMINI_8_DOCKING: {
+    mission: 'gemini-8',
+    id: 'docking',
+    title: 'The first docking',
+    name: 'Gemini 8',
+  },
 } as const;
 
 /** Mission times the tests open by address. */
@@ -101,7 +117,7 @@ export const MOMENTS = {
 
 /** What an address asks for (see src/app/deep-link.ts). Values left out are left out of the address. */
 interface Place {
-  mission: string;
+  mission?: string | undefined;
   start?: 'tour' | 'explore' | undefined;
   event?: string | undefined;
   t?: string | undefined;
@@ -120,7 +136,7 @@ function address(place: Place): string {
 
 /** The addresses specs open. Each puts the site straight where the test begins. */
 export const URLS = {
-  /** The welcome: the mission list over the mission's 3D view. */
+  /** The welcome: the mission on show, and the ways in, over its 3D view. */
   WELCOME: (mission: string) => address({ mission }),
   /** The guided tour, from its first stop. */
   TOUR: (mission: string) => address({ mission, start: 'tour' }),
@@ -136,4 +152,6 @@ export const URLS = {
   LINK: (place: Place) => address(place),
   /** An extra, open over a mission. */
   EXTRA: (mission: string, extra: string) => address({ mission, extra }),
+  /** An extra on its own, as the mission list opens it: over the welcome, with no flight behind it. */
+  EXTRA_ON_ITS_OWN: (extra: string) => address({ extra }),
 } as const;

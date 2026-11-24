@@ -7,8 +7,10 @@ import type { MissionBundle } from '../content/missions/bundle.ts';
  * edit: the registry (src/extras/index.ts) finds it by its file names.
  *
  *   src/extras/<id>/meta.ts    export const meta: ExtraMeta
- *                              Loads with the page, for the list. Keep it
- *                              tiny: import only the type, nothing else.
+ *                              Loads with the page, for the list and the
+ *                              end of each flight. Keep it tiny: import
+ *                              only the type, nothing else (the interface
+ *                              imports it; your other files load later).
  *   src/extras/<id>/index.ts   export const extra: Extra
  *                              Loads only when the extra is opened, as its
  *                              own file in the build, with everything it imports.
@@ -23,6 +25,12 @@ import type { MissionBundle } from '../content/missions/bundle.ts';
  * - An event can point at a hands-on extra with `handsOn: "<id>"` (see
  *   MissionEvent in src/content/types.ts). Its card then shows "Try it",
  *   which opens the extra with `mission=<mission id>&event=<event id>`.
+ * - The end of every flight suggests one extra of each kind (see
+ *   src/app/related.ts): a hands-on extra one of its events names, and an
+ *   explore extra whose `missions` names the flight (otherwise "rockets").
+ *   It opens the extra with `mission=<mission id>` only, with no event
+ *   (the flight waits at its end, not at a moment), so start on that
+ *   flight's page when you have one.
  * - The address `?extra=<id>` opens it directly. Every other value in the
  *   address reaches `mount` as `params`, so `?extra=stages&mission=apollo-11&event=liftoff`
  *   opens it over Apollo 11, at liftoff, with those two values in `params`.
@@ -45,6 +53,37 @@ import type { MissionBundle } from '../content/missions/bundle.ts';
  * If `mount` throws or rejects, the sheet shows a plain failure message.
  * Escape closes the sheet; to use Escape yourself (to cancel a drag, say),
  * call `preventDefault()` on that keydown.
+ *
+ * `context.origin` says how the sheet was opened: "flight" when a flight
+ * is waiting behind it (a moment's "Try it", the end of a flight, or an
+ * address that names a mission or a place in one), "list" when it was
+ * opened from the mission list or by an address that names only the
+ * extra. The host decides it; do not guess it from `params`.
+ * `context.openExtra(id, params)` opens another extra in this one's place,
+ * with the same origin.
+ *
+ * THE END OF A RUN
+ * A hands-on extra ends each run with `context.upNext(options)`: one
+ * recommended next step, then one pick from each shelf, then the quiet
+ * actions. Append the element it returns where the run's buttons go, and
+ * keep your own result text, sources, and notes around it. You give:
+ *   - the next step, from the origin. Over a flight: back to it ("Pick up
+ *     Apollo 11 after liftoff", "Your flight is waiting where you left it.",
+ *     and "Back to Apollo 11", which calls `context.close()`). From the
+ *     list: the flight where it really happened ("See the real liftoff",
+ *     "Apollo 11, July 1969", "Opens at liftoff.", `mission`, and "Fly
+ *     Apollo 11", which calls `context.openMission`).
+ *   - your quiet actions, with `again: true` on the one that runs it again.
+ * The host adds the rest: the patch of `mission` (and "Fly it to collect
+ * its patch." until it is collected), the other hands-on extra and an
+ * extra to explore (src/app/related.ts), each opened in place of yours,
+ * and All missions when the sheet was opened from the list. The one amber
+ * button at the end is the next step's, so make none of your own there.
+ * Wide, the block sits in your column; on a phone the next step is pinned
+ * at the bottom of the screen (the page leaves room for it at its end),
+ * and "More to explore" pulls it up into a sheet with the rest. Put focus
+ * on your result (its heading, say), not on a button under the visitor's
+ * finger.
  *
  * STYLES
  * Put your CSS in a file imported by index.ts. It loads with your extra and
@@ -123,6 +162,12 @@ export interface ExtraMeta {
   order: number;
   /** "draft" keeps an unfinished extra off the published list. */
   status: 'ready' | 'draft';
+  /**
+   * The flights this extra is about, by mission id, for an explore extra
+   * tied to some flights (the landing sites: the six flights that landed).
+   * The end of each of those flights suggests it under "More to explore".
+   */
+  missions?: readonly string[];
 }
 
 /** Where `openMission` should start the mission. */
@@ -137,18 +182,77 @@ export interface OpenMissionOptions {
   start?: 'tour' | 'explore';
 }
 
+/**
+ * How the sheet was opened. "flight": over a flight that is waiting behind
+ * it (a moment's "Try it", the end of a flight, or an address that names a
+ * mission or a place in one). "list": from the mission list, or by an
+ * address that names only the extra, with no flight behind it.
+ */
+export type ExtraOrigin = 'flight' | 'list';
+
+/** A button at the end of a run: what it says, and what it does. */
+export interface UpNextAction {
+  label: string;
+  run(): void;
+}
+
+/** One of the extra's own quiet actions at the end of a run. */
+export interface UpNextQuietAction extends UpNextAction {
+  /**
+   * The run again ("Try again"): it gets the replay icon, and on a phone it
+   * stays in reach beside "More to explore". At most one.
+   */
+  again?: boolean;
+}
+
+/** What an extra says at the end of a run; the host builds "Up next" from it. */
+export interface UpNextOptions {
+  /** The next step, short: "Pick up Apollo 11 after liftoff", "See the real docking". */
+  title: string;
+  /** A second line under the title: "Your flight is waiting where you left it.", "Gemini 8, March 1966". */
+  line?: string;
+  /** A sentence on where the next step leads: "Opens at the first docking." */
+  sentence?: string;
+  /**
+   * The flight the next step flies, by mission id: its patch shows beside
+   * the title (grey until collected), the sentence ends "Fly it to collect
+   * its patch." while it is not, and the picks are chosen for it. Leave it
+   * out when the next step goes back to the flight behind the sheet; the
+   * picks are then chosen for that flight.
+   */
+  mission?: string;
+  /** The one amber button: the next step. */
+  primary: UpNextAction;
+  /** The extra's own quiet actions, in order, for example Try again. */
+  actions?: readonly UpNextQuietAction[];
+}
+
 /** What the interface gives an extra. */
 export interface ExtraContext {
   /** Every listed mission (and the memorial), in date order. */
   summaries: readonly MissionSummary[];
   /** The id of the mission loaded behind the sheet. */
   missionId: string;
+  /** How the sheet was opened: over a flight waiting behind it, or from the list (see ExtraOrigin). */
+  origin: ExtraOrigin;
   /** Load any mission's story, flight plan, and vehicle file. Fast for the one already open. */
   loadBundle(id: string): Promise<MissionBundle>;
   /** Open a mission (a page navigation), optionally at a time or event and view. */
   openMission(id: string, options?: OpenMissionOptions): void;
   /** Close the sheet, as its Close button does. */
   close(): void;
+  /**
+   * Open another extra in this one's place, in the same sheet. It keeps this
+   * one's origin (a flight behind the sheet still waits there), and focus
+   * still goes back where it was when the sheet closes.
+   */
+  openExtra(id: string, params?: URLSearchParams): void;
+  /**
+   * The end of a run: a block that says what's next, built by the host so
+   * every extra ends the same way. Append it where the run's buttons go.
+   * See THE END OF A RUN above.
+   */
+  upNext(options: UpNextOptions): HTMLElement;
   /** True when the visitor prefers reduced motion. */
   reducedMotion(): boolean;
   /** Hear when that preference changes. Returns a function that stops listening (done for you at dispose). */

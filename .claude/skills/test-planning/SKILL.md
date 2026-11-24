@@ -75,7 +75,7 @@ The site is static: there is no server and no API. What a server would own elsew
 
 - What a card, panel, or dialog shows for a real mission
 - Visitor interactions (clicks, keys, selections) and what they change
-- States: touring, traveling between stops, exploring, playing, paused, no 3D view
+- States: touring, traveling between stops, exploring, playing, paused, the moment card's doors open or closed, the end of a flight (and "More to explore" open), the end of a run in an extra ("Up next" opened from a flight or from the list, pulled up on a phone), no 3D view
 - What the interface asks of the scene (which view, which scale)
 - Variations between missions (Earth orbit or Moon, one craft or two, a crew portrait or none)
 - Accessibility (names, roles, pressed and expanded states, announcements)
@@ -98,6 +98,7 @@ The site is static: there is no server and no API. What a server would own elsew
 - Rules every mission must satisfy (events in order and inside the flight, every citation resolving, every photo and recording present, writing rules)
 - Flight path math (no jumps, nothing under the ground, rendezvous, lunar orbit)
 - The clock and the tour (a stop ends exactly on its time, a trip takes its set number of seconds)
+- What the end of a flight suggests (`src/app/related.ts`: the next flight, the extra to try, the extra to explore, the flights collected), and what the end of a run in an extra suggests (the other hands-on extra)
 - A regression in one mission's data (add the rule for all missions, not a one-off)
 
 **Do NOT test here:**
@@ -116,20 +117,21 @@ This is the core value of this skill. For any given behavior, **test it at the l
 
 ### Decision Matrix
 
-| What you're testing                                   | E2E | Interface | Content and flight |
-| ----------------------------------------------------- | --- | --------- | ------------------ |
-| **A rule every mission must satisfy**                 | -   | -         | YES                |
-| **Flight path math, story time**                      | -   | -         | YES                |
-| **Clock and tour logic (timing, stops)**              | -   | -         | YES                |
-| **A writing rule in the content**                     | -   | -         | YES                |
-| **A card, panel, or dialog shows the right things**   | -   | YES       | -                  |
-| **A click or key triggers the right behavior**        | -   | YES       | -                  |
-| **Touring, traveling, playing, paused, no-3D states** | -   | YES       | -                  |
-| **The interface asks the scene for the right view**   | -   | YES       | -                  |
-| **A whole visitor journey (happy path)**              | YES | -         | -                  |
-| **A deep link opens the right place**                 | YES | -         | -                  |
-| **What the 3D scene draws, and where**                | YES | -         | -                  |
-| **Layout on a phone, focus in a real browser**        | YES | -         | -                  |
+| What you're testing                                                           | E2E | Interface | Content and flight |
+| ----------------------------------------------------------------------------- | --- | --------- | ------------------ |
+| **A rule every mission must satisfy**                                         | -   | -         | YES                |
+| **Flight path math, story time**                                              | -   | -         | YES                |
+| **Clock and tour logic (timing, stops)**                                      | -   | -         | YES                |
+| **Which flight or extra the end of a flight (or of an extra's run) suggests** | -   | -         | YES                |
+| **A writing rule in the content**                                             | -   | -         | YES                |
+| **A card, panel, or dialog shows the right things**                           | -   | YES       | -                  |
+| **A click or key triggers the right behavior**                                | -   | YES       | -                  |
+| **Touring, traveling, playing, paused, no-3D states**                         | -   | YES       | -                  |
+| **The interface asks the scene for the right view**                           | -   | YES       | -                  |
+| **A whole visitor journey (happy path)**                                      | YES | -         | -                  |
+| **A deep link opens the right place**                                         | YES | -         | -                  |
+| **What the 3D scene draws, and where**                                        | YES | -         | -                  |
+| **Layout on a phone, focus in a real browser**                                | YES | -         | -                  |
 
 ### The "Who Owns This Test?" Rules
 

@@ -5,18 +5,20 @@ import type { Mission } from '../content/types';
 import { button, byId } from './dom';
 
 /**
- * The view buttons and the True scale switch. The buttons are the views this
- * mission offers (Earth, Moon, Ship, and Both for a Moon flight; Earth and
- * Ship for a flight that stayed in Earth orbit). They ask the Director for a
- * view and show whatever view and scale it reports.
+ * The view buttons and the True scale switch, with its note on what is to
+ * scale, at the top left while Controls are open. The buttons are the views
+ * this mission offers (Earth, Moon, Ship, and Both for a Moon flight; Earth
+ * and Ship for a flight that stayed in Earth orbit). They ask the Director
+ * for a view and show whatever view and scale it reports.
  */
 export function setUpViewControls(director: Director, mission: Mission): void {
   const group = byId('view-buttons', HTMLDivElement);
   const scaleToggle = byId('scale-toggle', HTMLButtonElement);
-  const note = byId('scale-note', HTMLSpanElement);
+  const note = byId('scale-note', HTMLParagraphElement);
   const notes = copy.scaleNote[mission.destination];
 
   group.setAttribute('aria-label', copy.views.groupLabel);
+  byId('scale-toggle-label', HTMLSpanElement).textContent = copy.views.trueScale;
   const buttons = viewsFor(mission).map((view) => {
     const viewButton = button('segmented__item', copy.views[view]);
     viewButton.setAttribute('data-testid', `view-button-${view}`);

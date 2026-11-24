@@ -1,9 +1,10 @@
 import type { Locator, Page } from '@playwright/test';
 
 /**
- * The dialogs over the mission: About this mission, How this is drawn,
- * Sources and credits, and a memorial page. Each has a title, a Close
- * button, and a body. (The extras' sheet has ExtraSheetPage.)
+ * The dialogs over the mission: About this mission, How this is drawn, and
+ * Sources and credits (opened from the links at the end of "Tell me more",
+ * RecordsPage), and a memorial page. Each has a title, a Close button, and
+ * a body. (The extras' sheet has ExtraSheetPage.)
  */
 export class DialogsPage {
   readonly page: Page;

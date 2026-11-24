@@ -15,8 +15,8 @@ import type { Citation, ElapsedTime, Fact, Mission, MissionEvent } from '../../c
 import type { VehiclePart } from '../../content/vehicle-types.ts';
 import { sourcesBlock } from '../../ui/citations.ts';
 import { button, el, setText } from '../../ui/dom.ts';
-import { formatDate } from '../../ui/format.ts';
-import type { Extra, ExtraContext, ExtraMount } from '../types.ts';
+import { formatDate, monthOf } from '../../ui/format.ts';
+import type { Extra, ExtraContext, ExtraMount, UpNextOptions } from '../types.ts';
 import {
   RULES,
   advance,
@@ -152,7 +152,18 @@ const TEXT = {
     mission.launch
       ? `${mission.name} lifted off on ${formatDate(new Date(mission.launch.value.utc))}. This came ${elapsedInWords(event.elapsed)} later.`
       : `This came ${elapsedInWords(event.elapsed)} after liftoff.`,
-  open: (mission: Mission): string => `Open ${mission.name} at this moment`,
+  // What's next, from a flight: back to it, at the docking when that is where it was left.
+  pickUp: (flight: string, atTheDocking: boolean): string =>
+    atTheDocking ? `Pick up ${flight} after the docking` : `Pick up ${flight}`,
+  waiting: 'Your flight is waiting where you left it.',
+  back: (flight: string): string => `Back to ${flight}`,
+  // What's next, from the list: the flight where the docking really happened.
+  seeReal: 'See the real docking',
+  flightAndMonth: (name: string, month: string): string => (month ? `${name}, ${month}` : name),
+  // "The first docking" names the moment; any other title reads as "the docking".
+  opensAt: (event: MissionEvent): string =>
+    `Opens at ${/^The /.test(event.title) ? event.title.charAt(0).toLowerCase() + event.title.slice(1) : 'the docking'}.`,
+  fly: (name: string): string => `Fly ${name}`,
   // The simplification, said once in plain words.
   simplified:
     'A practice toy, not a simulator. Real spacecraft in orbit do not move in straight lines like this, and the real docking took hours of catching up first. The distances and speeds here are not the real ones.',
@@ -303,6 +314,7 @@ async function mount(
   const whyLine = el('p', 'extra-text', why?.text ?? TEXT.storyMissing);
   if (!why) whyLine.className = 'extra-note';
   const startButton = button('button button--primary button--large docking__start', TEXT.start);
+  startButton.setAttribute('data-testid', 'docking-start');
   intro.append(whyLine, el('p', 'extra-note docking__how', TEXT.howTo), startButton);
   if (why) {
     const sources = sourcesBlock(why.fact.citations, why.fact.discrepancy);
@@ -335,6 +347,7 @@ async function mount(
   const dot = svg('circle', { cx: 0, cy: 0, r: 3, class: 'docking__nose' });
   sight.append(drift, dot);
   const aimValue = el('p', 'docking__value');
+  aimValue.setAttribute('data-testid', 'docking-aim');
   const aimRow = el('div', 'docking__readout-row');
   aimRow.append(sight, aimValue);
   aimPanel.append(aimLabel, aimRow);
@@ -383,10 +396,10 @@ async function mount(
   const after = el('section', 'docking__after');
   after.hidden = true;
   const dockedLine = el('p', 'docking__docked', TEXT.docked);
+  dockedLine.setAttribute('data-testid', 'docking-docked');
   // Focus goes here on docking, so a screen reader reads on from it.
   dockedLine.tabIndex = -1;
   after.append(dockedLine);
-  const afterActions = el('div', 'extra-actions docking__after-actions');
   if (real) {
     const { mission, event } = real;
     const heading = el('h3', 'extra-heading', TEXT.realHeading(mission, event));
@@ -397,15 +410,62 @@ async function mount(
       el('p', 'extra-text', TEXT.when(mission, event)),
       sourcesBlock(citations, event.discrepancy, mission.launch?.discrepancy),
     );
-    const open = button('button button--primary', TEXT.open(mission));
-    open.addEventListener('click', () => context.openMission(mission.id, { event: event.id }), {
-      signal,
-    });
-    afterActions.append(open);
   }
-  const again = button('button', TEXT.tryAgain);
-  afterActions.append(again);
-  after.append(afterActions);
+
+  /** What's next: back to the flight waiting behind the sheet, or the flight where the docking really happened. */
+  const nextStep = (): UpNextOptions => {
+    if (context.origin === 'flight') {
+      const flight =
+        context.summaries.find((summary) => summary.id === context.missionId)?.name ??
+        context.missionId;
+      // "After the docking" only when the flight was left at the docking shown here.
+      const atTheDocking =
+        real !== null &&
+        real.mission.id === context.missionId &&
+        params.get('event') === real.event.id;
+      return {
+        title: TEXT.pickUp(flight, atTheDocking),
+        line: TEXT.waiting,
+        primary: { label: TEXT.back(flight), run: () => context.close() },
+      };
+    }
+    if (real) {
+      const { mission, event } = real;
+      return {
+        title: TEXT.seeReal,
+        line: TEXT.flightAndMonth(mission.name, monthOf(mission.launch?.value.utc ?? '')),
+        sentence: TEXT.opensAt(event),
+        mission: mission.id,
+        primary: {
+          label: TEXT.fly(mission.name),
+          run: () => context.openMission(mission.id, { event: event.id }),
+        },
+      };
+    }
+    // The story of the first docking did not load: its flight can still be flown.
+    const first = context.summaries.find((summary) => summary.id === FIRST_DOCKING);
+    const name = first?.name ?? FIRST_DOCKING;
+    return {
+      title: TEXT.seeReal,
+      line: TEXT.flightAndMonth(name, monthOf(first?.date ?? '')),
+      mission: FIRST_DOCKING,
+      primary: {
+        label: TEXT.fly(name),
+        run: () => context.openMission(FIRST_DOCKING, { start: 'explore' }),
+      },
+    };
+  };
+  // Built afresh at each docking, where the run's buttons go, so it always starts folded on a phone.
+  let upNext: HTMLElement | null = null;
+  const showUpNext = (): void => {
+    const block = context.upNext({
+      ...nextStep(),
+      actions: [{ label: TEXT.tryAgain, again: true, run: () => begin(true) }],
+    });
+    if (upNext) upNext.replaceWith(block);
+    else after.append(block);
+    upNext = block;
+  };
 
   side.append(intro, flying, after, el('p', 'extra-note docking__simple', TEXT.simplified));
   root.append(stage, side);
@@ -615,6 +675,7 @@ async function mount(
     latch = null;
     scene?.fly(flight, 0, true);
     scene?.join(still);
+    showUpNext();
     showPhase();
     context.announce(TEXT.docked);
     dockedLine.focus();
@@ -639,7 +700,6 @@ async function mount(
 
   startButton.addEventListener('click', () => begin(true), { signal });
   startOver.addEventListener('click', () => begin(false), { signal });
-  again.addEventListener('click', () => begin(true), { signal });
 
   document.addEventListener(
     'keydown',

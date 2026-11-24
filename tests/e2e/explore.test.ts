@@ -1,41 +1,45 @@
 import { test, expect } from '../fixtures';
 import { EventCardPage } from '../pages/EventCardPage';
-import { HubPage } from '../pages/HubPage';
 import { MissionPage } from '../pages/MissionPage';
 import { ScenePage } from '../pages/ScenePage';
 import { TimelinePage } from '../pages/TimelinePage';
+import { WelcomePage } from '../pages/WelcomePage';
 import { clockSeconds } from '../utils/helpers';
 import { followedShip, isInside } from '../utils/scene-report';
 import { MISSIONS, URLS } from '../utils/vars';
 
 /**
- * A visitor opens a mission and looks around: the view buttons move the
- * real camera, True scale redraws the scene, and Play runs the real clock.
- * The scene report says what the camera shows; the interface tests cover
- * which view the buttons ask for.
+ * A visitor opens a mission and looks around: Controls bring out the view
+ * buttons, which move the real camera, True scale redraws the scene, and
+ * Play runs the real clock. The scene report says what the camera shows;
+ * the interface tests cover which view the buttons ask for.
  */
 test.describe('Exploring a mission', () => {
-  test('a visitor chooses Explore from the welcome and looks through each view', async ({
+  test('a visitor chooses Explore on my own from the welcome and looks through each view', async ({
     sitePage,
   }) => {
     const missionPage = new MissionPage(sitePage);
-    const hubPage = new HubPage(sitePage);
+    const welcomePage = new WelcomePage(sitePage);
     const cardPage = new EventCardPage(sitePage);
     const scenePage = new ScenePage(sitePage);
 
     await test.step('Open the mission, which starts with the welcome', async () => {
       await sitePage.goto(URLS.WELCOME(MISSIONS.DEFAULT));
       await missionPage.waitForLoad();
-      await hubPage.waitForLoad();
-      await expect(hubPage.hub).toHaveAttribute('data-mode', 'welcome');
+      await welcomePage.waitForLoad();
       await expect(missionPage.site).toHaveClass(/\bis-welcome\b/);
     });
 
-    await test.step('Choose Explore on the loaded mission', async () => {
-      await hubPage.missionExplore(MISSIONS.DEFAULT).click();
-      await expect(hubPage.hub).toBeHidden();
+    await test.step('Choose Explore on my own', async () => {
+      await welcomePage.explore.click();
+      await expect(welcomePage.welcome).toBeHidden();
       await expect(missionPage.site).not.toHaveClass(/\bis-welcome\b/);
       await expect(cardPage.title).toBeVisible();
+    });
+
+    await test.step('Open Controls, which bring out the view buttons', async () => {
+      await cardPage.controlsToggle.click();
+      await expect(missionPage.viewButtons).toBeVisible();
     });
 
     for (const view of ['earth', 'moon', 'journey', 'spacecraft'] as const) {

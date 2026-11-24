@@ -1,8 +1,8 @@
 /**
  * The whole interface, mounted the way the site mounts it, for real
  * missions: what a visitor sees first, and how the parts work together (the
- * card and the clock, the tour and the timeline, the mission list and the
- * clock). Each part's details have their own file beside its module.
+ * card and the clock, the tour and the card's doors, the mission list and
+ * the clock). Each part's details have their own file beside its module.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { copy } from '../content/copy.ts';
@@ -26,18 +26,37 @@ describe('the mission interface', () => {
       expect(within(missionName).getByRole('button', { name: /all missions$/ })).toHaveTextContent(
         'Apollo 11 July 16–24, 1969',
       );
-      expect(screen.getByRole('button', { name: 'About this mission' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Sources and credits' })).toBeInTheDocument();
+      // The mission's own pages open from the end of "Tell me more", not from the header.
+      expect(screen.queryByRole('button', { name: 'About this mission' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Sources and credits' })).not.toBeInTheDocument();
     });
 
-    it('welcomes the visitor with the mission list', async () => {
+    it('keeps the story of the moment on screen, with both doors closed', async () => {
+      await mountMission('apollo-11', { start: 'explore' });
+
+      const card = screen.getByRole('region', { name: 'What is happening' });
+      expect(within(card).getByRole('article', { name: 'Liftoff' })).toBeVisible();
+      expect(within(card).getByRole('button', { name: 'Tell me more' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+      expect(within(card).getByRole('button', { name: 'Controls' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+      expect(screen.queryByRole('region', { name: 'Timeline' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Look at' })).not.toBeInTheDocument();
+    });
+
+    it('welcomes the visitor with the mission on show, and keeps the rest back until they choose', async () => {
       await mountMission('apollo-11');
 
-      const list = screen.getByRole('dialog', { name: 'Mission to the Moon' });
-      expect(list).toBeVisible();
+      const welcome = screen.getByRole('region', { name: 'Ride along on Apollo 11' });
+      expect(welcome).toBeVisible();
       expect(
-        within(list).getByRole('heading', { level: 2, name: 'Mission to the Moon' }),
+        within(welcome).getByRole('heading', { level: 2, name: 'Ride along on Apollo 11' }),
       ).toHaveFocus();
+      expect(document.body).toHaveClass('is-welcome');
       expect(document.title).toBe('Mission to the Moon');
     });
   });
@@ -46,17 +65,18 @@ describe('the mission interface', () => {
     it('starts at the first event with Play ready to press', async () => {
       const { user } = await mountMission('apollo-11');
 
-      await user.click(screen.getByRole('button', { name: 'Explore Apollo 11' }));
+      await user.click(screen.getByRole('button', { name: 'Explore on my own' }));
 
-      expect(screen.queryByRole('dialog', { name: 'Mission to the Moon' })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Play' })).toHaveFocus();
-      const timeline = screen.getByRole('region', { name: 'Timeline' });
-      expect(within(timeline).getByText('00:00:00')).toBeInTheDocument();
+      const where = screen.getByRole('group', { name: 'Where the flight is' });
+      expect(within(where).getByText('Launch')).toBeVisible();
+      expect(within(where).getByText('Day 1 of 9')).toBeVisible();
       expect(screen.getByRole('heading', { level: 3, name: 'Liftoff' })).toBeInTheDocument();
     });
 
     it('moves the card along with the clock', async () => {
       const { user } = await mountMission('apollo-11', { start: 'explore' });
+      await user.click(screen.getByRole('button', { name: 'Controls' }));
 
       await user.click(screen.getByRole('slider', { name: 'Mission time' }));
       await user.keyboard('{PageUp}');
@@ -72,7 +92,7 @@ describe('the mission interface', () => {
 
       await user.click(screen.getByRole('button', { name: /all missions$/ }));
 
-      expect(screen.getByRole('dialog', { name: 'Mission to the Moon' })).toBeVisible();
+      expect(screen.getByRole('dialog', { name: 'All missions' })).toBeVisible();
       expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: 'Close' }));
@@ -87,12 +107,10 @@ describe('the mission interface', () => {
 
       expect(document.body).toHaveClass('is-touring');
       expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 1 of 12');
-      expect(screen.getByRole('region', { name: 'Timeline' })).toHaveAttribute(
-        'title',
-        'The timeline follows the tour. Exit the tour to use it.',
-      );
+      expect(screen.queryByRole('button', { name: 'Controls' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Next event' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Previous event' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Tell me more' })).toBeEnabled();
     });
 
     it('holds the card on the stop it is heading for, not each event it passes', async () => {
@@ -105,9 +123,10 @@ describe('the mission interface', () => {
       expect(
         screen.getByRole('heading', { level: 3, name: 'Burn toward the Moon' }),
       ).toBeInTheDocument();
-      expect(
-        within(screen.getByRole('region', { name: 'Timeline' })).queryByText('02:44:16'),
-      ).not.toBeInTheDocument();
+      // The events passed on the way go by too quickly to read, so the card does not show them.
+      expect(screen.getByRole('group', { name: 'Where the flight is' })).not.toHaveTextContent(
+        '02:44:16',
+      );
     });
 
     it('notes the visit on this device once, however often it starts', async () => {
@@ -122,7 +141,8 @@ describe('the mission interface', () => {
 
   describe('fast forward', () => {
     it('shows "Fast forward" by the clock while the scene is in its fast-forward view', async () => {
-      const { director } = await mountMission('apollo-11', { start: 'explore' });
+      const { user, director } = await mountMission('apollo-11', { start: 'explore' });
+      await user.click(screen.getByRole('button', { name: 'Controls' }));
       expect(screen.getByText('Fast forward')).not.toBeVisible();
 
       director.setFastForward(true);
@@ -135,14 +155,23 @@ describe('the mission interface', () => {
 
   describe('without a 3D view', () => {
     it('shows the note in its place, leaves out the view buttons, and says so in the mission list', async () => {
-      await mountMission('gemini-8', { no3D: { note: copy.errors.noWebGL, offerReload: false } });
+      const { user } = await mountMission('gemini-8', {
+        no3D: { note: copy.errors.noWebGL, offerReload: false },
+        start: 'explore',
+      });
 
-      expect(screen.getByText(copy.errors.noWebGL)).toBeVisible();
-      expect(screen.queryByRole('button', { name: 'Earth' })).not.toBeInTheDocument();
+      // The welcome says it too, but it has gone by now.
+      const [inPlace, onTheWelcome] = screen.getAllByText(copy.errors.noWebGL);
+      expect(inPlace).toBeVisible();
+      expect(onTheWelcome).not.toBeVisible();
       expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument();
-      expect(
-        screen.getByRole('dialog', { name: 'Mission to the Moon' }),
-      ).toHaveAccessibleDescription(
+      await user.click(screen.getByRole('button', { name: 'Controls' }));
+      expect(screen.getByRole('region', { name: 'Timeline' })).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Earth' })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /all missions$/ }));
+
+      expect(screen.getByRole('dialog', { name: 'All missions' })).toHaveAccessibleDescription(
         /^Choose a flight and follow it, from liftoff to splashdown\. This browser can’t show the 3D view/,
       );
     });
@@ -169,6 +198,7 @@ describe('the mission interface', () => {
     it('says the event and its time once the card stops stepping, and only the latest', async () => {
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
       const { user, frames } = await mountMission('apollo-11', { start: 'explore' });
+      await user.click(screen.getByRole('button', { name: 'Controls' }));
 
       await user.click(screen.getByRole('button', { name: 'Next event' }));
       await user.click(screen.getByRole('button', { name: 'Next event' }));
@@ -195,6 +225,7 @@ describe('the mission interface', () => {
     it('explains fast forward once, not on every lap', async () => {
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
       const { user, director, frames } = await mountMission('apollo-11', { start: 'explore' });
+      await user.click(screen.getByRole('button', { name: 'Controls' }));
       director.setFastForward(true);
       settle(frames);
       expect(screen.getByText(copy.timeline.fastForwardSpoken)).toBeInTheDocument();

@@ -155,23 +155,23 @@ async function main(): Promise<void> {
     player,
   };
 
-  /** Begin where the address asks: the mission list, a tour, exploring, a memorial page, or an extra. */
+  /** Begin where the address asks: the welcome, a tour, exploring, a memorial page, or an extra. */
   const begin = (ui: MissionInterface): void => {
     if (memorialId) {
-      ui.welcome({ mission: memorialId });
+      ui.welcome();
       ui.memorial(memorialId);
       return;
     }
-    // An extra opens over the mission list, unless the address names a mission or a place in one.
+    // An extra opens over the welcome, unless the address names a mission or a place in one.
     const namesPlace = link.mission !== null || seeked || link.start !== null;
     if (link.start === 'tour') ui.tour();
     else if (seeked || link.start === 'explore' || (extraId && namesPlace)) ui.explore();
-    else ui.welcome(extraId ? { extra: extraId } : undefined);
+    else ui.welcome();
     if (extraId) ui.extra(extraId, link.extraParams);
   };
 
   // 3. The 3D scene. Without WebGL, or if its code did not load, every
-  //    mission can still be read, starting from the list as usual.
+  //    mission can still be read, starting from the welcome as usual.
   const made = await makeStage(sceneCode, canvas, {
     path,
     player,

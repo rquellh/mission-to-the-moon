@@ -50,8 +50,8 @@ export function reducedMotionQuery(): MediaQueryList {
 }
 
 /**
- * The wide layout: the event card becomes a panel at the side and the
- * timeline runs along the bottom. Keep in step with the media query in
+ * The wide layout: the moment card floats at the bottom and "Tell me more"
+ * opens as a panel at the side. Keep in step with the media query in
  * main.css.
  */
 export function wideLayoutQuery(): MediaQueryList {

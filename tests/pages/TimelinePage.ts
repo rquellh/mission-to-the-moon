@@ -1,9 +1,10 @@
 import type { Locator, Page } from '@playwright/test';
 
 /**
- * The timeline: Play and Pause, the mission clock, the scrubber, the
- * chapters (buttons on a wide screen, a menu on a phone), and the speed.
- * `play` has `aria-label` Play or Pause.
+ * Play on the moment card, and the tools behind its Controls door
+ * (`timeline`): the mission clock, the scrubber, the chapters (buttons on a
+ * wide screen, a menu on a phone), and the speed. `play` has `aria-label`
+ * Play or Pause. On a phone the clock sits beside Play while Controls are open.
  */
 export class TimelinePage {
   readonly page: Page;
@@ -14,7 +15,6 @@ export class TimelinePage {
   readonly clockSince: Locator;
   readonly clockDay: Locator;
   readonly clockFastForward: Locator;
-  readonly clockUtc: Locator;
   // Moving through the mission
   readonly scrubber: Locator;
   readonly chapters: Locator;
@@ -31,7 +31,6 @@ export class TimelinePage {
     this.clockSince = page.getByTestId('clock-since');
     this.clockDay = page.getByTestId('clock-day');
     this.clockFastForward = page.getByTestId('clock-fast-forward');
-    this.clockUtc = page.getByTestId('clock-utc');
     this.scrubber = page.getByTestId('timeline-scrubber');
     this.chapters = page.getByTestId('timeline-chapters');
     this.chapterSelect = page.getByTestId('timeline-chapter-select');

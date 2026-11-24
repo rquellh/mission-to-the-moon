@@ -12,7 +12,7 @@ import './stages.css';
 import type { MissionBundle } from '../../content/missions/bundle.ts';
 import { sourcesBlock } from '../../ui/citations.ts';
 import { button, el, setText } from '../../ui/dom.ts';
-import { yearOf } from '../../ui/format.ts';
+import { monthOf, yearOf } from '../../ui/format.ts';
 import type { Extra, ExtraContext, ExtraMount } from '../types.ts';
 import {
   capitalize,
@@ -515,20 +515,51 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
     });
     children.push(list);
 
-    const again = action('Try again', true, () => startClimb(climb));
-    const other = action('Try another rocket', false, showChoose);
-    const open = action(`Open ${climb.missionName} at liftoff`, false, () =>
-      context.openMission(
-        climb.missionId,
-        climb.liftoffEvent ? { event: climb.liftoffEvent.id } : { t: climb.liftoffAt },
-      ),
-    );
-    children.push(actions(again, other, open));
+    // What's next: back to the flight waiting behind the sheet, or the flight where this liftoff really happened.
+    const runs = [
+      { label: 'Try again', again: true, run: () => startClimb(climb) },
+      { label: 'Try another rocket', run: showChoose },
+    ];
+    if (context.origin === 'flight') {
+      const flight = summaryOf(context.missionId)?.name ?? context.missionId;
+      // "After liftoff" only when the flight was left at this rocket's liftoff.
+      const atLiftoff =
+        params.get('mission') === climb.missionId && params.get('event') === climb.liftoffEvent?.id;
+      children.push(
+        context.upNext({
+          title: atLiftoff ? `Pick up ${flight} after liftoff` : `Pick up ${flight}`,
+          line: 'Your flight is waiting where you left it.',
+          primary: { label: `Back to ${flight}`, run: () => context.close() },
+          actions: runs,
+        }),
+      );
+    } else {
+      // "Apollo 11, July 1969": the month it lifted off.
+      const month = monthOf(summaryOf(climb.missionId)?.date ?? '');
+      children.push(
+        context.upNext({
+          title: 'See the real liftoff',
+          line: month ? `${climb.missionName}, ${month}` : climb.missionName,
+          sentence: 'Opens at liftoff.',
+          mission: climb.missionId,
+          primary: {
+            label: `Fly ${climb.missionName}`,
+            run: () =>
+              context.openMission(
+                climb.missionId,
+                climb.liftoffEvent ? { event: climb.liftoffEvent.id } : { t: climb.liftoffAt },
+              ),
+          },
+          actions: runs,
+        }),
+      );
+    }
     setScreen('done', ...children);
     context.announce(
       `${title.textContent ?? ''}. Each part's real time and yours are listed below.`,
     );
-    focus(again);
+    // Focus on the result, not on a button: the visitor has just been pressing Drop it over and over.
+    focus(title);
   };
 
   /* -------------------------------------------------------------- */
@@ -569,8 +600,9 @@ function frameLoop(callback: (dt: number) => void): () => void {
   const step = (now: number): void => {
     const dt = last === null ? 0 : Math.min(0.1, (now - last) / 1000);
     last = now;
-    callback(dt);
+    // The next frame is asked for first, so a callback that stops the loop (the climb is over) cancels it.
     frame = requestAnimationFrame(step);
+    callback(dt);
   };
   frame = requestAnimationFrame(step);
   return () => cancelAnimationFrame(frame);

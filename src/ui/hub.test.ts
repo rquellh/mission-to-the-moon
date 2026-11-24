@@ -1,10 +1,11 @@
 /**
- * The mission list: the welcome, and reopened from the mission's name. How
- * it is grouped and marked, what choosing an entry does, and the ways out.
+ * The list of every mission, opened from the welcome's "All missions" and
+ * from the mission's name. How it is grouped and marked, what choosing an
+ * entry does, and the way out.
  */
 import { describe, expect, it } from 'vitest';
 import type { MissionSummary } from '../content/types.ts';
-import { mountMission, navigation, screen, visitedMissions, within } from '../test/test-utils.ts';
+import { mountMission, navigation, screen, within, type User } from '../test/test-utils.ts';
 
 /** The real list, with Gemini 7 as a flight that has no tour (every real flight has one). */
 const gemini7WithoutATour = (summaries: readonly MissionSummary[]): MissionSummary[] =>
@@ -12,7 +13,13 @@ const gemini7WithoutATour = (summaries: readonly MissionSummary[]): MissionSumma
     summary.id === 'gemini-7' ? { ...summary, hasTour: false } : summary,
   );
 
-const missionList = (): HTMLElement => screen.getByRole('dialog', { name: 'Mission to the Moon' });
+const missionList = (): HTMLElement => screen.getByRole('dialog', { name: 'All missions' });
+
+/** Open the list from the welcome, where a plain address begins. */
+async function openTheList(user: User): Promise<HTMLElement> {
+  await user.click(screen.getByRole('button', { name: 'All missions' }));
+  return missionList();
+}
 
 const namesIn = (section: HTMLElement): Array<string | null> =>
   within(section)
@@ -22,8 +29,8 @@ const namesIn = (section: HTMLElement): Array<string | null> =>
 describe('the mission list', () => {
   describe('rendering', () => {
     it('groups the missions by program, in date order, with the years each program flew', async () => {
-      await mountMission('apollo-11');
-      const list = missionList();
+      const { user } = await mountMission('apollo-11');
+      const list = await openTheList(user);
 
       const gemini = within(list).getByRole('region', { name: /^Gemini/ });
       expect(within(gemini).getByRole('heading', { level: 3 })).toHaveTextContent(
@@ -45,25 +52,29 @@ describe('the mission list', () => {
     });
 
     it('says what the list is for, and who is remembered in it', async () => {
-      await mountMission('apollo-11');
+      const { user } = await mountMission('apollo-11');
 
-      expect(missionList()).toHaveAccessibleDescription(
+      const list = await openTheList(user);
+
+      expect(within(list).getByRole('heading', { level: 2 })).toHaveTextContent('All missions');
+      expect(list).toHaveAccessibleDescription(
         'Choose a flight and ride along in 3D, from liftoff to splashdown. Apollo 1 is remembered here too.',
       );
     });
 
     it('marks the mission on show', async () => {
-      await mountMission('apollo-11');
+      const { user } = await mountMission('apollo-11');
+      const list = await openTheList(user);
 
-      const showing = within(missionList()).getByRole('listitem', { current: true });
+      const showing = within(list).getByRole('listitem', { current: true });
       expect(within(showing).getByRole('heading', { level: 4 })).toHaveTextContent(
         'Apollo 11 Now showing',
       );
     });
 
     it('offers Read for the memorial, and the tour only on a flight that has one', async () => {
-      await mountMission('apollo-11', { missionList: gemini7WithoutATour });
-      const list = missionList();
+      const { user } = await mountMission('apollo-11', { missionList: gemini7WithoutATour });
+      const list = await openTheList(user);
 
       expect(within(list).getByRole('button', { name: 'Read about Apollo 1' })).toBeInTheDocument();
       expect(
@@ -79,19 +90,22 @@ describe('the mission list', () => {
     });
 
     it('marks an unfinished mission as a draft', async () => {
-      await mountMission('apollo-11', { isDraft: (summary) => summary.id === 'apollo-17' });
+      const { user } = await mountMission('apollo-11', {
+        isDraft: (summary) => summary.id === 'apollo-17',
+      });
+      const list = await openTheList(user);
 
       expect(
-        within(missionList()).getByRole('heading', { level: 4, name: 'Apollo 17 Draft' }),
+        within(list).getByRole('heading', { level: 4, name: 'Apollo 17 Draft' }),
       ).toBeInTheDocument();
       expect(
-        within(missionList()).getByRole('heading', { level: 4, name: 'Apollo 16' }),
+        within(list).getByRole('heading', { level: 4, name: 'Apollo 16' }),
       ).toBeInTheDocument();
     });
 
     it('lists the extras in two groups under the missions', async () => {
-      await mountMission('apollo-11');
-      const list = missionList();
+      const { user } = await mountMission('apollo-11');
+      const list = await openTheList(user);
 
       expect(namesIn(within(list).getByRole('region', { name: 'Try it yourself' }))).toEqual([
         'Drop the stages',
@@ -106,18 +120,25 @@ describe('the mission list', () => {
   });
 
   describe('choosing', () => {
-    it('starts the tour of the mission on show, in place', async () => {
+    it('starts the tour of the mission on show, in place, leaving the welcome behind', async () => {
       const { user } = await mountMission('apollo-11');
+      await openTheList(user);
 
       await user.click(screen.getByRole('button', { name: 'Take the tour of Apollo 11' }));
 
-      expect(screen.queryByRole('dialog', { name: 'Mission to the Moon' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'All missions' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('region', { name: 'Ride along on Apollo 11' }),
+      ).not.toBeInTheDocument();
+      expect(document.body).not.toHaveClass('is-welcome');
       expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 1 of 12');
+      expect(document.title).toBe('Apollo 11 · Mission to the Moon');
       expect(navigation.address).toBeNull();
     });
 
     it('opens another mission at its own address, starting the way chosen', async () => {
       const { user } = await mountMission('apollo-11');
+      await openTheList(user);
 
       await user.click(screen.getByRole('button', { name: 'Take the tour of Gemini 8' }));
       expect(navigation.address).toBe('http://localhost:3000/?mission=gemini-8&start=tour');
@@ -128,6 +149,7 @@ describe('the mission list', () => {
 
     it('opens the memorial page over the list', async () => {
       const { user } = await mountMission('apollo-11');
+      await openTheList(user);
 
       await user.click(screen.getByRole('button', { name: 'Read about Apollo 1' }));
 
@@ -137,6 +159,7 @@ describe('the mission list', () => {
 
     it('opens an extra over the list', async () => {
       const { user } = await mountMission('apollo-11');
+      await openTheList(user);
 
       await user.click(screen.getByRole('button', { name: 'Open Three rockets' }));
 
@@ -146,17 +169,7 @@ describe('the mission list', () => {
   });
 
   describe('leaving without a choice', () => {
-    it('starts exploring when the welcome is closed with Escape', async () => {
-      const { user } = await mountMission('apollo-11');
-
-      await user.keyboard('{Escape}');
-
-      expect(screen.queryByRole('dialog', { name: 'Mission to the Moon' })).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Play' })).toHaveFocus();
-      expect(visitedMissions()).toEqual(['apollo-11']);
-    });
-
-    it('puts the visitor back where they were when the reopened list closes', async () => {
+    it('puts the visitor back where they were when the list closes', async () => {
       const { user } = await mountMission('apollo-11', { start: 'explore' });
       const missionName = screen.getByRole('button', { name: /all missions$/ });
       await user.click(missionName);
@@ -164,7 +177,7 @@ describe('the mission list', () => {
 
       await user.keyboard('{Escape}');
 
-      expect(screen.queryByRole('dialog', { name: 'Mission to the Moon' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'All missions' })).not.toBeInTheDocument();
       expect(document.title).toBe('Apollo 11 · Mission to the Moon');
       expect(missionName).toHaveFocus();
     });
