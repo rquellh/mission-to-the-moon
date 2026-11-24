@@ -2,8 +2,8 @@
 
 A link can open a mission at a moment and a view. For example:
 
-- The first landing: [https://rquellh.github.io/mission-to-the-moon/?mission=apollo-11&t=102:45:40&view=moon](https://rquellh.github.io/mission-to-the-moon/?mission=apollo-11&t=102:45:40&view=moon)
-- The first docking: [https://rquellh.github.io/mission-to-the-moon/?mission=gemini-8&t=06:33:16&view=spacecraft](https://rquellh.github.io/mission-to-the-moon/?mission=gemini-8&t=06:33:16&view=spacecraft)
+- The first landing: [https://moon.ryanquellhorst.com/?mission=apollo-11&t=102:45:40&view=moon](https://moon.ryanquellhorst.com/?mission=apollo-11&t=102:45:40&view=moon)
+- The first docking: [https://moon.ryanquellhorst.com/?mission=gemini-8&t=06:33:16&view=spacecraft](https://moon.ryanquellhorst.com/?mission=gemini-8&t=06:33:16&view=spacecraft)
 
 The same options work on the dev server address.
 

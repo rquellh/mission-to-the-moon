@@ -3,7 +3,7 @@
 <p align="center">
   An interactive 3D tour of every crewed Gemini and Apollo flight, in your browser, on a phone or a desktop.
   <br />
-  <a href="https://rquellh.github.io/mission-to-the-moon/">Fly a mission</a>
+  <a href="https://moon.ryanquellhorst.com/">Fly a mission</a>
   ·
   <a href="#about">About</a>
   ·
@@ -16,7 +16,7 @@
   <a href="DEVELOPING.md">Developing</a>
 </p>
 
-<p align="center"><a href="https://rquellh.github.io/mission-to-the-moon/?mission=apollo-11&amp;t=102:45:40&amp;view=spacecraft"><img src="docs/images/apollo-11-landing.jpg" alt="Apollo 11 at the moment of landing: the lunar module Eagle sits on the Moon at the end of its descent path, the clock reads 102:45:40 since liftoff, and the card beside it carries the recording and the words of &quot;The Eagle has landed&quot;." width="888"></a></p>
+<p align="center"><a href="https://moon.ryanquellhorst.com/?mission=apollo-11&amp;t=102:45:40&amp;view=spacecraft"><img src="docs/images/apollo-11-landing.jpg" alt="Apollo 11 at the moment of landing: the lunar module Eagle sits on the Moon at the end of its descent path, the clock reads 102:45:40 since liftoff, and the card beside it carries the recording and the words of &quot;The Eagle has landed&quot;." width="888"></a></p>
 
 ## About
 
@@ -56,10 +56,10 @@ Every crewed flight of the two programs is here, from Gemini 3 to Apollo 17.
 
 Some good places to start:
 
-- [The first landing](https://rquellh.github.io/mission-to-the-moon/?mission=apollo-11&t=102:45:40&view=moon), Apollo 11, a little under 103 hours after liftoff
-- [The first docking](https://rquellh.github.io/mission-to-the-moon/?mission=gemini-8&t=06:33:16&view=spacecraft), Gemini 8, six and a half hours in
-- [The first trip around the Moon](https://rquellh.github.io/mission-to-the-moon/?mission=apollo-8&start=tour), Apollo 8, as a tour
-- [The flight that had to turn back](https://rquellh.github.io/mission-to-the-moon/?mission=apollo-13&start=tour), Apollo 13, as a tour
+- [The first landing](https://moon.ryanquellhorst.com/?mission=apollo-11&t=102:45:40&view=moon), Apollo 11, a little under 103 hours after liftoff
+- [The first docking](https://moon.ryanquellhorst.com/?mission=gemini-8&t=06:33:16&view=spacecraft), Gemini 8, six and a half hours in
+- [The first trip around the Moon](https://moon.ryanquellhorst.com/?mission=apollo-8&start=tour), Apollo 8, as a tour
+- [The flight that had to turn back](https://moon.ryanquellhorst.com/?mission=apollo-13&start=tour), Apollo 13, as a tour
 
 Those are ordinary links, and any moment of any flight can be one.
 [Links that open a moment](docs/links.md) lists the options.
@@ -68,11 +68,11 @@ Those are ordinary links, and any moment of any flight can be one.
 
 Under the missions are five things to try and explore:
 
-- [**Drop the stages**](https://rquellh.github.io/mission-to-the-moon/?extra=stages): help a rocket climb to orbit by dropping each part at the right moment.
-- [**Dock two spacecraft**](https://rquellh.github.io/mission-to-the-moon/?extra=docking): fly a Gemini slowly into the docking cone of its Agena target, the way Gemini 8's crew did first.
-- [**Six landings on the Moon**](https://rquellh.github.io/mission-to-the-moon/?extra=landing-sites): turn the Moon and find the six places where an Apollo lunar module landed.
-- [**Three rockets**](https://rquellh.github.io/mission-to-the-moon/?extra=rockets): the three rockets that launched the Gemini and Apollo crews, side by side at their true heights.
-- [**Mission patches**](https://rquellh.github.io/mission-to-the-moon/?extra=patches): a book of the crews' patches that fills in, in color, as you open each flight. The book is kept on your own device.
+- [**Drop the stages**](https://moon.ryanquellhorst.com/?extra=stages): help a rocket climb to orbit by dropping each part at the right moment.
+- [**Dock two spacecraft**](https://moon.ryanquellhorst.com/?extra=docking): fly a Gemini slowly into the docking cone of its Agena target, the way Gemini 8's crew did first.
+- [**Six landings on the Moon**](https://moon.ryanquellhorst.com/?extra=landing-sites): turn the Moon and find the six places where an Apollo lunar module landed.
+- [**Three rockets**](https://moon.ryanquellhorst.com/?extra=rockets): the three rockets that launched the Gemini and Apollo crews, side by side at their true heights.
+- [**Mission patches**](https://moon.ryanquellhorst.com/?extra=patches): a book of the crews' patches that fills in, in color, as you open each flight. The book is kept on your own device.
 
 A liftoff or docking card in a mission offers the matching one with a "Try it" button.
 
