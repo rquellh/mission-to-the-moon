@@ -43,6 +43,8 @@ The site uses relative paths, so `dist/` works from any subpath. Each mission, a
 
 A pull request runs four workflows from `.github/workflows/` side by side: `oxlint.yml` lints the code, `oxfmt.yml` checks the format, `vitest.yml` runs the content, flight math, and interface tests, and `playwright.yml` builds the site and runs the browser tests against the build. It publishes nothing. Pushing to `main` runs `deploy.yml`, which runs all four again, builds the site, and publishes it to GitHub Pages only if all four pass (turn on Pages with "GitHub Actions" as the source in the repository settings).
 
+The site is served at https://moon.ryanquellhorst.com/. That address is a custom domain set in the repository settings (Settings → Pages), and a DNS record at the domain's registrar points `moon.ryanquellhorst.com` at `rquellh.github.io`. The repository has no `CNAME` file, because Pages ignores one when a workflow publishes the site. The first address, https://rquellh.github.io/mission-to-the-moon/, redirects to the new one and keeps the rest of the link.
+
 `main` is protected: a repository rule (Settings → Rules) requires all four checks (`oxlint`, `oxfmt`, `vitest`, and `playwright`) to pass before a commit reaches `main`, so changes go through a pull request and a direct push of unchecked work is turned away. A lint error or an unformatted file stops the merge, the same as a failing test.
 
 ## Tests
