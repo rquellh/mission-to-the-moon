@@ -80,7 +80,7 @@ The setup file runs before every `ui` test file and provides:
 
 - The jest-dom matchers (`toBeInTheDocument`, `toBeVisible`, `toHaveAccessibleName`, ...)
 - The browser stand-ins from `browser.ts`, installed once per file
-- After each test: every open dialog is closed (so the page can tidy up, as leaving it would), the page and the device's storage are emptied, the screen, sound, and address are put back, fake timers are turned off, and every stub and spy is undone
+- After each test: every open dialog is closed (so the page can tidy up, as leaving it would), the timers the page left waiting are stopped, the page and the device's storage are emptied, the screen, sound, and address are put back, fake timers are turned off, and every stub and spy is undone
 
 ```ts
 installBrowser();
@@ -98,15 +98,16 @@ afterEach(() => {
 
 ### What `browser.ts` Fills In
 
-| jsdom lacks                                      | The stand-in                                                                                                                                      |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `HTMLDialogElement` `show`, `showModal`, `close` | Set and clear `open`, fire `close` at once; Escape fires `cancel` on the top modal dialog and closes it unless the page called `preventDefault()` |
-| `matchMedia`                                     | A phone-sized screen with no reduced-motion preference; the mount's `wide` option switches to the wide layout                                     |
-| `ResizeObserver`                                 | Never calls back (nothing is laid out in jsdom)                                                                                                   |
-| `Element.animate`, `Element.scrollBy`            | Accepted and ignored                                                                                                                              |
-| A canvas's `getContext`                          | Always `null`, as in a browser that cannot draw: an extra with a 3D view of its own shows its flat version                                        |
-| `HTMLMediaElement` `play`, `pause`, `load`       | A recording waits for the test to say how the file went (`sound`)                                                                                 |
-| Navigation (`location.assign`, `reload`)         | Recorded in `navigation`; nothing loads                                                                                                           |
+| jsdom lacks                                      | The stand-in                                                                                                                                                      |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HTMLDialogElement` `show`, `showModal`, `close` | Set and clear `open`, fire `close` at once; Escape fires `cancel` on the top modal dialog and closes it unless the page called `preventDefault()`                 |
+| `matchMedia`                                     | A phone-sized screen with no reduced-motion preference; the mount's `wide` option switches to the wide layout                                                     |
+| `ResizeObserver`                                 | Never calls back (nothing is laid out in jsdom)                                                                                                                   |
+| `Element.animate`, `Element.scrollBy`            | Accepted and ignored                                                                                                                                              |
+| A canvas's `getContext`                          | Always `null`, as in a browser that cannot draw: an extra with a 3D view of its own shows its flat version                                                        |
+| `HTMLMediaElement` `play`, `pause`, `load`       | A recording waits for the test to say how the file went (`sound`)                                                                                                 |
+| Navigation (`location.assign`, `reload`)         | Recorded in `navigation`; nothing loads                                                                                                                           |
+| A page's timers (`setTimeout`)                   | Stopped when the test ends, as a browser stops them when the page is left: a timer still waiting (the announcer's half second) never goes off during a later test |
 
 A jsdom "not implemented" error in the output means a test reached an edge with no stand-in. Fill the gap in `browser.ts`; never silence the console to hide it.
 

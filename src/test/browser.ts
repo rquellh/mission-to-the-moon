@@ -15,6 +15,8 @@
  *   through `sound`.
  * - Leaving the page (location.assign and reload): recorded in `navigation`
  *   instead of loading anything.
+ * - Timers (setTimeout): stopped when the test ends, as a browser stops a
+ *   page's timers when the page is left.
  *
  * setup.ts installs them once per test file and resets them after each test.
  */
@@ -296,6 +298,36 @@ function installNavigation(): void {
   Object.defineProperty(window, 'location', { configurable: true, get: () => location });
 }
 
+/* Timers ------------------------------------------------------------ */
+
+/**
+ * The timers the page has started since the last reset. A browser stops a
+ * page's timers when the page is left. jsdom's page is never left, so a timer
+ * still waiting when its test ends (the announcer's half second, say) would
+ * go off later: during another test, or after the last one, when the page and
+ * its frames are gone.
+ */
+const startedTimers = new Set<number>();
+
+/** Stop every timer the page started. Set at install, from the real clearTimeout. */
+let stopTimers = (): void => {};
+
+function installTimers(): void {
+  // The real ones, kept from before any test swaps them for fake timers.
+  const start = window.setTimeout;
+  const stop = window.clearTimeout;
+  window.setTimeout = function setTimeout(...args: Parameters<typeof start>): number {
+    const id = start.call(window, ...args);
+    startedTimers.add(id);
+    return id;
+  };
+  stopTimers = (): void => {
+    // Stopping a timer that has gone off, or was stopped already, does nothing.
+    for (const id of startedTimers) stop.call(window, id);
+    startedTimers.clear();
+  };
+}
+
 /* Setup and reset --------------------------------------------------- */
 
 let installed = false;
@@ -309,11 +341,13 @@ export function installBrowser(): void {
   installLayout();
   installSound();
   installNavigation();
+  installTimers();
 }
 
-/** Put the browser back as a fresh page has it: a phone screen, nothing playing, nowhere asked to go. */
+/** Put the browser back as a fresh page has it: a phone screen, nothing playing, nowhere asked to go, no timer waiting. */
 export function resetBrowser(): void {
   closeAllDialogs();
+  stopTimers();
   settings = { ...PHONE };
   lists.clear();
   pending = null;
