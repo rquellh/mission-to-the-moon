@@ -36,10 +36,10 @@ import {
   EARTH_SIDEREAL_ORBIT_DAYS,
   EARTH_SIDEREAL_ROTATION_HOURS,
   MOON_SIDEREAL_PERIOD_DAYS,
-} from "../content/physical-constants.ts";
-import { elapsedToSeconds } from "../content/types.ts";
-import type { SkySample } from "./types.ts";
-import { DEG, rotateX, rotateY, set, vec3, wrapPi, type Vec3 } from "./vec.ts";
+} from '../content/physical-constants.ts';
+import { elapsedToSeconds } from '../content/types.ts';
+import type { SkySample } from './types.ts';
+import { DEG, rotateX, rotateY, set, vec3, wrapPi, type Vec3 } from './vec.ts';
 
 /** The Moon's mean motion around Earth, radians per second (sidereal). */
 export const MOON_RATE = (2 * Math.PI) / (MOON_SIDEREAL_PERIOD_DAYS * 86_400);
@@ -149,7 +149,11 @@ export function fitSky(samples: readonly SkySample[]): SkyFit {
   const spin0 = circularMean(
     samples.map((s, i) => {
       const lambda = moonLongitude0 + MOON_RATE * times[i]!;
-      return rightAscensionOnEcliptic(lambda) - s.subLunarLongitude.value * DEG - EARTH_SPIN_RATE * times[i]!;
+      return (
+        rightAscensionOnEcliptic(lambda) -
+        s.subLunarLongitude.value * DEG -
+        EARTH_SPIN_RATE * times[i]!
+      );
     }),
   );
   const sunLongitude0 = circularMean(
@@ -269,4 +273,3 @@ export class Sky {
     return rotateX(out, vec3(0, 1, 0), -EARTH_AXIAL_TILT_RAD);
   }
 }
-

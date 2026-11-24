@@ -8,7 +8,11 @@ export function byId<T extends HTMLElement>(id: string, type: new () => T): T {
 }
 
 /** Find a required element inside a parent, checking its type. */
-export function find<T extends Element>(parent: ParentNode, selector: string, type: new () => T): T {
+export function find<T extends Element>(
+  parent: ParentNode,
+  selector: string,
+  type: new () => T,
+): T {
   const element = parent.querySelector(selector);
   if (!(element instanceof type)) {
     throw new Error(`Expected ${selector} to be a ${type.name}`);

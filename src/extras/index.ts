@@ -14,40 +14,48 @@
  * Vitest tests run through Vite and can import it; code that plain Node or
  * Playwright runs (tools/, tests/) cannot.
  */
-import type { Extra, ExtraMeta } from "./types.ts";
+import type { Extra, ExtraMeta } from './types.ts';
 
-export type { Extra, ExtraContext, ExtraMeta, ExtraMount } from "./types.ts";
+export type { Extra, ExtraContext, ExtraMeta, ExtraMount } from './types.ts';
 
 /** The folder a module path is in: "./stages/meta.ts" is "stages". */
 function folderOf(path: string): string {
-  return path.split("/")[1] ?? path;
+  return path.split('/')[1] ?? path;
 }
 
 function byFolder<T>(modules: Record<string, T>): ReadonlyMap<string, T> {
   return new Map(Object.entries(modules).map(([path, value]) => [folderOf(path), value]));
 }
 
-const metaById = byFolder(import.meta.glob<ExtraMeta>("./*/meta.ts", { eager: true, import: "meta" }));
-const loaders = byFolder(import.meta.glob<Extra>("./*/index.ts", { import: "extra" }));
+const metaById = byFolder(
+  import.meta.glob<ExtraMeta>('./*/meta.ts', { eager: true, import: 'meta' }),
+);
+const loaders = byFolder(import.meta.glob<Extra>('./*/index.ts', { import: 'extra' }));
 
 if (import.meta.env.DEV) {
   // Addresses and "handsOn" use the folder name, so a meta must use it too.
   for (const [folder, meta] of metaById) {
-    if (meta.id !== folder) console.warn(`extras/${folder}/meta.ts has id "${meta.id}"; it should be "${folder}".`);
+    if (meta.id !== folder)
+      console.warn(`extras/${folder}/meta.ts has id "${meta.id}"; it should be "${folder}".`);
   }
 }
 
 /** True when an extra is finished: marked ready, with its index.ts in place. */
 export function isExtraReady(meta: ExtraMeta): boolean {
-  return meta.status === "ready" && loaders.has(meta.id);
+  return meta.status === 'ready' && loaders.has(meta.id);
 }
 
-const KIND_ORDER: Record<ExtraMeta["kind"], number> = { "hands-on": 0, explore: 1 };
+const KIND_ORDER: Record<ExtraMeta['kind'], number> = { 'hands-on': 0, explore: 1 };
 
 /** The extras list: hands-on first, then the rest, each by `order`, leaving out drafts outside the dev server. */
 export const extras: readonly ExtraMeta[] = [...metaById.values()]
   .filter((meta) => import.meta.env.DEV || isExtraReady(meta))
-  .sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.order - b.order || a.title.localeCompare(b.title));
+  .sort(
+    (a, b) =>
+      KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
+      a.order - b.order ||
+      a.title.localeCompare(b.title),
+  );
 
 /** Any extra's meta by id, drafts included, or undefined when there is none. */
 export function extraFor(id: string | null | undefined): ExtraMeta | undefined {

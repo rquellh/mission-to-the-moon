@@ -11,7 +11,14 @@ describe('readDeepLink', () => {
   it('reads an empty address as the default mission, with nothing else asked for', () => {
     const link = readDeepLink('');
 
-    expect(link).toMatchObject({ mission: null, time: null, view: null, start: null, event: null, extra: null });
+    expect(link).toMatchObject({
+      mission: null,
+      time: null,
+      view: null,
+      start: null,
+      event: null,
+      extra: null,
+    });
     expect([...link.extraParams]).toEqual([]);
   });
 

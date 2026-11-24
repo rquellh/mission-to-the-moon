@@ -1,0 +1,6 @@
+# Commits that only changed how the code is laid out. GitHub's blame view skips
+# them by itself. For `git blame` on your own machine, run this once:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Format every file with oxfmt
+1b1546a7809d993560c8355a32e2126eb6caf96c

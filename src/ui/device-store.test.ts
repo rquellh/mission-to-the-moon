@@ -56,7 +56,9 @@ describe('the device store', () => {
       extraStore('patches').set('visited-missions', ['apollo-13']);
 
       expect(extraStore('patches').get('visited-missions')).toEqual(['apollo-8']);
-      expect(warn).toHaveBeenCalledWith('"visited-missions" is kept by the site; extras can read it but not change it.');
+      expect(warn).toHaveBeenCalledWith(
+        '"visited-missions" is kept by the site; extras can read it but not change it.',
+      );
     });
   });
 

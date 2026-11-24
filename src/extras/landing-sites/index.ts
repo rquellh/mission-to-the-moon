@@ -10,15 +10,15 @@
  * and each ring is drawn at a steady size on screen, far bigger than the
  * landing site it marks.
  */
-import "./landing-sites.css";
-import { Vector3 } from "three";
-import type { MissionBundle } from "../../content/missions/bundle.ts";
-import type { Citation, MissionSummary } from "../../content/types.ts";
-import { COLORS, createMiniView, createMoon, type Globe, type MiniView } from "../../scene/kit.ts";
-import { sourcesBlock } from "../../ui/citations.ts";
-import { button, el, hiddenText } from "../../ui/dom.ts";
-import { missionDates, summaryDates } from "../../ui/format.ts";
-import type { Extra, ExtraContext, ExtraMount } from "../types.ts";
+import './landing-sites.css';
+import { Vector3 } from 'three';
+import type { MissionBundle } from '../../content/missions/bundle.ts';
+import type { Citation, MissionSummary } from '../../content/types.ts';
+import { COLORS, createMiniView, createMoon, type Globe, type MiniView } from '../../scene/kit.ts';
+import { sourcesBlock } from '../../ui/citations.ts';
+import { button, el, hiddenText } from '../../ui/dom.ts';
+import { missionDates, summaryDates } from '../../ui/format.ts';
+import type { Extra, ExtraContext, ExtraMount } from '../types.ts';
 import {
   LANDING_MISSIONS,
   MEANT_TO_LAND,
@@ -28,8 +28,8 @@ import {
   landingOf,
   utcInWords,
   type Landing,
-} from "./landings.ts";
-import { meta } from "./meta.ts";
+} from './landings.ts';
+import { meta } from './meta.ts';
 
 interface Site {
   id: string;
@@ -67,41 +67,45 @@ const TAP_RADIUS = 30;
 /** Rings this near the Moon's edge (the cosine of the angle from the viewer) are too slanted to label. */
 const EDGE = 0.12;
 
-const overlaps = (a: Box, b: Box): boolean => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-const unique = (notes: Array<string | undefined>): string[] => [...new Set(notes.filter((n): n is string => Boolean(n)))];
+const overlaps = (a: Box, b: Box): boolean =>
+  a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+const unique = (notes: Array<string | undefined>): string[] => [
+  ...new Set(notes.filter((n): n is string => Boolean(n))),
+];
 
 function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams): ExtraMount {
   const { signal } = context;
-  const summaryOf = (id: string): MissionSummary | undefined => context.summaries.find((s) => s.id === id);
+  const summaryOf = (id: string): MissionSummary | undefined =>
+    context.summaries.find((s) => s.id === id);
 
   /* The page. */
-  const root = el("div", "ls");
-  const stage = el("div", "ls__stage");
-  const canvas = el("canvas", "ls__canvas");
-  canvas.setAttribute("role", "img");
-  const labels = el("div", "ls__labels");
-  labels.setAttribute("aria-hidden", "true");
+  const root = el('div', 'ls');
+  const stage = el('div', 'ls__stage');
+  const canvas = el('canvas', 'ls__canvas');
+  canvas.setAttribute('role', 'img');
+  const labels = el('div', 'ls__labels');
+  labels.setAttribute('aria-hidden', 'true');
   stage.append(canvas, labels);
 
-  const side = el("div", "ls__side");
+  const side = el('div', 'ls__side');
   const intro = el(
-    "p",
-    "extra-note ls__intro",
-    "Each ring is a place where an Apollo lunar module landed. Drag to turn the Moon. Tap a ring or an Apollo flight number.",
+    'p',
+    'extra-note ls__intro',
+    'Each ring is a place where an Apollo lunar module landed. Drag to turn the Moon. Tap a ring or an Apollo flight number.',
   );
-  const choices = el("div", "segmented ls__choices");
-  choices.setAttribute("role", "group");
-  choices.setAttribute("aria-label", "Choose a landing");
-  const status = el("p", "extra-note ls__status", "Loading the landings…");
-  const card = el("section", "extra-panel ls__card");
+  const choices = el('div', 'segmented ls__choices');
+  choices.setAttribute('role', 'group');
+  choices.setAttribute('aria-label', 'Choose a landing');
+  const status = el('p', 'extra-note ls__status', 'Loading the landings…');
+  const card = el('section', 'extra-panel ls__card');
   card.hidden = true;
   // Said on screen, as the header comment explains.
   const note = el(
-    "p",
-    "extra-note ls__note",
-    "Simplified: the Moon is drawn as a smooth ball covered with a photo map, lit from where you look, and each ring is far bigger than the landing site it marks.",
+    'p',
+    'extra-note ls__note',
+    'Simplified: the Moon is drawn as a smooth ball covered with a photo map, lit from where you look, and each ring is far bigger than the landing site it marks.',
   );
-  const meant = el("div", "ls__meant");
+  const meant = el('div', 'ls__meant');
   meant.hidden = true;
   side.append(intro, choices, status, card, note, meant);
   root.append(stage, side);
@@ -110,24 +114,35 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
   const sites: Site[] = LANDING_MISSIONS.map((id) => {
     const summary = summaryOf(id);
     const name = summary?.name ?? id;
-    const short = name.replace(/^Apollo\s+/, "");
-    const choice = button("segmented__item ls__choice");
-    if (short !== name) choice.append(hiddenText("Apollo "), short);
+    const short = name.replace(/^Apollo\s+/, '');
+    const choice = button('segmented__item ls__choice');
+    if (short !== name) choice.append(hiddenText('Apollo '), short);
     else choice.textContent = name;
-    choice.setAttribute("aria-pressed", "false");
+    choice.setAttribute('aria-pressed', 'false');
     choice.disabled = true;
-    const label = el("span", "ls__label", short);
+    const label = el('span', 'ls__label', short);
     label.hidden = true;
     choices.append(choice);
     labels.append(label);
-    return { id, summary, name, short, choice, label, labelSize: null, bundle: null, landing: null, removeMarker: null };
+    return {
+      id,
+      summary,
+      name,
+      short,
+      choice,
+      label,
+      labelSize: null,
+      bundle: null,
+      landing: null,
+      removeMarker: null,
+    };
   });
 
   /* The Moon. Without WebGL the cards still work, and the screen says why the Moon is missing. */
   let view: MiniView | null = null;
   let moon: Globe | null = null;
   try {
-    view = createMiniView(canvas, { lighting: "globes" });
+    view = createMiniView(canvas, { lighting: 'globes' });
     moon = createMoon({ view });
     view.scene.add(moon.root);
     view.frame(new Vector3(0, 0, 0), moon.radius * 1.12, new Vector3(0, 0, 1));
@@ -136,9 +151,13 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
     view?.dispose();
     moon = null;
     view = null;
-    stage.classList.add("ls__stage--none");
+    stage.classList.add('ls__stage--none');
     stage.replaceChildren(
-      el("p", "extra-note", "This browser cannot draw 3D pictures, so the Moon is not shown. Choose a flight to read where it landed."),
+      el(
+        'p',
+        'extra-note',
+        'This browser cannot draw 3D pictures, so the Moon is not shown. Choose a flight to read where it landed.',
+      ),
     );
   }
 
@@ -156,7 +175,7 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
     moon.setSunDirection(sun);
   };
   if (view) {
-    view.controls.addEventListener("change", light);
+    view.controls.addEventListener('change', light);
     light();
   }
 
@@ -181,7 +200,12 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
       point.project(view.camera);
       shown.push({ site, x: ((point.x + 1) / 2) * width, y: ((1 - point.y) / 2) * height });
     }
-    const taken: Box[] = shown.map(({ x, y }) => ({ left: x - 8, top: y - 8, right: x + 8, bottom: y + 8 }));
+    const taken: Box[] = shown.map(({ x, y }) => ({
+      left: x - 8,
+      top: y - 8,
+      right: x + 8,
+      bottom: y + 8,
+    }));
     for (const { site, x, y } of shown) {
       site.label.hidden = false;
       site.labelSize ??= { width: site.label.offsetWidth, height: site.label.offsetHeight };
@@ -197,8 +221,14 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
         [x + gap * 0.7, y + gap * 0.7],
         [x - gap * 0.7 - w, y + gap * 0.7],
       ];
-      const boxOf = ([left, top]: [number, number]): Box => ({ left, top, right: left + w, bottom: top + h });
-      const spot = tries.find((t) => !taken.some((box) => overlaps(box, boxOf(t)))) ?? tries[0] ?? [x, y];
+      const boxOf = ([left, top]: [number, number]): Box => ({
+        left,
+        top,
+        right: left + w,
+        bottom: top + h,
+      });
+      const spot = tries.find((t) => !taken.some((box) => overlaps(box, boxOf(t)))) ??
+        tries[0] ?? [x, y];
       taken.push(boxOf(spot));
       site.label.style.transform = `translate(${Math.round(spot[0])}px, ${Math.round(spot[1])}px)`;
     }
@@ -216,21 +246,24 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
       site.landing.latitude,
       site.landing.longitude,
       // The chosen place is drawn as the lunar module's color in a white ring.
-      isChosen ? { style: "dot", color: COLORS.other } : { style: "ring" },
+      isChosen ? { style: 'dot', color: COLORS.other } : { style: 'ring' },
     );
   };
 
   const describeCanvas = (): void => {
     const ready = sites.filter((s) => s.landing).length;
-    const which = chosen ? ` ${chosen.name} is chosen.` : "";
-    canvas.setAttribute("aria-label", `The Moon, with a ring at each of ${ready} Apollo landing sites.${which}`);
+    const which = chosen ? ` ${chosen.name} is chosen.` : '';
+    canvas.setAttribute(
+      'aria-label',
+      `The Moon, with a ring at each of ${ready} Apollo landing sites.${which}`,
+    );
   };
 
   const fact = (list: HTMLDListElement, term: string, ...lines: string[]): void => {
-    const row = el("div", "ls__fact");
-    const dd = el("dd");
-    lines.forEach((line, i) => dd.append(...(i > 0 ? [el("br"), line] : [line])));
-    row.append(el("dt", undefined, term), dd);
+    const row = el('div', 'ls__fact');
+    const dd = el('dd');
+    lines.forEach((line, i) => dd.append(...(i > 0 ? [el('br'), line] : [line])));
+    row.append(el('dt', undefined, term), dd);
     list.append(row);
   };
 
@@ -239,25 +272,38 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
     if (!bundle || !landing) return;
     const mission = bundle.mission;
     const event = landing.event;
-    const heading = el("h3", "extra-heading ls__name", site.name);
+    const heading = el('h3', 'extra-heading ls__name', site.name);
     heading.id = `ls-name-${site.id}`;
-    card.setAttribute("aria-labelledby", heading.id);
-    const dates = el("p", "ls__dates", site.summary ? summaryDates(site.summary) : missionDates(mission));
-    const blurb = el("p", "extra-text ls__blurb", site.summary?.blurb ?? mission.summary.text.short);
-    const facts = el("dl", "ls__facts");
-    fact(facts, "Where it landed", `${formatLatitude(landing.latitude)}, ${formatLongitude(landing.longitude)}`);
+    card.setAttribute('aria-labelledby', heading.id);
+    const dates = el(
+      'p',
+      'ls__dates',
+      site.summary ? summaryDates(site.summary) : missionDates(mission),
+    );
+    const blurb = el(
+      'p',
+      'extra-text ls__blurb',
+      site.summary?.blurb ?? mission.summary.text.short,
+    );
+    const facts = el('dl', 'ls__facts');
+    fact(
+      facts,
+      'Where it landed',
+      `${formatLatitude(landing.latitude)}, ${formatLongitude(landing.longitude)}`,
+    );
     if (event) {
       const lines = [`${elapsedInWords(event.elapsed)} after liftoff, on the mission clock`];
       if (event.utc) lines.push(utcInWords(event.utc));
-      fact(facts, "When it landed", ...lines);
+      fact(facts, 'When it landed', ...lines);
     }
-    const open = button("button button--primary", `Open ${site.name} at the landing`);
+    const open = button('button button--primary', `Open ${site.name} at the landing`);
     open.addEventListener(
-      "click",
-      () => context.openMission(site.id, event ? { event: event.id, view: "moon" } : { view: "moon" }),
+      'click',
+      () =>
+        context.openMission(site.id, event ? { event: event.id, view: 'moon' } : { view: 'moon' }),
       { signal },
     );
-    const actions = el("div", "extra-actions");
+    const actions = el('div', 'extra-actions');
     actions.append(open);
     const citations: Citation[] = [
       ...mission.summary.citations,
@@ -282,36 +328,53 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
    * "address": the address named it; face it at once, without motion.
    * "first": the first landing to arrive; nothing turns.
    */
-  const choose = (site: Site, how: "visitor" | "address" | "first"): void => {
+  const choose = (site: Site, how: 'visitor' | 'address' | 'first'): void => {
     if (!site.landing) return;
     const previous = chosen;
     chosen = site;
-    for (const s of sites) s.choice.setAttribute("aria-pressed", String(s === site));
-    for (const s of sites) s.label.classList.toggle("is-chosen", s === site);
+    for (const s of sites) s.choice.setAttribute('aria-pressed', String(s === site));
+    for (const s of sites) s.label.classList.toggle('is-chosen', s === site);
     if (previous && previous !== site) setMarker(previous, false);
     if (previous !== site) setMarker(site, true);
-    if (view && moon && how !== "first") {
+    if (view && moon && how !== 'first') {
       const toward = view.camera.position.clone().sub(view.controls.target).normalize();
-      void moon.turnTo(site.landing.latitude, site.landing.longitude, toward, how === "visitor" ? TURN_SECONDS : 0);
+      void moon.turnTo(
+        site.landing.latitude,
+        site.landing.longitude,
+        toward,
+        how === 'visitor' ? TURN_SECONDS : 0,
+      );
     }
     showCard(site);
     describeCanvas();
-    if (how === "visitor") {
-      context.announce(`${site.name}. It landed at ${formatLatitude(site.landing.latitude)}, ${formatLongitude(site.landing.longitude)}.`);
+    if (how === 'visitor') {
+      context.announce(
+        `${site.name}. It landed at ${formatLatitude(site.landing.latitude)}, ${formatLongitude(site.landing.longitude)}.`,
+      );
     }
   };
 
-  for (const site of sites) site.choice.addEventListener("click", () => choose(site, "visitor"), { signal });
+  for (const site of sites)
+    site.choice.addEventListener('click', () => choose(site, 'visitor'), { signal });
 
   // A tap (not a drag) near a ring chooses it.
   let down: { x: number; y: number; time: number } | null = null;
-  canvas.addEventListener("pointerdown", (e) => (down = { x: e.offsetX, y: e.offsetY, time: performance.now() }), { signal });
   canvas.addEventListener(
-    "pointerup",
+    'pointerdown',
+    (e) => (down = { x: e.offsetX, y: e.offsetY, time: performance.now() }),
+    { signal },
+  );
+  canvas.addEventListener(
+    'pointerup',
     (e) => {
       const start = down;
       down = null;
-      if (!start || Math.hypot(e.offsetX - start.x, e.offsetY - start.y) > 8 || performance.now() - start.time > 600) return;
+      if (
+        !start ||
+        Math.hypot(e.offsetX - start.x, e.offsetY - start.y) > 8 ||
+        performance.now() - start.time > 600
+      )
+        return;
       let best: Site | null = null;
       let bestDistance = TAP_RADIUS;
       for (const { site, x, y } of onScreen) {
@@ -321,27 +384,31 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
           bestDistance = distance;
         }
       }
-      if (best) choose(best, "visitor");
+      if (best) choose(best, 'visitor');
     },
     { signal },
   );
-  canvas.addEventListener("pointercancel", () => (down = null), { signal });
+  canvas.addEventListener('pointercancel', () => (down = null), { signal });
 
   /* Loading: one mission after another, each ring shown as it arrives. */
   // Only an address that names a landing picks it (the mission behind the sheet may just be the default).
-  const named = sites.find((s) => s.id === params.get("mission"))?.id;
+  const named = sites.find((s) => s.id === params.get('mission'))?.id;
   const showMeantToLand = (bundle: MissionBundle): void => {
     const summary = summaryOf(MEANT_TO_LAND);
     const text = summary?.blurb ?? bundle.mission.summary.text.short;
     // Only if the story itself says this flight was meant to land.
     if (!/\bland/i.test(text)) return;
     const name = summary?.name ?? bundle.mission.name;
-    const line = el("p", "extra-note ls__meant-text", text);
-    const open = button("button button--quiet", `Open ${name}`);
-    open.addEventListener("click", () => context.openMission(MEANT_TO_LAND), { signal });
-    const actions = el("div", "extra-actions");
+    const line = el('p', 'extra-note ls__meant-text', text);
+    const open = button('button button--quiet', `Open ${name}`);
+    open.addEventListener('click', () => context.openMission(MEANT_TO_LAND), { signal });
+    const actions = el('div', 'extra-actions');
     actions.append(open);
-    meant.replaceChildren(line, actions, sourcesBlock(bundle.mission.summary.citations, bundle.mission.summary.discrepancy));
+    meant.replaceChildren(
+      line,
+      actions,
+      sourcesBlock(bundle.mission.summary.citations, bundle.mission.summary.discrepancy),
+    );
     meant.hidden = false;
   };
 
@@ -361,8 +428,8 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
         setMarker(site, false);
         ready += 1;
         describeCanvas();
-        if (site.id === named) choose(site, "address");
-        else if (!chosen && !named) choose(site, "first");
+        if (site.id === named) choose(site, 'address');
+        else if (!chosen && !named) choose(site, 'first');
         view?.requestRender();
       } catch (error) {
         if (signal.aborted) return;
@@ -372,10 +439,10 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
     }
     if (!chosen) {
       const first = sites.find((s) => s.landing);
-      if (first) choose(first, "first");
+      if (first) choose(first, 'first');
     }
     if (failed.length > 0) {
-      status.textContent = `${failed.join(" and ")} could not be loaded. The other landings are shown.`;
+      status.textContent = `${failed.join(' and ')} could not be loaded. The other landings are shown.`;
       context.announce(status.textContent);
     } else {
       status.hidden = true;
@@ -395,7 +462,7 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
     dispose() {
       if (view) {
         view.scene.onAfterRender = () => undefined;
-        view.controls.removeEventListener("change", light);
+        view.controls.removeEventListener('change', light);
       }
       if (moon) {
         view?.scene.remove(moon.root);

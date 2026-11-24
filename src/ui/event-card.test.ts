@@ -3,8 +3,8 @@
  * recording, sources, "Try it"), and stepping from event to event.
  */
 import { describe, expect, it } from 'vitest';
-import { mountMission, screen, within } from '../test/test-utils.ts';
 import type { Mission } from '../content/types.ts';
+import { mountMission, screen, within } from '../test/test-utils.ts';
 
 /** Apollo 11 told from its first stage separation, so the clock starts before the first event. */
 const withoutLiftoff = (mission: Mission): Mission => ({
@@ -23,7 +23,9 @@ const withoutMoreOnStaging = (mission: Mission): Mission => ({
 /** Apollo 11 with a "Try it" on its launch pointing at an extra the list does not show (a draft). */
 const unlistedExtraOnLiftoff = (mission: Mission): Mission => ({
   ...mission,
-  events: mission.events.map((event) => (event.id === 'liftoff' ? { ...event, handsOn: 'not-listed' } : event)),
+  events: mission.events.map((event) =>
+    event.id === 'liftoff' ? { ...event, handsOn: 'not-listed' } : event,
+  ),
 });
 
 describe('the event card', () => {
@@ -32,7 +34,9 @@ describe('the event card', () => {
       await mountMission('apollo-11', { event: 'landing' });
 
       const card = screen.getByRole('article');
-      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent('The Eagle has landed');
+      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent(
+        'The Eagle has landed',
+      );
       expect(card).toHaveTextContent('102:45:39 after liftoff');
       expect(within(card).getByText('July 20, 1969, 20:17:39 UTC')).toBeInTheDocument();
       expect(card).toHaveTextContent('Armstrong flies Eagle past a crater full of boulders');
@@ -42,7 +46,9 @@ describe('the event card', () => {
       await mountMission('gemini-8', { start: 'explore' });
 
       const card = screen.getByRole('article');
-      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent('The target launches');
+      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent(
+        'The target launches',
+      );
       expect(card).toHaveTextContent('−01:40:59 before liftoff');
       expect(within(card).getByText('March 16, 1966, 15:00:03 UTC')).toBeInTheDocument();
     });
@@ -65,7 +71,9 @@ describe('the event card', () => {
       expect(within(card).getByRole('button', { name: 'Previous event' })).toBeDisabled();
 
       await user.click(within(card).getByRole('button', { name: 'Next event' }));
-      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent('First stage separates');
+      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent(
+        'First stage separates',
+      );
       expect(within(card).getByRole('button', { name: 'Previous event' })).toBeEnabled();
 
       await user.click(within(card).getByRole('button', { name: 'Previous event' }));
@@ -99,14 +107,22 @@ describe('the event card', () => {
 
       await user.click(within(card).getByRole('button', { name: 'Next event' }));
       expect(within(card).getByText(/^Armstrong's left foot touched the surface/)).toBeVisible();
-      expect(within(card).getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
+      expect(within(card).getByRole('button', { name: 'Show less' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
     });
 
     it('is not offered when an event has nothing more to tell', async () => {
-      await mountMission('apollo-11', { story: withoutMoreOnStaging, event: 'first-stage-separation' });
+      await mountMission('apollo-11', {
+        story: withoutMoreOnStaging,
+        event: 'first-stage-separation',
+      });
 
       const card = screen.getByRole('article');
-      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent('First stage separates');
+      expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent(
+        'First stage separates',
+      );
       expect(within(card).queryByRole('button', { name: 'Tell me more' })).not.toBeInTheDocument();
     });
   });
@@ -117,7 +133,9 @@ describe('the event card', () => {
       const card = screen.getByRole('article');
 
       const photo = within(card).getByRole('figure');
-      expect(within(photo).getByRole('img')).toHaveAccessibleName(/^The flat, gray surface of the Moon/);
+      expect(within(photo).getByRole('img')).toHaveAccessibleName(
+        /^The flat, gray surface of the Moon/,
+      );
       expect(photo).toHaveTextContent('Photo: NASA.');
       expect(within(photo).getByRole('link', { name: /^Original/ })).toHaveAttribute(
         'href',
@@ -142,8 +160,14 @@ describe('the event card', () => {
       await user.click(within(sources).getByText('Sources (7)'));
 
       expect(within(sources).getByText('Sources differ.')).toBeVisible();
-      expect(within(sources).getByText(/NSSDCA gives the landing time as 20:17:40 UT/)).toBeVisible();
-      expect(within(sources).getByRole('link', { name: /^Apollo 11 Timeline, row "LM lunar landing\."/ })).toBeVisible();
+      expect(
+        within(sources).getByText(/NSSDCA gives the landing time as 20:17:40 UT/),
+      ).toBeVisible();
+      expect(
+        within(sources).getByRole('link', {
+          name: /^Apollo 11 Timeline, row "LM lunar landing\."/,
+        }),
+      ).toBeVisible();
       // The note sits with the sources, never in the story.
       expect(within(card).getAllByText(/NSSDCA gives the landing time/)).toHaveLength(1);
     });
@@ -172,7 +196,9 @@ describe('the event card', () => {
     it('is not offered for an extra the list leaves out', async () => {
       await mountMission('apollo-11', { story: unlistedExtraOnLiftoff, start: 'explore' });
 
-      expect(within(screen.getByRole('article')).queryByRole('button', { name: /^Try it/ })).not.toBeInTheDocument();
+      expect(
+        within(screen.getByRole('article')).queryByRole('button', { name: /^Try it/ }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -182,7 +208,9 @@ describe('the event card', () => {
       const card = screen.getByRole('article');
 
       const recording = within(card).getByRole('region', { name: 'Recording' });
-      expect(within(recording).getByRole('button', { name: 'Play the recording, 15 seconds' })).toBeInTheDocument();
+      expect(
+        within(recording).getByRole('button', { name: 'Play the recording, 15 seconds' }),
+      ).toBeInTheDocument();
       const words = within(recording).getByRole('list', { name: 'What they said' });
       expect(within(words).getAllByRole('listitem')[0]).toHaveTextContent(
         'Neil Armstrong: Houston, Tranquility Base here. The Eagle has landed.',

@@ -26,7 +26,9 @@ function spokenLength(seconds: number): string {
   const minutes = Math.floor(whole / 60);
   const rest = whole % 60;
   if (!minutes) return copy.time.seconds(rest);
-  return rest ? `${copy.time.minutes(minutes)} ${copy.time.seconds(rest)}` : copy.time.minutes(minutes);
+  return rest
+    ? `${copy.time.minutes(minutes)} ${copy.time.seconds(rest)}`
+    : copy.time.minutes(minutes);
 }
 
 /** Only one recording plays at a time, across the whole page. */
@@ -77,7 +79,10 @@ export function createAudioPlayer(clip: AudioClip): AudioPlayer {
   const note = clip.note ? el('p', 'audio__note', clip.note) : null;
 
   const credit = el('p', 'audio__credit');
-  credit.append(`${copy.audio.credit} ${clip.credit}. `, externalLink(clip.sourceUrl, copy.card.original));
+  credit.append(
+    `${copy.audio.credit} ${clip.credit}. `,
+    externalLink(clip.sourceUrl, copy.card.original),
+  );
 
   // State changes are spoken here, next to the button that caused them.
   const status = el('p', 'visually-hidden');
@@ -91,11 +96,18 @@ export function createAudioPlayer(clip: AudioClip): AudioPlayer {
   const render = (): void => {
     const on = state === 'loading' || state === 'playing';
     root.classList.toggle('audio--on', on);
-    label.textContent = state === 'loading' ? copy.audio.loading : on ? copy.audio.pause : copy.audio.play;
-    toggle.setAttribute('aria-label', on ? copy.audio.pauseLabel : copy.audio.playLabel(spokenLength(clip.seconds)));
+    label.textContent =
+      state === 'loading' ? copy.audio.loading : on ? copy.audio.pause : copy.audio.play;
+    toggle.setAttribute(
+      'aria-label',
+      on ? copy.audio.pauseLabel : copy.audio.playLabel(spokenLength(clip.seconds)),
+    );
     const total = audio && Number.isFinite(audio.duration) ? audio.duration : clip.seconds;
     const at = audio && state !== 'idle' ? audio.currentTime : 0;
-    time.textContent = state === 'idle' || state === 'failed' ? clockText(total) : `${clockText(at)} / ${clockText(total)}`;
+    time.textContent =
+      state === 'idle' || state === 'failed'
+        ? clockText(total)
+        : `${clockText(at)} / ${clockText(total)}`;
     bar.style.setProperty('--progress', String(total > 0 ? Math.min(1, at / total) : 0));
   };
   const say = (text: string): void => {
@@ -171,7 +183,9 @@ export function createAudioPlayer(clip: AudioClip): AudioPlayer {
     });
   };
 
-  toggle.addEventListener('click', () => (state === 'loading' || state === 'playing' ? self.pause() : play()));
+  toggle.addEventListener('click', () =>
+    state === 'loading' || state === 'playing' ? self.pause() : play(),
+  );
 
   const stop = (): void => {
     if (audio) {

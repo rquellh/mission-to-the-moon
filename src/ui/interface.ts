@@ -90,7 +90,13 @@ export interface MissionList {
  * The mission list on its own, with no mission behind it: the way on when a
  * mission could not be loaded. Every entry opens its own page.
  */
-export function setUpMissionList({ summaries, nameOf, isDraft, loadMemorial, addressOf }: MissionListOptions): MissionList {
+export function setUpMissionList({
+  summaries,
+  nameOf,
+  isDraft,
+  loadMemorial,
+  addressOf,
+}: MissionListOptions): MissionList {
   const memorials = setUpMemorial({ load: loadMemorial, nameOf, addressOf });
   const hub = setUpHub({
     currentId: null,
@@ -126,7 +132,19 @@ function makeAnnouncer(): (text: string) => void {
 
 /** Build the whole interface for one mission and connect it to the clock and the camera. */
 export function mountInterface(options: InterfaceOptions): MissionInterface {
-  const { mission, flight, cited, summaries, nameOf, isDraft, loadMemorial, addressOf, player, director, has3D } = options;
+  const {
+    mission,
+    flight,
+    cited,
+    summaries,
+    nameOf,
+    isDraft,
+    loadMemorial,
+    addressOf,
+    player,
+    director,
+    has3D,
+  } = options;
   const { extras, extraTitleOf, isExtraDraft, loadExtra, loadBundle } = options;
   const index = new MissionIndex(mission);
   const motion = reducedMotionQuery();
@@ -142,7 +160,10 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   byId('mission-dates', HTMLSpanElement).textContent = missionDates(mission);
   const hubButton = byId('hub-button', HTMLButtonElement);
   hubButton.title = copy.header.missionsHint;
-  hubButton.append(icon('chevron-down', 'icon masthead__chevron'), hiddenText(`, ${copy.header.missions}`));
+  hubButton.append(
+    icon('chevron-down', 'icon masthead__chevron'),
+    hiddenText(`, ${copy.header.missions}`),
+  );
   renderAbout(mission);
   renderHowDrawn(mission, flight);
   renderCredits(credits, { mission, cited, summaries, extras });
@@ -199,7 +220,10 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   const describe = (eventIndex: number): string => {
     const event = index.events[eventIndex];
     return event
-      ? copy.card.nowShowing(event.title, speakMissionTime(index.seconds[eventIndex] ?? 0, index.countsDays))
+      ? copy.card.nowShowing(
+          event.title,
+          speakMissionTime(index.seconds[eventIndex] ?? 0, index.countsDays),
+        )
       : mission.name;
   };
 
@@ -260,7 +284,8 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     // turns once as the trip begins rather than flicking through every event
     // passed, which go by too quickly to read. The clock and the timeline show the way.
     if (stop) card.show(index.events.indexOf(stop));
-    if (tour.phase === 'stopped' && stop) announce(copy.tour.arrived(tour.index + 1, tour.total, stop.title));
+    if (tour.phase === 'stopped' && stop)
+      announce(copy.tour.arrived(tour.index + 1, tour.total, stop.title));
     // Leaving the tour partway to a stop: the card catches up with the clock.
     if (tour.phase === 'off' && tourPhase === 'traveling') card.show(index.eventAt(player.time));
     tourPhase = tour.phase;

@@ -77,7 +77,12 @@ const _qFull = new Quaternion();
  * the camera's offset from the target turns along an arc and its length
  * changes geometrically, so large zoom changes feel even.
  */
-export function interpolatePose(from: CameraPose, to: CameraPose, t: number, out: CameraPose): void {
+export function interpolatePose(
+  from: CameraPose,
+  to: CameraPose,
+  t: number,
+  out: CameraPose,
+): void {
   out.target.lerpVectors(from.target, to.target, t);
 
   _dirA.subVectors(from.position, from.target);

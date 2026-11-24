@@ -15,7 +15,9 @@ import { MISSIONS, URLS } from '../utils/vars';
  * which view the buttons ask for.
  */
 test.describe('Exploring a mission', () => {
-  test('a visitor chooses Explore from the welcome and looks through each view', async ({ sitePage }) => {
+  test('a visitor chooses Explore from the welcome and looks through each view', async ({
+    sitePage,
+  }) => {
     const missionPage = new MissionPage(sitePage);
     const hubPage = new HubPage(sitePage);
     const cardPage = new EventCardPage(sitePage);
@@ -84,7 +86,9 @@ test.describe('Exploring a mission', () => {
     });
 
     await test.step('The clock and the scene move on', async () => {
-      await expect.poll(async () => clockSeconds(await timelinePage.clockTime.innerText())).toBeGreaterThan(clockBefore);
+      await expect
+        .poll(async () => clockSeconds(await timelinePage.clockTime.innerText()))
+        .toBeGreaterThan(clockBefore);
       await expect.poll(async () => (await scenePage.report()).time).toBeGreaterThan(sceneBefore);
     });
   });

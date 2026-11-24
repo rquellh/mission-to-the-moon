@@ -40,7 +40,12 @@ let disclosures = 0;
  * then its sources folded away. `alsoCites` adds the sources of things shown
  * with the fact (the date, beside the summary).
  */
-function factBlock(fact: Fact, className: string, alsoCites: readonly Citation[] = [], alsoDiffers?: string): HTMLElement {
+function factBlock(
+  fact: Fact,
+  className: string,
+  alsoCites: readonly Citation[] = [],
+  alsoDiffers?: string,
+): HTMLElement {
   const wrap = el('div', className);
   wrap.append(el('p', 'about__short', fact.text.short));
   if (fact.text.more) {
@@ -77,14 +82,24 @@ function renderMemorial(memorial: Memorial): HTMLElement[] {
     fillPhoto(figure, memorial.photo);
     intro.append(figure);
   }
-  intro.append(factBlock(memorial.summary, 'about__summary', memorial.date.citations, memorial.date.discrepancy));
+  intro.append(
+    factBlock(
+      memorial.summary,
+      'about__summary',
+      memorial.date.citations,
+      memorial.date.discrepancy,
+    ),
+  );
   parts.push(intro);
 
   const crew = section(copy.memorial.crew);
   const crewList = el('ul', 'about__crew');
   for (const member of memorial.crew.value) {
     const item = el('li', 'about__crew-member');
-    item.append(el('span', 'about__crew-name', member.name), el('span', 'about__crew-role', member.role));
+    item.append(
+      el('span', 'about__crew-name', member.name),
+      el('span', 'about__crew-role', member.role),
+    );
     crewList.append(item);
   }
   crew.append(crewList, sourcesBlock(memorial.crew.citations, memorial.crew.discrepancy));

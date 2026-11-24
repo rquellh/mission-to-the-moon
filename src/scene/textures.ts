@@ -1,10 +1,4 @@
-import {
-  LoadingManager,
-  RepeatWrapping,
-  SRGBColorSpace,
-  TextureLoader,
-  type Texture,
-} from 'three';
+import { LoadingManager, RepeatWrapping, SRGBColorSpace, TextureLoader, type Texture } from 'three';
 
 export type TextureTier = '2k' | '4k';
 
@@ -60,7 +54,12 @@ export function loadTexture(
   onLoad: () => void = () => undefined,
   onError: (error: unknown) => void = () => undefined,
 ): Texture {
-  const texture = new TextureLoader().load(`${import.meta.env.BASE_URL}textures/${name}-${tier}.jpg`, onLoad, undefined, onError);
+  const texture = new TextureLoader().load(
+    `${import.meta.env.BASE_URL}textures/${name}-${tier}.jpg`,
+    onLoad,
+    undefined,
+    onError,
+  );
   texture.colorSpace = SRGBColorSpace;
   if (name === 'stars') {
     // Mirrored as in loadStageTextures, for drawing on the inside of a sphere.

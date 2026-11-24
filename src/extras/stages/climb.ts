@@ -1,3 +1,4 @@
+import type { MissionBundle } from '../../content/missions/bundle.ts';
 /**
  * The facts and the timing behind "Drop the stages", kept apart from the
  * page so Node can check them.
@@ -18,9 +19,13 @@
  * each one, so the whole climb takes well under a minute and there is time
  * to press the button.
  */
-import { elapsedToSeconds, type Cited, type ElapsedTime, type MissionEvent } from "../../content/types.ts";
-import type { VehicleChange, VehiclePart } from "../../content/vehicle-types.ts";
-import type { MissionBundle } from "../../content/missions/bundle.ts";
+import {
+  elapsedToSeconds,
+  type Cited,
+  type ElapsedTime,
+  type MissionEvent,
+} from '../../content/types.ts';
+import type { VehicleChange, VehiclePart } from '../../content/vehicle-types.ts';
 
 /** One moment the rocket let go of something on the way up. */
 export interface Drop {
@@ -64,22 +69,24 @@ export interface Climb {
  * falls back to its id in words.
  */
 const PART_NAMES: Partial<Record<VehiclePart, string>> = {
-  "first-stage": "the first stage",
-  "saturn-ib-first-stage": "the first stage",
-  "titan-first-stage": "the first stage",
-  "aft-interstage": "the ring between the first and second stages",
-  "second-stage": "the second stage",
-  "titan-second-stage": "the second stage",
-  "escape-tower": "the launch escape tower",
+  'first-stage': 'the first stage',
+  'saturn-ib-first-stage': 'the first stage',
+  'titan-first-stage': 'the first stage',
+  'aft-interstage': 'the ring between the first and second stages',
+  'second-stage': 'the second stage',
+  'titan-second-stage': 'the second stage',
+  'escape-tower': 'the launch escape tower',
 };
 
 export function partName(part: VehiclePart): string {
-  return PART_NAMES[part] ?? `the ${part.replace(/-/g, " ")}`;
+  return PART_NAMES[part] ?? `the ${part.replace(/-/g, ' ')}`;
 }
 
 function namesOf(parts: readonly VehiclePart[]): string {
   const names = [...new Set(parts.map(partName))];
-  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return names.length <= 1
+    ? (names[0] ?? '')
+    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
 /** "the first stage" to "The first stage". */
@@ -100,22 +107,25 @@ const near = (a: number, b: number): boolean => Math.abs(a - b) < 0.001;
 
 /** The vehicle file says the time is a plan, not a measurement (Apollo 17's escape tower). */
 function isPlanned(change: VehicleChange): boolean {
-  return /\bplanned\b/i.test(change.label) || change.at.citations.some((c) => /\bplanned time\b/i.test(c.locator));
+  return (
+    /\bplanned\b/i.test(change.label) ||
+    change.at.citations.some((c) => /\bplanned time\b/i.test(c.locator))
+  );
 }
 
 /** The climb a mission's files describe, or null when its vehicle file gives no usable sequence. */
 export function climbFor(bundle: MissionBundle): Climb | null {
   const { mission, flight, vehicle } = bundle;
-  const main = flight.ships.find((ship) => ship.role === "main");
+  const main = flight.ships.find((ship) => ship.role === 'main');
   if (!main) return null;
-  const ascent = main.phases[0].kind === "ascent" ? main.phases[0] : undefined;
+  const ascent = main.phases[0].kind === 'ascent' ? main.phases[0] : undefined;
   const insertion = ascent ? elapsedToSeconds(ascent.end.value) : undefined;
 
   const changes = vehicle
     .filter((change) => change.ship === main.id)
     .map((change) => ({ change, seconds: elapsedToSeconds(change.at.value) }))
     .sort((a, b) => a.seconds - b.seconds);
-  const start = changes.findIndex(({ change }) => change.layout === "launch");
+  const start = changes.findIndex(({ change }) => change.layout === 'launch');
   const first = changes[start];
   if (!first || first.change.parts.length === 0) return null;
 
@@ -124,14 +134,20 @@ export function climbFor(bundle: MissionBundle): Climb | null {
   let leftLaunch: number | undefined;
   let previous = first.change;
   for (const { change, seconds } of changes.slice(start + 1)) {
-    const inLaunch = change.layout === "launch";
+    const inLaunch = change.layout === 'launch';
     // Only the way up counts: nothing after orbit insertion (and its allowance).
     if (insertion !== undefined && seconds > insertion + ORBIT_ALLOWANCE_SECONDS) break;
     // Without a cited insertion time, only changes in the launch layout count.
     if (!inLaunch && insertion === undefined) break;
     const dropped = previous.parts.filter((part) => !change.parts.includes(part));
     if (dropped.length > 0) {
-      drops.push({ parts: dropped, name: namesOf(dropped), at: change.at, seconds, planned: isPlanned(change) });
+      drops.push({
+        parts: dropped,
+        name: namesOf(dropped),
+        at: change.at,
+        seconds,
+        planned: isPlanned(change),
+      });
       if (!inLaunch) leftLaunch = seconds;
     }
     if (!inLaunch) break;
@@ -151,8 +167,10 @@ export function climbFor(bundle: MissionBundle): Climb | null {
     liftoff: first.seconds,
     drops,
     end,
-    orbit: (insertion !== undefined ? at(insertion) : undefined) ?? (leftLaunch !== undefined ? at(leftLaunch) : undefined),
-    liftoffEvent: at(first.seconds) ?? mission.events.find((event) => event.id === "liftoff"),
+    orbit:
+      (insertion !== undefined ? at(insertion) : undefined) ??
+      (leftLaunch !== undefined ? at(leftLaunch) : undefined),
+    liftoffEvent: at(first.seconds) ?? mission.events.find((event) => event.id === 'liftoff'),
     liftoffAt: first.change.at.value,
   };
 }
@@ -161,23 +179,24 @@ export function climbFor(bundle: MissionBundle): Climb | null {
 /* Words for times.                                                    */
 /* ------------------------------------------------------------------ */
 
-const unit = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
+const unit = (count: number, one: string, many: string): string =>
+  `${count} ${count === 1 ? one : many}`;
 
 /**
  * A cited time in words, keeping the source's digits: "000:02:42.30" is
  * "2 minutes 42.30 seconds", "000:06:05.66" is "6 minutes 5.66 seconds".
  */
 export function sayElapsed(elapsed: ElapsedTime): string {
-  const [h = "0", m = "0", s = "0"] = elapsed.replace("-", "").trim().split(":");
+  const [h = '0', m = '0', s = '0'] = elapsed.replace('-', '').trim().split(':');
   const hours = Number(h);
   const minutes = Number(m);
-  const secondsText = s.replace(/^0+(?=\d)/, "");
-  const seconds = secondsText === "1" ? "1 second" : `${secondsText} seconds`;
+  const secondsText = s.replace(/^0+(?=\d)/, '');
+  const seconds = secondsText === '1' ? '1 second' : `${secondsText} seconds`;
   const words: string[] = [];
-  if (hours > 0) words.push(unit(hours, "hour", "hours"));
-  if (hours > 0 || minutes > 0) words.push(unit(minutes, "minute", "minutes"));
+  if (hours > 0) words.push(unit(hours, 'hour', 'hours'));
+  if (hours > 0 || minutes > 0) words.push(unit(minutes, 'minute', 'minutes'));
   words.push(seconds);
-  return words.join(" ");
+  return words.join(' ');
 }
 
 /** A reading of the illustration's clock in words, whole seconds: "2 minutes 41 seconds". */
@@ -185,14 +204,16 @@ export function sayClock(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds + 1e-6));
   const minutes = Math.floor(whole / 60);
   const rest = whole % 60;
-  if (minutes === 0) return unit(rest, "second", "seconds");
-  return rest === 0 ? unit(minutes, "minute", "minutes") : `${unit(minutes, "minute", "minutes")} ${unit(rest, "second", "seconds")}`;
+  if (minutes === 0) return unit(rest, 'second', 'seconds');
+  return rest === 0
+    ? unit(minutes, 'minute', 'minutes')
+    : `${unit(minutes, 'minute', 'minutes')} ${unit(rest, 'second', 'seconds')}`;
 }
 
 /** The clock face: minutes and seconds, "2:41". */
 export function clockFace(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds + 1e-6));
-  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -224,7 +245,8 @@ export interface Schedule {
   end: number;
 }
 
-const clamp = (value: number, low: number, high: number): number => Math.min(high, Math.max(low, value));
+const clamp = (value: number, low: number, high: number): number =>
+  Math.min(high, Math.max(low, value));
 
 /** How the clock runs for a climb, from Start to orbit. */
 export function scheduleFor(climb: Climb): Schedule {
@@ -271,8 +293,8 @@ export function missionAt(schedule: Schedule, seconds: number): number {
 }
 
 /** "early": too soon, nothing drops. "on-time": it drops. */
-export function judge(target: number, seconds: number): "early" | "on-time" {
-  return seconds < target - EARLY_WINDOW ? "early" : "on-time";
+export function judge(target: number, seconds: number): 'early' | 'on-time' {
+  return seconds < target - EARLY_WINDOW ? 'early' : 'on-time';
 }
 
 /** True once the visitor has waited too long: the part drops by itself. */

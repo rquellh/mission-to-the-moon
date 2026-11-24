@@ -1,5 +1,10 @@
 import { copy } from '../content/copy';
-import { elapsedToSeconds, type ElapsedTime, type Mission, type MissionSummary } from '../content/types';
+import {
+  elapsedToSeconds,
+  type ElapsedTime,
+  type Mission,
+  type MissionSummary,
+} from '../content/types';
 
 const pad = (value: number): string => String(value).padStart(2, '0');
 
@@ -95,7 +100,11 @@ export function formatDate(date: Date, style: 'long' | 'short' = 'long'): string
   return (style === 'long' ? longDate : shortDate).format(date);
 }
 
-const monthDay = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
+const monthDay = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'UTC',
+  month: 'short',
+  day: 'numeric',
+});
 
 /** "Jul 20", in UTC. */
 export function formatMonthDay(date: Date): string {

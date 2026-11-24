@@ -39,7 +39,13 @@ export interface EventCardOptions {
  * "Try it" when the event has a hands-on extra, its recording, "Tell me
  * more", its photo, and its sources.
  */
-export function setUpEventCard({ index, onStep, reducedMotion, extraTitle, onTryIt }: EventCardOptions): EventCard {
+export function setUpEventCard({
+  index,
+  onStep,
+  reducedMotion,
+  extraTitle,
+  onTryIt,
+}: EventCardOptions): EventCard {
   const card = byId('card', HTMLElement);
 
   // Built once; the content changes with each event.

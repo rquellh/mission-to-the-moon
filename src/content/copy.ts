@@ -33,9 +33,11 @@ export const copy = {
   hub: {
     lede: 'Choose a flight and ride along in 3D, from liftoff to splashdown.',
     /** The same, when this browser has no 3D view. */
-    ledeNo3D: 'Choose a flight and follow it, from liftoff to splashdown. This browser can’t show the 3D view, but every mission can still be read.',
+    ledeNo3D:
+      'Choose a flight and follow it, from liftoff to splashdown. This browser can’t show the 3D view, but every mission can still be read.',
     /** Added to the lede when the list has a memorial page, for a crew that never flew. */
-    ledeMemorial: (names: string, count: number) => `${names} ${count === 1 ? 'is' : 'are'} remembered here too.`,
+    ledeMemorial: (names: string, count: number) =>
+      `${names} ${count === 1 ? 'is' : 'are'} remembered here too.`,
     tour: 'Tour',
     tourOf: (missionName: string) => `Take the tour of ${missionName}`,
     explore: 'Explore',
@@ -46,7 +48,8 @@ export const copy = {
     /** Marks an unfinished mission, which only the dev server lists. */
     draft: 'Draft',
     /** The years a program's listed missions span, read out. */
-    yearsSpoken: (first: number, last: number) => (first === last ? String(first) : `${first} to ${last}`),
+    yearsSpoken: (first: number, last: number) =>
+      first === last ? String(first) : `${first} to ${last}`,
     programs: {
       gemini: 'Gemini',
       apollo: 'Apollo',
@@ -63,8 +66,10 @@ export const copy = {
   /** The full-screen sheet an extra opens in. */
   extra: {
     loadingUnnamed: 'Loading…',
-    failed: (title: string) => `${title} did not load. Check your connection and reload the page, or go back to the mission.`,
-    failedUnnamed: 'This did not load. Check your connection and reload the page, or go back to the mission.',
+    failed: (title: string) =>
+      `${title} did not load. Check your connection and reload the page, or go back to the mission.`,
+    failedUnnamed:
+      'This did not load. Check your connection and reload the page, or go back to the mission.',
     reload: 'Reload',
     back: 'Back to the mission',
   },
@@ -115,7 +120,8 @@ export const copy = {
     justBeforeLiftoff: 'just before liftoff',
     hours: (count: number) => `${count} ${count === 1 ? 'hour' : 'hours'}`,
     minutes: (count: number) => `${count} ${count === 1 ? 'minute' : 'minutes'}`,
-    fromLiftoff: (span: string, before: boolean) => `${span} ${before ? 'before' : 'after'} liftoff`,
+    fromLiftoff: (span: string, before: boolean) =>
+      `${span} ${before ? 'before' : 'after'} liftoff`,
     /** Added to the time on flights longer than two days. */
     onDay: (day: number) => `day ${day} of the flight`,
     seconds: (count: number) => `${count} ${count === 1 ? 'second' : 'seconds'}`,
@@ -134,7 +140,8 @@ export const copy = {
     day: (day: number) => `Day ${day}`,
     /** Beside the clock while the ship circles too fast to follow and the view holds still. */
     fastForward: 'Fast forward',
-    fastForwardSpoken: 'Fast forward. The ship goes around too fast to see, so its path shows as a ring.',
+    fastForwardSpoken:
+      'Fast forward. The ship goes around too fast to see, so its path shows as a ring.',
     lockedDuringTour: 'The timeline follows the tour. Exit the tour to use it.',
   },
 
@@ -185,7 +192,8 @@ export const copy = {
     skip: 'Skip',
     skipLabel: 'Skip to this stop',
     exit: 'Exit tour',
-    arrived: (index: number, total: number, title: string) => `Stop ${index} of ${total}: ${title}.`,
+    arrived: (index: number, total: number, title: string) =>
+      `Stop ${index} of ${total}: ${title}.`,
     endTitle: 'That’s the tour!',
     endText:
       'Now it’s your turn. Press play, drag the timeline, or pick a chapter. Use the arrows on each card to step through every event.',
@@ -202,7 +210,8 @@ export const copy = {
     crew: 'The crew',
     callSigns: 'Spacecraft names',
     accomplishments: 'What they did',
-    whereNow: (count: number) => (count === 1 ? 'Where the spacecraft is now' : 'Where the spacecraft are now'),
+    whereNow: (count: number) =>
+      count === 1 ? 'Where the spacecraft is now' : 'Where the spacecraft are now',
     sources: 'Sources',
   },
 
@@ -244,9 +253,11 @@ export const copy = {
     closeTogether:
       'When two spacecraft fly close together, the gap between them is not to scale. They are placed so you can see both.',
     /** Flights whose vehicle file gives a published turning speed. */
-    turning: 'How a spacecraft turns and spins is an illustration too. It follows the speeds NASA published, but not every wobble.',
+    turning:
+      'How a spacecraft turns and spins is an illustration too. It follows the speeds NASA published, but not every wobble.',
     /** Earth-orbit flights. */
-    loops: 'Each trip around Earth is one loop of the line. Older loops are dimmed so the newest one stands out.',
+    loops:
+      'Each trip around Earth is one loop of the line. Older loops are dimmed so the newest one stands out.',
     sunlight: {
       moon: 'Sunlight comes from the direction it really did. The night side of Earth and the Moon is drawn brighter than it really is, so you can still see where you are.',
       'earth-orbit':
@@ -265,7 +276,8 @@ export const copy = {
     extras: 'Things to try and explore',
     sourceCount: (count: number) => `${count} ${count === 1 ? 'source' : 'sources'}`,
     photos: 'Photos',
-    photosNote: 'Each mission’s photos are credited on its own cards, and listed here when that mission is open.',
+    photosNote:
+      'Each mission’s photos are credited on its own cards, and listed here when that mission is open.',
     media: 'Images, data, and software',
     checked: (date: string) => `Link checked ${date}`,
     usedFor: 'Used for',
@@ -284,10 +296,12 @@ export const copy = {
       'The 3D view stopped because the graphics processor reset. It should recover on its own; if it does not, reload the page.',
     textures:
       'Some images for the 3D view did not load. Check your connection and reload the page.',
-    scene: 'The 3D view did not load, but you can still read about every mission. To see it in 3D, check your connection and reload the page.',
+    scene:
+      'The 3D view did not load, but you can still read about every mission. To see it in 3D, check your connection and reload the page.',
     mission: (missionName: string) =>
       `${missionName} did not load. Check your connection and reload the page, or choose another mission.`,
-    missionUnnamed: 'This mission did not load. Check your connection and reload the page, or choose another mission.',
+    missionUnnamed:
+      'This mission did not load. Check your connection and reload the page, or choose another mission.',
     allMissions: 'All missions',
   },
 } as const;

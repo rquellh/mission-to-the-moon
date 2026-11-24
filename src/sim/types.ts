@@ -41,18 +41,18 @@
  * mission folder's plan and checks it; tools/sky.mjs prints the `sky`
  * samples.
  */
-import type { Cited, ElapsedTime } from "../content/types.ts";
+import type { Cited, ElapsedTime } from '../content/types.ts';
 
-export type BodyId = "earth" | "moon";
+export type BodyId = 'earth' | 'moon';
 
 /** Direction of travel around a body, seen from above its north pole. */
-export type Sense = "prograde" | "retrograde";
+export type Sense = 'prograde' | 'retrograde';
 
 /** A place over a body, as printed by a source. */
 export interface Fix {
   latitude: Cited<number>;
   /** "geocentric" when the source prints a geocentric latitude (Earth only). */
-  latitudeKind?: "geodetic" | "geocentric";
+  latitudeKind?: 'geodetic' | 'geocentric';
   longitude: Cited<number>;
   /** Nautical miles. Omitted for a point on the surface. */
   altitude?: Cited<number>;
@@ -85,7 +85,7 @@ export interface StateFix extends Fix {
    * the stars ("space-fixed", the default) or the turning Earth
    * ("earth-fixed", as reentry guidance prints them).
    */
-  velocityFrame?: "space-fixed" | "earth-fixed";
+  velocityFrame?: 'space-fixed' | 'earth-fixed';
 }
 
 /** A lunar state: longitude, altitude, speed, and flight-path angle. */
@@ -108,7 +108,7 @@ interface PhaseBase {
  * at its start.
  */
 export interface AscentPhase extends PhaseBase {
-  kind: "ascent";
+  kind: 'ascent';
   body: BodyId;
   site: Fix;
   /** Published points along the way, each with its own time and altitude. */
@@ -172,7 +172,7 @@ export type RelativeStart =
  * `EntryPhase`).
  */
 export interface OrbitPhase extends PhaseBase {
-  kind: "orbit";
+  kind: 'orbit';
   body: BodyId;
   /** Highest and lowest points at the start of the phase, nautical miles. */
   apoapsis: Cited<number>;
@@ -224,7 +224,7 @@ export interface OrbitPhase extends PhaseBase {
    * adds up revolution after revolution. Pin them with `endRange` wherever
    * a distance is published, and give both ships their published `period`.
    */
-  endRange?: { target: string; range: Cited<number>; side?: "behind" | "ahead" };
+  endRange?: { target: string; range: Cited<number>; side?: 'behind' | 'ahead' };
   /**
    * The published orbital period, minutes. The craft then goes around in
    * that time instead of the time its published size implies (the shape
@@ -259,7 +259,7 @@ export interface OrbitPhase extends PhaseBase {
  * flight need no burn phase of their own (see `OrbitPhase.sizes`).
  */
 export interface BurnPhase extends PhaseBase {
-  kind: "burn";
+  kind: 'burn';
   body: BodyId;
   /** Velocity change, feet per second (informational). */
   deltaV?: Cited<number>;
@@ -289,7 +289,7 @@ export interface BurnPhase extends PhaseBase {
  * the conic through the fix.
  */
 export interface TransferPhase extends PhaseBase {
-  kind: "transfer";
+  kind: 'transfer';
   /** "moon" for the outbound coast, "earth" for the return. */
   to: BodyId;
   /**
@@ -335,7 +335,7 @@ export interface TransferPhase extends PhaseBase {
  *   `docked`): a free coast on the conic the craft was on.
  */
 export interface CoastPhase extends PhaseBase {
-  kind: "coast";
+  kind: 'coast';
   body: BodyId;
   /** Where the coast ends, at the phase end (or at its own time). */
   endFix?: StateFix;
@@ -344,14 +344,14 @@ export interface CoastPhase extends PhaseBase {
 
 /** Powered descent from orbit to a landing site. */
 export interface DescentPhase extends PhaseBase {
-  kind: "descent";
+  kind: 'descent';
   body: BodyId;
   site: Fix;
 }
 
 /** Resting on the surface. */
 export interface SurfacePhase extends PhaseBase {
-  kind: "surface";
+  kind: 'surface';
   body: BodyId;
   site: Fix;
 }
@@ -374,7 +374,7 @@ export interface SurfacePhase extends PhaseBase {
  * is kept.
  */
 export interface EntryPhase extends PhaseBase {
-  kind: "entry";
+  kind: 'entry';
   splashdown: Fix;
   /** Drogue parachute deployment: the end of travel over the ground. */
   drogue?: Cited<ElapsedTime>;
@@ -397,7 +397,7 @@ export interface EntryPhase extends PhaseBase {
  * `alongside`, so the scene can draw the two apart.
  */
 export interface RendezvousPhase extends PhaseBase {
-  kind: "rendezvous";
+  kind: 'rendezvous';
   body: BodyId;
   target: string;
   apoapsis: Cited<number>;
@@ -415,7 +415,7 @@ export interface RendezvousPhase extends PhaseBase {
  * from the target's path (a lunar module set loose before entry).
  */
 export interface DockedPhase extends PhaseBase {
-  kind: "docked";
+  kind: 'docked';
   target: string;
 }
 
@@ -431,7 +431,7 @@ export interface DockedPhase extends PhaseBase {
  * it has the same published size).
  */
 export interface StationPhase extends PhaseBase {
-  kind: "station";
+  kind: 'station';
   target: string;
   /** The published distance between the two, nautical miles (informational). */
   range?: Cited<number>;
@@ -450,7 +450,7 @@ export type Phase =
   | DockedPhase
   | StationPhase;
 
-export type PhaseKind = Phase["kind"];
+export type PhaseKind = Phase['kind'];
 
 /**
  * What a ship is for in the mission:
@@ -460,7 +460,7 @@ export type PhaseKind = Phase["kind"];
  *   lunar module);
  * - "target": an uncrewed vehicle the main ship meets (Gemini's Agena).
  */
-export type ShipRole = "main" | "lander" | "target";
+export type ShipRole = 'main' | 'lander' | 'target';
 
 export interface ShipPlan {
   /** Unique within the plan, for example "csm". */

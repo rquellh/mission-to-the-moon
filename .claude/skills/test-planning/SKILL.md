@@ -48,15 +48,18 @@ The Testing Trophy inverts the traditional testing pyramid. Instead of a wide ba
 The site is static: there is no server and no API. What a server would own elsewhere (the facts and the rules) lives here in the mission content and the flight math, so that is the third layer.
 
 ### Layer 1: E2E Tests (Playwright) - `tests/e2e/`
+
 **Purpose:** Validate that critical visitor journeys work in a real browser, with the real 3D scene, the whole site wired together by `src/main.ts`.
 
 **Test here:**
+
 - Happy path of critical journeys (take the guided tour, open a mission and look around, open a deep link)
 - What the 3D scene draws, read through the scene report (`window.__missionScene()`): which craft and parts are drawn, and where they are on the canvas
 - Behavior that depends on a real browser: WebGL, real frames, focus moving in and out of a dialog, the layout on a phone
 - The fallbacks only the whole site can show (no WebGL)
 
 **Do NOT test here:**
+
 - Every detail of a card or a dialog (do that in interface tests)
 - Timing math of the tour or the clock (the flight layer owns it)
 - Rules about mission content (do that once, for every mission, in content tests)
@@ -65,9 +68,11 @@ The site is static: there is no server and no API. What a server would own elsew
 **Cost:** Slow (each page draws a 3D scene in software), flaky-prone, expensive to maintain. Every E2E test must earn its place.
 
 ### Layer 2: Interface Tests (Vitest + Testing Library + jsdom) - `src/ui/**/*.test.ts`, `src/extras/**/*.test.ts`
+
 **Purpose:** Test the interface working as a whole: the real `mountInterface` over the real `index.html`, with a real mission, the real clock, and the real tour. Only the 3D scene (the `Director`) and the screen's frames are replaced. This is where the BULK of new testing happens.
 
 **Test here:**
+
 - What a card, panel, or dialog shows for a real mission
 - Visitor interactions (clicks, keys, selections) and what they change
 - States: touring, traveling between stops, exploring, playing, paused, no 3D view
@@ -76,6 +81,7 @@ The site is static: there is no server and no API. What a server would own elsew
 - Accessibility (names, roles, pressed and expanded states, announcements)
 
 **Do NOT test here:**
+
 - Things already covered by an E2E happy path (don't re-verify the same journey)
 - Pure helpers with many cases (use unit tests)
 - Facts in the content or the flight math
@@ -84,15 +90,18 @@ The site is static: there is no server and no API. What a server would own elsew
 **Cost:** Fast, reliable, high confidence. Default layer for interface behavior.
 
 ### Layer 3: Content and Flight Tests (Vitest, Node) - `src/sim/test/`, `src/app/*.test.ts`, `src/content/**/*.test.ts`
+
 **Purpose:** Test what must be true of every mission, and the logic with no page in it: the flight path math, story time, the mission clock, and the tour.
 
 **Test here:**
+
 - Rules every mission must satisfy (events in order and inside the flight, every citation resolving, every photo and recording present, writing rules)
 - Flight path math (no jumps, nothing under the ground, rendezvous, lunar orbit)
 - The clock and the tour (a stop ends exactly on its time, a trip takes its set number of seconds)
 - A regression in one mission's data (add the rule for all missions, not a one-off)
 
 **Do NOT test here:**
+
 - What the interface renders or how a visitor interacts with it
 - Anything that needs a page or a browser
 - Whether a fact is historically right. Sources and the fact check decide that, not a test.
@@ -107,20 +116,20 @@ This is the core value of this skill. For any given behavior, **test it at the l
 
 ### Decision Matrix
 
-| What you're testing | E2E | Interface | Content and flight |
-|---|---|---|---|
-| **A rule every mission must satisfy** | - | - | YES |
-| **Flight path math, story time** | - | - | YES |
-| **Clock and tour logic (timing, stops)** | - | - | YES |
-| **A writing rule in the content** | - | - | YES |
-| **A card, panel, or dialog shows the right things** | - | YES | - |
-| **A click or key triggers the right behavior** | - | YES | - |
-| **Touring, traveling, playing, paused, no-3D states** | - | YES | - |
-| **The interface asks the scene for the right view** | - | YES | - |
-| **A whole visitor journey (happy path)** | YES | - | - |
-| **A deep link opens the right place** | YES | - | - |
-| **What the 3D scene draws, and where** | YES | - | - |
-| **Layout on a phone, focus in a real browser** | YES | - | - |
+| What you're testing                                   | E2E | Interface | Content and flight |
+| ----------------------------------------------------- | --- | --------- | ------------------ |
+| **A rule every mission must satisfy**                 | -   | -         | YES                |
+| **Flight path math, story time**                      | -   | -         | YES                |
+| **Clock and tour logic (timing, stops)**              | -   | -         | YES                |
+| **A writing rule in the content**                     | -   | -         | YES                |
+| **A card, panel, or dialog shows the right things**   | -   | YES       | -                  |
+| **A click or key triggers the right behavior**        | -   | YES       | -                  |
+| **Touring, traveling, playing, paused, no-3D states** | -   | YES       | -                  |
+| **The interface asks the scene for the right view**   | -   | YES       | -                  |
+| **A whole visitor journey (happy path)**              | YES | -         | -                  |
+| **A deep link opens the right place**                 | YES | -         | -                  |
+| **What the 3D scene draws, and where**                | YES | -         | -                  |
+| **Layout on a phone, focus in a real browser**        | YES | -         | -                  |
 
 ### The "Who Owns This Test?" Rules
 
@@ -136,15 +145,15 @@ This is the core value of this skill. For any given behavior, **test it at the l
 
 Watch for these signs of redundant testing:
 
-| Smell | Problem | Fix |
-|---|---|---|
-| E2E test checks every line of a card or dialog | Over-testing at highest cost layer | Move the detail to interface tests, keep only the journey in E2E |
-| Interface test and E2E test walk the same flow | Same behavior tested twice | Keep the interface test for variations, E2E only for the happy path |
-| E2E test waits out a tour trip to check its length | Timing is logic, tested in a browser | The clock and tour tests own timing; E2E only checks that the tour arrives |
-| Interface test repeated for all 21 missions | A content rule tested through the interface | Write the rule once in a content test; use one or two missions in the interface test |
-| E2E test for one mission's data mistake | Wrong layer for a content rule | Add the rule to the content tests, for every mission |
-| Interface test that rebuilds flight math to predict a number | Testing logic in the interface | Trust the clock, test only that the interface shows what it is given |
-| A test that compares a screenshot of the 3D scene | Brittle, differs by machine | Assert on the scene report instead |
+| Smell                                                        | Problem                                     | Fix                                                                                  |
+| ------------------------------------------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------ |
+| E2E test checks every line of a card or dialog               | Over-testing at highest cost layer          | Move the detail to interface tests, keep only the journey in E2E                     |
+| Interface test and E2E test walk the same flow               | Same behavior tested twice                  | Keep the interface test for variations, E2E only for the happy path                  |
+| E2E test waits out a tour trip to check its length           | Timing is logic, tested in a browser        | The clock and tour tests own timing; E2E only checks that the tour arrives           |
+| Interface test repeated for all 21 missions                  | A content rule tested through the interface | Write the rule once in a content test; use one or two missions in the interface test |
+| E2E test for one mission's data mistake                      | Wrong layer for a content rule              | Add the rule to the content tests, for every mission                                 |
+| Interface test that rebuilds flight math to predict a number | Testing logic in the interface              | Trust the clock, test only that the interface shows what it is given                 |
+| A test that compares a screenshot of the 3D scene            | Brittle, differs by machine                 | Assert on the scene report instead                                                   |
 
 ---
 
@@ -155,6 +164,7 @@ When asked to plan tests for a feature, follow this process:
 ### Step 1: Understand the Feature
 
 Research the feature by reading:
+
 - The relevant interface modules (`src/ui/`, `src/extras/`)
 - The relevant logic (`src/app/`, `src/sim/`) and scene code (`src/scene/`)
 - The content it reads (`src/content/`)
@@ -163,6 +173,7 @@ Research the feature by reading:
 ### Step 2: Decompose Into Testable Behaviors
 
 Break the feature into observable behaviors. For each behavior, ask:
+
 - Is this a **rule about content**, or **logic with no page in it**? → Content and flight
 - Is this **something the interface shows or does**? → Interface
 - Is this a **whole journey**, or **something the 3D scene draws**? → E2E (only if critical)
@@ -171,6 +182,7 @@ Break the feature into observable behaviors. For each behavior, ask:
 ### Step 3: Check for Existing Coverage
 
 Before recommending new tests, check what already exists:
+
 - `tests/e2e/` - Existing E2E tests
 - `src/ui/**/*.test.ts`, `src/extras/**/*.test.ts` - Existing interface tests
 - `src/sim/test/`, `src/app/*.test.ts`, `src/content/**/*.test.ts` - Existing content and flight tests (`src/sim/test/all-missions.test.ts` already enforces many rules for every mission)
@@ -220,6 +232,7 @@ Output a structured test plan using this format:
 ### Step 5: Verify No Overlap
 
 Before finalizing, scan the plan for overlap:
+
 - Is any behavior tested at more than one layer? If so, justify it or remove the redundant test.
 - Could any E2E test be replaced by a cheaper interface test?
 - Are any interface tests duplicating a content rule or flight logic?
@@ -229,6 +242,7 @@ Before finalizing, scan the plan for overlap:
 ## Common Scenarios
 
 ### New Mission
+
 ```
 Content: NOTHING new. all-missions.test.ts picks the mission up and checks every rule.
          Add a test only if the mission needs a rule no other mission has.
@@ -238,6 +252,7 @@ E2E:     No new spec. Add its id to FLIGHT_IDS in tests/utils/vars.ts (a test fa
 ```
 
 ### New Panel, Dialog, or Control
+
 ```
 Content: Rules for any new content field, for every mission
 Interface: Tests for what it shows, its interactions, and its states
@@ -245,6 +260,7 @@ E2E:     ONE happy-path test if it is part of a critical journey, ZERO if it is 
 ```
 
 ### New Content Field or Writing Rule
+
 ```
 Content: ONE test that checks the rule for every mission
 Interface: A test that the field is shown, with a mission that has it and one that does not
@@ -252,6 +268,7 @@ E2E:     NONE
 ```
 
 ### Bug Fix
+
 ```
 Write ONE test at the layer where the bug lives:
 - Wrong or missing mission data? → Content test (as a rule for every mission)
@@ -263,6 +280,7 @@ Do NOT add tests at multiple layers for the same bug.
 ```
 
 ### New Model or Scene Behavior
+
 ```
 Content: Rules for the vehicle data that drives it
 Interface: NONE (the interface cannot see the scene)
@@ -271,6 +289,7 @@ E2E:     ONE test on the scene report at the moment that matters (what is drawn,
 ```
 
 ### Refactor
+
 ```
 Existing tests should still pass. If they don't, the tests were testing implementation
 details and should be fixed, not the refactor.

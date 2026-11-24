@@ -9,9 +9,16 @@
  * game.ts, one toy meter to one meter of the models, which the kit draws
  * at roughly their real sizes.
  */
-import { MathUtils, Vector3 } from "three";
-import { COLORS, createGlow, createMiniView, createVehicle, type MiniView, type VehiclePart } from "../../scene/kit.ts";
-import type { Flight, Thrust } from "./game.ts";
+import { MathUtils, Vector3 } from 'three';
+import {
+  COLORS,
+  createGlow,
+  createMiniView,
+  createVehicle,
+  type MiniView,
+  type VehiclePart,
+} from '../../scene/kit.ts';
+import type { Flight, Thrust } from './game.ts';
 
 export interface DockingParts {
   gemini: readonly VehiclePart[];
@@ -57,17 +64,17 @@ export function createDockingScene(canvas: HTMLCanvasElement, parts: DockingPart
   near();
 
   // The Agena flies cone first toward the Gemini: "backward" turns it end for end, its top kept on top.
-  const agena = createVehicle({ layout: "alone", parts: parts.agena, facing: "backward" });
+  const agena = createVehicle({ layout: 'alone', parts: parts.agena, facing: 'backward' });
   agena.object.rotation.x = LYING_DOWN;
   // Its cone end is its lowest point along the model's +Y; that goes to z = 0.
   agena.object.position.set(0, 0, agena.bottom);
   const agenaEngineZ = agena.bottom - agena.top;
 
-  const gemini = createVehicle({ layout: "alone", parts: parts.gemini });
+  const gemini = createVehicle({ layout: 'alone', parts: parts.gemini });
   gemini.object.rotation.x = LYING_DOWN;
 
   // The docked pair, with its Agena where the lone Agena is (its engine end is the pair's top).
-  const docked = createVehicle({ layout: "docked", parts: parts.docked });
+  const docked = createVehicle({ layout: 'docked', parts: parts.docked });
   docked.object.rotation.x = LYING_DOWN;
   docked.object.position.set(0, 0, agenaEngineZ + docked.top);
   docked.object.visible = false;
@@ -84,7 +91,13 @@ export function createDockingScene(canvas: HTMLCanvasElement, parts: DockingPart
   const look = new Vector3();
   let clock = 0;
   let puffLeft = 0;
-  let pair: { t: number; fromPosition: Vector3; toPosition: Vector3; fromLook: Vector3; toLook: Vector3 } | null = null;
+  let pair: {
+    t: number;
+    fromPosition: Vector3;
+    toPosition: Vector3;
+    fromLook: Vector3;
+    toLook: Vector3;
+  } | null = null;
 
   const placeGemini = (flight: Flight): void => {
     nose.set(flight.x, flight.y, flight.gap);
@@ -112,18 +125,18 @@ export function createDockingScene(canvas: HTMLCanvasElement, parts: DockingPart
   const puffAt = (thrust: Thrust, out: Vector3): Vector3 => {
     const center = gemini.object.position;
     switch (thrust) {
-      case "left":
+      case 'left':
         return out.set(center.x + 1.7, center.y, center.z);
-      case "right":
+      case 'right':
         return out.set(center.x - 1.7, center.y, center.z);
-      case "up":
+      case 'up':
         return out.set(center.x, center.y - 1.7, center.z);
-      case "down":
+      case 'down':
         return out.set(center.x, center.y + 1.7, center.z);
-      case "forward":
+      case 'forward':
         // Behind the aft end.
         return out.set(center.x, center.y, center.z - gemini.bottom + 0.4);
-      case "back":
+      case 'back':
         // Just ahead of the nose, off to one side so it is not hidden behind the cabin.
         return out.set(center.x + 0.6, center.y + 0.3, nose.z - 0.2);
     }

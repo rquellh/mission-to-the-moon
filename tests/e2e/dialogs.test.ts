@@ -9,7 +9,9 @@ import { MISSIONS, URLS } from '../utils/vars';
  * interface tests.
  */
 test.describe('Dialogs', () => {
-  test('About this mission opens from the header, closes with Escape, and gives focus back', async ({ sitePage }) => {
+  test('About this mission opens from the header, closes with Escape, and gives focus back', async ({
+    sitePage,
+  }) => {
     const missionPage = new MissionPage(sitePage);
     const dialogsPage = new DialogsPage(sitePage);
 

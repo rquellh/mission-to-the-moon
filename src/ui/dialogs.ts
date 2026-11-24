@@ -37,7 +37,8 @@ export function setUpDialog(dialog: HTMLDialogElement): DialogHandle {
   return {
     element: dialog,
     open(from) {
-      returnTo = from ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      returnTo =
+        from ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
       if (!dialog.open) dialog.showModal();
       dialog.scrollTop = 0;
       const body = dialog.querySelector('.dialog__body');

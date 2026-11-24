@@ -22,11 +22,7 @@
  *
  * All inputs and outputs are in Earth radii in the scene frame.
  */
-import {
-  EARTH_MOON_DISTANCE,
-  EARTH_RADIUS,
-  MOON_RADIUS,
-} from "../content/physical-constants.ts";
+import { EARTH_MOON_DISTANCE, EARTH_RADIUS, MOON_RADIUS } from '../content/physical-constants.ts';
 
 /**
  * Earth-Moon distance at the readable scale, in Earth radii. Must equal
@@ -85,7 +81,12 @@ export const EARTH_LIFT: RadialLift = {
   reach: 38,
   band: { amount: 0.05, from: 0.0315, to: 0.06, until: 5 },
 };
-export const MOON_LIFT: RadialLift = { radius: MOON_RADIUS, amount: 0.2, buildUp: 0.025, reach: 20 };
+export const MOON_LIFT: RadialLift = {
+  radius: MOON_RADIUS,
+  amount: 0.2,
+  buildUp: 0.025,
+  reach: 20,
+};
 
 /** The band's extra lift at height h: none below it, rising smoothly through it, fading out above. */
 function bandLift(h: number, band: Band): number {
@@ -108,8 +109,12 @@ export function readableRadius(r: number, lift: RadialLift): number {
   const fade = 1 - h / lift.reach;
   const band = lift.band ? bandLift(h, lift.band) : 0;
   const deviation =
-    (lift.radius * (1 - WARP_SCALE) + lift.amount * (1 - Math.exp(-Math.max(h, 0) / lift.buildUp)) + band) *
-    fade * fade * fade;
+    (lift.radius * (1 - WARP_SCALE) +
+      lift.amount * (1 - Math.exp(-Math.max(h, 0) / lift.buildUp)) +
+      band) *
+    fade *
+    fade *
+    fade;
   return base + deviation;
 }
 

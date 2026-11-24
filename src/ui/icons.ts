@@ -8,7 +8,9 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 type IconName = 'play' | 'pause' | 'previous' | 'next' | 'chevron-down' | 'external';
 
 const SHAPES: Record<IconName, { fill?: string[]; stroke?: string[] }> = {
-  play: { fill: ['M8.5 5.6v12.8a.8.8 0 0 0 1.2.7l10.1-6.4a.8.8 0 0 0 0-1.4L9.7 4.9a.8.8 0 0 0-1.2.7z'] },
+  play: {
+    fill: ['M8.5 5.6v12.8a.8.8 0 0 0 1.2.7l10.1-6.4a.8.8 0 0 0 0-1.4L9.7 4.9a.8.8 0 0 0-1.2.7z'],
+  },
   pause: {
     fill: [
       'M7 5h3a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z',
@@ -18,7 +20,13 @@ const SHAPES: Record<IconName, { fill?: string[]; stroke?: string[] }> = {
   previous: { stroke: ['M14.5 5.5 8 12l6.5 6.5'] },
   next: { stroke: ['M9.5 5.5 16 12l-6.5 6.5'] },
   'chevron-down': { stroke: ['M6.5 9.5 12 15l5.5-5.5'] },
-  external: { stroke: ['M13.5 5.5h5v5', 'M18.5 5.5 11 13', 'M16.5 13.5v4a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h4'] },
+  external: {
+    stroke: [
+      'M13.5 5.5h5v5',
+      'M18.5 5.5 11 13',
+      'M16.5 13.5v4a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h4',
+    ],
+  },
 };
 
 /** An inline SVG icon, hidden from assistive technology. */

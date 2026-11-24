@@ -28,9 +28,24 @@ import {
   type Material,
   type Object3D,
 } from 'three';
-import type { LeftBehind, VehicleChange, VehicleLayout, VehiclePart } from '../content/vehicle-types';
+import type {
+  LeftBehind,
+  VehicleChange,
+  VehicleLayout,
+  VehiclePart,
+} from '../content/vehicle-types';
+import {
+  buildWalker,
+  GAS_GUN,
+  holdGasGun,
+  walkerLook,
+  walkerMaterials,
+  type SuitEra,
+  type WalkerLook,
+  type WalkerOptions,
+  type WalkerPose,
+} from './astronaut';
 import { SHIP_SIZE_PX } from './config';
-import { buildWalker, GAS_GUN, holdGasGun, walkerLook, walkerMaterials, type SuitEra, type WalkerLook, type WalkerOptions, type WalkerPose } from './astronaut';
 
 /**
  * Simplified spacecraft models built from plain shapes, and how they are
@@ -113,7 +128,12 @@ interface Kit {
 
 /** A set of materials (each ship has its own, so one can fade out without the others), sharing shapes by key. */
 function makeKit(geometries: Map<string, BufferGeometry>): Kit {
-  const standard = (color: number, roughness = 0.55, metalness = 0.1, flat = false): MeshStandardMaterial =>
+  const standard = (
+    color: number,
+    roughness = 0.55,
+    metalness = 0.1,
+    flat = false,
+  ): MeshStandardMaterial =>
     new MeshStandardMaterial({ color, roughness, metalness, flatShading: flat });
   const inside = (color: number): MeshStandardMaterial =>
     new MeshStandardMaterial({ color, roughness: 0.8, metalness: 0.1, side: BackSide });
@@ -140,10 +160,20 @@ function makeKit(geometries: Map<string, BufferGeometry>): Kit {
     atlas: standard(0xc3c8cf, 0.35, 0.45),
     agena: standard(0xd3d7dc, 0.45, 0.25),
     agenaDark: standard(0x5a6068, 0.6),
-    cone: new MeshStandardMaterial({ color: 0xb9c0c8, roughness: 0.5, metalness: 0.2, side: DoubleSide }),
+    cone: new MeshStandardMaterial({
+      color: 0xb9c0c8,
+      roughness: 0.5,
+      metalness: 0.2,
+      side: DoubleSide,
+    }),
     shroudInside: inside(0x4a4f57),
     canopy: new MeshStandardMaterial({ vertexColors: true, roughness: 0.8, side: DoubleSide }),
-    dish: new MeshStandardMaterial({ color: 0xd9dde2, roughness: 0.45, metalness: 0.3, side: DoubleSide }),
+    dish: new MeshStandardMaterial({
+      color: 0xd9dde2,
+      roughness: 0.45,
+      metalness: 0.3,
+      side: DoubleSide,
+    }),
     fender: standard(0xa9875c, 0.6),
     lines: new LineBasicMaterial({ color: 0xd9d9d4, transparent: true, opacity: 0.7 }),
     geometries,
@@ -154,13 +184,22 @@ function makeKit(geometries: Map<string, BufferGeometry>): Kit {
 function kitMaterials(kit: Kit): Array<MeshStandardMaterial | LineBasicMaterial> {
   const out: Array<MeshStandardMaterial | LineBasicMaterial> = [];
   for (const value of Object.values(kit)) {
-    if (value instanceof MeshStandardMaterial || value instanceof LineBasicMaterial) out.push(value);
+    if (value instanceof MeshStandardMaterial || value instanceof LineBasicMaterial)
+      out.push(value);
   }
   return out;
 }
 
 /** A cylinder or cone frustum along Y from y0 to y1 (without end caps when `open`), shared by key. */
-function cylinder(kit: Kit, rBottom: number, rTop: number, y0: number, y1: number, segments = 28, open = false): BufferGeometry {
+function cylinder(
+  kit: Kit,
+  rBottom: number,
+  rTop: number,
+  y0: number,
+  y1: number,
+  segments = 28,
+  open = false,
+): BufferGeometry {
   const key = `cyl:${rBottom}:${rTop}:${y0}:${y1}:${segments}:${open}`;
   let geometry = kit.geometries.get(key);
   if (!geometry) {
@@ -176,7 +215,16 @@ function cylinder(kit: Kit, rBottom: number, rTop: number, y0: number, y1: numbe
  * `span` radians around the axis from angle `from` (measured from +Z
  * toward +X), shared by key. For panels that lie on a curved hull.
  */
-function conePatch(kit: Kit, rBottom: number, rTop: number, y0: number, y1: number, from: number, span: number, segments = 12): BufferGeometry {
+function conePatch(
+  kit: Kit,
+  rBottom: number,
+  rTop: number,
+  y0: number,
+  y1: number,
+  from: number,
+  span: number,
+  segments = 12,
+): BufferGeometry {
   const key = `patch:${rBottom}:${rTop}:${y0}:${y1}:${from}:${span}:${segments}`;
   let geometry = kit.geometries.get(key);
   if (!geometry) {
@@ -225,7 +273,15 @@ function canopyGeometry(kit: Kit, radius: number): BufferGeometry {
   const key = `canopy:${radius}`;
   let geometry = kit.geometries.get(key);
   if (!geometry) {
-    const dome = new SphereGeometry(radius, 24, 8, 0, Math.PI * 2, 0, Math.PI * 0.42).toNonIndexed();
+    const dome = new SphereGeometry(
+      radius,
+      24,
+      8,
+      0,
+      Math.PI * 2,
+      0,
+      Math.PI * 0.42,
+    ).toNonIndexed();
     dome.scale(1, 0.75, 1);
     const position = dome.getAttribute('position');
     const colors: number[] = [];
@@ -278,10 +334,22 @@ const APOLLO_HATCH = 'apollo-open-hatch';
 /** Groups that hold other parts and are always shown when their parts are. */
 const WRAPPERS: ReadonlySet<string> = new Set(['csm', 'lm', 'gemini-spacecraft']);
 /** Nodes handled one by one (see ShipModel.showSpecials). */
-const SPECIALS: ReadonlySet<string> = new Set([AGENA_BOOM, ATLAS_AGENA_ADAPTER, ATLAS_ATDA_ADAPTER, GEMINI_RIGHT_HATCH, APOLLO_HATCH, 'spacewalker', 'standup-spacewalker', GAS_GUN]);
+const SPECIALS: ReadonlySet<string> = new Set([
+  AGENA_BOOM,
+  ATLAS_AGENA_ADAPTER,
+  ATLAS_ATDA_ADAPTER,
+  GEMINI_RIGHT_HATCH,
+  APOLLO_HATCH,
+  'spacewalker',
+  'standup-spacewalker',
+  GAS_GUN,
+]);
 
 /** A named part: a group whose rest position is remembered for animation. */
-function part(name: VehiclePart | 'csm' | 'lm' | 'gemini-spacecraft', ...children: Object3D[]): Group {
+function part(
+  name: VehiclePart | 'csm' | 'lm' | 'gemini-spacecraft',
+  ...children: Object3D[]
+): Group {
   const group = new Group();
   group.name = name;
   if (children.length > 0) group.add(...children);
@@ -308,9 +376,16 @@ const NOT_BODY: ReadonlySet<VehiclePart> = new Set<VehiclePart>([
   'gas-gun',
 ]);
 /** Of those, parts that also do not count toward how far the model may reach on screen. */
-const NOT_SIZED: ReadonlySet<VehiclePart> = new Set<VehiclePart>(['spacewalker', 'standup-spacewalker', 'gas-gun']);
+const NOT_SIZED: ReadonlySet<VehiclePart> = new Set<VehiclePart>([
+  'spacewalker',
+  'standup-spacewalker',
+  'gas-gun',
+]);
 /** The lunar module's parts, which ride hidden inside the adapter at launch. */
-const LUNAR_MODULE_PARTS: ReadonlySet<VehiclePart> = new Set<VehiclePart>(['lm-descent-stage', 'lm-ascent-stage']);
+const LUNAR_MODULE_PARTS: ReadonlySet<VehiclePart> = new Set<VehiclePart>([
+  'lm-descent-stage',
+  'lm-ascent-stage',
+]);
 
 /* ---------------- Saturn V and Saturn IB, in stack coordinates (y from the Saturn V's engine exits) ---------------- */
 
@@ -343,8 +418,22 @@ function firstStage(kit: Kit): Group {
   ];
   for (let k = 0; k < 4; k += 1) {
     const a = Math.PI / 4 + (k * Math.PI) / 2;
-    children.push(mesh(cylinder(kit, 1.05, 0.55, 0, 3.4, 16), kit.dark, Math.cos(a) * 3.1, 0, Math.sin(a) * 3.1));
-    const fin = mesh(box(kit, 0.35, 5.5, 2.6), kit.white, Math.cos(a) * (r + 1.1), 6.4, Math.sin(a) * (r + 1.1));
+    children.push(
+      mesh(
+        cylinder(kit, 1.05, 0.55, 0, 3.4, 16),
+        kit.dark,
+        Math.cos(a) * 3.1,
+        0,
+        Math.sin(a) * 3.1,
+      ),
+    );
+    const fin = mesh(
+      box(kit, 0.35, 5.5, 2.6),
+      kit.white,
+      Math.cos(a) * (r + 1.1),
+      6.4,
+      Math.sin(a) * (r + 1.1),
+    );
     fin.rotation.y = -a;
     children.push(fin);
   }
@@ -352,7 +441,10 @@ function firstStage(kit: Kit): Group {
 }
 
 function aftInterstage(kit: Kit): Group {
-  return part('aft-interstage', mesh(cylinder(kit, 5.05, 5.05, STACK.firstStageTop, STACK.interstageTop), kit.ring));
+  return part(
+    'aft-interstage',
+    mesh(cylinder(kit, 5.05, 5.05, STACK.firstStageTop, STACK.interstageTop), kit.ring),
+  );
 }
 
 function secondStage(kit: Kit): Group {
@@ -402,20 +494,44 @@ function saturnIBFirstStage(kit: Kit): Group {
     const z = Math.cos(a);
     // The eight outer tanks, with rounded tops.
     children.push(
-      mesh(cylinder(kit, 0.9, 0.9, base + 2.6, tanksTop - 0.5, 16), kit.white, x * 2.36, 0, z * 2.36),
-      mesh(cylinder(kit, 0.9, 0.55, tanksTop - 0.5, tanksTop, 16), kit.white, x * 2.36, 0, z * 2.36),
+      mesh(
+        cylinder(kit, 0.9, 0.9, base + 2.6, tanksTop - 0.5, 16),
+        kit.white,
+        x * 2.36,
+        0,
+        z * 2.36,
+      ),
+      mesh(
+        cylinder(kit, 0.9, 0.55, tanksTop - 0.5, tanksTop, 16),
+        kit.white,
+        x * 2.36,
+        0,
+        z * 2.36,
+      ),
     );
     // Engine bells: four inboard, four outboard.
     const r = k % 2 === 0 ? 0.9 : 2.2;
     children.push(mesh(cylinder(kit, 0.5, 0.28, base, base + 0.9, 12), kit.dark, x * r, 0, z * r));
     // Fins between the tanks at the tail.
     const b = (k * Math.PI) / 4;
-    const fin = mesh(box(kit, 0.25, 3.4, 1.6), kit.white, Math.sin(b) * 3.75, base + 2.1, Math.cos(b) * 3.75);
+    const fin = mesh(
+      box(kit, 0.25, 3.4, 1.6),
+      kit.white,
+      Math.sin(b) * 3.75,
+      base + 2.1,
+      Math.cos(b) * 3.75,
+    );
     fin.rotation.y = b;
     children.push(fin);
     // Dark panels on the interstage (photo S68-48788).
     if (k % 2 === 0) {
-      const panel = mesh(box(kit, 1.0, 2.2, 0.06), kit.dark, Math.sin(b) * 3.31, top - 1.4, Math.cos(b) * 3.31);
+      const panel = mesh(
+        box(kit, 1.0, 2.2, 0.06),
+        kit.dark,
+        Math.sin(b) * 3.31,
+        top - 1.4,
+        Math.cos(b) * 3.31,
+      );
       panel.rotation.y = b;
       children.push(panel);
     }
@@ -424,7 +540,10 @@ function saturnIBFirstStage(kit: Kit): Group {
 }
 
 function adapter(kit: Kit): Group {
-  return part('adapter', mesh(cylinder(kit, 3.3, 1.95, STACK.unitTop, STACK.adapterTop), kit.adapter));
+  return part(
+    'adapter',
+    mesh(cylinder(kit, 3.3, 1.95, STACK.unitTop, STACK.adapterTop), kit.adapter),
+  );
 }
 
 /** How far the adapter's four panels stand open on the spent stage, from closed, in radians. */
@@ -462,10 +581,21 @@ function openAdapter(kit: Kit): Group {
   // The practice docking target: a white disk with a dark cross, on four struts.
   const targetY = base + 2.6;
   children.push(mesh(disk(kit, 0.7, targetY), kit.white));
-  children.push(mesh(box(kit, 1.2, 0.02, 0.1), kit.dark, 0, targetY + 0.01, 0), mesh(box(kit, 0.1, 0.02, 1.2), kit.dark, 0, targetY + 0.01, 0));
+  children.push(
+    mesh(box(kit, 1.2, 0.02, 0.1), kit.dark, 0, targetY + 0.01, 0),
+    mesh(box(kit, 0.1, 0.02, 1.2), kit.dark, 0, targetY + 0.01, 0),
+  );
   for (let k = 0; k < 4; k += 1) {
     const a = (k * Math.PI) / 2;
-    children.push(rod(kit, new Vector3(Math.sin(a) * 3.0, base, Math.cos(a) * 3.0), new Vector3(Math.sin(a) * 0.5, targetY, Math.cos(a) * 0.5), 0.07, kit.ring));
+    children.push(
+      rod(
+        kit,
+        new Vector3(Math.sin(a) * 3.0, base, Math.cos(a) * 3.0),
+        new Vector3(Math.sin(a) * 0.5, targetY, Math.cos(a) * 0.5),
+        0.07,
+        kit.ring,
+      ),
+    );
   }
   return part('adapter', ...children);
 }
@@ -490,7 +620,9 @@ function serviceModule(kit: Kit): Group {
   // Four thruster quads near the front.
   for (let k = 0; k < 4; k += 1) {
     const a = (k * Math.PI) / 2;
-    children.push(mesh(box(kit, 0.45, 0.7, 0.45), kit.ring, Math.cos(a) * 2.05, 3.3, Math.sin(a) * 2.05));
+    children.push(
+      mesh(box(kit, 0.45, 0.7, 0.45), kit.ring, Math.cos(a) * 2.05, 3.3, Math.sin(a) * 2.05),
+    );
   }
   return part('service-module', ...children);
 }
@@ -517,14 +649,25 @@ function serviceModuleDamaged(kit: Kit): Group {
     mesh(sphere(kit, 0.42), kit.ring, 1.4, 3.1, 0.25),
     mesh(cylinder(kit, 1.25, 0.45, CSM.bellExit, 0, 20), kit.dark),
   ];
-  for (const [angle, lean] of [[gapFrom + 0.05, -0.5], [gapFrom + gap - 0.05, 0.6]] as const) {
-    const strip = mesh(box(kit, 0.04, 2.2, 0.5), kit.serviceModule, Math.sin(angle) * 2.05, 2.9, Math.cos(angle) * 2.05);
+  for (const [angle, lean] of [
+    [gapFrom + 0.05, -0.5],
+    [gapFrom + gap - 0.05, 0.6],
+  ] as const) {
+    const strip = mesh(
+      box(kit, 0.04, 2.2, 0.5),
+      kit.serviceModule,
+      Math.sin(angle) * 2.05,
+      2.9,
+      Math.cos(angle) * 2.05,
+    );
     strip.rotation.set(0, angle, lean);
     children.push(strip);
   }
   for (let k = 0; k < 4; k += 1) {
     const a = (k * Math.PI) / 2;
-    children.push(mesh(box(kit, 0.45, 0.7, 0.45), kit.ring, Math.cos(a) * 2.05, 3.3, Math.sin(a) * 2.05));
+    children.push(
+      mesh(box(kit, 0.45, 0.7, 0.45), kit.ring, Math.cos(a) * 2.05, 3.3, Math.sin(a) * 2.05),
+    );
   }
   return part('service-module-damaged', ...children);
 }
@@ -572,7 +715,10 @@ function lmDescentStage(kit: Kit): Group {
     const strut = mesh(cylinder(kit, 0.1, 0.1, -length / 2, length / 2, 6), kit.ring);
     strut.position.copy(from).add(to).multiplyScalar(0.5);
     strut.quaternion.setFromUnitVectors(up, to.clone().sub(from).normalize());
-    children.push(strut, mesh(cylinder(kit, 0.5, 0.5, 0, 0.14, 12), kit.ring, cx * 3.7, 0, cz * 3.7));
+    children.push(
+      strut,
+      mesh(cylinder(kit, 0.5, 0.5, 0, 0.14, 12), kit.ring, cx * 3.7, 0, cz * 3.7),
+    );
   }
   return part('lm-descent-stage', ...children);
 }
@@ -653,7 +799,11 @@ function parachutes(kit: Kit, name: 'drogue-parachutes' | 'main-parachutes'): Gr
     children.push(canopy);
     for (let j = 0; j < 6; j += 1) {
       const b = (j * Math.PI * 2) / 6;
-      const rim = new Vector3(Math.cos(b) * radius * 0.97, radius * 0.75 * Math.cos(Math.PI * 0.42), Math.sin(b) * radius * 0.97);
+      const rim = new Vector3(
+        Math.cos(b) * radius * 0.97,
+        radius * 0.75 * Math.cos(Math.PI * 0.42),
+        Math.sin(b) * radius * 0.97,
+      );
       rim.applyEuler(canopy.rotation).add(center);
       linePoints.push(apex.x, apex.y, apex.z, rim.x, rim.y, rim.z);
     }
@@ -707,14 +857,22 @@ interface WalkerPlace {
  * flying blunt end first is built turned end for end (see endFor), which
  * would draw the figure upside down: `flipped` stands it the other way up.
  */
-function walkerTurn(at: Vector3, tilt: number, quarter: number, lean: number, flipped = false): Quaternion {
+function walkerTurn(
+  at: Vector3,
+  tilt: number,
+  quarter: number,
+  lean: number,
+  flipped = false,
+): Quaternion {
   // The side turned to the camera is WALKER_VIEW_LIFT on from the figure's own (the other way in a craft built end for end).
   const side = Math.atan2(at.x, at.z) + (flipped ? -1 : 1) * WALKER_VIEW_LIFT;
   const head = new Vector3(-Math.cos(side), 0, Math.sin(side));
   const front = new Vector3(Math.sin(side), 0, Math.cos(side));
   const across = new Vector3().crossVectors(head, front);
   const turn = new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(across, head, front));
-  turn.multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), tilt + (flipped ? Math.PI : 0)));
+  turn.multiply(
+    new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), tilt + (flipped ? Math.PI : 0)),
+  );
   turn.multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), quarter));
   return turn.multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -lean));
 }
@@ -728,14 +886,22 @@ function walkerTurn(at: Vector3, tilt: number, quarter: number, lean: number, fl
  * from in front of it and below (on Gemini, the chest pack), so it never
  * passes through the body.
  */
-function spacewalker(kit: Kit, place: WalkerPlace, options: Omit<WalkerOptions, 'pose'> & { pose?: WalkerPose }): Group {
+function spacewalker(
+  kit: Kit,
+  place: WalkerPlace,
+  options: Omit<WalkerOptions, 'pose'> & { pose?: WalkerPose },
+): Group {
   const look = walkerLook(options.era);
-  const { figure, tetherPoint } = buildWalker(kit.geometries, look, { pose: 'floating', ...options });
+  const { figure, tetherPoint } = buildWalker(kit.geometries, look, {
+    pose: 'floating',
+    ...options,
+  });
   figure.position.copy(place.at);
   figure.quaternion.copy(place.turn);
   figure.updateMatrix();
   // Points along the way, in the figure's own coordinates (see buildWalker), then in the model's.
-  const inFigure = (x: number, y: number, z: number): Vector3 => new Vector3(x, y, z).applyMatrix4(figure.matrix);
+  const inFigure = (x: number, y: number, z: number): Vector3 =>
+    new Vector3(x, y, z).applyMatrix4(figure.matrix);
   const side = place.hatch.clone().applyMatrix4(figure.matrix.clone().invert()).x < 0 ? -1 : 1;
   const out = place.outward.clone().normalize();
   const start = place.hatch.clone().addScaledVector(out, -0.08);
@@ -744,11 +910,24 @@ function spacewalker(kit: Kit, place: WalkerPlace, options: Omit<WalkerOptions, 
   const middle = rise.clone().add(beside).multiplyScalar(0.5).addScaledVector(out, 0.15);
   const near = inFigure(tetherPoint.x + side * 0.08, tetherPoint.y - 0.17, tetherPoint.z + 0.15);
   const end = inFigure(tetherPoint.x, tetherPoint.y, tetherPoint.z);
-  const key = `tether:${[start, beside, end].map((p) => p.toArray().map((v) => v.toFixed(3)).join(',')).join(':')}`;
+  const key = `tether:${[start, beside, end]
+    .map((p) =>
+      p
+        .toArray()
+        .map((v) => v.toFixed(3))
+        .join(','),
+    )
+    .join(':')}`;
   let tube = kit.geometries.get(key);
   if (!tube) {
     // Thicker than the real one (a few centimeters), so it reads when the ship view draws the craft close up.
-    tube = new TubeGeometry(new CatmullRomCurve3([start, rise, middle, beside, near, end], false, 'centripetal'), 56, 0.022, 6, false);
+    tube = new TubeGeometry(
+      new CatmullRomCurve3([start, rise, middle, beside, near, end], false, 'centripetal'),
+      56,
+      0.022,
+      6,
+      false,
+    );
     kit.geometries.set(key, tube);
   }
   const group = part('spacewalker', figure, mesh(tube, look.tether));
@@ -769,7 +948,13 @@ function spacewalker(kit: Kit, place: WalkerPlace, options: Omit<WalkerOptions, 
  * crewmate standing in the side hatch (seen from behind in S72-37001). No
  * photo shows the figure from outside: its place and pose are approximate.
  */
-function standupWalker(kit: Kit, era: SuitEra, at: Vector3, outward: Vector3, facing: Vector3): Group {
+function standupWalker(
+  kit: Kit,
+  era: SuitEra,
+  at: Vector3,
+  outward: Vector3,
+  facing: Vector3,
+): Group {
   const look = walkerLook(era);
   const { figure } = buildWalker(kit.geometries, look, { era, pose: 'standing' });
   const up = outward.clone().normalize();
@@ -838,7 +1023,10 @@ function geminiRetroSection(kit: Kit): Group {
   return part(
     'gemini-retro-section',
     mesh(cylinder(kit, 1.33, 1.15, GEMINI.equipmentTop, GEMINI.retroTop, 28), kit.geminiWhite),
-    mesh(cylinder(kit, 1.345, 1.345, GEMINI.equipmentTop - 0.03, GEMINI.equipmentTop + 0.03, 28, true), kit.ring),
+    mesh(
+      cylinder(kit, 1.345, 1.345, GEMINI.equipmentTop - 0.03, GEMINI.equipmentTop + 0.03, 28, true),
+      kit.ring,
+    ),
   );
 }
 
@@ -869,21 +1057,62 @@ function geminiHatch(kit: Kit, side: -1 | 1): Group {
   const { half, y0, y1 } = HATCH;
   const rim = 0.04;
   const frame = mesh(
-    conePatch(kit, cabinRadius(y0 - rim) + 0.012, cabinRadius(y1 + rim) + 0.012, y0 - rim, y1 + rim, center - half - rim, 2 * (half + rim)),
+    conePatch(
+      kit,
+      cabinRadius(y0 - rim) + 0.012,
+      cabinRadius(y1 + rim) + 0.012,
+      y0 - rim,
+      y1 + rim,
+      center - half - rim,
+      2 * (half + rim),
+    ),
     kit.hatchRim,
   );
   const panel = new Group();
   panel.add(
-    mesh(conePatch(kit, cabinRadius(y0) + 0.022, cabinRadius(y1) + 0.022, y0, y1, center - half, 2 * half), kit.hatch),
+    mesh(
+      conePatch(
+        kit,
+        cabinRadius(y0) + 0.022,
+        cabinRadius(y1) + 0.022,
+        y0,
+        y1,
+        center - half,
+        2 * half,
+      ),
+      kit.hatch,
+    ),
     // The window, toward the nose.
-    mesh(conePatch(kit, cabinRadius(3.0) + 0.03, cabinRadius(3.85) + 0.03, 3.0, 3.85, center - 0.17, 0.34), kit.window),
+    mesh(
+      conePatch(
+        kit,
+        cabinRadius(3.0) + 0.03,
+        cabinRadius(3.85) + 0.03,
+        3.0,
+        3.85,
+        center - 0.17,
+        0.34,
+      ),
+      kit.window,
+    ),
   );
   if (side < 0) {
     panel.add(frame);
     return panel;
   }
   // The hatchway, dark, seen when the hatch stands open.
-  const opening = mesh(conePatch(kit, cabinRadius(y0) + 0.017, cabinRadius(y1) + 0.017, y0, y1, center - half, 2 * half), kit.dark);
+  const opening = mesh(
+    conePatch(
+      kit,
+      cabinRadius(y0) + 0.017,
+      cabinRadius(y1) + 0.017,
+      y0,
+      y1,
+      center - half,
+      2 * half,
+    ),
+    kit.dark,
+  );
   // The hinge: the hatch's outer edge, from its aft corner to its forward corner.
   const edge = center + half + rim;
   const from = new Vector3(Math.sin(edge) * cabinRadius(y0), y0, Math.cos(edge) * cabinRadius(y0));
@@ -925,14 +1154,26 @@ function geminiHatchOutward(): Vector3 {
  * craft is built turned end for end (see walkerTurn).
  */
 function geminiSpacewalker(kit: Kit, backward: boolean): Group {
-  const hatch = new Vector3(Math.sin(HATCH.offset) * cabinRadius(3.4), 3.4, Math.cos(HATCH.offset) * cabinRadius(3.4));
+  const hatch = new Vector3(
+    Math.sin(HATCH.offset) * cabinRadius(3.4),
+    3.4,
+    Math.cos(HATCH.offset) * cabinRadius(3.4),
+  );
   const at = new Vector3(1.5, 4.3, 2.4);
-  const place: WalkerPlace = { at, turn: walkerTurn(at, -0.3, -0.6, 0.15, backward), hatch, outward: geminiHatchOutward() };
+  const place: WalkerPlace = {
+    at,
+    turn: walkerTurn(at, -0.3, -0.6, 0.15, backward),
+    hatch,
+    outward: geminiHatchOutward(),
+  };
   return spacewalker(kit, place, { era: 'gemini', gasGun: true });
 }
 
 /** Gemini's parachute (the small drogue or the big main), above a reentry module whose heat shield is at y = 0. */
-function geminiParachute(kit: Kit, name: 'gemini-drogue-parachute' | 'gemini-main-parachute'): Group {
+function geminiParachute(
+  kit: Kit,
+  name: 'gemini-drogue-parachute' | 'gemini-main-parachute',
+): Group {
   const main = name === 'gemini-main-parachute';
   // Much closer and smaller than the real ones, so the capsule stays the subject.
   const radius = main ? 2.2 : 0.75;
@@ -942,7 +1183,11 @@ function geminiParachute(kit: Kit, name: 'gemini-drogue-parachute' | 'gemini-mai
   const linePoints: number[] = [];
   for (let j = 0; j < 8; j += 1) {
     const b = (j * Math.PI * 2) / 8;
-    const rim = new Vector3(Math.cos(b) * radius * 0.97, height + radius * 0.75 * Math.cos(Math.PI * 0.42), Math.sin(b) * radius * 0.97);
+    const rim = new Vector3(
+      Math.cos(b) * radius * 0.97,
+      height + radius * 0.75 * Math.cos(Math.PI * 0.42),
+      Math.sin(b) * radius * 0.97,
+    );
     linePoints.push(apex.x, apex.y, apex.z, rim.x, rim.y, rim.z);
   }
   const geometry = new BufferGeometry();
@@ -997,12 +1242,17 @@ function agena(kit: Kit): Group {
     mesh(cylinder(kit, 0.76, 0.76, AGENA.bodyTop, AGENA.adapterTop, 24), kit.geminiWhite),
     // The docking cone, open toward +Y, with a docking collar at its throat.
     mesh(cylinder(kit, 0.62, 0.95, AGENA.adapterTop, AGENA.coneTop, 24, true), kit.cone),
-    mesh(cylinder(kit, 0.5, 0.5, AGENA.adapterTop - 0.01, AGENA.adapterTop + 0.05, 20), kit.agenaDark),
+    mesh(
+      cylinder(kit, 0.5, 0.5, AGENA.adapterTop - 0.01, AGENA.adapterTop + 0.05, 20),
+      kit.agenaDark,
+    ),
     // One-sided features, all on the same side (+Z), as NASA photos S66-25782
     // and S66-25779 (public/media/gemini-8/) show the Agena seen from Gemini 8.
     // A row of small dark openings along the forward body, on the side the
     // boom antenna stands out from (S66-25782).
-    ...[4.85, 5.1, 5.35, 5.6, 5.85, 6.1, 6.35].map((y) => mesh(box(kit, 0.16, 0.14, 0.04), kit.agenaDark, 0, y, 0.765)),
+    ...[4.85, 5.1, 5.35, 5.6, 5.85, 6.1, 6.35].map((y) =>
+      mesh(box(kit, 0.16, 0.14, 0.04), kit.agenaDark, 0, y, 0.765),
+    ),
     // Boxy units on the aft rack, on that side and the opposite one
     // (S66-25782 shows them on top; S66-25779 on top and bottom).
     mesh(box(kit, 0.55, 0.6, 0.26), kit.agena, 0, 1.25, 0.86),
@@ -1087,7 +1337,10 @@ function atdaShroudHalf(kit: Kit, upper: boolean): Group {
  */
 function atdaShroudOpen(kit: Kit): Group {
   const group = part('atda-shroud');
-  for (const [upper, angle] of [[true, 0.2], [false, 0.34]] as const) {
+  for (const [upper, angle] of [
+    [true, 0.2],
+    [false, 0.34],
+  ] as const) {
     const hinge = new Group();
     const side = upper ? 1 : -1;
     hinge.position.set(0, ATDA.bodyTop, side * ATDA_SHROUD.base);
@@ -1117,12 +1370,21 @@ function atlas(kit: Kit): Group {
   const atdaAdapter = special(
     ATLAS_ATDA_ADAPTER,
     mesh(cylinder(kit, 0.9, 0.98, ATLAS.top, ATLAS.atdaBase + 0.2, 24), kit.dark),
-    mesh(cylinder(kit, 0.98, 0.98, ATLAS.atdaBase + 0.2, ATLAS.atdaBase + ATDA.bodyTop, 24), kit.dark),
+    mesh(
+      cylinder(kit, 0.98, 0.98, ATLAS.atdaBase + 0.2, ATLAS.atdaBase + ATDA.bodyTop, 24),
+      kit.dark,
+    ),
   );
   for (let row = 0; row < 2; row += 1) {
     for (let k = 0; k < 4; k += 1) {
       const a = (k * Math.PI) / 2 + (row * Math.PI) / 4;
-      const square = mesh(box(kit, 0.36, 0.36, 0.04), kit.white, Math.sin(a) * 0.995, ATLAS.atdaBase + 0.75 + row * 0.85, Math.cos(a) * 0.995);
+      const square = mesh(
+        box(kit, 0.36, 0.36, 0.04),
+        kit.white,
+        Math.sin(a) * 0.995,
+        ATLAS.atdaBase + 0.75 + row * 0.85,
+        Math.cos(a) * 0.995,
+      );
       square.rotation.y = a;
       atdaAdapter.add(square);
     }
@@ -1135,7 +1397,13 @@ function atlas(kit: Kit): Group {
     mesh(cylinder(kit, 1.52, 1.52, 3.2, 18.5, 28), kit.atlas),
     mesh(cylinder(kit, 1.52, 0.9, 18.5, ATLAS.top, 28), kit.atlas),
     // The adapter, around the Agena's engine.
-    special(ATLAS_AGENA_ADAPTER, mesh(cylinder(kit, 0.9, 0.78, ATLAS.top, ATLAS.agenaBase + AGENA.engineTop, 24), kit.geminiWhite)),
+    special(
+      ATLAS_AGENA_ADAPTER,
+      mesh(
+        cylinder(kit, 0.9, 0.78, ATLAS.top, ATLAS.agenaBase + AGENA.engineTop, 24),
+        kit.geminiWhite,
+      ),
+    ),
     atdaAdapter,
   );
 }
@@ -1189,7 +1457,16 @@ function stackAssembly(kit: Kit): Group {
   csm.position.y = STACK.csmBase + CSM.center;
   const lm = lmAssembly(kit);
   lm.position.y = STACK.lmBase;
-  group.add(firstStage(kit), aftInterstage(kit), secondStage(kit), saturnIBFirstStage(kit), thirdStage(kit), adapter(kit), lm, csm);
+  group.add(
+    firstStage(kit),
+    aftInterstage(kit),
+    secondStage(kit),
+    saturnIBFirstStage(kit),
+    thirdStage(kit),
+    adapter(kit),
+    lm,
+    csm,
+  );
   return group;
 }
 
@@ -1214,7 +1491,12 @@ function cmHatchOutward(): Vector3 {
 function apolloSpacewalker(kit: Kit, backward: boolean): Group {
   const y = (CM_HATCH.y0 + CM_HATCH.y1) / 2;
   const at = new Vector3(0.6, 2.4, 3.6);
-  const place: WalkerPlace = { at, turn: walkerTurn(at, -0.25, -0.6, 0.15, backward), hatch: new Vector3(0, y, cmRadius(y)), outward: cmHatchOutward() };
+  const place: WalkerPlace = {
+    at,
+    turn: walkerTurn(at, -0.25, -0.6, 0.15, backward),
+    hatch: new Vector3(0, y, cmRadius(y)),
+    outward: cmHatchOutward(),
+  };
   return spacewalker(kit, place, { era: 'apollo', pack: 'small' });
 }
 
@@ -1229,10 +1511,25 @@ function apolloOpenHatch(kit: Kit): Group {
   const { y0, y1 } = CM_HATCH;
   const look: HatchLook = {
     opening: new MeshStandardMaterial({ color: 0x15171b, roughness: 0.9, transparent: true }),
-    door: new MeshStandardMaterial({ color: 0xc9ced5, roughness: 0.5, metalness: 0.2, transparent: true, side: DoubleSide }),
+    door: new MeshStandardMaterial({
+      color: 0xc9ced5,
+      roughness: 0.5,
+      metalness: 0.2,
+      transparent: true,
+      side: DoubleSide,
+    }),
   };
-  const opening = mesh(conePatch(kit, cmRadius(y0) + 0.02, cmRadius(y1) + 0.02, y0, y1, -0.3, 0.6), look.opening);
-  const door = mesh(box(kit, 0.04, 0.85, 0.75), look.door, Math.sin(0.3) * cmRadius(y0) + 0.38, (y0 + y1) / 2, Math.cos(0.3) * cmRadius(y0) + 0.32);
+  const opening = mesh(
+    conePatch(kit, cmRadius(y0) + 0.02, cmRadius(y1) + 0.02, y0, y1, -0.3, 0.6),
+    look.opening,
+  );
+  const door = mesh(
+    box(kit, 0.04, 0.85, 0.75),
+    look.door,
+    Math.sin(0.3) * cmRadius(y0) + 0.38,
+    (y0 + y1) / 2,
+    Math.cos(0.3) * cmRadius(y0) + 0.32,
+  );
   door.rotation.set(0.45, 0.8, 0);
   const group = special(APOLLO_HATCH, opening, door);
   group.userData['hatchLook'] = look;
@@ -1242,12 +1539,24 @@ function apolloOpenHatch(kit: Kit): Group {
 /** A crewmate standing in the command module's open side hatch (service module coordinates). */
 function apolloStandup(kit: Kit): Group {
   const y = (CM_HATCH.y0 + CM_HATCH.y1) / 2;
-  return standupWalker(kit, 'apollo', new Vector3(0, y, cmRadius(y)), cmHatchOutward(), new Vector3(0, -1, 0.3));
+  return standupWalker(
+    kit,
+    'apollo',
+    new Vector3(0, y, cmRadius(y)),
+    cmHatchOutward(),
+    new Vector3(0, -1, 0.3),
+  );
 }
 
 /** Both service modules (whole and damaged; the change's parts pick one), the command module, its open hatch, a crewmate standing in it, and (unless left out) a spacewalker. */
 function csmParts(kit: Kit, walker = true, backward = false): Object3D[] {
-  const parts = [serviceModule(kit), serviceModuleDamaged(kit), commandModule(kit), apolloOpenHatch(kit), apolloStandup(kit)];
+  const parts = [
+    serviceModule(kit),
+    serviceModuleDamaged(kit),
+    commandModule(kit),
+    apolloOpenHatch(kit),
+    apolloStandup(kit),
+  ];
   return walker ? [...parts, apolloSpacewalker(kit, backward)] : parts;
 }
 
@@ -1352,7 +1661,12 @@ function endFor(turned: boolean, ...children: Object3D[]): Group {
  * sections behind it, nose first, or blunt end first when `backward`.
  */
 function geminiAloneAssembly(kit: Kit, backward: boolean): Group {
-  return endFor(backward, ...geminiParts(kit), geminiSpacewalker(kit, backward), geminiStandup(kit));
+  return endFor(
+    backward,
+    ...geminiParts(kit),
+    geminiSpacewalker(kit, backward),
+    geminiStandup(kit),
+  );
 }
 
 /** The reentry module by itself, heat shield first (+Y), its heat shield at the origin, parachutes trailing; hatches on top (+Z), as in endFor. */
@@ -1362,7 +1676,11 @@ function geminiReentryAssembly(kit: Kit): Group {
   turned.rotation.z = Math.PI;
   const module = geminiReentryModule(kit);
   module.position.y = -GEMINI.retroTop;
-  turned.add(module, geminiParachute(kit, 'gemini-drogue-parachute'), geminiParachute(kit, 'gemini-main-parachute'));
+  turned.add(
+    module,
+    geminiParachute(kit, 'gemini-drogue-parachute'),
+    geminiParachute(kit, 'gemini-main-parachute'),
+  );
   group.add(turned);
   return group;
 }
@@ -1381,7 +1699,14 @@ function geminiDockedAssembly(kit: Kit, backward: boolean): Group {
   const atdaTarget = atda(kit);
   atdaTarget.rotation.z = Math.PI;
   atdaTarget.position.y = GEMINI_IN_CONE + ATDA.coneTop;
-  return endFor(backward, ...geminiParts(kit), agenaTarget, atdaTarget, geminiSpacewalker(kit, backward), geminiStandup(kit));
+  return endFor(
+    backward,
+    ...geminiParts(kit),
+    agenaTarget,
+    atdaTarget,
+    geminiSpacewalker(kit, backward),
+    geminiStandup(kit),
+  );
 }
 
 /** Where a target's cone mouth sits on a docked Gemini: the nose goes this far into the cone. */
@@ -1470,10 +1795,25 @@ type Kind =
   | 'none';
 
 /** Kinds that turn around about Z, keeping their top on top (see endFor); the rest turn about X. */
-const TURN_ABOUT_Z: ReadonlySet<Kind> = new Set<Kind>(['gemini', 'gemini-docked', 'gemini-reentry', 'agena', 'atda']);
+const TURN_ABOUT_Z: ReadonlySet<Kind> = new Set<Kind>([
+  'gemini',
+  'gemini-docked',
+  'gemini-reentry',
+  'agena',
+  'atda',
+]);
 
 /** Kinds a change's `facing` can turn end for end (craft in orbit). */
-const TURNABLE: ReadonlySet<Kind> = new Set<Kind>(['gemini', 'gemini-docked', 'docked', 'csm', 'sm', 'stage', 'agena', 'atda']);
+const TURNABLE: ReadonlySet<Kind> = new Set<Kind>([
+  'gemini',
+  'gemini-docked',
+  'docked',
+  'csm',
+  'sm',
+  'stage',
+  'agena',
+  'atda',
+]);
 
 /** Kinds whose changes share one launch-stack group (so stages can fall away from it). */
 const STACK_KINDS: ReadonlySet<Kind> = new Set<Kind>(['stack', 'titan', 'atlas']);
@@ -1566,7 +1906,8 @@ function kindOf(layout: VehicleLayout, parts: readonly VehiclePart[]): Kind {
   }
   if (has('agena')) return 'agena';
   if (has('atda')) return 'atda';
-  if (layout === 'launch' || layout === 'transposition' || layout === 'docked-on-stage') return 'stack';
+  if (layout === 'launch' || layout === 'transposition' || layout === 'docked-on-stage')
+    return 'stack';
   if (layout === 'docked' && has('command-module') && lunarModule) return 'docked';
   if (serviceModule && has('command-module')) return 'csm';
   if (has('command-module')) return 'cm';
@@ -1604,7 +1945,10 @@ function extentOf(group: Group, names: readonly string[]): [number, number] {
       const geometry = child.geometry as BufferGeometry;
       const position = geometry.getAttribute('position');
       for (let i = 0; i < position.count; i += 1) {
-        point.fromBufferAttribute(position, i).applyMatrix4(child.matrixWorld).applyMatrix4(inverse);
+        point
+          .fromBufferAttribute(position, i)
+          .applyMatrix4(child.matrixWorld)
+          .applyMatrix4(inverse);
         min = Math.min(min, point.y);
         max = Math.max(max, point.y);
       }
@@ -1623,7 +1967,11 @@ function axisPoint(group: Group, name: string, y: number): number | undefined {
 }
 
 /** The Gemini spacecraft's own sections. */
-const GEMINI_PARTS: readonly VehiclePart[] = ['gemini-equipment-section', 'gemini-retro-section', 'gemini-reentry-module'];
+const GEMINI_PARTS: readonly VehiclePart[] = [
+  'gemini-equipment-section',
+  'gemini-retro-section',
+  'gemini-reentry-module',
+];
 
 /** How big some parts are: the largest side of the box around them, and the farthest they reach from a pivot. */
 interface PartsSize {
@@ -1636,7 +1984,12 @@ interface PartsSize {
  * side, and the farthest any of it reaches from a point on the Y axis.
  * `offset` moves the parts first (a part parked apart from another).
  */
-function sizeOf(group: Group, names: readonly string[], pivot: number, offset?: Vector3): PartsSize {
+function sizeOf(
+  group: Group,
+  names: readonly string[],
+  pivot: number,
+  offset?: Vector3,
+): PartsSize {
   const min = new Vector3(Infinity, Infinity, Infinity);
   const max = new Vector3(-Infinity, -Infinity, -Infinity);
   const point = new Vector3();
@@ -1650,7 +2003,10 @@ function sizeOf(group: Group, names: readonly string[], pivot: number, offset?: 
       if (!(child instanceof Mesh) && !(child instanceof LineSegments)) return;
       const position = (child.geometry as BufferGeometry).getAttribute('position');
       for (let i = 0; i < position.count; i += 1) {
-        point.fromBufferAttribute(position, i).applyMatrix4(child.matrixWorld).applyMatrix4(inverse);
+        point
+          .fromBufferAttribute(position, i)
+          .applyMatrix4(child.matrixWorld)
+          .applyMatrix4(inverse);
         if (offset) point.add(offset);
         min.min(point);
         max.max(point);
@@ -1753,7 +2109,9 @@ const DROPPABLE: ReadonlySet<string> = new Set([
 ]);
 
 /** Parts that fall away only together with the part they sit on (the empty adapter with the S-IVB). */
-const RIDES_WITH: ReadonlyMap<VehiclePart, VehiclePart> = new Map<VehiclePart, VehiclePart>([['adapter', 'third-stage']]);
+const RIDES_WITH: ReadonlyMap<VehiclePart, VehiclePart> = new Map<VehiclePart, VehiclePart>([
+  ['adapter', 'third-stage'],
+]);
 
 /** Dropped parts that drift forward and aside (a tower or a nose shroud) rather than back. */
 const DROPS_FORWARD: ReadonlySet<string> = new Set(['escape-tower', 'agena-shroud', 'atda-shroud']);
@@ -1882,12 +2240,16 @@ export class ShipModel {
     for (const change of own) {
       const kind = kindOf(change.layout, change.parts);
       if (kind === 'none' && change.parts.length > 0) {
-        warnOnce(`${shipId} at "${change.label}": no shape is made of ${change.parts.join(', ')} in layout "${change.layout}"; nothing is drawn.`);
+        warnOnce(
+          `${shipId} at "${change.label}": no shape is made of ${change.parts.join(', ')} in layout "${change.layout}"; nothing is drawn.`,
+        );
       }
       // A craft in orbit may fly blunt end first.
       const backward = TURNABLE.has(kind) && change.facing === 'backward';
       if (change.facing && !TURNABLE.has(kind) && change.parts.length > 0) {
-        warnOnce(`${shipId} at "${change.label}": "facing" does not apply to this shape (${kind}); it keeps its usual way.`);
+        warnOnce(
+          `${shipId} at "${change.label}": "facing" does not apply to this shape (${kind}); it keeps its usual way.`,
+        );
       }
       let group: Group;
       if (STACK_KINDS.has(kind)) {
@@ -1911,12 +2273,17 @@ export class ShipModel {
         }
       });
       if (kind === 'stack' && change.layout === 'docked-on-stage' && !hasLunarModule(change)) {
-        warnOnce(`${shipId} at "${change.label}": "docked-on-stage" needs the lunar module's parts; for a flight without one, use "transposition".`);
+        warnOnce(
+          `${shipId} at "${change.label}": "docked-on-stage" needs the lunar module's parts; for a flight without one, use "transposition".`,
+        );
       }
       for (const name of change.parts) {
-        const shownByHatch = name === 'open-hatch' && (parts.has(GEMINI_RIGHT_HATCH) || parts.has(APOLLO_HATCH));
+        const shownByHatch =
+          name === 'open-hatch' && (parts.has(GEMINI_RIGHT_HATCH) || parts.has(APOLLO_HATCH));
         if (kind !== 'none' && !parts.has(name) && !shownByHatch) {
-          warnOnce(`${shipId} at "${change.label}": the ${kind} shape (layout "${change.layout}") cannot show "${name}"; it is left out.`);
+          warnOnce(
+            `${shipId} at "${change.label}": the ${kind} shape (layout "${change.layout}") cannot show "${name}"; it is left out.`,
+          );
         }
       }
 
@@ -1929,7 +2296,15 @@ export class ShipModel {
       let facingEnd: 1 | -1 = 1;
       const time = elapsed(change);
       const previous = this.shapes[this.shapes.length - 1];
-      const keptElsewhere = this.keptElsewhere(previous?.change, change, time, changes, elapsed, leftBehind, leftBehindTime);
+      const keptElsewhere = this.keptElsewhere(
+        previous?.change,
+        change,
+        time,
+        changes,
+        elapsed,
+        leftBehind,
+        leftBehindTime,
+      );
       if (STACK_KINDS.has(kind) && change.layout === 'launch') {
         // On its launch vehicle: the bottom of the stack sits on the path (on the pad at liftoff).
         pivot = min;
@@ -1941,7 +2316,12 @@ export class ShipModel {
       } else if (kind === 'lm') {
         pivot = change.parts.includes('lm-descent-stage') ? 0 : LM.descentTop;
         // An ascent stage that lifts off from a descent stage left on the surface starts where it sat, on top of it.
-        if (!change.parts.includes('lm-descent-stage') && keptElsewhere.has('lm-descent-stage') && previous?.kind === 'lm') pivotFrom = 0;
+        if (
+          !change.parts.includes('lm-descent-stage') &&
+          keptElsewhere.has('lm-descent-stage') &&
+          previous?.kind === 'lm'
+        )
+          pivotFrom = 0;
       } else if (kind === 'cm' || kind === 'gemini-reentry') {
         // Heat shield first, its base on the path (on the water at splashdown).
         pivot = 0;
@@ -2015,8 +2395,15 @@ export class ShipModel {
    * WALK_FOCUS_REACH meters (a long docked stack is then framed around the
    * spacewalker rather than whole).
    */
-  private walkerFocusOf(group: Group, kind: Kind, change: VehicleChange, pivot: number): Shape['walkerFocus'] {
-    const walker = group.getObjectByName(change.parts.includes('standup-spacewalker') ? 'standup-spacewalker' : 'spacewalker');
+  private walkerFocusOf(
+    group: Group,
+    kind: Kind,
+    change: VehicleChange,
+    pivot: number,
+  ): Shape['walkerFocus'] {
+    const walker = group.getObjectByName(
+      change.parts.includes('standup-spacewalker') ? 'standup-spacewalker' : 'spacewalker',
+    );
     const figure = walker?.children[0];
     if (!figure) return undefined;
     group.updateMatrixWorld(true);
@@ -2032,7 +2419,10 @@ export class ShipModel {
         if (!(child instanceof Mesh)) return;
         const position = (child.geometry as BufferGeometry).getAttribute('position');
         for (let i = 0; i < position.count; i += 1) {
-          point.fromBufferAttribute(position, i).applyMatrix4(child.matrixWorld).applyMatrix4(inverse);
+          point
+            .fromBufferAttribute(position, i)
+            .applyMatrix4(child.matrixWorld)
+            .applyMatrix4(inverse);
           point.y -= pivot;
           reach = Math.max(reach, point.distanceTo(center));
         }
@@ -2040,8 +2430,13 @@ export class ShipModel {
     }
     // The side to turn toward the camera: the figure's own, or WALKER_VIEW_LIFT on from it (see there).
     const lift = (walker?.userData['viewLift'] as number | undefined) ?? 0;
-    const side = Math.hypot(center.x, center.z) < 1e-6 ? Number.NaN : Math.atan2(center.x, center.z) + lift;
-    return { center, side, reach: Math.max(at.distanceTo(center) + 1.2, Math.min(reach, WALK_FOCUS_REACH)) };
+    const side =
+      Math.hypot(center.x, center.z) < 1e-6 ? Number.NaN : Math.atan2(center.x, center.z) + lift;
+    return {
+      center,
+      side,
+      reach: Math.max(at.distanceTo(center) + 1.2, Math.min(reach, WALK_FOCUS_REACH)),
+    };
   }
 
   /** The spacewalkers' own materials in a group. */
@@ -2074,10 +2469,16 @@ export class ShipModel {
     for (const name of before.parts) {
       if (change.parts.includes(name)) continue;
       const handedOver = changes.some(
-        (other) => other.ship !== change.ship && other.parts.includes(name) && Math.abs(elapsed(other) - time) <= 1,
+        (other) =>
+          other.ship !== change.ship &&
+          other.parts.includes(name) &&
+          Math.abs(elapsed(other) - time) <= 1,
       );
       const left = leftBehind.some(
-        (item) => item.ship === change.ship && item.part === name && Math.abs(leftBehindTime(item) - time) <= 1,
+        (item) =>
+          item.ship === change.ship &&
+          item.part === name &&
+          Math.abs(leftBehindTime(item) - time) <= 1,
       );
       if (handedOver || left) kept.add(name);
     }
@@ -2085,10 +2486,16 @@ export class ShipModel {
   }
 
   /** The main body's fixed point (see Shape.anchor) for a shape, relative to its pivot. */
-  private anchorOf(kind: Kind, change: VehicleChange, group: Group, pivot: number): number | undefined {
+  private anchorOf(
+    kind: Kind,
+    change: VehicleChange,
+    group: Group,
+    pivot: number,
+  ): number | undefined {
     const has = (name: VehiclePart): boolean => change.parts.includes(name);
     if (has('command-module')) {
-      if (kind === 'stack') return this.stackCmBase(change.layout, 1, hasLunarModule(change)) - pivot;
+      if (kind === 'stack')
+        return this.stackCmBase(change.layout, 1, hasLunarModule(change)) - pivot;
       if (kind === 'cm') return 0;
       return (axisPoint(group, 'command-module', CSM.smTop) ?? CSM.smTop) - pivot;
     }
@@ -2108,7 +2515,9 @@ export class ShipModel {
 
   /** Largest side and reach from the pivot, parachutes included (the turning-around CSM reaches farther). */
   private capSizes(group: Group, change: VehicleChange, kind: Kind, pivot: number): PartsSize {
-    const all = this.visibleParts(kind, change).filter((name) => !NOT_SIZED.has(name as VehiclePart));
+    const all = this.visibleParts(kind, change).filter(
+      (name) => !NOT_SIZED.has(name as VehiclePart),
+    );
     const size = sizeOf(group, all, pivot);
     if (change.layout === 'transposition') {
       size.largest += TRANSPOSITION_APART;
@@ -2144,7 +2553,9 @@ export class ShipModel {
 
   /** Whether a part is hidden in this shape although listed (the lunar module rides inside the adapter at launch). */
   private hiddenInside(kind: Kind, change: VehicleChange, name: string): boolean {
-    return kind === 'stack' && change.layout === 'launch' && LUNAR_MODULE_PARTS.has(name as VehiclePart);
+    return (
+      kind === 'stack' && change.layout === 'launch' && LUNAR_MODULE_PARTS.has(name as VehiclePart)
+    );
   }
 
   /** The named parts to show for a change. */
@@ -2208,7 +2619,10 @@ export class ShipModel {
   /** True when a shape has a spacewalker out. */
   hasWalker(index: number): boolean {
     const parts = this.shapes[index]?.change.parts;
-    return parts !== undefined && (parts.includes('spacewalker') || parts.includes('standup-spacewalker'));
+    return (
+      parts !== undefined &&
+      (parts.includes('spacewalker') || parts.includes('standup-spacewalker'))
+    );
   }
 
   /**
@@ -2235,7 +2649,8 @@ export class ShipModel {
   metersPerPixelOf(index: number, context: PoseContext): number {
     const shape = this.shapes[index];
     if (!shape) return 0;
-    const targetPixels = SHIP_SIZE_PX * context.sizeScale * Math.pow(shape.length / REFERENCE_LENGTH, SIZE_EXPONENT);
+    const targetPixels =
+      SHIP_SIZE_PX * context.sizeScale * Math.pow(shape.length / REFERENCE_LENGTH, SIZE_EXPONENT);
     const pixelsPerMeter = Math.min(
       targetPixels / shape.length,
       context.maxPixels / shape.largest,
@@ -2252,12 +2667,18 @@ export class ShipModel {
    * shows the true rate. When it stops, the model settles back square over a
    * moment. Under reduced motion every turn is slow and steady.
    */
-  private motionAt(index: number, context: PoseContext, out: { roll: number; tumble: number }): void {
+  private motionAt(
+    index: number,
+    context: PoseContext,
+    out: { roll: number; tumble: number },
+  ): void {
     let roll = 0;
     let tumble = 0;
     const limit = (degrees: number): number => {
       const rate = MathUtils.degToRad(degrees);
-      return context.reducedMotion ? Math.sign(rate) * Math.min(Math.abs(rate), MathUtils.degToRad(REDUCED_MOTION_TURN_DEG)) : rate;
+      return context.reducedMotion
+        ? Math.sign(rate) * Math.min(Math.abs(rate), MathUtils.degToRad(REDUCED_MOTION_TURN_DEG))
+        : rate;
     };
     for (let j = 0; j <= index; j += 1) {
       const shape = this.shapes[j] as Shape;
@@ -2275,7 +2696,11 @@ export class ShipModel {
         const start = limit(motion.rate.value);
         const finish = motion.rateTo ? limit(motion.rateTo.value) : start;
         // The angle turned: the rate changes evenly from start to finish over the whole stretch.
-        const angle = start * span + (Number.isFinite(length) && length > 0 ? ((finish - start) * span * span) / (2 * length) : 0);
+        const angle =
+          start * span +
+          (Number.isFinite(length) && length > 0
+            ? ((finish - start) * span * span) / (2 * length)
+            : 0);
         if (motion.kind === 'roll') {
           rolled += angle;
           rolling = true;
@@ -2315,19 +2740,28 @@ export class ShipModel {
    * stretch's `rateTo` when that is faster, otherwise the rate now (radians
    * per second, capped under reduced motion). NaN when there is no such turn.
    */
-  private ratesAt(index: number, context: PoseContext, out: { roll: [number, number]; tumble: [number, number] }): void {
+  private ratesAt(
+    index: number,
+    context: PoseContext,
+    out: { roll: [number, number]; tumble: [number, number] },
+  ): void {
     out.roll[0] = out.roll[1] = Number.NaN;
     out.tumble[0] = out.tumble[1] = Number.NaN;
     const shape = this.shapes[index];
     if (!shape) return;
     const limit = (degrees: number): number => {
       const rate = MathUtils.degToRad(degrees);
-      return context.reducedMotion ? Math.sign(rate) * Math.min(Math.abs(rate), MathUtils.degToRad(REDUCED_MOTION_TURN_DEG)) : rate;
+      return context.reducedMotion
+        ? Math.sign(rate) * Math.min(Math.abs(rate), MathUtils.degToRad(REDUCED_MOTION_TURN_DEG))
+        : rate;
     };
     const from = context.toStory(shape.time);
     const next = this.shapes[index + 1];
     const length = next ? context.toStory(next.time) - from : Infinity;
-    const progress = Number.isFinite(length) && length > 0 ? MathUtils.clamp((context.storyTime - from) / length, 0, 1) : 0;
+    const progress =
+      Number.isFinite(length) && length > 0
+        ? MathUtils.clamp((context.storyTime - from) / length, 0, 1)
+        : 0;
     for (const motion of shape.change.motion ?? []) {
       const start = limit(motion.rate.value);
       const finish = motion.rateTo ? limit(motion.rateTo.value) : start;
@@ -2361,7 +2795,10 @@ export class ShipModel {
     for (const kind of ['roll', 'tumble'] as const) {
       const [now, heading] = this.rates[kind];
       if (Number.isNaN(now)) {
-        this.idle[kind] = this.idle[kind] === 0 ? 0 : wrapAngle(this.idle[kind]) * Math.exp(-context.dt / IDLE_SETTLE_SECONDS);
+        this.idle[kind] =
+          this.idle[kind] === 0
+            ? 0
+            : wrapAngle(this.idle[kind]) * Math.exp(-context.dt / IDLE_SETTLE_SECONDS);
         if (Math.abs(this.idle[kind]) < 1e-4) this.idle[kind] = 0;
         else this.turningNow = true;
         this.idleRate[kind] = 0;
@@ -2371,7 +2808,8 @@ export class ShipModel {
         this.idleRate[kind] = now;
         continue;
       }
-      this.idleRate[kind] += (heading - this.idleRate[kind]) * (1 - Math.exp(-context.dt / IDLE_SPEED_UP_SECONDS));
+      this.idleRate[kind] +=
+        (heading - this.idleRate[kind]) * (1 - Math.exp(-context.dt / IDLE_SPEED_UP_SECONDS));
       this.idle[kind] = wrapAngle(this.idle[kind] + this.idleRate[kind] * context.dt);
       if (this.idleRate[kind] !== 0) this.turningNow = true;
     }
@@ -2381,7 +2819,12 @@ export class ShipModel {
   update(pose: ShipPose, context: PoseContext): boolean {
     const index = pose.exists ? this.shapeAt(context.time) : -1;
     const shape = index >= 0 ? this.shapes[index] : undefined;
-    if (!shape || shape.change.parts.length === 0 || context.unitsPerPixel <= 0 || context.opacity <= 0.005) {
+    if (
+      !shape ||
+      shape.change.parts.length === 0 ||
+      context.unitsPerPixel <= 0 ||
+      context.opacity <= 0.005
+    ) {
       this.root.visible = false;
       this.halo.visible = false;
       this.lastShape = -1;
@@ -2393,7 +2836,8 @@ export class ShipModel {
     this.halo.visible = true;
     this.fader.set(context.opacity);
     this.fade = Math.min(1, context.opacity);
-    (this.halo.material as SpriteMaterial).opacity = this.haloOpacity * Math.min(1, context.opacity) * context.glow;
+    (this.halo.material as SpriteMaterial).opacity =
+      this.haloOpacity * Math.min(1, context.opacity) * context.glow;
 
     const previous = index > 0 ? this.shapes[index - 1] : undefined;
     const since = (context.storyTime - context.toStory(shape.time)) / DROP_STORY_SECONDS;
@@ -2449,7 +2893,8 @@ export class ShipModel {
     shape.group.position.y = -pivot;
     // A spacewalk close-up centers between the craft and the figure.
     const focus = shape.walkerFocus;
-    if (focus && context.focus > 0) this.spin.position.copy(focus.center).multiplyScalar(-context.focus);
+    if (focus && context.focus > 0)
+      this.spin.position.copy(focus.center).multiplyScalar(-context.focus);
     else this.spin.position.set(0, 0, 0);
     if (droppedFrom) this.showDropped(droppedFrom, shape, dropped, turning, pivot);
 
@@ -2489,7 +2934,8 @@ export class ShipModel {
     // Apparent size: steady on screen, a little bigger for bigger stacks.
     const own = this.metersPerPixelOf(index, context);
     const wanted = context.metersPerPixel > 0 ? context.metersPerPixel : own;
-    if (context.snap || this.lastShape < 0 || this.metersPerPixel <= 0) this.metersPerPixel = wanted;
+    if (context.snap || this.lastShape < 0 || this.metersPerPixel <= 0)
+      this.metersPerPixel = wanted;
     else {
       const k = 1 - Math.exp(-context.dt / SIZE_SMOOTHING_SECONDS);
       this.metersPerPixel += (wanted - this.metersPerPixel) * k;
@@ -2526,7 +2972,8 @@ export class ShipModel {
         node.visible = true;
         continue;
       }
-      node.visible = shown.includes(name as VehiclePart) && !this.hiddenInside(shape.kind, shape.change, name);
+      node.visible =
+        shown.includes(name as VehiclePart) && !this.hiddenInside(shape.kind, shape.change, name);
     }
     if (shape.kind === 'stack' && shape.change.layout !== 'launch') {
       // Transposition: the command and service module backs off, turns around, and docks.
@@ -2539,7 +2986,10 @@ export class ShipModel {
           const b = context.toStory(next.time);
           p = b > a ? (context.storyTime - a) / (b - a) : 1;
         }
-        const { center, angle } = this.transposition(Math.min(1, Math.max(0, p)), hasLunarModule(shape.change));
+        const { center, angle } = this.transposition(
+          Math.min(1, Math.max(0, p)),
+          hasLunarModule(shape.change),
+        );
         csm.position.y = center;
         csm.rotation.x = angle;
       }
@@ -2557,14 +3007,16 @@ export class ShipModel {
     if (walker === 1) this.walkerGun = parts.includes('gas-gun');
     const standing = parts.includes('standup-spacewalker') ? 1 : 0;
     const hatch = walker === 1 || standing === 1 || parts.includes('open-hatch') ? 1 : 0;
-    const k = context.snap || context.reducedMotion ? 1 : 1 - Math.exp(-context.dt / WALKER_FADE_SECONDS);
+    const k =
+      context.snap || context.reducedMotion ? 1 : 1 - Math.exp(-context.dt / WALKER_FADE_SECONDS);
     this.walkerLevel += (walker - this.walkerLevel) * k;
     this.standLevel += (standing - this.standLevel) * k;
     this.hatchLevel += (hatch - this.hatchLevel) * k;
     if (Math.abs(this.walkerLevel - walker) < 0.004) this.walkerLevel = walker;
     if (Math.abs(this.standLevel - standing) < 0.004) this.standLevel = standing;
     if (Math.abs(this.hatchLevel - hatch) < 0.004) this.hatchLevel = hatch;
-    this.walkerMoving = this.walkerLevel !== walker || this.standLevel !== standing || this.hatchLevel !== hatch;
+    this.walkerMoving =
+      this.walkerLevel !== walker || this.standLevel !== standing || this.hatchLevel !== hatch;
   }
 
   /** Nodes that follow the listed parts in their own ways (`parts`: the parts of the shape they belong to). */
@@ -2630,18 +3082,28 @@ export class ShipModel {
   private droppedAt(previous: Shape, next: Shape, out: VehiclePart[]): VehiclePart[] {
     out.length = 0;
     const parts = previous.change.parts;
-    const gone = (name: VehiclePart): boolean => !next.change.parts.includes(name) && !next.keptElsewhere.has(name);
+    const gone = (name: VehiclePart): boolean =>
+      !next.change.parts.includes(name) && !next.keptElsewhere.has(name);
     for (let i = 0; i < parts.length; i += 1) {
       const name = parts[i] as VehiclePart;
       if (!gone(name)) continue;
       const base = RIDES_WITH.get(name);
-      if (DROPPABLE.has(name) || (base !== undefined && parts.includes(base) && gone(base) && DROPPABLE.has(base))) out.push(name);
+      if (
+        DROPPABLE.has(name) ||
+        (base !== undefined && parts.includes(base) && gone(base) && DROPPABLE.has(base))
+      )
+        out.push(name);
     }
     return out;
   }
 
   /** Within the launch stack: parts that came off drift away (stages back, the tower forward). */
-  private dropWithinStack(previous: Shape, next: Shape, shape: Shape, progress: { done: number; drift: number }): void {
+  private dropWithinStack(
+    previous: Shape,
+    next: Shape,
+    shape: Shape,
+    progress: { done: number; drift: number },
+  ): void {
     const since = progress.done;
     const dropped = this.droppedAt(previous, next, this.dropped);
     for (let i = 0; i < dropped.length; i += 1) {
@@ -2659,7 +3121,13 @@ export class ShipModel {
   }
 
   /** Between different models: show the previous model's dropped parts, lined up, drifting away. */
-  private showDropped(previous: Shape, shape: Shape, progress: { done: number; drift: number }, turning: boolean, pivotNow: number): void {
+  private showDropped(
+    previous: Shape,
+    shape: Shape,
+    progress: { done: number; drift: number },
+    turning: boolean,
+    pivotNow: number,
+  ): void {
     const since = progress.done;
     const dropped = this.droppedAt(previous, shape, this.dropped);
     if (dropped.length === 0 || previous.anchor === undefined || shape.anchor === undefined) return;
@@ -2769,7 +3237,10 @@ export class LeftBehindModel {
     const parked = PARKED[item.part];
     if (item.part === 'lm-descent-stage') this.holder.add(lmDescentStage(kit));
     else if (item.part === 'lunar-rover') this.holder.add(lunarRover(kit));
-    else warnOnce(`${item.ship} at "${item.label}": "${item.part}" cannot be drawn as a part left behind.`);
+    else
+      warnOnce(
+        `${item.ship} at "${item.label}": "${item.part}" cannot be drawn as a part left behind.`,
+      );
     if (parked) {
       this.holder.position.copy(parked.at);
       this.holder.rotation.y = parked.turn;
@@ -2808,7 +3279,13 @@ export class LeftBehindModel {
    * `front`; hide it when `shown` is false. When `context.metersPerPixel`
    * is above 0, draw at that scale (the lander standing at the site).
    */
-  update(shown: boolean, position: Vector3, up: Vector3, front: Vector3, context: PoseContext): void {
+  update(
+    shown: boolean,
+    position: Vector3,
+    up: Vector3,
+    front: Vector3,
+    context: PoseContext,
+  ): void {
     if (!shown || context.unitsPerPixel <= 0) {
       this.root.visible = false;
       this.metersPerPixel = 0;
@@ -2826,13 +3303,16 @@ export class LeftBehindModel {
     // The same scale the ascent stage gets (see ShipModel.update), unless the lander is still there.
     const ascent = LM.tunnelTop - LM.descentTop;
     const pixelsPerMeter = Math.min(
-      (SHIP_SIZE_PX * context.sizeScale * Math.pow(ascent / REFERENCE_LENGTH, SIZE_EXPONENT)) / ascent,
+      (SHIP_SIZE_PX * context.sizeScale * Math.pow(ascent / REFERENCE_LENGTH, SIZE_EXPONENT)) /
+        ascent,
       context.maxPixels / this.largest,
       context.maxReachPixels / this.reach,
     );
     const wanted = context.metersPerPixel > 0 ? context.metersPerPixel : 1 / pixelsPerMeter;
     if (context.snap || this.metersPerPixel <= 0) this.metersPerPixel = wanted;
-    else this.metersPerPixel += (wanted - this.metersPerPixel) * (1 - Math.exp(-context.dt / SIZE_SMOOTHING_SECONDS));
+    else
+      this.metersPerPixel +=
+        (wanted - this.metersPerPixel) * (1 - Math.exp(-context.dt / SIZE_SMOOTHING_SECONDS));
     this.root.scale.setScalar(context.unitsPerPixel / this.metersPerPixel);
   }
 }
@@ -2855,7 +3335,14 @@ function haloTexture(): CanvasTexture {
   canvas.height = size;
   const context = canvas.getContext('2d');
   if (context) {
-    const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    const gradient = context.createRadialGradient(
+      size / 2,
+      size / 2,
+      0,
+      size / 2,
+      size / 2,
+      size / 2,
+    );
     gradient.addColorStop(0, 'rgba(255,255,255,0.55)');
     gradient.addColorStop(0.45, 'rgba(255,255,255,0.22)');
     gradient.addColorStop(1, 'rgba(255,255,255,0)');
@@ -2888,9 +3375,13 @@ export function buildFleet(
   };
   const texture = haloTexture();
   for (const change of changes) {
-    if (!ships.some((ship) => ship.id === change.ship)) warnOnce(`A vehicle change names a ship the flight plan does not have: "${change.ship}".`);
+    if (!ships.some((ship) => ship.id === change.ship))
+      warnOnce(`A vehicle change names a ship the flight plan does not have: "${change.ship}".`);
   }
-  const models = ships.map((ship) => new ShipModel(ship.id, changes, elapsed, kitFor(), texture, ship.color, leftBehind, elapsed));
+  const models = ships.map(
+    (ship) =>
+      new ShipModel(ship.id, changes, elapsed, kitFor(), texture, ship.color, leftBehind, elapsed),
+  );
   const sharedKit = kitFor();
   const parts = leftBehind.map((item) => new LeftBehindModel(item, elapsed(item), sharedKit));
   // Everything parked at one site is capped together, so it keeps one scale.
@@ -2898,7 +3389,11 @@ export function buildFleet(
     const site = parts.filter((other) => other.shipId === model.shipId);
     const holder = new Group();
     for (const other of site) holder.add(other.root.clone());
-    const size = sizeOf(holder, site.map((other) => other.part), 0);
+    const size = sizeOf(
+      holder,
+      site.map((other) => other.part),
+      0,
+    );
     model.largest = size.largest;
     model.reach = size.reach;
   }
@@ -2949,22 +3444,28 @@ export function buildStandaloneVehicle(
   const geometries = new Map<string, BufferGeometry>();
   const kit = makeKit(geometries);
   const kind = kindOf(layout, parts);
-  if (kind === 'none' && parts.length > 0) warnOnce(`createVehicle: no shape is made of ${parts.join(', ')} in layout "${layout}".`);
+  if (kind === 'none' && parts.length > 0)
+    warnOnce(`createVehicle: no shape is made of ${parts.join(', ')} in layout "${layout}".`);
   const group = buildAssembly(kit, kind, TURNABLE.has(kind) && facing === 'backward');
   const nodes = new Map<string, Group>();
   group.traverse((child) => {
     if (child instanceof Group && child.name) nodes.set(child.name, child);
   });
   const known = parts.filter((name) => {
-    const ok = nodes.has(name) || (name === 'open-hatch' && (nodes.has(GEMINI_RIGHT_HATCH) || nodes.has(APOLLO_HATCH)));
-    if (!ok) warnOnce(`createVehicle: the ${kind} shape (layout "${layout}") cannot show "${name}".`);
+    const ok =
+      nodes.has(name) ||
+      (name === 'open-hatch' && (nodes.has(GEMINI_RIGHT_HATCH) || nodes.has(APOLLO_HATCH)));
+    if (!ok)
+      warnOnce(`createVehicle: the ${kind} shape (layout "${layout}") cannot show "${name}".`);
     return ok;
   });
-  const hidden = (name: string): boolean => kind === 'stack' && layout === 'launch' && LUNAR_MODULE_PARTS.has(name as VehiclePart);
+  const hidden = (name: string): boolean =>
+    kind === 'stack' && layout === 'launch' && LUNAR_MODULE_PARTS.has(name as VehiclePart);
   // Show the listed parts, and the nodes that go with them.
   for (const [name, node] of nodes) {
     if (WRAPPERS.has(name)) node.visible = true;
-    else if (!SPECIALS.has(name)) node.visible = known.includes(name as VehiclePart) && !hidden(name);
+    else if (!SPECIALS.has(name))
+      node.visible = known.includes(name as VehiclePart) && !hidden(name);
   }
   const boom = nodes.get(AGENA_BOOM);
   if (boom) boom.visible = !known.includes('agena-shroud');
@@ -2972,7 +3473,10 @@ export function buildStandaloneVehicle(
   if (agenaAdapter) agenaAdapter.visible = !known.includes('atda');
   const atdaAdapter = nodes.get(ATLAS_ATDA_ADAPTER);
   if (atdaAdapter) atdaAdapter.visible = known.includes('atda');
-  const open = known.includes('spacewalker') || known.includes('standup-spacewalker') || known.includes('open-hatch');
+  const open =
+    known.includes('spacewalker') ||
+    known.includes('standup-spacewalker') ||
+    known.includes('open-hatch');
   for (const name of ['spacewalker', 'standup-spacewalker'] as const) {
     const figure = nodes.get(name);
     if (!figure) continue;
@@ -2996,7 +3500,9 @@ export function buildStandaloneVehicle(
   if (csm && kind === 'stack' && layout !== 'launch') {
     const start = STACK.csmBase + CSM.center;
     const docks = parts.some((name) => LUNAR_MODULE_PARTS.has(name));
-    csm.position.y = docks ? STACK.lmBase + LM.tunnelTop + (CSM.tunnelTop - CSM.center) : start + TRANSPOSITION_APART;
+    csm.position.y = docks
+      ? STACK.lmBase + LM.tunnelTop + (CSM.tunnelTop - CSM.center)
+      : start + TRANSPOSITION_APART;
     csm.rotation.x = Math.PI;
   }
   const visible = bodyParts(known.filter((name) => !hidden(name)));
@@ -3070,11 +3576,23 @@ export function launchStackHeights(): StackHeights {
     vehicle.dispose();
     return Math.round(height * 10) / 10;
   };
-  const apollo: VehiclePart[] = ['third-stage', 'adapter', 'service-module', 'command-module', 'escape-tower'];
+  const apollo: VehiclePart[] = [
+    'third-stage',
+    'adapter',
+    'service-module',
+    'command-module',
+    'escape-tower',
+  ];
   return {
     saturnV: measure('launch', ['first-stage', 'aft-interstage', 'second-stage', ...apollo]),
     saturnIB: measure('launch', ['saturn-ib-first-stage', ...apollo]),
-    titanII: measure('launch', ['titan-first-stage', 'titan-second-stage', 'gemini-equipment-section', 'gemini-retro-section', 'gemini-reentry-module']),
+    titanII: measure('launch', [
+      'titan-first-stage',
+      'titan-second-stage',
+      'gemini-equipment-section',
+      'gemini-retro-section',
+      'gemini-reentry-module',
+    ]),
     atlasAgena: measure('launch', ['atlas', 'agena', 'agena-shroud']),
   };
 }

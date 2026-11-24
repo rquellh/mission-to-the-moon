@@ -28,8 +28,9 @@
   --color-accent-soft: rgb(244 185 66 / 0.13);
   --color-accent-line: rgb(244 185 66 / 0.5);
 
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --blur: blur(16px) saturate(1.15);
@@ -265,12 +266,12 @@ h4 {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
   grid-template-areas:
-    "masthead"
-    "views"
-    "."
-    "caption"
-    "sheet"
-    "timeline";
+    'masthead'
+    'views'
+    '.'
+    'caption'
+    'sheet'
+    'timeline';
   pointer-events: none;
 }
 
@@ -427,7 +428,7 @@ body.is-welcome .hud {
 }
 
 .segmented__item::before {
-  content: "";
+  content: '';
   position: absolute;
   inset: 4px;
   z-index: -1;
@@ -450,11 +451,11 @@ body.is-welcome .hud {
   border-radius: 12px;
 }
 
-.segmented__item[aria-pressed="true"] {
+.segmented__item[aria-pressed='true'] {
   color: var(--color-text);
 }
 
-.segmented__item[aria-pressed="true"]::before {
+.segmented__item[aria-pressed='true']::before {
   background: var(--color-accent-soft);
   box-shadow: inset 0 0 0 1px var(--color-accent-line);
 }
@@ -506,15 +507,15 @@ body.is-welcome .hud {
     background-color 200ms ease-out;
 }
 
-.switch[aria-pressed="true"] {
+.switch[aria-pressed='true'] {
   color: var(--color-text);
 }
 
-.switch[aria-pressed="true"] .switch__track {
+.switch[aria-pressed='true'] .switch__track {
   background: var(--color-accent);
 }
 
-.switch[aria-pressed="true"] .switch__knob {
+.switch[aria-pressed='true'] .switch__knob {
   transform: translateX(12px);
   background: var(--color-accent-ink);
 }
@@ -559,7 +560,7 @@ body.is-welcome .hud {
 
 /* Phones: with the card expanded the 3D view is mostly covered, so its note
    steps aside; on a short screen it would otherwise crowd the view buttons. */
-.hud:has(.sheet[data-state="expanded"]) .caption {
+.hud:has(.sheet[data-state='expanded']) .caption {
   display: none;
 }
 
@@ -600,7 +601,7 @@ body.is-welcome .hud {
 
 /* Reach above the sheet so the grab area is a full 44 pixels. */
 .sheet__handle::before {
-  content: "";
+  content: '';
   position: absolute;
   inset: -22px 0 0;
 }
@@ -633,8 +634,8 @@ body.is-welcome .hud {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    "progress progress progress"
-    "exit count nav";
+    'progress progress progress'
+    'exit count nav';
   align-items: center;
   gap: 10px 6px;
 }
@@ -827,17 +828,17 @@ body.is-welcome .hud {
   padding-top: 14px;
 }
 
-.sheet[data-state="compact"] .card__body,
-.sheet[data-state="compact"] .card__utc {
+.sheet[data-state='compact'] .card__body,
+.sheet[data-state='compact'] .card__utc {
   display: none;
 }
 
-.sheet[data-state="expanded"] .card__line {
+.sheet[data-state='expanded'] .card__line {
   display: none;
 }
 
 /* On the tour, the compact card shows a little more of the text. */
-.is-touring .sheet[data-state="compact"] .card__line {
+.is-touring .sheet[data-state='compact'] .card__line {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -1002,7 +1003,7 @@ body.is-welcome .hud {
   transition: transform 200ms var(--ease-out);
 }
 
-.disclosure[aria-expanded="true"] .disclosure__icon,
+.disclosure[aria-expanded='true'] .disclosure__icon,
 .sources[open] .sources__icon {
   transform: rotate(180deg);
 }
@@ -1105,9 +1106,9 @@ body.is-welcome .hud {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) auto;
   grid-template-areas:
-    "play clock speed"
-    "scrub scrub scrub"
-    "chapter chapter chapter";
+    'play clock speed'
+    'scrub scrub scrub'
+    'chapter chapter chapter';
   align-items: center;
   gap: 4px 12px;
   padding: 8px var(--safe-right) var(--safe-bottom) var(--safe-left);
@@ -1439,7 +1440,7 @@ body.is-welcome .hud {
 /* Reach down so each chapter name is a full 44 pixels tall to tap, and
    at least 44 wide for a short chapter. */
 .chapters__item::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 0;
   bottom: -8px;
@@ -1537,7 +1538,7 @@ body.is-welcome .hud {
   animation: rise 520ms var(--ease-out) both;
 }
 
-.hub[data-mode="return"] {
+.hub[data-mode='return'] {
   animation-duration: 320ms;
 }
 
@@ -1633,7 +1634,7 @@ body.is-welcome .hud {
 }
 
 /* The mission loaded behind the picker. */
-.hub__entry[aria-current="true"] {
+.hub__entry[aria-current='true'] {
   margin: 6px -10px;
   padding: 12px 10px;
   border-top: 0;
@@ -1642,7 +1643,7 @@ body.is-welcome .hud {
   box-shadow: inset 0 0 0 1px var(--color-accent-line);
 }
 
-.hub__entry[aria-current="true"] + .hub__entry {
+.hub__entry[aria-current='true'] + .hub__entry {
   border-top-color: transparent;
 }
 
@@ -1690,7 +1691,7 @@ body.is-welcome .hud {
 }
 
 .hub__mark--current::before {
-  content: "";
+  content: '';
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -1739,7 +1740,7 @@ body.is-welcome .hud {
 }
 
 /* The open mission, and a memorial, are read in full. */
-.hub__entry[aria-current="true"] .hub__summary,
+.hub__entry[aria-current='true'] .hub__summary,
 .hub__entry--memorial .hub__summary {
   display: block;
   overflow: visible;
@@ -2405,11 +2406,11 @@ body.is-welcome .hud {
     grid-template-columns: minmax(0, 1fr) var(--panel-width);
     grid-template-rows: auto auto minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "masthead sheet"
-      "views sheet"
-      ". sheet"
-      "caption sheet"
-      "timeline timeline";
+      'masthead sheet'
+      'views sheet'
+      '. sheet'
+      'caption sheet'
+      'timeline timeline';
   }
 
   .masthead {
@@ -2447,7 +2448,7 @@ body.is-welcome .hud {
   }
 
   .caption,
-  .hud:has(.sheet[data-state="expanded"]) .caption {
+  .hud:has(.sheet[data-state='expanded']) .caption {
     display: flex;
     padding: 0 16px 10px max(24px, env(safe-area-inset-left));
   }
@@ -2485,9 +2486,9 @@ body.is-welcome .hud {
   .tour__steps {
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
-      "count count"
-      "progress progress"
-      "exit nav";
+      'count count'
+      'progress progress'
+      'exit nav';
   }
 
   .tour__count {
@@ -2526,8 +2527,8 @@ body.is-welcome .hud {
     grid-template-columns: 48px auto minmax(0, 1fr) auto;
     grid-template-rows: 44px 36px;
     grid-template-areas:
-      "play clock scrub speed"
-      "play clock chapters speed";
+      'play clock scrub speed'
+      'play clock chapters speed';
     gap: 0 20px;
     padding: 10px max(24px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
       max(24px, env(safe-area-inset-left));
@@ -2598,7 +2599,7 @@ body.is-welcome .hud {
     padding: 0 28px 20px;
   }
 
-  .hub__entry[aria-current="true"] {
+  .hub__entry[aria-current='true'] {
     margin: 6px -12px;
     padding: 12px;
   }
@@ -2611,7 +2612,7 @@ body.is-welcome .hud {
   }
 
   .caption,
-  .hud:has(.sheet[data-state="expanded"]) .caption {
+  .hud:has(.sheet[data-state='expanded']) .caption {
     display: none;
   }
 
@@ -2701,7 +2702,7 @@ body.is-welcome .hud {
   }
 
   .masthead__site::after {
-    content: "/";
+    content: '/';
     margin-left: 12px;
     color: var(--color-text-faint);
   }

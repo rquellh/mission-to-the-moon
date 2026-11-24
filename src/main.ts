@@ -1,11 +1,19 @@
 import './styles/main.css';
 import type { Director, StoryMap } from './app/contract';
-import { outlineOf, sourcesCitedBy } from './app/outline';
 import { readDeepLink } from './app/deep-link';
+import { outlineOf, sourcesCitedBy } from './app/outline';
 import { MissionPlayer } from './app/player';
-import { copy } from './content/copy';
 import { homeView, nearestView } from './app/views';
-import { flightIdFor, hasMemorial, isReady, loadBundle, loadMemorial, summaries, summaryFor } from './content/missions';
+import { copy } from './content/copy';
+import {
+  flightIdFor,
+  hasMemorial,
+  isReady,
+  loadBundle,
+  loadMemorial,
+  summaries,
+  summaryFor,
+} from './content/missions';
 import { elapsedToSeconds, type EventView, type MissionSummary } from './content/types';
 import { extraFor, extras, hasExtra, isExtraReady, loadExtra } from './extras';
 import type { Stage } from './scene/stage';
@@ -106,10 +114,14 @@ async function main(): Promise<void> {
   } catch (error) {
     console.error(error);
     const list = setUpMissionList(listOptions);
-    status.showMessage(flightName ? copy.errors.mission(flightName) : copy.errors.missionUnnamed, true, {
-      text: copy.errors.allMissions,
-      run: (from) => list.open(from),
-    });
+    status.showMessage(
+      flightName ? copy.errors.mission(flightName) : copy.errors.missionUnnamed,
+      true,
+      {
+        text: copy.errors.allMissions,
+        run: (from) => list.open(from),
+      },
+    );
     return;
   }
   const { bundle, path, storyTime } = flight;
@@ -123,7 +135,8 @@ async function main(): Promise<void> {
   const player = new MissionPlayer(keys[0] ?? path.start, keys[keys.length - 1] ?? path.end, story);
 
   // A time in the address wins over an event.
-  const atEvent = link.time === null ? mission.events.find((event) => event.id === link.event) : undefined;
+  const atEvent =
+    link.time === null ? mission.events.find((event) => event.id === link.event) : undefined;
   if (link.time !== null) player.seek(link.time);
   else if (atEvent) player.seek(elapsedToSeconds(atEvent.elapsed));
   const seeked = link.time !== null || atEvent !== undefined;

@@ -8,7 +8,10 @@ import { formatDate, formatTimeOfDay, missionDates } from './format';
 import { fillPhoto } from './photo';
 
 /** The folded list of sources, with any notes where sources disagree inside it. */
-function sources(citations: readonly Citation[], ...discrepancies: Array<string | undefined>): HTMLElement[] {
+function sources(
+  citations: readonly Citation[],
+  ...discrepancies: Array<string | undefined>
+): HTMLElement[] {
   return [sourcesBlock(citations, ...discrepancies)];
 }
 
@@ -41,13 +44,19 @@ export function renderAbout(mission: Mission): void {
     const when = new Date(launch.utc);
     const line = Number.isNaN(when.getTime())
       ? copy.about.launchUndated(launch.site, launch.vehicle)
-      : copy.about.launch(`${formatDate(when)}, at ${formatTimeOfDay(when).slice(0, 5)} UTC`, launch.site, launch.vehicle);
+      : copy.about.launch(
+          `${formatDate(when)}, at ${formatTimeOfDay(when).slice(0, 5)} UTC`,
+          launch.site,
+          launch.vehicle,
+        );
     byline.append(el('span', 'about__launch', line));
   }
   if (byline.childElementCount) intro.append(byline);
   intro.append(factText(mission.summary, 'about__summary'));
   const introCitations = [...mission.summary.citations, ...(mission.launch?.citations ?? [])];
-  intro.append(...sources(introCitations, mission.summary.discrepancy, mission.launch?.discrepancy));
+  intro.append(
+    ...sources(introCitations, mission.summary.discrepancy, mission.launch?.discrepancy),
+  );
   parts.push(intro);
 
   // Crew: NASA's portrait when the mission has one, then the names and roles.
@@ -65,7 +74,10 @@ export function renderAbout(mission: Mission): void {
   const crewList = el('ul', 'about__crew');
   for (const member of mission.crew.value) {
     const item = el('li', 'about__crew-member');
-    item.append(el('span', 'about__crew-name', member.name), el('span', 'about__crew-role', member.role));
+    item.append(
+      el('span', 'about__crew-name', member.name),
+      el('span', 'about__crew-role', member.role),
+    );
     crewList.append(item);
   }
   crew.append(crewList, ...sources(mission.crew.citations, mission.crew.discrepancy));
@@ -77,7 +89,10 @@ export function renderAbout(mission: Mission): void {
     const list = el('ul', 'about__crew');
     for (const sign of mission.callSigns.value) {
       const item = el('li', 'about__crew-member');
-      item.append(el('span', 'about__crew-name', sign.name), el('span', 'about__crew-role', sign.craft));
+      item.append(
+        el('span', 'about__crew-name', sign.name),
+        el('span', 'about__crew-role', sign.craft),
+      );
       list.append(item);
     }
     calls.append(list, ...sources(mission.callSigns.citations, mission.callSigns.discrepancy));
@@ -126,7 +141,11 @@ export function howDrawnParagraphs(mission: Mission, flight: FlightOutline): str
   const text = copy.howDrawn;
   const where = mission.destination;
   const moon = where === 'moon';
-  const exact = flight.landsOnMoon ? text.exact.moonLanding : flight.splashdown ? text.exact.splashdown : text.exact.other;
+  const exact = flight.landsOnMoon
+    ? text.exact.moonLanding
+    : flight.splashdown
+      ? text.exact.splashdown
+      : text.exact.other;
   return [
     ...(moon ? [text.heldStill] : []),
     exact,
@@ -144,5 +163,7 @@ export function howDrawnParagraphs(mission: Mission, flight: FlightOutline): str
 export function renderHowDrawn(mission: Mission, flight: FlightOutline): void {
   byId('drawn-title', HTMLHeadingElement).textContent = copy.howDrawn.title;
   const body = byId('drawn-body', HTMLDivElement);
-  body.replaceChildren(...howDrawnParagraphs(mission, flight).map((line) => el('p', 'note__paragraph', line)));
+  body.replaceChildren(
+    ...howDrawnParagraphs(mission, flight).map((line) => el('p', 'note__paragraph', line)),
+  );
 }

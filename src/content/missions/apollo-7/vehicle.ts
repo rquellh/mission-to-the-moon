@@ -26,29 +26,35 @@
  *   as a motion: while the two keep station, the scene turns it to face the
  *   stage.
  */
-import type { Citation, Cited, ElapsedTime } from "../../types.ts";
-import type { LeftBehind, VehicleChange, VehiclePart } from "../../vehicle-types.ts";
+import type { Citation, Cited, ElapsedTime } from '../../types.ts';
+import type { LeftBehind, VehicleChange, VehiclePart } from '../../vehicle-types.ts';
 
 /* ------------------------------------------------------------------ */
 /* Citation helpers.                                                   */
 /* ------------------------------------------------------------------ */
 
 const MISSION_REPORT =
-  "https://web.archive.org/web/20250207014232/https://www.nasa.gov/wp-content/uploads/static/history/alsj/a410/A07_MissionReport.pdf";
-const ABN = "https://www.nasa.gov/wp-content/uploads/static/history/SP-4029/";
+  'https://web.archive.org/web/20250207014232/https://www.nasa.gov/wp-content/uploads/static/history/alsj/a410/A07_MissionReport.pdf';
+const ABN = 'https://www.nasa.gov/wp-content/uploads/static/history/SP-4029/';
 
 function report(locator: string): Citation {
-  return { source: "apollo-7-mission-report", locator, url: MISSION_REPORT };
+  return { source: 'apollo-7-mission-report', locator, url: MISSION_REPORT };
 }
 
 /** A row of Table 2-I, "Actual" column. */
-function sequence(row: string, page: "2-3" | "2-4"): Citation {
-  return report(`Table 2-I, "Sequence of Events" (page ${page}, PDF page ${page === "2-3" ? 29 : 30}), "${row}" row, actual column`);
+function sequence(row: string, page: '2-3' | '2-4'): Citation {
+  return report(
+    `Table 2-I, "Sequence of Events" (page ${page}, PDF page ${page === '2-3' ? 29 : 30}), "${row}" row, actual column`,
+  );
 }
 
 /** A row of the Apollo by the Numbers Apollo 7 Timeline, quoted as printed. */
 function timeline(row: string): Citation {
-  return { source: "apollo-by-the-numbers", locator: `Apollo 7 Timeline, row "${row}"`, url: `${ABN}Apollo_07f_Timeline.htm` };
+  return {
+    source: 'apollo-by-the-numbers',
+    locator: `Apollo 7 Timeline, row "${row}"`,
+    url: `${ABN}Apollo_07f_Timeline.htm`,
+  };
 }
 
 function at(elapsed: ElapsedTime, citation: Citation, ...more: Citation[]): Cited<ElapsedTime> {
@@ -60,9 +66,10 @@ const PARACHUTES = report(
 );
 
 const NO_LUNAR_MODULE: Citation = {
-  source: "nssdca-master-catalog",
-  locator: '"Apollo 7" (1968-089A), Description: "There was no lunar module or boilerplate unit on this flight."',
-  url: "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1968-089A",
+  source: 'nssdca-master-catalog',
+  locator:
+    '"Apollo 7" (1968-089A), Description: "There was no lunar module or boilerplate unit on this flight."',
+  url: 'https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1968-089A',
 };
 
 const PANELS_OPEN = report(
@@ -73,9 +80,9 @@ const PANELS_OPEN = report(
 /* Parts lists.                                                        */
 /* ------------------------------------------------------------------ */
 
-const CSM: readonly VehiclePart[] = ["service-module", "command-module"];
+const CSM: readonly VehiclePart[] = ['service-module', 'command-module'];
 /** The S-IVB with its empty spacecraft-LM adapter. */
-const STAGE: readonly VehiclePart[] = ["third-stage", "adapter"];
+const STAGE: readonly VehiclePart[] = ['third-stage', 'adapter'];
 
 /* ------------------------------------------------------------------ */
 /* The changes, in time order for each ship.                           */
@@ -84,78 +91,108 @@ const STAGE: readonly VehiclePart[] = ["third-stage", "adapter"];
 export const vehicle: readonly VehicleChange[] = [
   /* The spacecraft on its Saturn IB, then on its own. */
   {
-    ship: "csm",
+    ship: 'csm',
     at: at(
-      "000:00:00.36",
-      report('Table 2-I, "Sequence of Events" (page 2-3, PDF page 29): "Lift-off (15:02:45.36 G.m.t.)", range zero at 15:02:45 G.m.t.'),
-      timeline("Liftoff (umbilical disconnected)."),
+      '000:00:00.36',
+      report(
+        'Table 2-I, "Sequence of Events" (page 2-3, PDF page 29): "Lift-off (15:02:45.36 G.m.t.)", range zero at 15:02:45 G.m.t.',
+      ),
+      timeline('Liftoff (umbilical disconnected).'),
       NO_LUNAR_MODULE,
     ),
-    label: "Saturn IB lifts off",
-    layout: "launch",
-    parts: ["saturn-ib-first-stage", ...STAGE, ...CSM, "escape-tower"],
+    label: 'Saturn IB lifts off',
+    layout: 'launch',
+    parts: ['saturn-ib-first-stage', ...STAGE, ...CSM, 'escape-tower'],
   },
   {
-    ship: "csm",
-    at: at("000:02:25.59", timeline("S-IB/S-IVB separation command."), sequence("S-IB/S-IVB separation", "2-3")),
-    label: "First stage separates",
-    layout: "launch",
-    parts: [...STAGE, ...CSM, "escape-tower"],
+    ship: 'csm',
+    at: at(
+      '000:02:25.59',
+      timeline('S-IB/S-IVB separation command.'),
+      sequence('S-IB/S-IVB separation', '2-3'),
+    ),
+    label: 'First stage separates',
+    layout: 'launch',
+    parts: [...STAGE, ...CSM, 'escape-tower'],
   },
   {
-    ship: "csm",
-    at: at("000:02:46.54", timeline("Launch escape tower jettisoned."), sequence("Escape tower jettison", "2-3")),
-    label: "Launch escape tower jettisoned",
-    layout: "launch",
+    ship: 'csm',
+    at: at(
+      '000:02:46.54',
+      timeline('Launch escape tower jettisoned.'),
+      sequence('Escape tower jettison', '2-3'),
+    ),
+    label: 'Launch escape tower jettisoned',
+    layout: 'launch',
     parts: [...STAGE, ...CSM],
   },
   {
-    ship: "csm",
-    at: at("002:55:02.40", timeline("Separation of CSM from S-IVB."), sequence("Spacecraft/S-IVB separation", "2-3")),
-    label: "The command and service module separates from the S-IVB",
-    layout: "alone",
+    ship: 'csm',
+    at: at(
+      '002:55:02.40',
+      timeline('Separation of CSM from S-IVB.'),
+      sequence('Spacecraft/S-IVB separation', '2-3'),
+    ),
+    label: 'The command and service module separates from the S-IVB',
+    layout: 'alone',
     parts: CSM,
   },
   {
-    ship: "csm",
-    at: at("259:43:33.8", sequence("Command module/service module separation", "2-4"), timeline("CM/SM separation.")),
-    label: "Command module separates from the service module",
-    layout: "alone",
-    parts: ["command-module"],
-  },
-  {
-    ship: "csm",
-    at: at("260:03:23", sequence("Drogue deployment", "2-4"), timeline("Drogue parachute deployed"), PARACHUTES),
-    label: "Drogue parachutes open",
-    layout: "alone",
-    parts: ["command-module", "drogue-parachutes"],
-  },
-  {
-    ship: "csm",
+    ship: 'csm',
     at: at(
-      "260:04:13",
-      sequence("Main parachute deployment", "2-4"),
-      timeline("Main parachute deployed. VHF voice contact with CM established by recovery forces."),
+      '259:43:33.8',
+      sequence('Command module/service module separation', '2-4'),
+      timeline('CM/SM separation.'),
+    ),
+    label: 'Command module separates from the service module',
+    layout: 'alone',
+    parts: ['command-module'],
+  },
+  {
+    ship: 'csm',
+    at: at(
+      '260:03:23',
+      sequence('Drogue deployment', '2-4'),
+      timeline('Drogue parachute deployed'),
       PARACHUTES,
     ),
-    label: "Main parachutes open",
-    layout: "alone",
-    parts: ["command-module", "main-parachutes"],
+    label: 'Drogue parachutes open',
+    layout: 'alone',
+    parts: ['command-module', 'drogue-parachutes'],
+  },
+  {
+    ship: 'csm',
+    at: at(
+      '260:04:13',
+      sequence('Main parachute deployment', '2-4'),
+      timeline(
+        'Main parachute deployed. VHF voice contact with CM established by recovery forces.',
+      ),
+      PARACHUTES,
+    ),
+    label: 'Main parachutes open',
+    layout: 'alone',
+    parts: ['command-module', 'main-parachutes'],
   },
 
   /* The S-IVB: part of the stack, then a target of its own. */
   {
-    ship: "s-ivb",
-    at: at("000:00:00.36", timeline("Liftoff (umbilical disconnected).")),
-    label: "Carrying the spacecraft, and drawn with it",
-    layout: "alone",
+    ship: 's-ivb',
+    at: at('000:00:00.36', timeline('Liftoff (umbilical disconnected).')),
+    label: 'Carrying the spacecraft, and drawn with it',
+    layout: 'alone',
     parts: [],
   },
   {
-    ship: "s-ivb",
-    at: at("002:55:02.40", timeline("Separation of CSM from S-IVB."), sequence("Spacecraft/S-IVB separation", "2-3"), PANELS_OPEN),
-    label: "The spent stage, its adapter panels open",
-    layout: "alone",
+    ship: 's-ivb',
+    at: at(
+      '002:55:02.40',
+      timeline('Separation of CSM from S-IVB.'),
+      sequence('Spacecraft/S-IVB separation', '2-3'),
+      PANELS_OPEN,
+    ),
+    label: 'The spent stage, its adapter panels open',
+    layout: 'alone',
     parts: STAGE,
   },
 ];

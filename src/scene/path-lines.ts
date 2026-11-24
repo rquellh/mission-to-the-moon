@@ -161,7 +161,6 @@ const fragmentShader = /* glsl */ `
   }
 `;
 
-
 /** The bright ring drawn for an orbit while many revolutions pass in a moment: even, with soft edges. */
 const ringFragmentShader = /* glsl */ `
   #include <common>
@@ -191,7 +190,9 @@ const MAX_HIDDEN = 4;
 const MAX_RUNS = 4;
 
 /** Corner layout of one segment: a quad with a cap at each end (as in three's LineSegmentsGeometry). */
-const QUAD_POSITIONS = [-1, 2, 0, 1, 2, 0, -1, 1, 0, 1, 1, 0, -1, 0, 0, 1, 0, 0, -1, -1, 0, 1, -1, 0];
+const QUAD_POSITIONS = [
+  -1, 2, 0, 1, 2, 0, -1, 1, 0, 1, 1, 0, -1, 0, 0, 1, 0, 0, -1, -1, 0, 1, -1, 0,
+];
 const QUAD_UVS = [-1, 2, 1, 2, -1, 1, 1, 1, -1, -1, 1, -1, -1, -2, 1, -2];
 const QUAD_INDEX = [0, 2, 1, 2, 3, 1, 2, 4, 3, 4, 5, 3, 4, 6, 5, 6, 7, 5];
 
@@ -303,7 +304,10 @@ export function createPathLine(
   const revs = new InstancedInterleavedBuffer(Float32Array.from(revolutions), 1, 1);
   geometry.setAttribute('revStart', new InterleavedBufferAttribute(revs, 1, 0));
   geometry.setAttribute('revEnd', new InterleavedBufferAttribute(revs, 1, 1));
-  geometry.setAttribute('runStart', new InterleavedBufferAttribute(new InstancedInterleavedBuffer(runOf, 1, 1), 1, 0));
+  geometry.setAttribute(
+    'runStart',
+    new InterleavedBufferAttribute(new InstancedInterleavedBuffer(runOf, 1, 1), 1, 0),
+  );
 
   let samples = n;
   const lastTime = times[n - 1] ?? 0;
@@ -431,7 +435,11 @@ export function createOrbitRing(color: number, widthPx: number, capacity = 256):
   mesh.frustumCulled = false;
   mesh.name = 'Orbit ring';
   mesh.visible = false;
-  const uniforms = material.uniforms as { uOpacity: { value: number }; resolution: { value: Vector2 }; diffuse: { value: Color } };
+  const uniforms = material.uniforms as {
+    uOpacity: { value: number };
+    resolution: { value: Vector2 };
+    diffuse: { value: Color };
+  };
 
   return {
     mesh,

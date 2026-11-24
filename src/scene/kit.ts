@@ -88,7 +88,14 @@ function glowMap(): CanvasTexture {
   canvas.height = size;
   const context = canvas.getContext('2d');
   if (context) {
-    const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    const gradient = context.createRadialGradient(
+      size / 2,
+      size / 2,
+      0,
+      size / 2,
+      size / 2,
+      size / 2,
+    );
     gradient.addColorStop(0, 'rgba(255,255,255,0.55)');
     gradient.addColorStop(0.45, 'rgba(255,255,255,0.22)');
     gradient.addColorStop(1, 'rgba(255,255,255,0)');
@@ -107,7 +114,14 @@ function glowMap(): CanvasTexture {
  */
 export function createGlow(color: number = COLORS.main, size = 1, opacity = 0.55): Sprite {
   const sprite = new Sprite(
-    new SpriteMaterial({ map: glowMap(), color, transparent: true, opacity, blending: AdditiveBlending, depthWrite: false }),
+    new SpriteMaterial({
+      map: glowMap(),
+      color,
+      transparent: true,
+      opacity,
+      blending: AdditiveBlending,
+      depthWrite: false,
+    }),
   );
   sprite.scale.setScalar(size);
   sprite.renderOrder = -1;
@@ -240,7 +254,11 @@ export function createMiniView(canvas: HTMLCanvasElement, options: MiniViewOptio
   const globes = options.lighting === 'globes';
   const sun = new DirectionalLight(0xffffff, globes ? SUN_INTENSITY : SHIP_SUN_INTENSITY);
   sun.position.set(0.6, 0.8, 1).multiplyScalar(100);
-  scene.add(sun, sun.target, new AmbientLight(0xffffff, globes ? AMBIENT_INTENSITY : SHIP_AMBIENT_INTENSITY));
+  scene.add(
+    sun,
+    sun.target,
+    new AmbientLight(0xffffff, globes ? AMBIENT_INTENSITY : SHIP_AMBIENT_INTENSITY),
+  );
 
   let stars: Starfield | null = null;
   if (options.stars) {
@@ -288,7 +306,8 @@ export function createMiniView(canvas: HTMLCanvasElement, options: MiniViewOptio
     else last = null;
   };
   const schedule = (): void => {
-    if (frame === null && !disposed && !lost && document.visibilityState === 'visible') frame = requestAnimationFrame(tick);
+    if (frame === null && !disposed && !lost && document.visibilityState === 'visible')
+      frame = requestAnimationFrame(tick);
   };
 
   const resize = (): void => {
@@ -342,7 +361,15 @@ export function createMiniView(canvas: HTMLCanvasElement, options: MiniViewOptio
     },
     frame(center, radius, direction = new Vector3(0.35, 0.25, 1).normalize()) {
       const up = new Vector3(0, 1, 0);
-      const distance = fitDistance(camera, center, direction, [{ center, radius }], 1.08, { width: 1, height: 1 }, up);
+      const distance = fitDistance(
+        camera,
+        center,
+        direction,
+        [{ center, radius }],
+        1.08,
+        { width: 1, height: 1 },
+        up,
+      );
       camera.position.copy(center).addScaledVector(direction, Math.max(distance, radius * 1.2));
       camera.up.copy(up);
       camera.lookAt(center);
@@ -548,7 +575,12 @@ function kitGlobe(
 ): Globe {
   const markers = new Set<MarkerSet>();
   const sets = viewMarkers(view);
-  const turnTo = (latitude: number, longitude: number, toward: Vector3, seconds = 0): Promise<void> => {
+  const turnTo = (
+    latitude: number,
+    longitude: number,
+    toward: Vector3,
+    seconds = 0,
+  ): Promise<void> => {
     // The turn that carries the place's normal (and north) to the wanted direction (and up).
     const parent = surface.parent ?? root;
     parent.updateMatrixWorld(true);
@@ -604,12 +636,19 @@ function kitGlobe(
     },
     pointAt(latitude, longitude, height = 0, out = new Vector3()) {
       root.updateMatrixWorld(true);
-      return surface.localToWorld(latLonToVector(latitude, longitude, out).multiplyScalar(radius + height));
+      return surface.localToWorld(
+        latLonToVector(latitude, longitude, out).multiplyScalar(radius + height),
+      );
     },
     addMarker(latitude, longitude, options = {}) {
-      const p = latLonToVector(latitude, longitude).multiplyScalar(radius * 1.002).toArray();
+      const p = latLonToVector(latitude, longitude)
+        .multiplyScalar(radius * 1.002)
+        .toArray();
       const ring = (options.style ?? 'ring') === 'ring';
-      const set = createMarkers([{ readable: p, true: p, color: options.color ?? COLORS.main, eventIndex: ring ? -1 : 0 }], ring);
+      const set = createMarkers(
+        [{ readable: p, true: p, color: options.color ?? COLORS.main, eventIndex: ring ? -1 : 0 }],
+        ring,
+      );
       // A dot is drawn as the main scene draws the current event: the color in a white ring.
       set.setCurrent(ring ? -10 : 0);
       set.setPixelRatio(view.renderer.getPixelRatio());
@@ -628,7 +667,10 @@ function kitGlobe(
     turnTo,
     pick(x, y) {
       const canvas = view.renderer.domElement;
-      const pointer = new Vector2((x / Math.max(1, canvas.clientWidth)) * 2 - 1, -(y / Math.max(1, canvas.clientHeight)) * 2 + 1);
+      const pointer = new Vector2(
+        (x / Math.max(1, canvas.clientWidth)) * 2 - 1,
+        -(y / Math.max(1, canvas.clientHeight)) * 2 + 1,
+      );
       const raycaster = new Raycaster();
       raycaster.setFromCamera(pointer, view.camera);
       const hit = raycaster.intersectObject(surface, false)[0];
@@ -671,10 +713,16 @@ export function createMoon(options: GlobeOptions): Globe {
   const ready = new Promise<void>((resolve) => {
     done = resolve;
   });
-  const texture = loadTexture('moon', tier, view.renderer.capabilities.getMaxAnisotropy(), () => {
-    done();
-    view.requestRender();
-  }, () => done());
+  const texture = loadTexture(
+    'moon',
+    tier,
+    view.renderer.capabilities.getMaxAnisotropy(),
+    () => {
+      done();
+      view.requestRender();
+    },
+    () => done(),
+  );
   const moon = createMoonGlobe(texture, detail);
   const surface = moon.root.children[0] as Mesh;
   return kitGlobe(
@@ -704,10 +752,16 @@ export function createEarth(options: GlobeOptions): Globe {
   const ready = new Promise<void>((resolve) => {
     done = resolve;
   });
-  const texture = loadTexture('earth', tier, view.renderer.capabilities.getMaxAnisotropy(), () => {
-    done();
-    view.requestRender();
-  }, () => done());
+  const texture = loadTexture(
+    'earth',
+    tier,
+    view.renderer.capabilities.getMaxAnisotropy(),
+    () => {
+      done();
+      view.requestRender();
+    },
+    () => done(),
+  );
   const earth = createEarthGlobe(texture, detail);
   return kitGlobe(
     view,

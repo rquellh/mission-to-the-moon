@@ -16,17 +16,17 @@
  * Vitest tests run through Vite and can import it; code that plain Node or
  * Playwright runs (tools/, tests/) cannot.
  */
-import type { Memorial, MissionSummary } from "../types.ts";
-import type { MissionBundle } from "./bundle.ts";
+import type { Memorial, MissionSummary } from '../types.ts';
+import type { MissionBundle } from './bundle.ts';
 
-export type { MissionBundle } from "./bundle.ts";
+export type { MissionBundle } from './bundle.ts';
 
 /** The mission shown when the address does not name one, or names one we do not have. */
-export const DEFAULT_MISSION_ID = "apollo-11";
+export const DEFAULT_MISSION_ID = 'apollo-11';
 
 /** The folder a module path is in: "./apollo-11/summary.ts" is "apollo-11". */
 function folderOf(path: string): string {
-  return path.split("/")[1] ?? path;
+  return path.split('/')[1] ?? path;
 }
 
 function byFolder<T>(modules: Record<string, T>): ReadonlyMap<string, T> {
@@ -34,21 +34,28 @@ function byFolder<T>(modules: Record<string, T>): ReadonlyMap<string, T> {
 }
 
 const summaryById = byFolder(
-  import.meta.glob<MissionSummary>("./*/summary.ts", { eager: true, import: "summary" }),
+  import.meta.glob<MissionSummary>('./*/summary.ts', { eager: true, import: 'summary' }),
 );
-const bundleLoaders = byFolder(import.meta.glob<MissionBundle>("./*/index.ts", { import: "bundle" }));
-const memorialLoaders = byFolder(import.meta.glob<Memorial>("./*/memorial.ts", { import: "memorial" }));
+const bundleLoaders = byFolder(
+  import.meta.glob<MissionBundle>('./*/index.ts', { import: 'bundle' }),
+);
+const memorialLoaders = byFolder(
+  import.meta.glob<Memorial>('./*/memorial.ts', { import: 'memorial' }),
+);
 
 if (import.meta.env.DEV) {
   // Addresses and the list use the folder name, so a summary must use it too.
   for (const [folder, summary] of summaryById) {
-    if (summary.id !== folder) console.warn(`missions/${folder}/summary.ts has id "${summary.id}"; it should be "${folder}".`);
+    if (summary.id !== folder)
+      console.warn(
+        `missions/${folder}/summary.ts has id "${summary.id}"; it should be "${folder}".`,
+      );
   }
 }
 
 /** True when the files a summary points to exist: the flight's bundle, or the memorial page. */
 function hasContent(summary: MissionSummary): boolean {
-  return (summary.kind === "memorial" ? memorialLoaders : bundleLoaders).has(summary.id);
+  return (summary.kind === 'memorial' ? memorialLoaders : bundleLoaders).has(summary.id);
 }
 
 /**
@@ -56,7 +63,7 @@ function hasContent(summary: MissionSummary): boolean {
  * Anything else is listed only in the dev server, marked as a draft.
  */
 export function isReady(summary: MissionSummary): boolean {
-  return summary.status === "ready" && hasContent(summary);
+  return summary.status === 'ready' && hasContent(summary);
 }
 
 const time = (summary: MissionSummary): number => {
@@ -87,7 +94,7 @@ export function hasMemorial(id: string | null | undefined): boolean {
 /** Load a flight's bundle. An unknown id loads the default mission. */
 export function loadBundle(id: string | null | undefined): Promise<MissionBundle> {
   const loader = bundleLoaders.get(flightIdFor(id));
-  return loader ? loader() : Promise.reject(new Error("No missions are registered"));
+  return loader ? loader() : Promise.reject(new Error('No missions are registered'));
 }
 
 /** Load a memorial page. */

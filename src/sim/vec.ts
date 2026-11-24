@@ -122,7 +122,12 @@ export function rotateX(out: Vec3, a: Readonly<Vec3>, angle: number): Vec3 {
 }
 
 /** Rodrigues rotation of `a` about the unit vector `axis` by `angle` radians. */
-export function rotateAxis(out: Vec3, a: Readonly<Vec3>, axis: Readonly<Vec3>, angle: number): Vec3 {
+export function rotateAxis(
+  out: Vec3,
+  a: Readonly<Vec3>,
+  axis: Readonly<Vec3>,
+  angle: number,
+): Vec3 {
   const c = Math.cos(angle);
   const s = Math.sin(angle);
   const kd = dot(axis, a) * (1 - c);

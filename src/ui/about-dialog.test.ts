@@ -5,18 +5,23 @@
  * on its own at the end.
  */
 import { describe, expect, it } from 'vitest';
-import { mountMission, screen, within } from '../test/test-utils.ts';
 import { outlineOf } from '../app/outline.ts';
+import type { FlightOutline } from '../app/outline.ts';
 import { copy } from '../content/copy.ts';
 import { bundle as apollo8 } from '../content/missions/apollo-8/index.ts';
 import { bundle as apollo11 } from '../content/missions/apollo-11/index.ts';
 import { bundle as gemini3 } from '../content/missions/gemini-3/index.ts';
 import { bundle as gemini8 } from '../content/missions/gemini-8/index.ts';
-import type { FlightOutline } from '../app/outline.ts';
+import { mountMission, screen, within } from '../test/test-utils.ts';
 import { howDrawnParagraphs } from './about-dialog.ts';
 
 /** A flight with no landing and no splashdown: none of the real ones, so a typed fixture. */
-const noLandingNoSplashdown: FlightOutline = { ships: 1, landsOnMoon: false, splashdown: false, turns: false };
+const noLandingNoSplashdown: FlightOutline = {
+  ships: 1,
+  landsOnMoon: false,
+  splashdown: false,
+  turns: false,
+};
 
 describe('About this mission', () => {
   describe('opening', () => {
@@ -49,9 +54,15 @@ describe('About this mission', () => {
       await user.click(screen.getByRole('button', { name: 'About this mission' }));
 
       const about = screen.getByRole('dialog', { name: 'About Apollo 11' });
-      expect(within(about).getByRole('heading', { level: 3, name: 'The crew' })).toBeInTheDocument();
-      expect(within(about).getByRole('img', { name: /^From left, Neil A\. Armstrong, Michael Collins/ })).toBeInTheDocument();
-      expect(within(about).getByText(/^From left, Neil A\. Armstrong, Michael Collins/)).toBeVisible();
+      expect(
+        within(about).getByRole('heading', { level: 3, name: 'The crew' }),
+      ).toBeInTheDocument();
+      expect(
+        within(about).getByRole('img', { name: /^From left, Neil A\. Armstrong, Michael Collins/ }),
+      ).toBeInTheDocument();
+      expect(
+        within(about).getByText(/^From left, Neil A\. Armstrong, Michael Collins/),
+      ).toBeVisible();
       expect(within(about).getByText('Michael Collins')).toBeInTheDocument();
       expect(within(about).getByText('Command module pilot')).toBeInTheDocument();
     });
@@ -61,14 +72,24 @@ describe('About this mission', () => {
       await user.click(screen.getByRole('button', { name: 'About this mission' }));
 
       const about = screen.getByRole('dialog', { name: 'About Apollo 11' });
-      expect(within(about).getByRole('heading', { level: 3, name: 'Spacecraft names' })).toBeInTheDocument();
+      expect(
+        within(about).getByRole('heading', { level: 3, name: 'Spacecraft names' }),
+      ).toBeInTheDocument();
       expect(within(about).getByText('Columbia')).toBeInTheDocument();
       expect(within(about).getByText('Eagle')).toBeInTheDocument();
-      expect(within(about).getByRole('heading', { level: 3, name: 'What they did' })).toBeInTheDocument();
-      expect(within(about).getByText(/^Neil Armstrong and Buzz Aldrin became the first people/)).toBeInTheDocument();
-      expect(within(about).getByRole('heading', { level: 3, name: 'Where the spacecraft is now' })).toBeInTheDocument();
+      expect(
+        within(about).getByRole('heading', { level: 3, name: 'What they did' }),
+      ).toBeInTheDocument();
+      expect(
+        within(about).getByText(/^Neil Armstrong and Buzz Aldrin became the first people/),
+      ).toBeInTheDocument();
+      expect(
+        within(about).getByRole('heading', { level: 3, name: 'Where the spacecraft is now' }),
+      ).toBeInTheDocument();
       expect(within(about).getByText('Command module Columbia')).toBeInTheDocument();
-      expect(within(about).getByText('National Air and Space Museum, Washington, D.C.')).toBeInTheDocument();
+      expect(
+        within(about).getByText('National Air and Space Museum, Washington, D.C.'),
+      ).toBeInTheDocument();
     });
 
     it('leaves out a section the mission has nothing for', async () => {
@@ -76,8 +97,12 @@ describe('About this mission', () => {
       await user.click(screen.getByRole('button', { name: 'About this mission' }));
 
       const about = screen.getByRole('dialog', { name: 'About Gemini 8' });
-      expect(within(about).getByRole('heading', { level: 3, name: 'The crew' })).toBeInTheDocument();
-      expect(within(about).queryByRole('heading', { level: 3, name: 'Spacecraft names' })).not.toBeInTheDocument();
+      expect(
+        within(about).getByRole('heading', { level: 3, name: 'The crew' }),
+      ).toBeInTheDocument();
+      expect(
+        within(about).queryByRole('heading', { level: 3, name: 'Spacecraft names' }),
+      ).not.toBeInTheDocument();
     });
   });
 });

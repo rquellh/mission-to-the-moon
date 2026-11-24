@@ -32,29 +32,35 @@
  *   after it was let go.
  * - No turn rates are published, so no motion is drawn.
  */
-import type { Citation, Cited, ElapsedTime } from "../../types.ts";
-import type { LeftBehind, VehicleChange, VehiclePart } from "../../vehicle-types.ts";
+import type { Citation, Cited, ElapsedTime } from '../../types.ts';
+import type { LeftBehind, VehicleChange, VehiclePart } from '../../vehicle-types.ts';
 
 /* ------------------------------------------------------------------ */
 /* Citation helpers.                                                   */
 /* ------------------------------------------------------------------ */
 
 const MISSION_REPORT =
-  "https://web.archive.org/web/20250815162504/https://www.nasa.gov/wp-content/uploads/static/history/alsj/a410/A09_MissionReport.pdf";
-const ABN = "https://www.nasa.gov/wp-content/uploads/static/history/SP-4029/";
+  'https://web.archive.org/web/20250815162504/https://www.nasa.gov/wp-content/uploads/static/history/alsj/a410/A09_MissionReport.pdf';
+const ABN = 'https://www.nasa.gov/wp-content/uploads/static/history/SP-4029/';
 
 function report(locator: string): Citation {
-  return { source: "apollo-9-mission-report", locator, url: MISSION_REPORT };
+  return { source: 'apollo-9-mission-report', locator, url: MISSION_REPORT };
 }
 
 /** A row of Table 3-I, the sequence of events. */
-function sequence(row: string, page: "3-4" | "3-5"): Citation {
-  return report(`Table 3-I, "Sequence of Events" (page ${page}, PDF page ${page === "3-4" ? 14 : 15}), "${row}" row`);
+function sequence(row: string, page: '3-4' | '3-5'): Citation {
+  return report(
+    `Table 3-I, "Sequence of Events" (page ${page}, PDF page ${page === '3-4' ? 14 : 15}), "${row}" row`,
+  );
 }
 
 /** A row of the Apollo by the Numbers Apollo 9 Timeline, quoted as printed. */
 function timeline(row: string): Citation {
-  return { source: "apollo-by-the-numbers", locator: `Apollo 9 Timeline, row "${row}"`, url: `${ABN}Apollo_09f_Timeline.htm` };
+  return {
+    source: 'apollo-by-the-numbers',
+    locator: `Apollo 9 Timeline, row "${row}"`,
+    url: `${ABN}Apollo_09f_Timeline.htm`,
+  };
 }
 
 function at(elapsed: ElapsedTime, citation: Citation, ...more: Citation[]): Cited<ElapsedTime> {
@@ -62,7 +68,7 @@ function at(elapsed: ElapsedTime, citation: Citation, ...more: Citation[]): Cite
 }
 
 const PANELS_JETTISONED: Citation = {
-  source: "apollo-by-the-numbers",
+  source: 'apollo-by-the-numbers',
   locator:
     'Apollo 9 mission summary, "Earth Orbit Phase" section: "the CSM was separated from the S-IVB stage at 002:41:16.0. The adapter panels that housed the LM and shielded it from the rigors of launch was then jettisoned. The CM was turned so its apex, holding the docking probe, faced the LM."',
   url: `${ABN}Apollo_09a_Summary.htm`,
@@ -82,17 +88,18 @@ const CM_HATCH_CLOSED = report(
 );
 
 const PARACHUTES: Citation = {
-  source: "nasa-apollo-9-completes-its-mission",
-  locator: 'Paragraph on the entry: "after which the drogue parachutes deployed. The three main parachutes opened at 10,000 feet altitude"',
+  source: 'nasa-apollo-9-completes-its-mission',
+  locator:
+    'Paragraph on the entry: "after which the drogue parachutes deployed. The three main parachutes opened at 10,000 feet altitude"',
 };
 
 /* ------------------------------------------------------------------ */
 /* Parts lists.                                                        */
 /* ------------------------------------------------------------------ */
 
-const LUNAR_MODULE: readonly VehiclePart[] = ["lm-descent-stage", "lm-ascent-stage"];
-const CSM: readonly VehiclePart[] = ["service-module", "command-module"];
-const SPACECRAFT: readonly VehiclePart[] = ["adapter", ...LUNAR_MODULE, ...CSM];
+const LUNAR_MODULE: readonly VehiclePart[] = ['lm-descent-stage', 'lm-ascent-stage'];
+const CSM: readonly VehiclePart[] = ['service-module', 'command-module'];
+const SPACECRAFT: readonly VehiclePart[] = ['adapter', ...LUNAR_MODULE, ...CSM];
 
 /* ------------------------------------------------------------------ */
 /* The changes, in time order for each ship.                           */
@@ -100,166 +107,227 @@ const SPACECRAFT: readonly VehiclePart[] = ["adapter", ...LUNAR_MODULE, ...CSM];
 
 export const vehicle: readonly VehicleChange[] = [
   {
-    ship: "csm",
-    at: at("000:00:00.67", timeline("Liftoff (umbilical disconnected)."), sequence("Lift-off", "3-4")),
-    label: "Saturn V lifts off",
-    layout: "launch",
-    parts: ["first-stage", "aft-interstage", "second-stage", "third-stage", ...SPACECRAFT, "escape-tower"],
-  },
-  {
-    ship: "csm",
-    at: at("000:02:43.45", timeline("S-IC/S-II separation command and S-IC maximum Earth-fixed velocity."), sequence("S-IC/S-II separation", "3-4")),
-    label: "First stage separates",
-    layout: "launch",
-    parts: ["aft-interstage", "second-stage", "third-stage", ...SPACECRAFT, "escape-tower"],
-  },
-  {
-    ship: "csm",
-    at: at("000:03:13.5", timeline("S-II aft interstage jettisoned."), sequence("Interstage jettison", "3-4")),
-    label: "Second stage drops its aft interstage",
-    layout: "launch",
-    parts: ["second-stage", "third-stage", ...SPACECRAFT, "escape-tower"],
-  },
-  {
-    ship: "csm",
-    at: at("000:03:18.3", timeline("Launch escape tower jettisoned."), sequence("Launch escape tower jettison", "3-4")),
-    label: "Launch escape tower jettisoned",
-    layout: "launch",
-    parts: ["second-stage", "third-stage", ...SPACECRAFT],
-  },
-  {
-    ship: "csm",
-    at: at("000:08:57.18", timeline("S-II/S-IVB separation command."), sequence("S-II/S-IVB separation", "3-4")),
-    label: "Second stage separates",
-    layout: "launch",
-    parts: ["third-stage", ...SPACECRAFT],
-  },
-  {
-    ship: "csm",
+    ship: 'csm',
     at: at(
-      "002:41:16.0",
-      timeline("CSM separated from S-IVB (command)."),
-      sequence("Command and service module/S-IVB separation command", "3-4"),
+      '000:00:00.67',
+      timeline('Liftoff (umbilical disconnected).'),
+      sequence('Lift-off', '3-4'),
+    ),
+    label: 'Saturn V lifts off',
+    layout: 'launch',
+    parts: [
+      'first-stage',
+      'aft-interstage',
+      'second-stage',
+      'third-stage',
+      ...SPACECRAFT,
+      'escape-tower',
+    ],
+  },
+  {
+    ship: 'csm',
+    at: at(
+      '000:02:43.45',
+      timeline('S-IC/S-II separation command and S-IC maximum Earth-fixed velocity.'),
+      sequence('S-IC/S-II separation', '3-4'),
+    ),
+    label: 'First stage separates',
+    layout: 'launch',
+    parts: ['aft-interstage', 'second-stage', 'third-stage', ...SPACECRAFT, 'escape-tower'],
+  },
+  {
+    ship: 'csm',
+    at: at(
+      '000:03:13.5',
+      timeline('S-II aft interstage jettisoned.'),
+      sequence('Interstage jettison', '3-4'),
+    ),
+    label: 'Second stage drops its aft interstage',
+    layout: 'launch',
+    parts: ['second-stage', 'third-stage', ...SPACECRAFT, 'escape-tower'],
+  },
+  {
+    ship: 'csm',
+    at: at(
+      '000:03:18.3',
+      timeline('Launch escape tower jettisoned.'),
+      sequence('Launch escape tower jettison', '3-4'),
+    ),
+    label: 'Launch escape tower jettisoned',
+    layout: 'launch',
+    parts: ['second-stage', 'third-stage', ...SPACECRAFT],
+  },
+  {
+    ship: 'csm',
+    at: at(
+      '000:08:57.18',
+      timeline('S-II/S-IVB separation command.'),
+      sequence('S-II/S-IVB separation', '3-4'),
+    ),
+    label: 'Second stage separates',
+    layout: 'launch',
+    parts: ['third-stage', ...SPACECRAFT],
+  },
+  {
+    ship: 'csm',
+    at: at(
+      '002:41:16.0',
+      timeline('CSM separated from S-IVB (command).'),
+      sequence('Command and service module/S-IVB separation command', '3-4'),
       PANELS_JETTISONED,
     ),
-    label: "Gumdrop separates from the third stage and turns around",
-    layout: "transposition",
-    parts: ["third-stage", ...LUNAR_MODULE, ...CSM],
+    label: 'Gumdrop separates from the third stage and turns around',
+    layout: 'transposition',
+    parts: ['third-stage', ...LUNAR_MODULE, ...CSM],
   },
   {
-    ship: "csm",
-    at: at("003:01:59.3", timeline("Formation flying. CSM docked with LM/S-IVB."), sequence("Docking", "3-4")),
-    label: "Gumdrop docks with Spider",
-    layout: "docked-on-stage",
-    parts: ["third-stage", ...LUNAR_MODULE, ...CSM],
+    ship: 'csm',
+    at: at(
+      '003:01:59.3',
+      timeline('Formation flying. CSM docked with LM/S-IVB.'),
+      sequence('Docking', '3-4'),
+    ),
+    label: 'Gumdrop docks with Spider',
+    layout: 'docked-on-stage',
+    parts: ['third-stage', ...LUNAR_MODULE, ...CSM],
   },
   {
-    ship: "csm",
+    ship: 'csm',
     at: {
-      ...at("004:08:06", sequence("Spacecraft ejection from S-IVB", "3-4"), report('Section 7.2, "Spacecraft/S-IVB Separation" (page 7-1, PDF page 83): "At 4:08:06, the docked spacecraft were separated from the S-IVB"')),
-      discrepancy: 'Apollo by the Numbers (Timeline, "CSM/LM ejected from S-IVB.", and its Earth Orbit Phase table) gives 004:08:09. We follow the mission report.',
+      ...at(
+        '004:08:06',
+        sequence('Spacecraft ejection from S-IVB', '3-4'),
+        report(
+          'Section 7.2, "Spacecraft/S-IVB Separation" (page 7-1, PDF page 83): "At 4:08:06, the docked spacecraft were separated from the S-IVB"',
+        ),
+      ),
+      discrepancy:
+        'Apollo by the Numbers (Timeline, "CSM/LM ejected from S-IVB.", and its Earth Orbit Phase table) gives 004:08:09. We follow the mission report.',
     },
-    label: "Gumdrop and Spider are pushed free of the third stage",
-    layout: "docked",
+    label: 'Gumdrop and Spider are pushed free of the third stage',
+    layout: 'docked',
     parts: [...LUNAR_MODULE, ...CSM],
   },
   {
-    ship: "csm",
-    at: at("072:59:02", SPACEWALK, timeline("LMP started egress.")),
+    ship: 'csm',
+    at: at('072:59:02', SPACEWALK, timeline('LMP started egress.')),
     label: "Schweickart climbs out onto Spider's porch",
-    layout: "docked",
-    parts: [...LUNAR_MODULE, ...CSM, "spacewalker"],
+    layout: 'docked',
+    parts: [...LUNAR_MODULE, ...CSM, 'spacewalker'],
   },
   {
-    ship: "csm",
-    at: at("073:02:00", CM_HATCH_OPEN, SCOTT_IN_HATCH, timeline("CM side hatch open.")),
+    ship: 'csm',
+    at: at('073:02:00', CM_HATCH_OPEN, SCOTT_IN_HATCH, timeline('CM side hatch open.')),
     label: "Scott opens Gumdrop's side hatch and leans out",
-    layout: "docked",
-    parts: [...LUNAR_MODULE, ...CSM, "spacewalker", "standup-spacewalker"],
+    layout: 'docked',
+    parts: [...LUNAR_MODULE, ...CSM, 'spacewalker', 'standup-spacewalker'],
   },
   {
-    ship: "csm",
-    at: at("073:46:03", SPACEWALK, timeline("LMP ingress completed.")),
+    ship: 'csm',
+    at: at('073:46:03', SPACEWALK, timeline('LMP ingress completed.')),
     label: "Schweickart is back inside Spider; Scott is still in Gumdrop's hatch",
-    layout: "docked",
-    parts: [...LUNAR_MODULE, ...CSM, "standup-spacewalker"],
+    layout: 'docked',
+    parts: [...LUNAR_MODULE, ...CSM, 'standup-spacewalker'],
   },
   {
-    ship: "csm",
+    ship: 'csm',
     at: {
-      ...at("073:49:00", CM_HATCH_CLOSED),
-      discrepancy: 'Apollo by the Numbers (Timeline, "CM side hatch reported closed and locked.") gives 073:49:23. We follow the mission report.',
+      ...at('073:49:00', CM_HATCH_CLOSED),
+      discrepancy:
+        'Apollo by the Numbers (Timeline, "CM side hatch reported closed and locked.") gives 073:49:23. We follow the mission report.',
     },
     label: "Gumdrop's hatch is closed",
-    layout: "docked",
+    layout: 'docked',
     parts: [...LUNAR_MODULE, ...CSM],
   },
   {
-    ship: "csm",
-    at: at("092:39:36", sequence("First undocking", "3-5"), timeline("CSM/LM reported undocked.")),
-    label: "Spider undocks",
-    layout: "alone",
+    ship: 'csm',
+    at: at('092:39:36', sequence('First undocking', '3-5'), timeline('CSM/LM reported undocked.')),
+    label: 'Spider undocks',
+    layout: 'alone',
     parts: CSM,
   },
   {
-    ship: "csm",
-    at: at("099:02:26", sequence("Docking", "3-5"), timeline("CSM/LM docked.")),
+    ship: 'csm',
+    at: at('099:02:26', sequence('Docking', '3-5'), timeline('CSM/LM docked.')),
     label: "Spider's ascent stage docks with Gumdrop",
-    layout: "docked",
-    parts: ["lm-ascent-stage", ...CSM],
+    layout: 'docked',
+    parts: ['lm-ascent-stage', ...CSM],
   },
   {
-    ship: "csm",
-    at: at("101:22:45.0", timeline("LM ascent stage jettisoned."), sequence("Lunar module jettison", "3-5")),
+    ship: 'csm',
+    at: at(
+      '101:22:45.0',
+      timeline('LM ascent stage jettisoned.'),
+      sequence('Lunar module jettison', '3-5'),
+    ),
     label: "Spider's ascent stage is let go",
-    layout: "alone",
+    layout: 'alone',
     parts: CSM,
   },
   {
-    ship: "csm",
-    at: at("240:36:03.8", timeline("CM/SM separation."), sequence("Command module/service module separation", "3-5")),
-    label: "Command module separates from the service module",
-    layout: "alone",
-    parts: ["command-module"],
+    ship: 'csm',
+    at: at(
+      '240:36:03.8',
+      timeline('CM/SM separation.'),
+      sequence('Command module/service module separation', '3-5'),
+    ),
+    label: 'Command module separates from the service module',
+    layout: 'alone',
+    parts: ['command-module'],
   },
   {
-    ship: "csm",
-    at: at("240:55:07.8", timeline("Drogue parachute deployed"), sequence("Drogue deployment", "3-5"), PARACHUTES),
-    label: "Drogue parachutes open",
-    layout: "alone",
-    parts: ["command-module", "drogue-parachutes"],
+    ship: 'csm',
+    at: at(
+      '240:55:07.8',
+      timeline('Drogue parachute deployed'),
+      sequence('Drogue deployment', '3-5'),
+      PARACHUTES,
+    ),
+    label: 'Drogue parachutes open',
+    layout: 'alone',
+    parts: ['command-module', 'drogue-parachutes'],
   },
   {
-    ship: "csm",
-    at: at("240:55:59.0", timeline("Main parachute deployed."), sequence("Main parachute deployment", "3-5"), PARACHUTES),
-    label: "Main parachutes open",
-    layout: "alone",
-    parts: ["command-module", "main-parachutes"],
+    ship: 'csm',
+    at: at(
+      '240:55:59.0',
+      timeline('Main parachute deployed.'),
+      sequence('Main parachute deployment', '3-5'),
+      PARACHUTES,
+    ),
+    label: 'Main parachutes open',
+    layout: 'alone',
+    parts: ['command-module', 'main-parachutes'],
   },
 
   {
-    ship: "lm",
-    at: at("092:39:36", sequence("First undocking", "3-5"), timeline("CSM/LM reported undocked.")),
-    label: "Spider undocks",
-    layout: "alone",
+    ship: 'lm',
+    at: at('092:39:36', sequence('First undocking', '3-5'), timeline('CSM/LM reported undocked.')),
+    label: 'Spider undocks',
+    layout: 'alone',
     parts: LUNAR_MODULE,
   },
   {
-    ship: "lm",
+    ship: 'lm',
     at: at(
-      "096:16:06.54",
-      timeline("LM coelliptic sequence initiation maneuver ignition. Approximate time of LM descent stage jettison."),
-      report('Section 5.3.1, "Lunar Module" (page 5-9, PDF page 52): "coelliptic sequence initiation was performed at 96:16:06, with the descent stage being jettisoned immediately after the start of reaction control system thrusting" (no time is given for the jettison itself, so the firing\'s start, the approximate time of staging, is used)'),
+      '096:16:06.54',
+      timeline(
+        'LM coelliptic sequence initiation maneuver ignition. Approximate time of LM descent stage jettison.',
+      ),
+      report(
+        'Section 5.3.1, "Lunar Module" (page 5-9, PDF page 52): "coelliptic sequence initiation was performed at 96:16:06, with the descent stage being jettisoned immediately after the start of reaction control system thrusting" (no time is given for the jettison itself, so the firing\'s start, the approximate time of staging, is used)',
+      ),
     ),
-    label: "Spider drops its descent stage (at about the start of the coelliptic firing)",
-    layout: "alone",
-    parts: ["lm-ascent-stage"],
+    label: 'Spider drops its descent stage (at about the start of the coelliptic firing)',
+    layout: 'alone',
+    parts: ['lm-ascent-stage'],
   },
   {
-    ship: "lm",
-    at: at("099:02:26", sequence("Docking", "3-5"), timeline("CSM/LM docked.")),
-    label: "Docked to Gumdrop, and drawn with it",
-    layout: "alone",
+    ship: 'lm',
+    at: at('099:02:26', sequence('Docking', '3-5'), timeline('CSM/LM docked.')),
+    label: 'Docked to Gumdrop, and drawn with it',
+    layout: 'alone',
     parts: [],
   },
 ];

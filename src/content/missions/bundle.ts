@@ -1,6 +1,6 @@
-import type { FlightPlan } from "../../sim/types.ts";
-import type { Mission } from "../types.ts";
-import type { LeftBehind, VehicleChange } from "../vehicle-types.ts";
+import type { FlightPlan } from '../../sim/types.ts';
+import type { Mission } from '../types.ts';
+import type { LeftBehind, VehicleChange } from '../vehicle-types.ts';
 
 export interface MissionBundle {
   mission: Mission;

@@ -1,17 +1,17 @@
 /* The patch book. Each emblem sits on a light "page" so NASA's white image
    backgrounds disappear into it (multiply), the way a patch sits on cloth. */
-[data-extra="patches"] {
+[data-extra='patches'] {
   --patches-paper: #eeebe4;
   --patches-ink: #5f5b53;
 }
 
-[data-extra="patches"] .patches__intro {
+[data-extra='patches'] .patches__intro {
   display: grid;
   gap: 6px;
   margin-bottom: 22px;
 }
 
-[data-extra="patches"] .patches__count {
+[data-extra='patches'] .patches__count {
   margin: 4px 0 0;
   font-size: 0.875rem;
   font-weight: 600;
@@ -19,11 +19,11 @@
   color: var(--color-text);
 }
 
-[data-extra="patches"] .patches__program + .patches__program {
+[data-extra='patches'] .patches__program + .patches__program {
   margin-top: 28px;
 }
 
-[data-extra="patches"] .patches__grid {
+[data-extra='patches'] .patches__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
@@ -33,13 +33,13 @@
   list-style: none;
 }
 
-[data-extra="patches"] .patches__slot {
+[data-extra='patches'] .patches__slot {
   display: flex;
   min-width: 0;
 }
 
 /* A filled page: the whole card opens it larger. */
-[data-extra="patches"] .patches__open {
+[data-extra='patches'] .patches__open {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -59,13 +59,13 @@
     border-color 160ms ease-out;
 }
 
-[data-extra="patches"] .patches__open:hover {
+[data-extra='patches'] .patches__open:hover {
   border-color: var(--color-line-strong);
   background: var(--color-hover);
 }
 
 /* A page still to fill: a plain slot with the patch's dashed outline. */
-[data-extra="patches"] .patches__slot--empty {
+[data-extra='patches'] .patches__slot--empty {
   flex-direction: column;
   gap: 8px;
   padding: 8px 8px 10px;
@@ -74,8 +74,8 @@
   text-align: center;
 }
 
-[data-extra="patches"] .patches__paper,
-[data-extra="patches"] .patches__outline {
+[data-extra='patches'] .patches__paper,
+[data-extra='patches'] .patches__outline {
   display: grid;
   place-items: center;
   aspect-ratio: 1;
@@ -83,23 +83,23 @@
   border-radius: 8px;
 }
 
-[data-extra="patches"] .patches__paper {
+[data-extra='patches'] .patches__paper {
   position: relative;
   background: var(--patches-paper);
 }
 
-[data-extra="patches"] .patches__outline {
+[data-extra='patches'] .patches__outline {
   color: var(--color-text-faint);
 }
 
-[data-extra="patches"] .patches__outline svg {
+[data-extra='patches'] .patches__outline svg {
   width: 100%;
   height: 100%;
   overflow: visible;
 }
 
 /* Placed, not flowed, so a tall image can never stretch its square page. */
-[data-extra="patches"] .patches__image {
+[data-extra='patches'] .patches__image {
   position: absolute;
   inset: 5%;
   display: block;
@@ -109,38 +109,38 @@
   mix-blend-mode: multiply;
 }
 
-[data-extra="patches"] .patches__none {
+[data-extra='patches'] .patches__none {
   color: var(--patches-ink);
   font-size: 0.8125rem;
   font-weight: 600;
 }
 
-[data-extra="patches"] .patches__name {
+[data-extra='patches'] .patches__name {
   font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.25;
 }
 
-[data-extra="patches"] .patches__hint {
+[data-extra='patches'] .patches__hint {
   font-size: 0.75rem;
   line-height: 1.35;
   color: var(--color-text-muted);
 }
 
-[data-extra="patches"] .patches__fly {
+[data-extra='patches'] .patches__fly {
   width: 100%;
   margin-top: auto;
 }
 
 /* One patch, larger. */
-[data-extra="patches"] .patches__detail {
+[data-extra='patches'] .patches__detail {
   display: grid;
   justify-items: start;
   gap: 14px;
   animation: patches-turn 240ms var(--ease-out);
 }
 
-[data-extra="patches"] .patches__detail[hidden] {
+[data-extra='patches'] .patches__detail[hidden] {
   display: none;
 }
 
@@ -150,86 +150,86 @@
   }
 }
 
-[data-extra="patches"] .patches__back .icon {
+[data-extra='patches'] .patches__back .icon {
   margin-left: -4px;
 }
 
-[data-extra="patches"] .patches__title {
+[data-extra='patches'] .patches__title {
   margin: 4px 0 0;
 }
 
-[data-extra="patches"] .patches__spread {
+[data-extra='patches'] .patches__spread {
   display: grid;
   gap: 16px;
   width: 100%;
 }
 
-[data-extra="patches"] .patches__figure {
+[data-extra='patches'] .patches__figure {
   justify-self: center;
   width: min(100%, 320px, 42vh);
   margin: 0;
 }
 
-[data-extra="patches"] .patches__paper--large {
+[data-extra='patches'] .patches__paper--large {
   border-radius: 12px;
 }
 
-[data-extra="patches"] .patches__paper--large .patches__image {
+[data-extra='patches'] .patches__paper--large .patches__image {
   inset: 7%;
   width: 86%;
   height: 86%;
 }
 
-[data-extra="patches"] .patches__credit {
+[data-extra='patches'] .patches__credit {
   margin-top: 6px;
   font-size: 0.75rem;
   color: var(--color-text-faint);
 }
 
-[data-extra="patches"] .patches__words {
+[data-extra='patches'] .patches__words {
   min-width: 0;
 }
 
-[data-extra="patches"] .patches__visit {
+[data-extra='patches'] .patches__visit {
   margin-top: 8px;
 }
 
 @media (min-width: 360px) {
-  [data-extra="patches"] .patches__grid {
+  [data-extra='patches'] .patches__grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 600px) {
-  [data-extra="patches"] .patches__grid {
+  [data-extra='patches'] .patches__grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 760px) {
-  [data-extra="patches"] .patches__grid {
+  [data-extra='patches'] .patches__grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 12px;
   }
 
-  [data-extra="patches"] .patches__spread {
+  [data-extra='patches'] .patches__spread {
     grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
     align-items: start;
     gap: 28px;
   }
 
-  [data-extra="patches"] .patches__figure {
+  [data-extra='patches'] .patches__figure {
     justify-self: stretch;
     width: 100%;
   }
 
-  [data-extra="patches"] .patches__words {
+  [data-extra='patches'] .patches__words {
     padding-top: 4px;
   }
 }
 
 @media (min-width: 1040px) {
-  [data-extra="patches"] .patches__grid {
+  [data-extra='patches'] .patches__grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }

@@ -141,7 +141,9 @@ export function setUpExtraSheet(options: ExtraSheetOptions): ExtraSheet {
         if (!isCurrent()) return;
         const reload = button('button', copy.extra.reload);
         reload.setAttribute('data-testid', 'extra-sheet-reload');
-        reload.addEventListener('click', () => window.location.assign(extraAddress(id, options.missionId, params)));
+        reload.addEventListener('click', () =>
+          window.location.assign(extraAddress(id, options.missionId, params)),
+        );
         const back = button('button button--primary', copy.extra.back);
         back.setAttribute('data-testid', 'extra-sheet-back');
         back.addEventListener('click', close);

@@ -77,8 +77,11 @@ export function setUpTourPanel(tour: Tour, { onExplore, onRestart }: TourPanelOp
 
     if (!finished && phase !== 'off') {
       const position = tour.index + 1;
-      count.replaceChildren(el('strong', 'tour__count-number', copy.tour.stopOf(position, tour.total)));
-      if (phase === 'traveling') count.append(' ', el('span', 'tour__count-note', copy.tour.onTheWay));
+      count.replaceChildren(
+        el('strong', 'tour__count-number', copy.tour.stopOf(position, tour.total)),
+      );
+      if (phase === 'traveling')
+        count.append(' ', el('span', 'tour__count-note', copy.tour.onTheWay));
       dots.forEach((dot, i) => {
         dot.classList.toggle('tour__dot--done', i < tour.index);
         dot.classList.toggle('tour__dot--current', i === tour.index);

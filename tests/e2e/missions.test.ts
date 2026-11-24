@@ -25,7 +25,9 @@ test.describe('Every mission opens', () => {
     });
 
     await test.step('Every flight and the memorial page are listed, and nothing else', async () => {
-      const listed = await hubPage.missions.evaluateAll((entries) => entries.map((entry) => entry.getAttribute('data-testid')));
+      const listed = await hubPage.missions.evaluateAll((entries) =>
+        entries.map((entry) => entry.getAttribute('data-testid')),
+      );
       const expected = [...FLIGHT_IDS, MISSIONS.MEMORIAL].map((id) => `hub-mission-${id}`);
       expect([...listed].sort()).toEqual([...expected].sort());
     });

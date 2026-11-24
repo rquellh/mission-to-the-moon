@@ -187,7 +187,9 @@ async function connect(endpoint) {
   const socket = new WebSocket(endpoint);
   await new Promise((done, fail) => {
     socket.addEventListener('open', done, { once: true });
-    socket.addEventListener('error', () => fail(new Error('Could not connect to Chrome')), { once: true });
+    socket.addEventListener('error', () => fail(new Error('Could not connect to Chrome')), {
+      once: true,
+    });
   });
   let nextId = 1;
   const pending = new Map();
@@ -252,7 +254,9 @@ function makePage(cdp, sessionId, options) {
       returnByValue: true,
     });
     if (result.exceptionDetails) {
-      throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
+      throw new Error(
+        result.exceptionDetails.exception?.description ?? result.exceptionDetails.text,
+      );
     }
     return result.result.value;
   };
@@ -279,7 +283,10 @@ function makePage(cdp, sessionId, options) {
     })()`);
 
   const screenshot = async (path) => {
-    const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    const { data } = await send('Page.captureScreenshot', {
+      format: 'png',
+      captureBeyondViewport: false,
+    });
     const file = resolve(path);
     await mkdir(dirname(file), { recursive: true });
     await writeFile(file, Buffer.from(data, 'base64'));
@@ -355,7 +362,9 @@ function makePage(cdp, sessionId, options) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help || !options.url) {
-    console.log('Usage: node tools/screenshot.mjs <url> [--size WxH] [--out PATH] [--step STEP ...]');
+    console.log(
+      'Usage: node tools/screenshot.mjs <url> [--size WxH] [--out PATH] [--step STEP ...]',
+    );
     console.log('See the comment at the top of tools/screenshot.mjs for every option.');
     process.exit(options.help ? 0 : 2);
   }
@@ -373,13 +382,20 @@ async function main() {
     cdp.on((event) => {
       if (event.sessionId !== sessionId) return;
       const { method, params } = event;
-      if (method === 'Runtime.consoleAPICalled' && (params.type === 'error' || params.type === 'assert')) {
-        errors.push(`console.${params.type}: ${params.args.map((a) => a.value ?? a.description ?? '').join(' ')}`);
+      if (
+        method === 'Runtime.consoleAPICalled' &&
+        (params.type === 'error' || params.type === 'assert')
+      ) {
+        errors.push(
+          `console.${params.type}: ${params.args.map((a) => a.value ?? a.description ?? '').join(' ')}`,
+        );
       } else if (method === 'Runtime.exceptionThrown') {
         const details = params.exceptionDetails;
         errors.push(`exception: ${details.exception?.description ?? details.text}`);
       } else if (method === 'Log.entryAdded' && params.entry.level === 'error') {
-        errors.push(`${params.entry.source}: ${params.entry.text}${params.entry.url ? ` (${params.entry.url})` : ''}`);
+        errors.push(
+          `${params.entry.source}: ${params.entry.text}${params.entry.url ? ` (${params.entry.url})` : ''}`,
+        );
       }
     });
 
@@ -396,7 +412,12 @@ async function main() {
       await page.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
     }
     await page.send('Emulation.setEmulatedMedia', {
-      features: [{ name: 'prefers-reduced-motion', value: options.reducedMotion ? 'reduce' : 'no-preference' }],
+      features: [
+        {
+          name: 'prefers-reduced-motion',
+          value: options.reducedMotion ? 'reduce' : 'no-preference',
+        },
+      ],
     });
 
     const loaded = new Promise((done) => {

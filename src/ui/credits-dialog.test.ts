@@ -4,8 +4,8 @@
  * source is listed once, and the crew portrait leads the photo credits.
  */
 import { describe, expect, it } from 'vitest';
-import { mountMission, screen, within, type User } from '../test/test-utils.ts';
 import { SOURCES } from '../content/sources.ts';
+import { mountMission, screen, within, type User } from '../test/test-utils.ts';
 
 async function openCredits(user: User): Promise<HTMLElement> {
   await user.click(screen.getByRole('button', { name: 'Sources and credits' }));
@@ -26,12 +26,22 @@ describe('Sources and credits', () => {
       const dialog = await openCredits(user);
 
       const sources = groupTitled(dialog, 'Sources');
-      expect(within(sources).getAllByRole('heading', { level: 4 })[0]).toHaveTextContent('Gemini 7');
+      expect(within(sources).getAllByRole('heading', { level: 4 })[0]).toHaveTextContent(
+        'Gemini 7',
+      );
       const [own] = within(sources).getAllByRole('list');
       expect(within(own!).getAllByRole('listitem')).toHaveLength(7);
       expect(within(own!).getByRole('link', { name: /^Gemini VII Capsule/ })).toBeInTheDocument();
-      expect(within(own!).getByRole('link', { name: /^Gemini Program Mission Report: Gemini VII \(MSC-G-R-66-1\)/ })).toBeInTheDocument();
-      expect(within(own!).getByRole('link', { name: /^Gemini Program Mission Report: Gemini VIII \(MSC-G-R-66-4\)/ })).toBeInTheDocument();
+      expect(
+        within(own!).getByRole('link', {
+          name: /^Gemini Program Mission Report: Gemini VII \(MSC-G-R-66-1\)/,
+        }),
+      ).toBeInTheDocument();
+      expect(
+        within(own!).getByRole('link', {
+          name: /^Gemini Program Mission Report: Gemini VIII \(MSC-G-R-66-4\)/,
+        }),
+      ).toBeInTheDocument();
     });
 
     it('lists each source once, and every one of them', async () => {
@@ -39,11 +49,19 @@ describe('Sources and credits', () => {
       const dialog = await openCredits(user);
 
       const sources = groupTitled(dialog, 'Sources');
-      expect(within(sources).getAllByRole('heading', { level: 5 })).toHaveLength(Object.keys(SOURCES).length);
-      expect(within(sources).getAllByRole('link', { name: /^Gemini Program Mission Report: Gemini VII \(MSC-G-R-66-1\)/ })).toHaveLength(1);
+      expect(within(sources).getAllByRole('heading', { level: 5 })).toHaveLength(
+        Object.keys(SOURCES).length,
+      );
+      expect(
+        within(sources).getAllByRole('link', {
+          name: /^Gemini Program Mission Report: Gemini VII \(MSC-G-R-66-1\)/,
+        }),
+      ).toHaveLength(1);
       // Gemini 6A keeps seven sources; Gemini 7 lists three of them as its own, so its fold has four.
       // (A fold's summary has no accessible name, so the name's own line leads to it.)
-      expect(within(sources).getByText('Gemini 6A').closest('summary')).toHaveTextContent('Gemini 6A4 sources');
+      expect(within(sources).getByText('Gemini 6A').closest('summary')).toHaveTextContent(
+        'Gemini 6A4 sources',
+      );
     });
 
     it('says when the link of each source was last checked', async () => {
@@ -51,9 +69,9 @@ describe('Sources and credits', () => {
       const dialog = await openCredits(user);
 
       const sources = groupTitled(dialog, 'Sources');
-      expect(within(sources).getAllByText(/^Link checked [A-Z][a-z]+ \d{1,2}, \d{4}$/)).toHaveLength(
-        Object.keys(SOURCES).length,
-      );
+      expect(
+        within(sources).getAllByText(/^Link checked [A-Z][a-z]+ \d{1,2}, \d{4}$/),
+      ).toHaveLength(Object.keys(SOURCES).length);
     });
   });
 
@@ -63,7 +81,11 @@ describe('Sources and credits', () => {
       const dialog = await openCredits(user);
 
       const photos = groupTitled(dialog, 'Photos');
-      expect(within(photos).getAllByRole('heading', { level: 4 }).map((heading) => heading.textContent)).toEqual([
+      expect(
+        within(photos)
+          .getAllByRole('heading', { level: 4 })
+          .map((heading) => heading.textContent),
+      ).toEqual([
         'The crew (opens in a new tab)',
         'Liftoff for two weeks (opens in a new tab)',
         'Watching a missile launch (opens in a new tab)',

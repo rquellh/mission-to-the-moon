@@ -1,4 +1,12 @@
-import { Color, Group, Mesh, MeshStandardMaterial, SphereGeometry, Vector3, type Texture } from 'three';
+import {
+  Color,
+  Group,
+  Mesh,
+  MeshStandardMaterial,
+  SphereGeometry,
+  Vector3,
+  type Texture,
+} from 'three';
 import { MOON_RADIUS } from '../content/physical-constants';
 import { addNightSide } from './night-side';
 
@@ -19,7 +27,7 @@ export function createMoon(texture: Texture, detail: 'low' | 'high'): Moon {
   const root = new Group();
   root.name = 'Moon';
 
-  const segments = detail === 'high' ? [96, 48] as const : [64, 32] as const;
+  const segments = detail === 'high' ? ([96, 48] as const) : ([64, 32] as const);
   const globe = new Mesh(
     new SphereGeometry(MOON_RADIUS, segments[0], segments[1]),
     new MeshStandardMaterial({ map: texture, roughness: 1, metalness: 0 }),

@@ -103,7 +103,8 @@ function sourceGroups({ mission, cited, summaries, extras }: CreditsOptions): HT
   const own = take([...ownIds, ...borrowedIds]);
   if (own.length) parts.push(el('h4', 'credits__subgroup-title', mission.name), list(own));
   const shared = take(sharedIds);
-  if (shared.length) parts.push(el('h4', 'credits__subgroup-title', copy.credits.shared), list(shared));
+  if (shared.length)
+    parts.push(el('h4', 'credits__subgroup-title', copy.credits.shared), list(shared));
 
   /** A group of sources folded away under a name, or null when all of them are listed already. */
   const fold = (name: string, ids: readonly string[]): HTMLElement | null => {
@@ -127,7 +128,8 @@ function sourceGroups({ mission, cited, summaries, extras }: CreditsOptions): HT
     const folded = fold(name, Object.keys(sources));
     if (folded) missionFolds.push(folded);
   }
-  if (missionFolds.length) parts.push(el('h4', 'credits__subgroup-title', copy.credits.otherMissions), ...missionFolds);
+  if (missionFolds.length)
+    parts.push(el('h4', 'credits__subgroup-title', copy.credits.otherMissions), ...missionFolds);
 
   // Each listed extra's own sources, in the list's order, named with its title.
   const extraFolds: HTMLElement[] = [];
@@ -135,7 +137,8 @@ function sourceGroups({ mission, cited, summaries, extras }: CreditsOptions): HT
     const folded = fold(meta.title, Object.keys(SOURCE_GROUPS.extras[meta.id] ?? {}));
     if (folded) extraFolds.push(folded);
   }
-  if (extraFolds.length) parts.push(el('h4', 'credits__subgroup-title', copy.credits.extras), ...extraFolds);
+  if (extraFolds.length)
+    parts.push(el('h4', 'credits__subgroup-title', copy.credits.extras), ...extraFolds);
 
   return group(copy.credits.sources, ...parts);
 }
@@ -168,7 +171,9 @@ function photoGroup(mission: Mission): HTMLElement {
     items.push(item);
   }
   const note = el('p', 'credits__note', copy.credits.photosNote);
-  return items.length ? group(copy.credits.photos, note, list(items)) : group(copy.credits.photos, note);
+  return items.length
+    ? group(copy.credits.photos, note, list(items))
+    : group(copy.credits.photos, note);
 }
 
 /** Fill the "Sources and credits" dialog: sources, this mission's photo credits, and site-wide credits. */

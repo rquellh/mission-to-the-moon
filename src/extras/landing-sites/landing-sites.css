@@ -1,10 +1,10 @@
 /* "Six landings on the Moon". Phone first: the Moon on top, the choices and card below. */
-[data-extra="landing-sites"] .ls {
+[data-extra='landing-sites'] .ls {
   display: grid;
   gap: 12px;
 }
 
-[data-extra="landing-sites"] .ls__stage {
+[data-extra='landing-sites'] .ls__stage {
   position: relative;
   height: clamp(220px, 38svh, 440px);
   overflow: hidden;
@@ -13,7 +13,7 @@
   background: #000;
 }
 
-[data-extra="landing-sites"] .ls__stage--none {
+[data-extra='landing-sites'] .ls__stage--none {
   display: grid;
   place-items: center;
   height: auto;
@@ -21,7 +21,7 @@
   background: var(--color-raised);
 }
 
-[data-extra="landing-sites"] .ls__canvas {
+[data-extra='landing-sites'] .ls__canvas {
   display: block;
   width: 100%;
   height: 100%;
@@ -29,18 +29,18 @@
   cursor: grab;
 }
 
-[data-extra="landing-sites"] .ls__canvas:active {
+[data-extra='landing-sites'] .ls__canvas:active {
   cursor: grabbing;
 }
 
-[data-extra="landing-sites"] .ls__labels {
+[data-extra='landing-sites'] .ls__labels {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
 }
 
-[data-extra="landing-sites"] .ls__label {
+[data-extra='landing-sites'] .ls__label {
   position: absolute;
   top: 0;
   left: 0;
@@ -58,87 +58,87 @@
   white-space: nowrap;
 }
 
-[data-extra="landing-sites"] .ls__label.is-chosen {
+[data-extra='landing-sites'] .ls__label.is-chosen {
   color: var(--color-lm);
 }
 
-[data-extra="landing-sites"] .ls__side {
+[data-extra='landing-sites'] .ls__side {
   display: grid;
   gap: 12px;
   align-content: start;
   min-width: 0;
 }
 
-[data-extra="landing-sites"] .ls__choices {
+[data-extra='landing-sites'] .ls__choices {
   flex: none;
 }
 
 /* Six equal buttons in one row at every width (the site's wide layout sizes segments for its view buttons). */
-[data-extra="landing-sites"] .ls__choice {
+[data-extra='landing-sites'] .ls__choice {
   flex: 1 1 0;
   min-width: 0;
   padding: 0 4px;
   font-variant-numeric: tabular-nums;
 }
 
-[data-extra="landing-sites"] .ls__choice:disabled {
+[data-extra='landing-sites'] .ls__choice:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-[data-extra="landing-sites"] .ls__card .extra-heading {
+[data-extra='landing-sites'] .ls__card .extra-heading {
   margin-bottom: 2px;
 }
 
-[data-extra="landing-sites"] .ls__dates {
+[data-extra='landing-sites'] .ls__dates {
   margin: 0 0 8px;
   color: var(--color-text-muted);
   font-size: 0.875rem;
 }
 
-[data-extra="landing-sites"] .ls__facts {
+[data-extra='landing-sites'] .ls__facts {
   display: grid;
   gap: 8px;
   margin: 12px 0 14px;
 }
 
-[data-extra="landing-sites"] .ls__fact dt {
+[data-extra='landing-sites'] .ls__fact dt {
   color: var(--color-text-muted);
   font-size: 0.8125rem;
   font-weight: 600;
 }
 
-[data-extra="landing-sites"] .ls__fact dd {
+[data-extra='landing-sites'] .ls__fact dd {
   margin: 2px 0 0;
   font-size: 0.9375rem;
   line-height: 1.45;
   font-variant-numeric: tabular-nums;
 }
 
-[data-extra="landing-sites"] .ls__card .sources {
+[data-extra='landing-sites'] .ls__card .sources {
   margin-top: 12px;
 }
 
-[data-extra="landing-sites"] .ls__meant {
+[data-extra='landing-sites'] .ls__meant {
   display: grid;
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--color-line);
 }
 
-[data-extra="landing-sites"] .ls__meant .sources {
+[data-extra='landing-sites'] .ls__meant .sources {
   margin-top: 0;
   border-top: 0;
 }
 
 @media (min-width: 860px), (min-width: 600px) and (orientation: landscape) {
-  [data-extra="landing-sites"] .ls {
+  [data-extra='landing-sites'] .ls {
     grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
     align-items: start;
     gap: 20px;
   }
 
-  [data-extra="landing-sites"] .ls__stage {
+  [data-extra='landing-sites'] .ls__stage {
     position: sticky;
     top: 0;
     height: max(320px, calc(100svh - 130px));

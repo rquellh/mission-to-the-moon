@@ -49,8 +49,8 @@ import {
   MOON_GM_KM3_PER_S2,
   MOON_MEAN_RADIUS_KM,
   NAUTICAL_MILE_KM,
-} from "../content/physical-constants.ts";
-import { elapsedToSeconds } from "../content/types.ts";
+} from '../content/physical-constants.ts';
+import { elapsedToSeconds } from '../content/types.ts';
 import {
   bodyFixedDirection,
   EARTH_SPIN_RATE,
@@ -59,8 +59,8 @@ import {
   geodeticToGeocentric,
   moonFixedDirection,
   Sky,
-} from "./frames.ts";
-import { Conic, ellipticMeanFromTrue, solveLambert } from "./kepler.ts";
+} from './frames.ts';
+import { Conic, ellipticMeanFromTrue, solveLambert } from './kepler.ts';
 import {
   AnchoredOrbit,
   bodyFixedState,
@@ -81,7 +81,7 @@ import {
   type PositionAndVelocity,
   type Segment,
   type SizeKnot,
-} from "./segments.ts";
+} from './segments.ts';
 import type {
   BodyId,
   CoastPhase,
@@ -102,7 +102,7 @@ import type {
   TransferPhase,
   AscentPhase,
   Vec3Out,
-} from "./types.ts";
+} from './types.ts';
 import {
   add,
   addScaled,
@@ -119,8 +119,8 @@ import {
   sub,
   vec3,
   type Vec3,
-} from "./vec.ts";
-import { moonDistanceAtMix, toReadable } from "./warp.ts";
+} from './vec.ts';
+import { moonDistanceAtMix, toReadable } from './warp.ts';
 
 /* ------------------------------------------------------------------ */
 /* Modeling choices (not published values).                            */
@@ -225,7 +225,7 @@ const NM = NAUTICAL_MILE_KM;
 const FPS = FOOT_KM;
 
 function mu(body: BodyId): number {
-  return body === "earth" ? EARTH_GM_KM3_PER_S2 : MOON_GM_KM3_PER_S2;
+  return body === 'earth' ? EARTH_GM_KM3_PER_S2 : MOON_GM_KM3_PER_S2;
 }
 
 function hasLatitude(fix: Fix | LunarFix): fix is Fix {
@@ -273,7 +273,19 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     schedule?: SizeSchedule,
     gm: number = mu(body),
   ): AnchoredOrbit {
-    return new AnchoredOrbit(sky, body, gm, rp, ra, t0, t1, reference, endDirection, body === "earth" ? earthBulge : undefined, schedule);
+    return new AnchoredOrbit(
+      sky,
+      body,
+      gm,
+      rp,
+      ra,
+      t0,
+      t1,
+      reference,
+      endDirection,
+      body === 'earth' ? earthBulge : undefined,
+      schedule,
+    );
   }
 
   /**
@@ -293,10 +305,14 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const ends = shipPlan.phases.map((p) => elapsedToSeconds(p.end.value));
     for (let i = 0; i < starts.length; i++) {
       if (!(ends[i]! > starts[i]!)) {
-        throw new Error(`${shipPlan.id} phase ${i} (${shipPlan.phases[i]!.label}) ends before it starts`);
+        throw new Error(
+          `${shipPlan.id} phase ${i} (${shipPlan.phases[i]!.label}) ends before it starts`,
+        );
       }
       if (i > 0 && Math.abs(starts[i]! - ends[i - 1]!) > 1e-6) {
-        throw new Error(`${shipPlan.id} phase ${i} (${shipPlan.phases[i]!.label}) does not start where the previous phase ends`);
+        throw new Error(
+          `${shipPlan.id} phase ${i} (${shipPlan.phases[i]!.label}) does not start where the previous phase ends`,
+        );
       }
     }
     return {
@@ -344,7 +360,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
   /** Geodetic (map) latitude of an Earth fix, radians. */
   function earthFixLatitude(fix: Fix): number {
     const lat = fix.latitude.value * DEG;
-    return fix.latitudeKind === "geocentric" ? geocentricToGeodetic(lat) : lat;
+    return fix.latitudeKind === 'geocentric' ? geocentricToGeodetic(lat) : lat;
   }
 
   /**
@@ -357,8 +373,8 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
    */
   function earthFixDrawnLatitude(fix: Fix): number {
     const lat = fix.latitude.value * DEG;
-    const geodetic = fix.latitudeKind === "geocentric" ? geocentricToGeodetic(lat) : lat;
-    const geocentric = fix.latitudeKind === "geocentric" ? lat : geodeticToGeocentric(lat);
+    const geodetic = fix.latitudeKind === 'geocentric' ? geocentricToGeodetic(lat) : lat;
+    const geocentric = fix.latitudeKind === 'geocentric' ? lat : geodeticToGeocentric(lat);
     const altitudeKm = (fix.altitude?.value ?? 0) * NM;
     return geocentric + (geodetic - geocentric) * Math.exp(-altitudeKm / LATITUDE_EASE_KM);
   }
@@ -371,12 +387,24 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const r = fix.altitude
       ? ellipsoidRadius(earthFixLatitude(fix)) + fix.altitude.value * NM
       : EARTH_MEAN_RADIUS_KM;
-    return sky.earthPointInertial(earthFixDrawnLatitude(fix), fix.longitude.value * DEG, r, t, vec3());
+    return sky.earthPointInertial(
+      earthFixDrawnLatitude(fix),
+      fix.longitude.value * DEG,
+      r,
+      t,
+      vec3(),
+    );
   }
 
   /** Inertial unit direction of an Earth fix at t. */
   function earthFixDirection(fix: Fix, t: number): Vec3 {
-    return sky.earthPointInertial(earthFixDrawnLatitude(fix), fix.longitude.value * DEG, 1, t, vec3());
+    return sky.earthPointInertial(
+      earthFixDrawnLatitude(fix),
+      fix.longitude.value * DEG,
+      1,
+      t,
+      vec3(),
+    );
   }
 
   /**
@@ -395,9 +423,12 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const speed = (fix.speed?.value ?? 1) * FPS;
     const v = vec3();
     for (let k = 0; k < 3; k++) {
-      v[k] = speed * (Math.cos(gamma) * (Math.cos(psi) * north[k]! + Math.sin(psi) * east[k]!) + Math.sin(gamma) * up[k]!);
+      v[k] =
+        speed *
+        (Math.cos(gamma) * (Math.cos(psi) * north[k]! + Math.sin(psi) * east[k]!) +
+          Math.sin(gamma) * up[k]!);
     }
-    if (fix.velocityFrame === "earth-fixed") {
+    if (fix.velocityFrame === 'earth-fixed') {
       const spin = cross(vec3(), scale(vec3(), pole, EARTH_SPIN_RATE), r);
       add(v, v, spin);
     }
@@ -406,7 +437,12 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
 
   /** True when a fix gives a full published state: position, speed, and direction of travel. */
   function isFullState(fix: StateFix): boolean {
-    return fix.altitude !== undefined && fix.speed !== undefined && fix.flightPathAngle !== undefined && fix.heading !== undefined;
+    return (
+      fix.altitude !== undefined &&
+      fix.speed !== undefined &&
+      fix.flightPathAngle !== undefined &&
+      fix.heading !== undefined
+    );
   }
 
   /** Moon-centered inertial direction of a lunar fix at t (equatorial plane). */
@@ -429,8 +465,9 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
   }
 
   function lunarNormal(sense: Sense): Vec3 {
-    if (lunarPlaneUp) return sense === "prograde" ? vec3(...lunarPlaneUp) : scale(vec3(), lunarPlaneUp, -1);
-    return sense === "prograde" ? vec3(...MOON_NORTH) : vec3(0, -1, 0);
+    if (lunarPlaneUp)
+      return sense === 'prograde' ? vec3(...lunarPlaneUp) : scale(vec3(), lunarPlaneUp, -1);
+    return sense === 'prograde' ? vec3(...MOON_NORTH) : vec3(0, -1, 0);
   }
 
   /** The prograde normal of the plan's lunar orbit plane (see LunarOrbitPlane), if it sets one. */
@@ -440,24 +477,35 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     let t: number | undefined = plane.time ? elapsedToSeconds(plane.time.value) : undefined;
     if (t === undefined) {
       for (const ship of plan.ships) {
-        const stay = ship.phases.find((p) => p.kind === "surface" && p.body === "moon");
+        const stay = ship.phases.find((p) => p.kind === 'surface' && p.body === 'moon');
         if (stay) {
           t = (elapsedToSeconds(stay.start.value) + elapsedToSeconds(stay.end.value)) / 2;
           break;
         }
       }
     }
-    if (t === undefined) throw new Error("lunarOrbitPlane needs a time when there is no stay on the lunar surface");
-    const site = moonFixedDirection(plane.site.latitude.value * DEG, plane.site.longitude.value * DEG, vec3());
+    if (t === undefined)
+      throw new Error('lunarOrbitPlane needs a time when there is no stay on the lunar surface');
+    const site = moonFixedDirection(
+      plane.site.latitude.value * DEG,
+      plane.site.longitude.value * DEG,
+      vec3(),
+    );
     const north = sub(vec3(), [0, 1, 0], scale(vec3(), site, site[1]));
-    if (length(north) < 1e-6) throw new Error("lunarOrbitPlane: the site cannot be at a pole");
+    if (length(north) < 1e-6) throw new Error('lunarOrbitPlane: the site cannot be at a pole');
     normalize(north, north);
     const east = cross(vec3(), north, site);
     const heading = (plane.heading?.value ?? 270) * DEG;
-    const travel = addScaled(vec3(), scale(vec3(), north, Math.cos(heading)), east, Math.sin(heading));
+    const travel = addScaled(
+      vec3(),
+      scale(vec3(), north, Math.cos(heading)),
+      east,
+      Math.sin(heading),
+    );
     const up = normalize(vec3(), cross(vec3(), site, travel));
     if (up[1] < 0) scale(up, up, -1);
-    if (Math.abs(up[1]) < 1e-6) throw new Error("lunarOrbitPlane: an orbit over the poles is not supported");
+    if (Math.abs(up[1]) < 1e-6)
+      throw new Error('lunarOrbitPlane: an orbit over the poles is not supported');
     return rotateY(up, up, sky.moonLongitude(t));
   }
 
@@ -481,7 +529,12 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const direction = normalize(vec3(), rState);
     const normal = normalize(vec3(), cross(vec3(), rState, vState));
     const rising = dot(rState, vState) >= 0;
-    return { t, direction, normal, trueAnomaly: trueAnomalyAtRadius(rp, ra, length(rState), rising) };
+    return {
+      t,
+      direction,
+      normal,
+      trueAnomaly: trueAnomalyAtRadius(rp, ra, length(rState), rising),
+    };
   }
 
   /* ---------------- segment builders ---------------- */
@@ -502,38 +555,40 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const t0 = ship.starts[i]!;
     const t1 = ship.ends[i]!;
     switch (phase.kind) {
-      case "orbit":
+      case 'orbit':
         return buildOrbit(ship, i, phase, t0, t1);
-      case "burn": {
+      case 'burn': {
         if (i === 0 || i === ship.plan.phases.length - 1) {
           throw new Error(`${ship.plan.id} phase ${i}: a burn needs a phase before and after it`);
         }
         const before = segment(ship, i - 1);
         const after = segment(ship, i + 1);
         if (!before.extendable || !after.extendable) {
-          throw new Error(`${where(ship, i)}: a burn must sit between orbits, coasts, transfers, or station keeping (or lead from an orbit into the entry)`);
+          throw new Error(
+            `${where(ship, i)}: a burn must sit between orbits, coasts, transfers, or station keeping (or lead from an orbit into the entry)`,
+          );
         }
         return new BurnBlend(phase.body, before, after, t0, t1);
       }
-      case "transfer":
+      case 'transfer':
         return buildTransfer(ship, i, phase, t0, t1);
-      case "coast":
+      case 'coast':
         return buildCoast(ship, i, phase, t0, t1);
-      case "ascent":
+      case 'ascent':
         return buildAscent(ship, i, phase, t0, t1);
-      case "descent":
+      case 'descent':
         return buildDescent(ship, i, phase, t0, t1);
-      case "surface": {
+      case 'surface': {
         const dir = siteDirection(phase.body, phase.site);
-        const radius = phase.body === "earth" ? EARTH_MEAN_RADIUS_KM : MOON_MEAN_RADIUS_KM;
+        const radius = phase.body === 'earth' ? EARTH_MEAN_RADIUS_KM : MOON_MEAN_RADIUS_KM;
         return new SurfacePoint(sky, phase.body, dir, radius, t0, t1);
       }
-      case "entry":
+      case 'entry':
         return buildEntry(ship, i, phase, t0, t1);
-      case "rendezvous":
+      case 'rendezvous':
         return buildRendezvous(ship, i, phase, t0, t1);
-      case "docked":
-      case "station":
+      case 'docked':
+      case 'station':
         // Station keeping holds the target's place, like docking; the scene
         // draws the pair a little apart.
         return new Follow(follower(phase.target), t0, t1);
@@ -542,19 +597,28 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
 
   /** Body-fixed unit direction of a surface site. */
   function siteDirection(body: BodyId, site: Fix): Vec3 {
-    if (body === "earth") {
+    if (body === 'earth') {
       return bodyFixedDirection(earthFixLatitude(site), site.longitude.value * DEG, vec3());
     }
     return moonFixedDirection(site.latitude.value * DEG, site.longitude.value * DEG, vec3());
   }
 
-  function apsides(body: BodyId, phase: { apoapsis: { value: number }; periapsis: { value: number } }): [number, number] {
-    const ref = body === "earth" ? EARTH_EQUATORIAL_RADIUS_KM : moonRefRadius;
+  function apsides(
+    body: BodyId,
+    phase: { apoapsis: { value: number }; periapsis: { value: number } },
+  ): [number, number] {
+    const ref = body === 'earth' ? EARTH_EQUATORIAL_RADIUS_KM : moonRefRadius;
     return [ref + phase.periapsis.value * NM, ref + phase.apoapsis.value * NM];
   }
 
   /** The orbit reference used when a phase starts right after a burn and has no published start. */
-  function referenceAcrossBurn(ship: ShipState, i: number, body: BodyId, rp: number, ra: number): OrbitReference {
+  function referenceAcrossBurn(
+    ship: ShipState,
+    i: number,
+    body: BodyId,
+    rp: number,
+    ra: number,
+  ): OrbitReference {
     const burnStart = ship.starts[i - 1]!;
     const burnEnd = ship.ends[i - 1]!;
     const before = segment(ship, i - 2);
@@ -576,7 +640,9 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     for (const size of phase.sizes) {
       const t = elapsedToSeconds(size.time.value);
       if (!(t > knots[knots.length - 1]!.t && t <= ship.ends[i]!)) {
-        throw new Error(`${where(ship, i)}: orbit sizes must be in time order and inside the phase (${size.time.value})`);
+        throw new Error(
+          `${where(ship, i)}: orbit sizes must be in time order and inside the phase (${size.time.value})`,
+        );
       }
       const [p, a] = apsides(phase.body, size);
       knots.push({ t, rp: p, ra: a });
@@ -585,11 +651,18 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
   }
 
   /** Where and how an orbit phase starts (see OrbitPhase in types.ts for the order of preference). */
-  function orbitReference(ship: ShipState, i: number, phase: OrbitPhase, rp: number, ra: number): OrbitReference {
+  function orbitReference(
+    ship: ShipState,
+    i: number,
+    phase: OrbitPhase,
+    rp: number,
+    ra: number,
+  ): OrbitReference {
     const body = phase.body;
     const t0 = ship.starts[i]!;
     const previous = i > 0 ? ship.plan.phases[i - 1]! : undefined;
-    const afterTarget = previous?.kind === "docked" || previous?.kind === "station" ? previous.target : undefined;
+    const afterTarget =
+      previous?.kind === 'docked' || previous?.kind === 'station' ? previous.target : undefined;
     const fromId = phase.from ?? (phase.startFix ? undefined : afterTarget);
 
     if (fromId) {
@@ -597,14 +670,25 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
       // is, on its orbit if this one has the same size.
       const target = shipById(fromId);
       let k = phaseIndexAt(target, t0);
-      if (k < 0) throw new Error(`${where(ship, i)}: "${fromId}" does not exist at the phase start`);
+      if (k < 0)
+        throw new Error(`${where(ship, i)}: "${fromId}" does not exist at the phase start`);
       // When the other ship starts flying beside this one at this very
       // moment (a spent stage set loose and kept on station), take its state
       // from just before, so the two do not wait on each other.
       const there = target.plan.phases[k]!;
-      if (k > 0 && target.starts[k] === t0 && (there.kind === "docked" || there.kind === "station") && there.target === ship.plan.id) k--;
+      if (
+        k > 0 &&
+        target.starts[k] === t0 &&
+        (there.kind === 'docked' || there.kind === 'station') &&
+        there.target === ship.plan.id
+      )
+        k--;
       const targetSeg = segment(target, k);
-      if (targetSeg instanceof AnchoredOrbit && targetSeg.body === body && shapeMatches(targetSeg, rp, ra, t0)) {
+      if (
+        targetSeg instanceof AnchoredOrbit &&
+        targetSeg.body === body &&
+        shapeMatches(targetSeg, rp, ra, t0)
+      ) {
         return continuation(targetSeg, t0);
       }
       const { r, v } = bodyInertialState(sky, body, targetSeg, t0);
@@ -612,9 +696,10 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     }
     if (phase.startFix) return fixReference(phase, phase.startFix, t0, rp, ra, ship, i);
     if (phase.startRelative) return relativeReference(ship, i, phase, rp);
-    if (previous?.kind === "burn") return referenceAcrossBurn(ship, i, body, rp, ra);
-    if (previous?.kind === "ascent" && body === "earth") return launchReference(ship, i, phase, rp);
-    if (previous?.kind === "ascent" && body === "moon") return lunarLiftoffReference(ship, i, phase, rp, ra);
+    if (previous?.kind === 'burn') return referenceAcrossBurn(ship, i, body, rp, ra);
+    if (previous?.kind === 'ascent' && body === 'earth') return launchReference(ship, i, phase, rp);
+    if (previous?.kind === 'ascent' && body === 'moon')
+      return lunarLiftoffReference(ship, i, phase, rp, ra);
     if (previous) {
       const prevSeg = segment(ship, i - 1);
       if (prevSeg instanceof AnchoredOrbit) {
@@ -626,10 +711,18 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
       const { r, v } = bodyInertialState(sky, body, prevSeg, t0);
       return referenceFromState(r, v, t0, rp, ra);
     }
-    throw new Error(`${where(ship, i)}: an orbit needs a start fix, a previous phase, "from", or "startRelative"`);
+    throw new Error(
+      `${where(ship, i)}: an orbit needs a start fix, a previous phase, "from", or "startRelative"`,
+    );
   }
 
-  function buildOrbit(ship: ShipState, i: number, phase: OrbitPhase, t0: number, t1: number): AnchoredOrbit {
+  function buildOrbit(
+    ship: ShipState,
+    i: number,
+    phase: OrbitPhase,
+    t0: number,
+    t1: number,
+  ): AnchoredOrbit {
     const body = phase.body;
     const [rp, ra] = apsides(body, phase);
     const schedule = sizeSchedule(ship, i, phase);
@@ -641,7 +734,9 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     }
     if (phase.endFix) {
       endDirection =
-        body === "earth" ? earthFixDirection(phase.endFix as Fix, t1) : moonFixDirection(phase.endFix, t1);
+        body === 'earth'
+          ? earthFixDirection(phase.endFix as Fix, t1)
+          : moonFixDirection(phase.endFix, t1);
     } else if (phase.endRange) {
       endDirection = trailingDirection(ship, i, phase, t0, t1, rp, ra, reference, schedule);
     } else if (stateCoastAfterBurn(ship, i)) {
@@ -652,7 +747,17 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     } else if (deorbitAfter(ship, i)) {
       return orbitIntoFall(ship, i, rp, ra, reference, schedule);
     }
-    const orbit = anchoredOrbit(body, rp, ra, t0, t1, reference, endDirection, schedule, phaseMu(phase, rp, ra));
+    const orbit = anchoredOrbit(
+      body,
+      rp,
+      ra,
+      t0,
+      t1,
+      reference,
+      endDirection,
+      schedule,
+      phaseMu(phase, rp, ra),
+    );
     // A published retrofire position: the fall starts there.
     if (phase.endFix && deorbitAfter(ship, i)) planFallFrom(ship, i, orbit);
     return orbit;
@@ -664,10 +769,20 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
    */
   function naturalOrbit(ship: ShipState, k: number): AnchoredOrbit | undefined {
     const phase = ship.plan.phases[k]!;
-    if (phase.kind !== "orbit") return undefined;
+    if (phase.kind !== 'orbit') return undefined;
     const [rp, ra] = apsides(phase.body, phase);
     const reference = orbitReference(ship, k, phase, rp, ra);
-    return anchoredOrbit(phase.body, rp, ra, ship.starts[k]!, ship.ends[k]!, reference, undefined, sizeSchedule(ship, k, phase), phaseMu(phase, rp, ra));
+    return anchoredOrbit(
+      phase.body,
+      rp,
+      ra,
+      ship.starts[k]!,
+      ship.ends[k]!,
+      reference,
+      undefined,
+      sizeSchedule(ship, k, phase),
+      phaseMu(phase, rp, ra),
+    );
   }
 
   /**
@@ -675,12 +790,18 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
    * it is the published straight-line distance ahead of (or behind) the
    * other ship, in that ship's orbit plane.
    */
-  function relativeReference(ship: ShipState, i: number, phase: OrbitPhase, rp: number): OrbitReference {
+  function relativeReference(
+    ship: ShipState,
+    i: number,
+    phase: OrbitPhase,
+    rp: number,
+  ): OrbitReference {
     const place = phase.startRelative!;
     const t = elapsedToSeconds(place.time.value);
     const other = shipById(place.ship);
     const k = phaseIndexAt(other, t);
-    if (k < 0) throw new Error(`${where(ship, i)}: "${place.ship}" does not exist at ${place.time.value}`);
+    if (k < 0)
+      throw new Error(`${where(ship, i)}: "${place.ship}" does not exist at ${place.time.value}`);
     const body = phase.body;
     const otherOrbit = naturalOrbit(other, k);
     let rOther: Vec3;
@@ -698,14 +819,21 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     // near-circular orbits of targets it hardly shows).
     const schedule = sizeSchedule(ship, i, phase);
     const radius = schedule ? schedule.aAt(t) * (1 - schedule.eAt(t)) : rp;
-    const ahead = "ahead" in place;
+    const ahead = 'ahead' in place;
     const d = (ahead ? place.ahead.value : place.behind.value) * NM;
     const r0 = length(rOther);
     const c = (radius * radius + r0 * r0 - d * d) / (2 * radius * r0);
     if (!(c <= 1 && c >= -1)) {
-      throw new Error(`${where(ship, i)}: an orbit of this size cannot be ${d / NM} nautical miles from "${place.ship}"`);
+      throw new Error(
+        `${where(ship, i)}: an orbit of this size cannot be ${d / NM} nautical miles from "${place.ship}"`,
+      );
     }
-    const direction = rotateAxis(vec3(), normalize(vec3(), rOther), normal, (ahead ? 1 : -1) * Math.acos(c));
+    const direction = rotateAxis(
+      vec3(),
+      normalize(vec3(), rOther),
+      normal,
+      (ahead ? 1 : -1) * Math.acos(c),
+    );
     return { t, direction, normal, trueAnomaly: 0 };
   }
 
@@ -718,20 +846,41 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
    * LIFTOFF_SHIFT_LIMIT), which keeps the orbit's own speed: where it
    * starts is still our illustration, not a published place.
    */
-  function lunarLiftoffReference(ship: ShipState, i: number, phase: OrbitPhase, rp: number, ra: number): OrbitReference {
+  function lunarLiftoffReference(
+    ship: ShipState,
+    i: number,
+    phase: OrbitPhase,
+    rp: number,
+    ra: number,
+  ): OrbitReference {
     const ascent = ship.plan.phases[i - 1] as AscentPhase;
     const liftoff = ship.starts[i - 1]!;
     const t0 = ship.starts[i]!;
     const t1 = ship.ends[i]!;
     const normal = lunarNormal(phase.sense.value);
-    const site = siteDirection("moon", ascent.site);
+    const site = siteDirection('moon', ascent.site);
     rotateY(site, site, sky.moonLongitude(liftoff));
     const onPlane = normalize(vec3(), addScaled(vec3(), site, normal, -dot(site, normal)));
     const speed = Math.sqrt(MOON_GM_KM3_PER_S2 / rp);
     const downrange = (LUNAR_DOWNRANGE_FRACTION * speed * (t0 - liftoff)) / rp;
-    const reference: OrbitReference = { t: t0, direction: rotateAxis(vec3(), onPlane, normal, downrange), normal, trueAnomaly: 0 };
+    const reference: OrbitReference = {
+      t: t0,
+      direction: rotateAxis(vec3(), onPlane, normal, downrange),
+      normal,
+      trueAnomaly: 0,
+    };
     if (!phase.endFix) return reference;
-    const natural = anchoredOrbit("moon", rp, ra, t0, t1, reference, undefined, sizeSchedule(ship, i, phase), phaseMu(phase, rp, ra)).inertialPosition(t1, vec3());
+    const natural = anchoredOrbit(
+      'moon',
+      rp,
+      ra,
+      t0,
+      t1,
+      reference,
+      undefined,
+      sizeSchedule(ship, i, phase),
+      phaseMu(phase, rp, ra),
+    ).inertialPosition(t1, vec3());
     const wanted = moonFixDirection(phase.endFix, t1);
     const shift = Math.atan2(dot(cross(vec3(), natural, wanted), normal), dot(natural, wanted));
     if (Math.abs(shift) > LIFTOFF_SHIFT_LIMIT) return reference;
@@ -759,7 +908,12 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
   /** The orbit normal for travel from `up` at a space-fixed heading (radians east of north). */
   function headingNormal(up: Readonly<Vec3>, heading: number): Vec3 {
     const { north, east } = localAxes(up);
-    const travel = addScaled(vec3(), scale(vec3(), north, Math.cos(heading)), east, Math.sin(heading));
+    const travel = addScaled(
+      vec3(),
+      scale(vec3(), north, Math.cos(heading)),
+      east,
+      Math.sin(heading),
+    );
     return normalize(vec3(), cross(vec3(), up, travel));
   }
 
@@ -767,11 +921,17 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
    * The two space-fixed headings at `up` for an orbit of the given
    * inclination (radians): northeast-bound first, then southeast-bound.
    */
-  function headingsForInclination(up: Readonly<Vec3>, inclination: number, context: string): [number, number] {
+  function headingsForInclination(
+    up: Readonly<Vec3>,
+    inclination: number,
+    context: string,
+  ): [number, number] {
     const { cosLatitude } = localAxes(up);
     const latitude = Math.acos(Math.min(1, cosLatitude));
     if (inclination < latitude - 1 * DEG) {
-      throw new Error(`${context}: an orbit inclined ${(inclination / DEG).toFixed(2)} degrees cannot pass over latitude ${(latitude / DEG).toFixed(2)}`);
+      throw new Error(
+        `${context}: an orbit inclined ${(inclination / DEG).toFixed(2)} degrees cannot pass over latitude ${(latitude / DEG).toFixed(2)}`,
+      );
     }
     // Within a degree of the latitude (the latitude conventions differ by up
     // to 0.2 degree), the orbit is drawn at the lowest inclination that
@@ -789,7 +949,8 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const { cosLatitude } = localAxes(up);
     const spin = EARTH_SPIN_RATE * EARTH_MEAN_RADIUS_KM * cosLatitude;
     const s = Math.sin(azimuth);
-    const ground = -spin * s + Math.sqrt(Math.max(0, spin * spin * s * s - spin * spin + speed * speed));
+    const ground =
+      -spin * s + Math.sqrt(Math.max(0, spin * spin * s * s - spin * spin + speed * speed));
     return Math.atan2(ground * s + spin, ground * Math.cos(azimuth));
   }
 
@@ -801,26 +962,45 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
    * way it leaves the site (northeast or southeast) follows the azimuth,
    * northeast when none is published.
    */
-  function launchReference(ship: ShipState, i: number, phase: OrbitPhase, rp: number): OrbitReference {
+  function launchReference(
+    ship: ShipState,
+    i: number,
+    phase: OrbitPhase,
+    rp: number,
+  ): OrbitReference {
     const ascent = ship.plan.phases[i - 1] as AscentPhase;
     const tLaunch = ship.starts[i - 1]!;
     const t0 = ship.starts[i]!;
     const site = earthFixDirection(ascent.site, tLaunch);
     const speed = Math.sqrt(EARTH_GM_KM3_PER_S2 / rp);
-    const azimuth = ascent.azimuth ? spaceFixedHeading(site, ascent.azimuth.value * DEG, speed) : undefined;
+    const azimuth = ascent.azimuth
+      ? spaceFixedHeading(site, ascent.azimuth.value * DEG, speed)
+      : undefined;
     let heading: number;
     if (phase.inclination) {
-      const [northeast, southeast] = headingsForInclination(site, phase.inclination.value * DEG, where(ship, i));
-      const off = (h: number) => Math.abs(Math.atan2(Math.sin(h - azimuth!), Math.cos(h - azimuth!)));
+      const [northeast, southeast] = headingsForInclination(
+        site,
+        phase.inclination.value * DEG,
+        where(ship, i),
+      );
+      const off = (h: number) =>
+        Math.abs(Math.atan2(Math.sin(h - azimuth!), Math.cos(h - azimuth!)));
       heading = azimuth !== undefined && off(southeast) < off(northeast) ? southeast : northeast;
     } else if (azimuth !== undefined) {
       heading = azimuth;
     } else {
-      throw new Error(`${where(ship, i)}: an orbit after a launch needs a start fix with a heading, an inclination, or the ascent's azimuth`);
+      throw new Error(
+        `${where(ship, i)}: an orbit after a launch needs a start fix with a heading, an inclination, or the ascent's azimuth`,
+      );
     }
     const normal = headingNormal(site, heading);
     const downrange = (DOWNRANGE_FRACTION * speed * (t0 - tLaunch)) / rp;
-    return { t: t0, direction: rotateAxis(vec3(), site, normal, downrange), normal, trueAnomaly: 0 };
+    return {
+      t: t0,
+      direction: rotateAxis(vec3(), site, normal, downrange),
+      normal,
+      trueAnomaly: 0,
+    };
   }
 
   /**
@@ -841,23 +1021,34 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     schedule: SizeSchedule | undefined,
   ): Vec3 {
     const { target: targetId, range } = phase.endRange!;
-    const ahead = phase.endRange!.side === "ahead";
+    const ahead = phase.endRange!.side === 'ahead';
     const body = phase.body;
     const target = shipById(targetId);
     const k = phaseIndexAt(target, t1);
-    if (k < 0) throw new Error(`${ship.plan.id} phase ${i} (${phase.label}): "${targetId}" does not exist at the phase end`);
+    if (k < 0)
+      throw new Error(
+        `${ship.plan.id} phase ${i} (${phase.label}): "${targetId}" does not exist at the phase end`,
+      );
     const { r: rt, v: vt } = bodyInertialState(sky, body, segment(target, k), t1);
     const targetRadius = length(rt);
     const up = normalize(vec3(), rt);
     const normal = normalize(vec3(), cross(vec3(), rt, vt));
     const d = range.value * NM;
     const gm = phaseMu(phase, rp, ra);
-    let radius = length(anchoredOrbit(body, rp, ra, t0, t1, reference, undefined, schedule, gm).inertialPosition(t1, vec3()));
+    let radius = length(
+      anchoredOrbit(body, rp, ra, t0, t1, reference, undefined, schedule, gm).inertialPosition(
+        t1,
+        vec3(),
+      ),
+    );
     const direction = vec3();
     for (let pass = 0; pass < 4; pass++) {
-      const c = (radius * radius + targetRadius * targetRadius - d * d) / (2 * radius * targetRadius);
+      const c =
+        (radius * radius + targetRadius * targetRadius - d * d) / (2 * radius * targetRadius);
       if (!(c <= 1 && c >= -1)) {
-        throw new Error(`${ship.plan.id} phase ${i} (${phase.label}): the end range cannot be reached`);
+        throw new Error(
+          `${ship.plan.id} phase ${i} (${phase.label}): the end range cannot be reached`,
+        );
       }
       rotateAxis(direction, up, normal, (ahead ? 1 : -1) * Math.acos(c));
       const aimed = anchoredOrbit(body, rp, ra, t0, t1, reference, direction, schedule, gm);
@@ -895,26 +1086,34 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     i: number,
   ): OrbitReference {
     const body = phase.body;
-    if (body === "earth") {
-      if (!hasLatitude(fix)) throw new Error(`${ship.plan.id} phase ${i}: Earth fixes need a latitude`);
+    if (body === 'earth') {
+      if (!hasLatitude(fix))
+        throw new Error(`${ship.plan.id} phase ${i}: Earth fixes need a latitude`);
       const r = earthFixInertial(fix, t0);
       const v = earthFixVelocity(fix, r);
       let normal: Vec3;
       if (v) normal = normalize(vec3(), cross(vec3(), r, v));
-      else if (i >= 2 && ship.plan.phases[i - 1]!.kind === "burn") {
+      else if (i >= 2 && ship.plan.phases[i - 1]!.kind === 'burn') {
         normal = referenceAcrossBurn(ship, i, body, rp, ra).normal;
       } else if (phase.inclination) {
         // The plane through the fix at the published inclination; of the
         // two, the one that passes nearer the launch site, if there is one.
         const up = normalize(vec3(), r);
-        const normals = headingsForInclination(up, phase.inclination.value * DEG, where(ship, i)).map((h) => headingNormal(up, h));
+        const normals = headingsForInclination(
+          up,
+          phase.inclination.value * DEG,
+          where(ship, i),
+        ).map((h) => headingNormal(up, h));
         const ascent = ship.plan.phases[i - 1];
         normal = normals[0]!;
-        if (ascent?.kind === "ascent") {
+        if (ascent?.kind === 'ascent') {
           const site = earthFixDirection(ascent.site, ship.starts[i - 1]!);
           if (Math.abs(dot(normals[1]!, site)) < Math.abs(dot(normal, site))) normal = normals[1]!;
         }
-      } else throw new Error(`${where(ship, i)}: an Earth orbit start fix needs a heading or an inclination`);
+      } else
+        throw new Error(
+          `${where(ship, i)}: an Earth orbit start fix needs a heading or an inclination`,
+        );
       const rising = (fix.flightPathAngle?.value ?? 0) >= 0;
       return {
         t: t0,
@@ -942,7 +1141,8 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const gamma = moonFix.flightPathAngle!.value * DEG;
     const speed = moonFix.speed!.value * FPS;
     const vM = vec3();
-    for (let k = 0; k < 3; k++) vM[k] = speed * (Math.cos(gamma) * horizontal[k]! + Math.sin(gamma) * up[k]!);
+    for (let k = 0; k < 3; k++)
+      vM[k] = speed * (Math.cos(gamma) * horizontal[k]! + Math.sin(gamma) * up[k]!);
     return Conic.fromState(rM, vM, MOON_GM_KM3_PER_S2, tM);
   }
 
@@ -965,13 +1165,14 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
    */
   function departure(ship: ShipState, i: number): Departure {
     const phases = ship.plan.phases;
-    if (i >= 2 && phases[i - 1]!.kind === "burn") {
+    if (i >= 2 && phases[i - 1]!.kind === 'burn') {
       const t = (ship.starts[i - 1]! + ship.ends[i - 1]!) / 2;
-      return { ...bodyInertialState(sky, "earth", segment(ship, i - 2), t), t };
+      return { ...bodyInertialState(sky, 'earth', segment(ship, i - 2), t), t };
     }
-    if (i === 0) throw new Error(`${where(ship, i)}: a transfer without an Earth fix needs a phase before it`);
+    if (i === 0)
+      throw new Error(`${where(ship, i)}: a transfer without an Earth fix needs a phase before it`);
     const t = ship.starts[i]!;
-    return { ...bodyInertialState(sky, "earth", segment(ship, i - 1), t), t };
+    return { ...bodyInertialState(sky, 'earth', segment(ship, i - 1), t), t };
   }
 
   /**
@@ -989,7 +1190,13 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
   ): number {
     const change = (tj: number): number => {
       const r2 = pointAt(tj);
-      const { v1 } = solveLambert(start.r, r2, tj - start.t, EARTH_GM_KM3_PER_S2, earthShortWay(start.r, r2, sense));
+      const { v1 } = solveLambert(
+        start.r,
+        r2,
+        tj - start.t,
+        EARTH_GM_KM3_PER_S2,
+        earthShortWay(start.r, r2, sense),
+      );
       const d = length(sub(vec3(), v1, start.v));
       return Number.isFinite(d) ? d : Infinity;
     };
@@ -1020,16 +1227,26 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
   /** Lambert's short or long way for a coast about Earth in the given direction of travel. */
   function earthShortWay(r1: Readonly<Vec3>, r2: Readonly<Vec3>, sense: Sense): boolean {
     const turn = dot(cross(vec3(), r1, r2), MOON_NORTH);
-    return turn >= 0 === (sense === "prograde");
+    return turn >= 0 === (sense === 'prograde');
   }
 
-  function buildTransfer(ship: ShipState, i: number, phase: TransferPhase, t0: number, t1: number): Segment {
-    const outbound = phase.to === "moon";
+  function buildTransfer(
+    ship: ShipState,
+    i: number,
+    phase: TransferPhase,
+    t0: number,
+    t1: number,
+  ): Segment {
+    const outbound = phase.to === 'moon';
     const { earthFix, moonFix } = phase;
-    if (!earthFix && !moonFix) throw new Error(`${where(ship, i)}: a transfer needs an Earth fix, a lunar fix, or both`);
-    if (earthFix && !earthFix.altitude) throw new Error(`${where(ship, i)}: the Earth fix needs an altitude`);
+    if (!earthFix && !moonFix)
+      throw new Error(`${where(ship, i)}: a transfer needs an Earth fix, a lunar fix, or both`);
+    if (earthFix && !earthFix.altitude)
+      throw new Error(`${where(ship, i)}: the Earth fix needs an altitude`);
     if (moonFix && (!moonFix.altitude || !moonFix.speed || !moonFix.flightPathAngle)) {
-      throw new Error(`${where(ship, i)}: the lunar fix needs altitude, speed, and flight-path angle`);
+      throw new Error(
+        `${where(ship, i)}: the lunar fix needs altitude, speed, and flight-path angle`,
+      );
     }
     const tE = earthFix?.time ? elapsedToSeconds(earthFix.time.value) : outbound ? t0 : t1;
 
@@ -1038,7 +1255,10 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
       if (outbound) {
         // Before a midcourse burn: the conic about Earth through the
         // published state, which must not reach the Moon.
-        if (!isFullState(fix)) throw new Error(`${where(ship, i)}: without a lunar fix, the Earth fix must be a full state (speed, flight-path angle, heading)`);
+        if (!isFullState(fix))
+          throw new Error(
+            `${where(ship, i)}: without a lunar fix, the Earth fix must be a full state (speed, flight-path angle, heading)`,
+          );
         const r = earthFixInertial(fix, tE);
         const conic = Conic.fromState(r, earthFixVelocity(fix, r)!, EARTH_GM_KM3_PER_S2, tE);
         const p = vec3();
@@ -1046,16 +1266,31 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
         for (let k = 0; k <= 200; k++) {
           const t = t0 + ((t1 - t0) * k) / 200;
           const d = length(sub(p, conic.position(t, p), sky.moonCenterInertial(t, m)));
-          if (d < NEAR_RADIUS_KM) throw new Error(`${where(ship, i)}: this leg reaches the Moon, so it needs a lunar fix`);
+          if (d < NEAR_RADIUS_KM)
+            throw new Error(
+              `${where(ship, i)}: this leg reaches the Moon, so it needs a lunar fix`,
+            );
         }
-        return new ConicSegment(sky, "earth", conic, t0, t1);
+        return new ConicSegment(sky, 'earth', conic, t0, t1);
       }
       // Home after a midcourse burn: from where the burn was to the entry
       // interface, about Earth alone.
       const { r: r1, t: ta } = departure(ship, i);
       const r2 = earthFixInertial(fix, tE);
-      const { v1 } = solveLambert(r1, r2, tE - ta, EARTH_GM_KM3_PER_S2, earthShortWay(r1, r2, phase.earthSense.value));
-      return new ConicSegment(sky, "earth", Conic.fromState(r1, v1, EARTH_GM_KM3_PER_S2, ta), t0, t1);
+      const { v1 } = solveLambert(
+        r1,
+        r2,
+        tE - ta,
+        EARTH_GM_KM3_PER_S2,
+        earthShortWay(r1, r2, phase.earthSense.value),
+      );
+      return new ConicSegment(
+        sky,
+        'earth',
+        Conic.fromState(r1, v1, EARTH_GM_KM3_PER_S2, ta),
+        t0,
+        t1,
+      );
     }
 
     const tM = moonFix.time ? elapsedToSeconds(moonFix.time.value) : outbound ? t1 : t0;
@@ -1079,13 +1314,16 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     // the burn with the least change of velocity (the burn then looks no
     // bigger than the two published paths need); home, at the patch point
     // when it is still ahead, otherwise halfway through the fade.
-    const afterBurn = ship.plan.phases[i - 1]?.kind === "burn";
-    const inFade = afterBurn && (outbound ? t0 > farTime && t0 < nearTime : t0 > nearTime && t0 < farTime);
+    const afterBurn = ship.plan.phases[i - 1]?.kind === 'burn';
+    const inFade =
+      afterBurn && (outbound ? t0 > farTime && t0 < nearTime : t0 > nearTime && t0 < farTime);
     const fadeFar = inFade && outbound ? t0 : farTime;
     const fadeNear = inFade && !outbound ? t0 : nearTime;
-    const pointAt = (t: number) => add(vec3(), sky.moonCenterInertial(t, vec3()), moonConic.position(t, vec3()));
+    const pointAt = (t: number) =>
+      add(vec3(), sky.moonCenterInertial(t, vec3()), moonConic.position(t, vec3()));
     let joinTime = patchTime;
-    if (inFade && outbound && !earthFix) joinTime = leastChangeJoin(departure(ship, i), t0, nearTime, pointAt, phase.earthSense.value);
+    if (inFade && outbound && !earthFix)
+      joinTime = leastChangeJoin(departure(ship, i), t0, nearTime, pointAt, phase.earthSense.value);
     else if (inFade && !outbound && patchTime <= t0) joinTime = (t0 + farTime) / 2;
     const join = pointAt(joinTime);
 
@@ -1094,8 +1332,16 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
       // The Earth conic: Lambert arc between the Earth fix (or, after a
       // midcourse burn, where the burn was) and the patch point.
       const start = earthFix ? { r: earthFixInertial(earthFix, tE), t: tE } : departure(ship, i);
-      const [r1, r2, ta, tb] = outbound ? [start.r, join, start.t, joinTime] : [join, start.r, joinTime, start.t];
-      const { v1 } = solveLambert(r1, r2, tb - ta, EARTH_GM_KM3_PER_S2, earthShortWay(r1, r2, phase.earthSense.value));
+      const [r1, r2, ta, tb] = outbound
+        ? [start.r, join, start.t, joinTime]
+        : [join, start.r, joinTime, start.t];
+      const { v1 } = solveLambert(
+        r1,
+        r2,
+        tb - ta,
+        EARTH_GM_KM3_PER_S2,
+        earthShortWay(r1, r2, phase.earthSense.value),
+      );
       earthConic = Conic.fromState(r1, v1, EARTH_GM_KM3_PER_S2, ta);
     } else {
       // Leaving the Moon before a midcourse burn: carried on about Earth
@@ -1112,24 +1358,32 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const burn = phases[i + 1];
     const coast = phases[i + 2];
     return (
-      burn?.kind === "burn" &&
-      coast?.kind === "coast" &&
-      coast.body === "earth" &&
-      phases[i]!.kind === "orbit" &&
-      (phases[i] as OrbitPhase).body === "earth" &&
+      burn?.kind === 'burn' &&
+      coast?.kind === 'coast' &&
+      coast.body === 'earth' &&
+      phases[i]!.kind === 'orbit' &&
+      (phases[i] as OrbitPhase).body === 'earth' &&
       coast.endFix !== undefined &&
       isFullState(coast.endFix)
     );
   }
 
-  function buildCoast(ship: ShipState, i: number, phase: CoastPhase, t0: number, t1: number): ConicSegment {
+  function buildCoast(
+    ship: ShipState,
+    i: number,
+    phase: CoastPhase,
+    t0: number,
+    t1: number,
+  ): ConicSegment {
     const body = phase.body;
     const endFix = phase.endFix;
     const previous = i > 0 ? ship.plan.phases[i - 1]! : undefined;
     if (!endFix) {
-      if (previous?.kind === "burn") {
-        if (body !== "earth" || ship.plan.phases[i + 1]?.kind !== "entry") {
-          throw new Error(`${where(ship, i)}: a coast after a burn needs an end fix, unless it falls into the entry`);
+      if (previous?.kind === 'burn') {
+        if (body !== 'earth' || ship.plan.phases[i + 1]?.kind !== 'entry') {
+          throw new Error(
+            `${where(ship, i)}: a coast after a burn needs an end fix, unless it falls into the entry`,
+          );
         }
         // The fall from retrofire to the entry interface (see planFall).
         return new ConicSegment(sky, body, fallFor(ship, i - 1).conic, t0, t1);
@@ -1140,7 +1394,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
       const { r, v } = bodyInertialState(sky, body, segment(ship, i - 1), t0);
       return new ConicSegment(sky, body, Conic.fromState(r, v, mu(body), t0), t0, t1);
     }
-    if (body === "earth" && isFullState(endFix)) {
+    if (body === 'earth' && isFullState(endFix)) {
       // A full published state at the end: the coast is the Kepler conic
       // through it, run back to the start of the phase.
       const tFix = endFix.time ? elapsedToSeconds(endFix.time.value) : t1;
@@ -1150,7 +1404,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     }
     let r1: Vec3;
     let ta: number;
-    if (i >= 2 && ship.plan.phases[i - 1]!.kind === "burn") {
+    if (i >= 2 && ship.plan.phases[i - 1]!.kind === 'burn') {
       ta = (ship.starts[i - 1]! + ship.ends[i - 1]!) / 2;
       r1 = bodyInertialState(sky, body, segment(ship, i - 2), ta).r;
     } else if (i > 0) {
@@ -1158,11 +1412,11 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
       r1 = bodyInertialState(sky, body, segment(ship, i - 1), ta).r;
     } else throw new Error(`${ship.plan.id} phase ${i}: a coast needs a previous phase`);
     const r2 =
-      body === "earth"
+      body === 'earth'
         ? earthFixInertial(endFix, t1)
         : scale(vec3(), moonFixDirection(endFix, t1), moonFixRadius(endFix) ?? MOON_MEAN_RADIUS_KM);
-    const north = body === "earth" ? vec3(0, 1, 0) : vec3(...(lunarPlaneUp ?? MOON_NORTH));
-    const shortWay = dot(cross(vec3(), r1, r2), north) >= 0 === (phase.sense.value === "prograde");
+    const north = body === 'earth' ? vec3(0, 1, 0) : vec3(...(lunarPlaneUp ?? MOON_NORTH));
+    const shortWay = dot(cross(vec3(), r1, r2), north) >= 0 === (phase.sense.value === 'prograde');
     const { v1 } = solveLambert(r1, r2, t1 - ta, mu(body), shortWay);
     return new ConicSegment(sky, body, Conic.fromState(r1, v1, mu(body), ta), t0, t1);
   }
@@ -1185,16 +1439,29 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const phases = ship.plan.phases;
     const orbit = phases[i];
     const next = phases[i + 2];
-    if (orbit?.kind !== "orbit" || orbit.body !== "earth" || phases[i + 1]?.kind !== "burn") return false;
-    if (next?.kind === "entry") return true;
-    return next?.kind === "coast" && next.body === "earth" && !next.endFix && phases[i + 3]?.kind === "entry";
+    if (orbit?.kind !== 'orbit' || orbit.body !== 'earth' || phases[i + 1]?.kind !== 'burn')
+      return false;
+    if (next?.kind === 'entry') return true;
+    return (
+      next?.kind === 'coast' &&
+      next.body === 'earth' &&
+      !next.endFix &&
+      phases[i + 3]?.kind === 'entry'
+    );
   }
 
   /** The planned fall after the burn at index iBurn (it is planned while the orbit before it is built). */
   function fallFor(ship: ShipState, iBurn: number): Fall {
     const before = ship.plan.phases[iBurn - 1];
-    if (iBurn < 1 || before?.kind !== "orbit" || before.body !== "earth" || !deorbitAfter(ship, iBurn - 1)) {
-      throw new Error(`${where(ship, iBurn)}: retrofire into the entry needs an Earth orbit before the burn`);
+    if (
+      iBurn < 1 ||
+      before?.kind !== 'orbit' ||
+      before.body !== 'earth' ||
+      !deorbitAfter(ship, iBurn - 1)
+    ) {
+      throw new Error(
+        `${where(ship, iBurn)}: retrofire into the entry needs an Earth orbit before the burn`,
+      );
     }
     segment(ship, iBurn - 1);
     const fall = falls.get(`${ship.plan.id}:${iBurn}`);
@@ -1215,7 +1482,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
   /** What the fall after orbit phase i must reach, worked back from the splashdown. */
   function fallTarget(ship: ShipState, i: number): FallTarget {
     const phases = ship.plan.phases;
-    const coast = phases[i + 2]!.kind === "coast";
+    const coast = phases[i + 2]!.kind === 'coast';
     const je = coast ? i + 3 : i + 2;
     const entry = phases[je] as EntryPhase;
     const landing = ship.ends[je]!;
@@ -1224,14 +1491,18 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     let entryTime: number;
     if (coast) entryTime = ship.ends[i + 2]!;
     else {
-      entryTime = drogue !== undefined ? Math.min(landing - ENTRY_BEFORE_LANDING_S, drogue - ENTRY_BEFORE_DROGUE_S) : landing - ENTRY_BEFORE_LANDING_S;
+      entryTime =
+        drogue !== undefined
+          ? Math.min(landing - ENTRY_BEFORE_LANDING_S, drogue - ENTRY_BEFORE_DROGUE_S)
+          : landing - ENTRY_BEFORE_LANDING_S;
       // Keep at least a minute of fall after retrofire, and of entry before
       // the drogue (or the landing).
       entryTime = Math.min(Math.max(entryTime, burnEnd + 60), (drogue ?? landing) - 60);
     }
     // Where the capsule has slowed over the landing area: halfway from
     // entry interface to the drogue (or to buildEntry's default drogue time).
-    const slowed = entryTime + 0.5 * ((drogue ?? entryTime + 0.6 * (landing - entryTime)) - entryTime);
+    const slowed =
+      entryTime + 0.5 * ((drogue ?? entryTime + 0.6 * (landing - entryTime)) - entryTime);
     return {
       entryTime,
       published: coast,
@@ -1273,7 +1544,9 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const shortest = fallTime(ra, steepest, r);
     if (!(dt <= longest && dt >= shortest)) {
       if (target.published) {
-        throw new Error(`${where(ship, i + 1)}: no fall from retrofire reaches the entry interface ${(dt / 60).toFixed(1)} minutes later (between ${(shortest / 60).toFixed(1)} and ${(longest / 60).toFixed(1)} minutes can)`);
+        throw new Error(
+          `${where(ship, i + 1)}: no fall from retrofire reaches the entry interface ${(dt / 60).toFixed(1)} minutes later (between ${(shortest / 60).toFixed(1)} and ${(longest / 60).toFixed(1)} minutes can)`,
+        );
       }
       dt = clamp(dt, shortest, longest);
     }
@@ -1290,10 +1563,18 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const p = (2 * ra * rp) / (ra + rp);
     const sweep = Math.PI - Math.acos(clamp((p / r - 1) / e, -1, 1));
     const high =
-      "entry" in toward
+      'entry' in toward
         ? rotateAxis(vec3(), toward.entry, plane, -sweep)
         : normalize(vec3(), toward.apoapsis);
-    const conic = new Conic({ mu: EARTH_GM_KM3_PER_S2, p, e, pHat: scale(vec3(), high, -1), normal: vec3(plane[0], plane[1], plane[2]), t0: tMid, M0: Math.PI });
+    const conic = new Conic({
+      mu: EARTH_GM_KM3_PER_S2,
+      p,
+      e,
+      pHat: scale(vec3(), high, -1),
+      normal: vec3(plane[0], plane[1], plane[2]),
+      t0: tMid,
+      M0: Math.PI,
+    });
     const fall = { conic, entryTime: tMid + dt };
     falls.set(`${ship.plan.id}:${i + 1}`, fall);
     return fall;
@@ -1320,15 +1601,28 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const tMid = (ship.starts[i + 1]! + ship.ends[i + 1]!) / 2;
     const target = fallTarget(ship, i);
     const gm = phaseMu(ship.plan.phases[i] as OrbitPhase, rp, ra);
-    let orbit = anchoredOrbit("earth", rp, ra, t0, t1, reference, undefined, schedule, gm);
+    let orbit = anchoredOrbit('earth', rp, ra, t0, t1, reference, undefined, schedule, gm);
     for (let pass = 0; pass < 3; pass++) {
       const r = orbit.inertialPosition(tMid, vec3());
       const normal = orbit.normalAt(tMid, vec3());
-      const plane = normalize(vec3(), addScaled(vec3(), normal, target.splash, -dot(normal, target.splash)));
+      const plane = normalize(
+        vec3(),
+        addScaled(vec3(), normal, target.splash, -dot(normal, target.splash)),
+      );
       const entry = rotateAxis(vec3(), target.splash, plane, -ENTRY_ARC_RAD);
       const fall = planFall(ship, i, target, length(r), plane, { entry });
       const start = fall.conic.position(t1, vec3());
-      orbit = anchoredOrbit("earth", rp, ra, t0, t1, reference, normalize(start, start), schedule, gm);
+      orbit = anchoredOrbit(
+        'earth',
+        rp,
+        ra,
+        t0,
+        t1,
+        reference,
+        normalize(start, start),
+        schedule,
+        gm,
+      );
     }
     return orbit;
   }
@@ -1343,26 +1637,43 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     planFall(ship, i, target, length(r), plane, { apoapsis: r });
   }
 
-  function buildAscent(ship: ShipState, i: number, phase: AscentPhase, t0: number, t1: number): SurfaceRelativePath {
+  function buildAscent(
+    ship: ShipState,
+    i: number,
+    phase: AscentPhase,
+    t0: number,
+    t1: number,
+  ): SurfaceRelativePath {
     const body = phase.body;
     const next = segment(ship, i + 1);
     const end = bodyFixedState(sky, body, next, t1);
-    const surfaceRadius = body === "earth" ? EARTH_MEAN_RADIUS_KM : MOON_MEAN_RADIUS_KM;
-    const knots: PathKnot[] = [{ t: t0, direction: siteDirection(body, phase.site), radius: surfaceRadius }];
+    const surfaceRadius = body === 'earth' ? EARTH_MEAN_RADIUS_KM : MOON_MEAN_RADIUS_KM;
+    const knots: PathKnot[] = [
+      { t: t0, direction: siteDirection(body, phase.site), radius: surfaceRadius },
+    ];
     for (const point of phase.track ?? []) {
-      if (!point.time || !point.altitude) throw new Error(`${ship.plan.id} phase ${i}: track points need a time and altitude`);
+      if (!point.time || !point.altitude)
+        throw new Error(`${ship.plan.id} phase ${i}: track points need a time and altitude`);
       const t = elapsedToSeconds(point.time.value);
       // Points just before insertion are left to the orbit itself, so the
       // climb joins the orbit without a kink.
       if (t <= t0 || t >= t1 - TRACK_END_MARGIN_S) continue;
       let direction: Vec3;
       let radius: number;
-      if (body === "earth") {
+      if (body === 'earth') {
         radius = ellipsoidRadius(earthFixLatitude(point)) + point.altitude.value * NM;
-        direction = bodyFixedDirection(earthFixDrawnLatitude(point), point.longitude.value * DEG, vec3());
+        direction = bodyFixedDirection(
+          earthFixDrawnLatitude(point),
+          point.longitude.value * DEG,
+          vec3(),
+        );
       } else {
         radius = moonRefRadius + point.altitude.value * NM;
-        direction = moonFixedDirection(point.latitude.value * DEG, point.longitude.value * DEG, vec3());
+        direction = moonFixedDirection(
+          point.latitude.value * DEG,
+          point.longitude.value * DEG,
+          vec3(),
+        );
       }
       knots.push({ t, direction, radius });
     }
@@ -1372,21 +1683,31 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
       startDirectionRate: vec3(0, 0, 0),
       endDirectionRate: directionRate(end.r, end.v, vec3()),
       // A lunar ascent starts with a vertical rise; an Earth ascent starts at rest.
-      startRadiusRate: body === "moon" ? 2 * firstSecant : 0,
+      startRadiusRate: body === 'moon' ? 2 * firstSecant : 0,
       endRadiusRate: radiusRate(end.r, end.v),
     });
   }
 
-  function buildDescent(ship: ShipState, i: number, phase: DescentPhase, t0: number, t1: number): SurfaceRelativePath {
+  function buildDescent(
+    ship: ShipState,
+    i: number,
+    phase: DescentPhase,
+    t0: number,
+    t1: number,
+  ): SurfaceRelativePath {
     const body = phase.body;
     const start = bodyFixedState(sky, body, segment(ship, i - 1), t0);
-    const surfaceRadius = body === "earth" ? EARTH_MEAN_RADIUS_KM : MOON_MEAN_RADIUS_KM;
+    const surfaceRadius = body === 'earth' ? EARTH_MEAN_RADIUS_KM : MOON_MEAN_RADIUS_KM;
     const knots: PathKnot[] = [
       { t: t0, direction: normalize(vec3(), start.r), radius: length(start.r) },
       { t: t1, direction: siteDirection(body, phase.site), radius: surfaceRadius },
     ];
     return new SurfaceRelativePath(sky, body, knots, {
-      startDirectionRate: limitDirectionRate(knots[0]!, knots[1]!, directionRate(start.r, start.v, vec3())),
+      startDirectionRate: limitDirectionRate(
+        knots[0]!,
+        knots[1]!,
+        directionRate(start.r, start.v, vec3()),
+      ),
       endDirectionRate: vec3(0, 0, 0),
       startRadiusRate: radiusRate(start.r, start.v),
       endRadiusRate: 0,
@@ -1396,20 +1717,36 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
   /** When each entry phase reaches the atmosphere (later than its start when it begins at retrofire). */
   const entryInterfaces = new Map<string, number>();
 
-  function buildEntry(ship: ShipState, i: number, phase: EntryPhase, t0: number, t1: number): Segment {
+  function buildEntry(
+    ship: ShipState,
+    i: number,
+    phase: EntryPhase,
+    t0: number,
+    t1: number,
+  ): Segment {
     // Straight after retrofire, the entry begins with the planned fall to
     // the entry interface (see planFall); otherwise it begins there.
     const fall =
-      ship.plan.phases[i - 1]?.kind === "burn" ? new ConicSegment(sky, "earth", fallFor(ship, i - 1).conic, t0, t1) : undefined;
+      ship.plan.phases[i - 1]?.kind === 'burn'
+        ? new ConicSegment(sky, 'earth', fallFor(ship, i - 1).conic, t0, t1)
+        : undefined;
     const tE = fall ? fallFor(ship, i - 1).entryTime : t0;
-    if (!(tE < t1)) throw new Error(`${where(ship, i)}: the entry interface comes after the landing`);
+    if (!(tE < t1))
+      throw new Error(`${where(ship, i)}: the entry interface comes after the landing`);
     entryInterfaces.set(`${ship.plan.id}:${i}`, tE);
-    const start = bodyFixedState(sky, "earth", fall ?? segment(ship, i - 1), tE);
+    const start = bodyFixedState(sky, 'earth', fall ?? segment(ship, i - 1), tE);
     const tDrogue = phase.drogue ? elapsedToSeconds(phase.drogue.value) : tE + 0.6 * (t1 - tE);
-    if (!(tDrogue > tE && tDrogue < t1)) throw new Error(`${where(ship, i)}: the drogue must open after the entry interface and before landing`);
+    if (!(tDrogue > tE && tDrogue < t1))
+      throw new Error(
+        `${where(ship, i)}: the drogue must open after the entry interface and before landing`,
+      );
     const knots: PathKnot[] = [
       { t: tE, direction: normalize(vec3(), start.r), radius: length(start.r) },
-      { t: tDrogue, direction: siteDirection("earth", phase.splashdown), radius: EARTH_MEAN_RADIUS_KM },
+      {
+        t: tDrogue,
+        direction: siteDirection('earth', phase.splashdown),
+        radius: EARTH_MEAN_RADIUS_KM,
+      },
     ];
     // Height: falls from the entry interface toward the drogue height with
     // the arrival descent rate, levels off there, then drops under the
@@ -1429,10 +1766,14 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     };
     const path = new SurfaceRelativePath(
       sky,
-      "earth",
+      'earth',
       knots,
       {
-        startDirectionRate: limitDirectionRate(knots[0]!, knots[1]!, directionRate(start.r, start.v, vec3())),
+        startDirectionRate: limitDirectionRate(
+          knots[0]!,
+          knots[1]!,
+          directionRate(start.r, start.v, vec3()),
+        ),
         endDirectionRate: vec3(0, 0, 0),
       },
       (t) => EARTH_MEAN_RADIUS_KM + height(t),
@@ -1440,25 +1781,34 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     return {
       t0,
       t1,
-      body: "earth",
+      body: 'earth',
       // With the fall in front, the burn before can blend into it.
       extendable: fall !== undefined,
       evaluate: (t, out) => (fall && t < tE ? fall.evaluate(t, out) : path.evaluate(t, out)),
     };
   }
 
-  function buildRendezvous(ship: ShipState, i: number, phase: RendezvousPhase, t0: number, t1: number): Converge {
+  function buildRendezvous(
+    ship: ShipState,
+    i: number,
+    phase: RendezvousPhase,
+    t0: number,
+    t1: number,
+  ): Converge {
     const body = phase.body;
     const [rp, ra] = apsides(body, phase);
     let reference: OrbitReference;
-    if (i >= 2 && ship.plan.phases[i - 1]!.kind === "burn") reference = referenceAcrossBurn(ship, i, body, rp, ra);
+    if (i >= 2 && ship.plan.phases[i - 1]!.kind === 'burn')
+      reference = referenceAcrossBurn(ship, i, body, rp, ra);
     else {
       const { r, v } = bodyInertialState(sky, body, segment(ship, i - 1), t0);
       reference = referenceFromState(r, v, t0, rp, ra);
     }
     const meet = phase.alongside ? elapsedToSeconds(phase.alongside.value) : t1;
     if (!(meet > t0 && meet <= t1)) {
-      throw new Error(`${ship.plan.id} phase ${i} (${phase.label}): "alongside" must fall inside the phase`);
+      throw new Error(
+        `${ship.plan.id} phase ${i} (${phase.label}): "alongside" must fall inside the phase`,
+      );
     }
     const own = anchoredOrbit(body, rp, ra, t0, t1, reference);
     return new Converge(body, own, follower(phase.target), t0, t1, meet);
@@ -1501,7 +1851,13 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
   }
 
   /** Where the Earth-fixed point under scene position pKm (at time t) is at time t2. */
-  function groundPointAt(pKm: Readonly<Vec3>, t: number, t2: number, mix: number, out: Vec3Out): void {
+  function groundPointAt(
+    pKm: Readonly<Vec3>,
+    t: number,
+    t2: number,
+    mix: number,
+    out: Vec3Out,
+  ): void {
     sky.sceneToEarthFixed(pKm, t, scratchFixed);
     applyMix(sky.earthFixedToScene(scratchFixed, t2, scratchFixed), mix, out);
   }
@@ -1554,7 +1910,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
       const k = phaseIndexAt(ship, t);
       const phase = ship.plan.phases[k]!;
       positionAt(ship, t, m, dirP);
-      if (phase.kind === "surface") {
+      if (phase.kind === 'surface') {
         localUp(dirP, m, out);
         return true;
       }
@@ -1569,13 +1925,18 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
       // Near Earth's surface, show travel relative to the ground, easing
       // into travel in the scene frame by the end of the ascent (and out of
       // it over the entry).
-      const groundRelative = phase.kind === "entry" || (phase.kind === "ascent" && phase.body === "earth");
+      const groundRelative =
+        phase.kind === 'entry' || (phase.kind === 'ascent' && phase.body === 'earth');
       if (groundRelative) {
         // An entry that begins at retrofire counts its progress from the
         // entry interface: before it, the craft is still falling in space.
-        const from = phase.kind === "entry" ? (entryInterfaces.get(`${ship.plan.id}:${k}`) ?? ship.starts[k]!) : ship.starts[k]!;
+        const from =
+          phase.kind === 'entry'
+            ? (entryInterfaces.get(`${ship.plan.id}:${k}`) ?? ship.starts[k]!)
+            : ship.starts[k]!;
         const progress = (t - from) / (ship.ends[k]! - from);
-        const groundWeight = phase.kind === "ascent" ? 1 - smoothstep(progress) : smoothstep(progress);
+        const groundWeight =
+          phase.kind === 'ascent' ? 1 - smoothstep(progress) : smoothstep(progress);
         shipPositionKm(ship, t, dirKm);
         groundPointAt(dirKm, t, ta, m, dirGA);
         groundPointAt(dirKm, t, tb, m, dirGB);
@@ -1681,14 +2042,22 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
       readPos.push(s[1][0]!, s[1][1]!, s[1][2]!);
     }
 
-    function refine(ta: number, a: [number[], number[]], tb: number, b: [number[], number[]], depth: number, limit: number): void {
+    function refine(
+      ta: number,
+      a: [number[], number[]],
+      tb: number,
+      b: [number[], number[]],
+      depth: number,
+      limit: number,
+    ): void {
       const tm = (ta + tb) / 2;
       const m = sample(tm);
       const split =
         depth < 16 &&
         times.length < limit &&
         tb - ta > 0.05 &&
-        (needsSplit(a[0], b[0], m[0], EARTH_MOON_DISTANCE) || needsSplit(a[1], b[1], m[1], moonDistanceAtMix(0)));
+        (needsSplit(a[0], b[0], m[0], EARTH_MOON_DISTANCE) ||
+          needsSplit(a[1], b[1], m[1], moonDistanceAtMix(0)));
       if (split) {
         refine(ta, a, tm, m, depth + 1, limit);
         refine(tm, m, tb, b, depth + 1, limit);
@@ -1743,7 +2112,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
 
   function orbitLike(ship: ShipState, k: number): boolean {
     const kind = ship.plan.phases[k]!.kind;
-    return kind === "orbit" || kind === "rendezvous" || kind === "docked" || kind === "station";
+    return kind === 'orbit' || kind === 'rendezvous' || kind === 'docked' || kind === 'station';
   }
 
   /** Starting subdivision of a phase before adaptive refinement. */
@@ -1751,16 +2120,16 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
     const phase = ship.plan.phases[k]!;
     const duration = ship.ends[k]! - ship.starts[k]!;
     switch (phase.kind) {
-      case "surface":
+      case 'surface':
         return 1;
-      case "orbit":
-      case "rendezvous":
-      case "docked":
-      case "station": {
+      case 'orbit':
+      case 'rendezvous':
+      case 'docked':
+      case 'station': {
         const period = orbitPeriodNear(ship, k) ?? 7200;
         return Math.max(4, Math.ceil((duration / period) * 48));
       }
-      case "transfer":
+      case 'transfer':
         return 160;
       default:
         return 12;
@@ -1774,7 +2143,7 @@ export function buildFlightPath(plan: FlightPlan): FlightPath & { report: BuildR
   function orbitPeriodNear(ship: ShipState, k: number): number | undefined {
     const phase = ship.plan.phases[k]!;
     let seg: Segment = segment(ship, k);
-    if (phase.kind === "docked" || phase.kind === "station") {
+    if (phase.kind === 'docked' || phase.kind === 'station') {
       const target = shipById(phase.target);
       const j = phaseIndexAt(target, (ship.starts[k]! + ship.ends[k]!) / 2);
       if (j < 0) return undefined;
@@ -1799,4 +2168,3 @@ function limitDirectionRate(a: PathKnot, b: PathKnot, rate: Vec3): Vec3 {
   if (len > max && len > 0) scale(rate, rate, max / len);
   return rate;
 }
-

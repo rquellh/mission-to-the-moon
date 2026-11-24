@@ -1,12 +1,12 @@
+import { MOON_CENTER_KM, type Sky } from './frames.ts';
+import { Conic, ellipticMeanFromTrue, ellipticTrueFromMean } from './kepler.ts';
 /**
  * Trajectory pieces. Each segment gives a position in the scene frame, in
  * kilometers, for any time in its phase; "extendable" segments (Kepler
  * orbits and coasts) also give sensible positions a little outside their
  * phase, which burns use to blend one orbit into the next.
  */
-import type { BodyId } from "./types.ts";
-import { Conic, ellipticMeanFromTrue, ellipticTrueFromMean } from "./kepler.ts";
-import { MOON_CENTER_KM, type Sky } from "./frames.ts";
+import type { BodyId } from './types.ts';
 import {
   addScaled,
   angleBetween,
@@ -24,7 +24,7 @@ import {
   sub,
   vec3,
   type Vec3,
-} from "./vec.ts";
+} from './vec.ts';
 
 export interface Segment {
   readonly t0: number;
@@ -38,7 +38,7 @@ export interface Segment {
 }
 
 export function bodyCenter(body: BodyId): Readonly<Vec3> {
-  return body === "earth" ? ORIGIN : MOON_CENTER_KM;
+  return body === 'earth' ? ORIGIN : MOON_CENTER_KM;
 }
 
 const ORIGIN: Readonly<Vec3> = [0, 0, 0];
@@ -47,12 +47,24 @@ const ORIGIN: Readonly<Vec3> = [0, 0, 0];
  * Position relative to a body in its non-rotating frame: Earth-centered
  * inertial (I) for Earth, Moon-centered inertial for the Moon.
  */
-export function toBodyInertial(sky: Sky, body: BodyId, p: Readonly<Vec3>, t: number, out: Vec3): Vec3 {
-  return body === "earth" ? sky.sceneToInertial(p, t, out) : sky.sceneToMoonInertial(p, t, out);
+export function toBodyInertial(
+  sky: Sky,
+  body: BodyId,
+  p: Readonly<Vec3>,
+  t: number,
+  out: Vec3,
+): Vec3 {
+  return body === 'earth' ? sky.sceneToInertial(p, t, out) : sky.sceneToMoonInertial(p, t, out);
 }
 
-export function fromBodyInertial(sky: Sky, body: BodyId, p: Readonly<Vec3>, t: number, out: Vec3): Vec3 {
-  return body === "earth" ? sky.inertialToScene(p, t, out) : sky.moonInertialToScene(p, t, out);
+export function fromBodyInertial(
+  sky: Sky,
+  body: BodyId,
+  p: Readonly<Vec3>,
+  t: number,
+  out: Vec3,
+): Vec3 {
+  return body === 'earth' ? sky.inertialToScene(p, t, out) : sky.moonInertialToScene(p, t, out);
 }
 
 /** Where a craft is and how it is moving at one moment: position (km) and velocity (km/s), in the frame each use names. */
@@ -82,17 +94,28 @@ export function bodyInertialState(
  * frame, scene axes relative to the Moon's center.
  */
 export function toBodyFixed(sky: Sky, body: BodyId, p: Readonly<Vec3>, t: number, out: Vec3): Vec3 {
-  if (body === "earth") return sky.sceneToEarthFixed(p, t, out);
+  if (body === 'earth') return sky.sceneToEarthFixed(p, t, out);
   return set(out, p[0] - MOON_CENTER_KM[0], p[1], p[2]);
 }
 
-export function fromBodyFixed(sky: Sky, body: BodyId, p: Readonly<Vec3>, t: number, out: Vec3): Vec3 {
-  if (body === "earth") return sky.earthFixedToScene(p, t, out);
+export function fromBodyFixed(
+  sky: Sky,
+  body: BodyId,
+  p: Readonly<Vec3>,
+  t: number,
+  out: Vec3,
+): Vec3 {
+  if (body === 'earth') return sky.earthFixedToScene(p, t, out);
   return set(out, p[0] + MOON_CENTER_KM[0], p[1], p[2]);
 }
 
 /** Body-fixed position and velocity of a segment at t. */
-export function bodyFixedState(sky: Sky, body: BodyId, seg: Segment, t: number): PositionAndVelocity {
+export function bodyFixedState(
+  sky: Sky,
+  body: BodyId,
+  seg: Segment,
+  t: number,
+): PositionAndVelocity {
   const h = 0.5;
   const a = toBodyFixed(sky, body, seg.evaluate(t - h, vec3()), t - h, vec3());
   const b = toBodyFixed(sky, body, seg.evaluate(t + h, vec3()), t + h, vec3());
@@ -178,14 +201,15 @@ export class SizeSchedule {
   private readonly sums: number[];
 
   constructor(mu: number, knots: readonly SizeKnot[]) {
-    if (knots.length === 0) throw new Error("A size schedule needs at least one size");
+    if (knots.length === 0) throw new Error('A size schedule needs at least one size');
     this.mu = mu;
     this.t = knots.map((k) => k.t);
     this.a = knots.map((k) => (Math.min(k.rp, k.ra) + Math.max(k.rp, k.ra)) / 2);
     this.e = knots.map((k) => Math.abs(k.ra - k.rp) / (k.ra + k.rp));
     this.sums = [0];
     for (let j = 1; j < knots.length; j++) {
-      if (!(this.t[j]! > this.t[j - 1]!)) throw new Error("Orbit sizes must be listed in time order");
+      if (!(this.t[j]! > this.t[j - 1]!))
+        throw new Error('Orbit sizes must be listed in time order');
       this.sums.push(this.sums[j - 1]! + this.pieceIntegral(j - 1, this.t[j]!));
     }
   }
@@ -348,9 +372,16 @@ export class AnchoredOrbit implements Segment {
       // Over a changing size, the bulge's rates are averaged over the
       // published sizes (a simplification: they change by a few percent).
       const rate = (aa: number, ee: number) =>
-        0.75 * oblateness.j2 * (oblateness.radius / (aa * (1 - ee * ee))) ** 2 * Math.sqrt(mu / aa ** 3);
-      const k = schedule ? schedule.average(rate) : 0.75 * oblateness.j2 * (oblateness.radius / p) ** 2 * this.conic.n;
-      const root = schedule ? schedule.average((_, ee) => Math.sqrt(1 - ee * ee)) : Math.sqrt(1 - e * e);
+        0.75 *
+        oblateness.j2 *
+        (oblateness.radius / (aa * (1 - ee * ee))) ** 2 *
+        Math.sqrt(mu / aa ** 3);
+      const k = schedule
+        ? schedule.average(rate)
+        : 0.75 * oblateness.j2 * (oblateness.radius / p) ** 2 * this.conic.n;
+      const root = schedule
+        ? schedule.average((_, ee) => Math.sqrt(1 - ee * ee))
+        : Math.sqrt(1 - e * e);
       nodeRate = -2 * k * c;
       periapsisRate = k * (5 * c * c - 1);
       meanAnomalyRate = k * root * (3 * c * c - 1);
@@ -396,11 +427,15 @@ export class AnchoredOrbit implements Segment {
   }
 
   private trueFromMean(M: number, t: number): number {
-    return this.schedule ? ellipticTrueFromMean(M, this.schedule.eAt(t)) : this.conic.trueFromMean(M);
+    return this.schedule
+      ? ellipticTrueFromMean(M, this.schedule.eAt(t))
+      : this.conic.trueFromMean(M);
   }
 
   private meanFromTrue(nu: number, t: number): number {
-    return this.schedule ? ellipticMeanFromTrue(nu, this.schedule.eAt(t)) : this.conic.meanFromTrue(nu);
+    return this.schedule
+      ? ellipticMeanFromTrue(nu, this.schedule.eAt(t))
+      : this.conic.meanFromTrue(nu);
   }
 
   /** Position in the orbit's own plane, before the bulge's turning and the corrections. */
@@ -419,13 +454,19 @@ export class AnchoredOrbit implements Segment {
 
   /** Semilatus rectum and eccentricity at t (they change only with a schedule). */
   shapeAt(t: number): { p: number; e: number } {
-    return this.schedule ? { p: this.schedule.pAt(t), e: this.schedule.eAt(t) } : { p: this.conic.p, e: this.conic.e };
+    return this.schedule
+      ? { p: this.schedule.pAt(t), e: this.schedule.eAt(t) }
+      : { p: this.conic.p, e: this.conic.e };
   }
 
   /** The oblateness drift since the reference time: node, periapsis, and mean anomaly, radians. */
   private drift(t: number): OrbitDrift {
     const dt = t - this.conic.t0;
-    return { node: this.nodeRate * dt, periapsis: this.periapsisRate * dt, mean: this.meanAnomalyRate * dt };
+    return {
+      node: this.nodeRate * dt,
+      periapsis: this.periapsisRate * dt,
+      mean: this.meanAnomalyRate * dt,
+    };
   }
 
   /** Progress of the corrections at t: 0 before the phase, 1 after. */
@@ -435,14 +476,19 @@ export class AnchoredOrbit implements Segment {
 
   /** Mean anomaly at t, with the drift and the phase correction. */
   private meanAt(t: number): number {
-    return this.naturalMean(t) + this.meanAnomalyRate * (t - this.conic.t0) + this.phaseCorrection * this.progress(t);
+    return (
+      this.naturalMean(t) +
+      this.meanAnomalyRate * (t - this.conic.t0) +
+      this.phaseCorrection * this.progress(t)
+    );
   }
 
   /** Position in the body's inertial frame, km. */
   inertialPosition(t: number, out: Vec3): Vec3 {
     const s = this.progress(t);
     this.positionAtTrue(this.trueFromMean(this.meanAt(t), t), t, out);
-    if (this.periapsisRate !== 0) rotateAxis(out, out, this.conic.normal, this.periapsisRate * (t - this.conic.t0));
+    if (this.periapsisRate !== 0)
+      rotateAxis(out, out, this.conic.normal, this.periapsisRate * (t - this.conic.t0));
     if (this.planeCorrection !== 0) rotateAxis(out, out, this.planeAxis, this.planeCorrection * s);
     if (this.nodeRate !== 0) rotateAxis(out, out, this.pole, this.nodeRate * (t - this.conic.t0));
     return out;
@@ -516,7 +562,7 @@ export class BurnBlend implements Segment {
  */
 export class TransferBlend implements Segment {
   readonly extendable = true;
-  readonly body = "earth" as const;
+  readonly body = 'earth' as const;
   readonly earthConic: Conic;
   readonly moonConic: Conic;
   readonly t0: number;
@@ -574,7 +620,9 @@ export class TransferBlend implements Segment {
 function hermite(p0: number, m0: number, p1: number, m1: number, u: number): number {
   const u2 = u * u;
   const u3 = u2 * u;
-  return (2 * u3 - 3 * u2 + 1) * p0 + (u3 - 2 * u2 + u) * m0 + (-2 * u3 + 3 * u2) * p1 + (u3 - u2) * m1;
+  return (
+    (2 * u3 - 3 * u2 + 1) * p0 + (u3 - 2 * u2 + u) * m0 + (-2 * u3 + 3 * u2) * p1 + (u3 - u2) * m1
+  );
 }
 
 /** Fritsch-Carlson limit: keeps a cubic Hermite piece from overshooting. */
@@ -702,7 +750,14 @@ export class SurfacePoint implements Segment {
   private readonly sky: Sky;
   private readonly fixed: Vec3;
 
-  constructor(sky: Sky, body: BodyId, direction: Readonly<Vec3>, radius: number, t0: number, t1: number) {
+  constructor(
+    sky: Sky,
+    body: BodyId,
+    direction: Readonly<Vec3>,
+    radius: number,
+    t0: number,
+    t1: number,
+  ) {
     this.sky = sky;
     this.body = body;
     this.t0 = t0;

@@ -47,45 +47,60 @@ The id in a dynamic test id is always a content id: a mission id (`apollo-11`), 
 
 Pattern: `{component}-{entity-id?}-{element}`
 
-| Type | Pattern | Example |
-|------|---------|---------|
-| Container | `{component}` | `tour-panel`, `event-card`, `hub`, `extra-sheet`, `about-dialog` |
-| Container element | `{component}-{element}` | `tour-next`, `event-card-title`, `timeline-play`, `clock-time`, `about-dialog-close` |
-| Dynamic container | `{component}-{id}` | `hub-mission-apollo-11`, `view-button-moon`, `chapter-landing`, `tour-dot-liftoff` |
-| Dynamic child | `{component}-{id}-{element}` | `hub-mission-apollo-11-tour`, `hub-mission-apollo-1-read`, `hub-extra-stages-open` |
+| Type              | Pattern                      | Example                                                                              |
+| ----------------- | ---------------------------- | ------------------------------------------------------------------------------------ |
+| Container         | `{component}`                | `tour-panel`, `event-card`, `hub`, `extra-sheet`, `about-dialog`                     |
+| Container element | `{component}-{element}`      | `tour-next`, `event-card-title`, `timeline-play`, `clock-time`, `about-dialog-close` |
+| Dynamic container | `{component}-{id}`           | `hub-mission-apollo-11`, `view-button-moon`, `chapter-landing`, `tour-dot-liftoff`   |
+| Dynamic child     | `{component}-{id}-{element}` | `hub-mission-apollo-11-tour`, `hub-mission-apollo-1-read`, `hub-extra-stages-open`   |
 
 `<body data-testid="site">` is the page itself: it carries the state classes `is-ready`, `is-welcome`, `is-touring`, and `no-3d`.
 
 **Test ids locate; state attributes are what you assert.** The site already says what state it is in, so read that rather than adding test ids for states:
 
-| Element | State |
-|---------|-------|
-| `site` (body) | classes `is-ready`, `is-welcome`, `is-touring`, `no-3d` |
-| `tour-panel` | `data-phase`: `off`, `traveling`, `stopped`, `finished` |
-| `sheet` | `data-state`: `compact`, `expanded` |
-| `hub` | `data-mode`: `welcome`, `return` |
-| `extra-sheet` | `data-extra`: the open extra's id |
-| `view-button-<view>`, `scale-toggle` | `aria-pressed` |
-| `timeline-play` | `aria-label`: `Play`, `Pause` |
-| `hub-mission-<id>` | `aria-current="true"` on the loaded mission |
+| Element                              | State                                                   |
+| ------------------------------------ | ------------------------------------------------------- |
+| `site` (body)                        | classes `is-ready`, `is-welcome`, `is-touring`, `no-3d` |
+| `tour-panel`                         | `data-phase`: `off`, `traveling`, `stopped`, `finished` |
+| `sheet`                              | `data-state`: `compact`, `expanded`                     |
+| `hub`                                | `data-mode`: `welcome`, `return`                        |
+| `extra-sheet`                        | `data-extra`: the open extra's id                       |
+| `view-button-<view>`, `scale-toggle` | `aria-pressed`                                          |
+| `timeline-play`                      | `aria-label`: `Play`, `Pause`                           |
+| `hub-mission-<id>`                   | `aria-current="true"` on the loaded mission             |
 
 ### Real Examples
 
 **index.html** - the header:
+
 ```html
 <header class="masthead" id="masthead" data-testid="masthead">
   ...
-  <button type="button" class="masthead__switch" id="hub-button" aria-haspopup="dialog" data-testid="masthead-missions">
+  <button
+    type="button"
+    class="masthead__switch"
+    id="hub-button"
+    aria-haspopup="dialog"
+    data-testid="masthead-missions"
+  >
     <span class="masthead__label">
       <span class="masthead__name" id="mission-name" data-testid="masthead-mission-name"></span>
       <span class="masthead__dates" id="mission-dates" data-testid="masthead-mission-dates"></span>
     </span>
   </button>
   ...
-  <button type="button" class="button button--quiet" id="about-button" aria-haspopup="dialog" aria-label="About this mission" data-testid="masthead-about">
+  <button
+    type="button"
+    class="button button--quiet"
+    id="about-button"
+    aria-haspopup="dialog"
+    aria-label="About this mission"
+    data-testid="masthead-about"
+  >
 ```
 
 **src/ui/tour-panel.ts** - one dot per stop, by the stop's event id:
+
 ```typescript
 const dots = tour.stops.map((stop) => {
   const dot = el('li', 'tour__dot');
@@ -95,6 +110,7 @@ const dots = tour.stops.map((stop) => {
 ```
 
 **src/ui/hub.ts** - a mission's entry and its buttons, by the mission id:
+
 ```typescript
 const item = el('li', memorial ? 'hub__entry hub__entry--memorial' : 'hub__entry');
 item.setAttribute('data-testid', `hub-mission-${shown.id}`);
@@ -107,6 +123,7 @@ explore.setAttribute('data-testid', `hub-mission-${shown.id}-explore`);
 ```
 
 **src/ui/extra-sheet.ts** - the host an extra fills, by the extra id:
+
 ```typescript
 const host = el('div', 'extra-host');
 host.setAttribute('data-testid', `extra-sheet-host-${id}`);
@@ -234,16 +251,16 @@ async skipTrip(): Promise<void> {
 
 Each page object is the documentation of the test ids in its part of the site. Keep every locator, used or not.
 
-| Page object | Part of the site | Methods |
-|-------------|------------------|---------|
-| `MissionPage` | `site`, header, view buttons and True scale, caption, the no-3D note, loading, messages | `waitForLoad()` |
-| `ScenePage` | the canvas, and the scene report | `waitForLoad()`, `report()` |
-| `TourPanelPage` | the tour panel and its ending | `skipTrip()` |
-| `EventCardPage` | the card and the sheet it sits in | none |
-| `TimelinePage` | Play, the clock, the scrubber, chapters, speed | none |
-| `HubPage` | the mission list (welcome and reopened) | `waitForLoad()` |
-| `DialogsPage` | About this mission, How this is drawn, Sources and credits, a memorial page | none |
-| `ExtraSheetPage` | the full-screen sheet an extra opens in | `waitForLoad()` |
+| Page object      | Part of the site                                                                        | Methods                     |
+| ---------------- | --------------------------------------------------------------------------------------- | --------------------------- |
+| `MissionPage`    | `site`, header, view buttons and True scale, caption, the no-3D note, loading, messages | `waitForLoad()`             |
+| `ScenePage`      | the canvas, and the scene report                                                        | `waitForLoad()`, `report()` |
+| `TourPanelPage`  | the tour panel and its ending                                                           | `skipTrip()`                |
+| `EventCardPage`  | the card and the sheet it sits in                                                       | none                        |
+| `TimelinePage`   | Play, the clock, the scrubber, chapters, speed                                          | none                        |
+| `HubPage`        | the mission list (welcome and reopened)                                                 | `waitForLoad()`             |
+| `DialogsPage`    | About this mission, How this is drawn, Sources and credits, a memorial page             | none                        |
+| `ExtraSheetPage` | the full-screen sheet an extra opens in                                                 | `waitForLoad()`             |
 
 ---
 
@@ -266,6 +283,7 @@ When cleaning up old page objects, follow this checklist:
    - Only remove a locator if its `data-testid` was removed from the site
 
 3. **Convert name-based methods to ID-based locators:**
+
    ```typescript
    // BEFORE: method that finds a mission by its name
    async exploreMission(name: string): Promise<void> {
@@ -290,6 +308,7 @@ When cleaning up old page objects, follow this checklist:
 ### Example: EventCardPage Cleanup
 
 **Before (old pattern):**
+
 ```typescript
 // These methods should be REMOVED:
 async nextEvent(): Promise<void> {
@@ -302,6 +321,7 @@ async currentTitle(): Promise<string | null> {
 ```
 
 **After (locator-first):**
+
 ```typescript
 // Just locators in constructor:
 readonly title: Locator;
@@ -344,6 +364,7 @@ await expect(dialogsPage.about).toBeVisible();
 ```
 
 **Why?**
+
 - Locators are defined once in page objects, not scattered across specs
 - When a `data-testid` changes, update ONE file (the page object)
 - Page objects document the test ids each part of the site has
@@ -367,7 +388,9 @@ import { MISSIONS, URLS } from '../utils/vars';
  * interface tests.
  */
 test.describe('Dialogs', () => {
-  test('About this mission opens from the header, closes with Escape, and gives focus back', async ({ sitePage }) => {
+  test('About this mission opens from the header, closes with Escape, and gives focus back', async ({
+    sitePage,
+  }) => {
     const missionPage = new MissionPage(sitePage);
     const dialogsPage = new DialogsPage(sitePage);
 
@@ -419,6 +442,7 @@ Never allow an error through this fixture. If a test logs one, the site has a bu
 ### Key Patterns in Tests
 
 **Direct locator usage:**
+
 ```typescript
 // Click actions - call .click() on the locator
 await tourPage.next.click();
@@ -432,6 +456,7 @@ await expect(missionPage.site).not.toHaveClass(/\bis-touring\b/);
 ```
 
 **One generated test per id** (tests/e2e/missions.test.ts):
+
 ```typescript
 for (const id of FLIGHT_IDS) {
   test(`${id} opens in the Ship view with its craft drawn`, async ({ sitePage }) => {
@@ -445,15 +470,18 @@ for (const id of FLIGHT_IDS) {
     });
     ...
 ```
+
 A hard-coded list must be checked against the site's own, or a new entry is silently left out. `missions.test.ts` opens the mission list and compares every `hub-mission-<id>` entry with `FLIGHT_IDS`.
 
 **Desktop only**, when the layout cannot matter (say why):
+
 ```typescript
 test.describe('Deep links', () => {
   test.skip(({ isMobile }) => isMobile, 'Where a link opens does not depend on the screen.');
 ```
 
 **A wait that is long by design** gets `test.slow()` and its own timeout on that one assertion, with a comment saying why:
+
 ```typescript
 // A trip takes 5 to 14 seconds, and longer on a busy machine drawing in software.
 test.slow();
@@ -488,9 +516,11 @@ export const URLS = {
   /** Exploring, from the first event, in a view if one is named. */
   EXPLORE: (mission: string, view?: EventView) => address({ mission, start: 'explore', view }),
   /** Paused at an event, in the event's own view unless one is named. */
-  EVENT: (mission: string, event: string, view?: EventView) => address({ mission, start: 'explore', event, view }),
+  EVENT: (mission: string, event: string, view?: EventView) =>
+    address({ mission, start: 'explore', event, view }),
   /** Paused at a mission time (HHH:MM:SS since liftoff). */
-  TIME: (mission: string, t: string, view?: EventView) => address({ mission, start: 'explore', t, view }),
+  TIME: (mission: string, t: string, view?: EventView) =>
+    address({ mission, start: 'explore', t, view }),
   /** Only the event or the time, as a shared link has them: no `start`. */
   LINK: (place: Place) => address(place),
   /** An extra, open over a mission. */
@@ -524,7 +554,10 @@ A browser condition the address cannot set goes in an init script, called before
 export async function withoutWebGL(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const getContext = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args: unknown[]) {
+    HTMLCanvasElement.prototype.getContext = function (
+      this: HTMLCanvasElement,
+      ...args: unknown[]
+    ) {
       const [kind] = args;
       if (typeof kind === 'string' && kind.toLowerCase().includes('webgl')) return null;
       return getContext.apply(this, args as Parameters<typeof getContext>);
@@ -539,16 +572,16 @@ A canvas cannot be queried like a page, so the scene describes itself. `window._
 
 Read it with `ScenePage.report()`, and find things in it with `tests/utils/scene-report.ts`:
 
-| Helper | Purpose |
-|--------|---------|
-| `shipOf(report, id)` | A ship by id (`csm`, `lm`, `gemini`, `agena`); throws, naming the ships there are, if missing |
-| `followedShip(report)` | The ship the Ship view follows now |
-| `partOf(report, shipId, name)` | A named part of a ship's current shape (`spacewalker`, `gemini-reentry-module`) |
-| `leftBehindOf(report, name)` | A part left on the Moon (`lm-descent-stage`, `lunar-rover`) |
-| `drawn(box, what)` | A box that must be drawn; fails with `what` when it is null |
-| `isInside(box, frame)` | True when `box` lies wholly inside `frame` |
-| `overlaps(a, b)` | True when two boxes share an area (touching within a pixel does not count) |
-| `overlapping(box, others)` | The names of the boxes in `others` that `box` overlaps, for a readable failure |
+| Helper                         | Purpose                                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| `shipOf(report, id)`           | A ship by id (`csm`, `lm`, `gemini`, `agena`); throws, naming the ships there are, if missing |
+| `followedShip(report)`         | The ship the Ship view follows now                                                            |
+| `partOf(report, shipId, name)` | A named part of a ship's current shape (`spacewalker`, `gemini-reentry-module`)               |
+| `leftBehindOf(report, name)`   | A part left on the Moon (`lm-descent-stage`, `lunar-rover`)                                   |
+| `drawn(box, what)`             | A box that must be drawn; fails with `what` when it is null                                   |
+| `isInside(box, frame)`         | True when `box` lies wholly inside `frame`                                                    |
+| `overlaps(a, b)`               | True when two boxes share an area (touching within a pixel does not count)                    |
+| `overlapping(box, others)`     | The names of the boxes in `others` that `box` overlaps, for a readable failure                |
 
 ```typescript
 /** True when `box` lies wholly inside `frame`. */
@@ -563,13 +596,19 @@ export function isInside(box: SceneBox, frame: SceneBox): boolean {
 ```
 
 A box check in a spec (tests/e2e/scene.test.ts):
+
 ```typescript
 await test.step('The astronaut rises above the reentry module rather than being drawn over it', async () => {
   const report = await scenePage.report();
   const figure = drawn(partOf(report, 'gemini', 'spacewalker').box, 'The astronaut');
-  const capsule = drawn(partOf(report, 'gemini', 'gemini-reentry-module').box, 'The reentry module');
+  const capsule = drawn(
+    partOf(report, 'gemini', 'gemini-reentry-module').box,
+    'The reentry module',
+  );
   // A smaller y is higher on the canvas.
-  expect(figure.y, 'the top of the astronaut, against the top of the reentry module').toBeLessThan(capsule.y);
+  expect(figure.y, 'the top of the astronaut, against the top of the reentry module').toBeLessThan(
+    capsule.y,
+  );
 });
 ```
 
@@ -686,10 +725,10 @@ The config gives each test 60 seconds and each assertion 15. Keep those. A wait 
 
 `helpers.ts` holds shared helpers that are not element access. Nothing in it sleeps.
 
-| Utility | Purpose |
-|---------|---------|
+| Utility              | Purpose                                                                                |
+| -------------------- | -------------------------------------------------------------------------------------- |
 | `withoutWebGL(page)` | Makes every canvas refuse a WebGL context, for the no-3D fallback (call before `goto`) |
-| `clockSeconds(text)` | Seconds since liftoff from the mission clock's text, to see that the clock moved on |
+| `clockSeconds(text)` | Seconds since liftoff from the mission clock's text, to see that the clock moved on    |
 
 ---
 
@@ -733,14 +772,14 @@ There is no `@types/node`: in tests, use only `process.env` (declared in `tests/
 
 ## 8. Commands
 
-| Command | Purpose |
-|---------|---------|
-| `npm run test:e2e` | Run the tests against the dev server (port 5173), both projects - **DEFAULT** |
-| `npm run test:e2e:preview` | Build, then run the tests against the built site (port 4173) |
-| `npm run test:e2e:ui` | Open Playwright UI mode for debugging |
-| `npm run test:e2e:debug` | Debug mode with step-through |
-| `npm run test:e2e:codegen` | Record new tests (then rewrite them with page objects and test ids) |
-| `npm run test:e2e:report` | View the HTML report |
+| Command                    | Purpose                                                                       |
+| -------------------------- | ----------------------------------------------------------------------------- |
+| `npm run test:e2e`         | Run the tests against the dev server (port 5173), both projects - **DEFAULT** |
+| `npm run test:e2e:preview` | Build, then run the tests against the built site (port 4173)                  |
+| `npm run test:e2e:ui`      | Open Playwright UI mode for debugging                                         |
+| `npm run test:e2e:debug`   | Debug mode with step-through                                                  |
+| `npm run test:e2e:codegen` | Record new tests (then rewrite them with page objects and test ids)           |
+| `npm run test:e2e:report`  | View the HTML report                                                          |
 
 Pass Playwright flags after `--`:
 
@@ -758,6 +797,7 @@ The config starts the server itself and reuses one that is already running. It d
 **REFUSE to write code that violates these rules:**
 
 ### Locator Strategy
+
 1. `getByTestId()` - USE THIS. Almost always.
 2. `getByRole()`, `getByText()`, `getByLabel()`, CSS selectors - LAST RESORT only, and only inside a page object (for example, `HubPage.missions` narrows a test id prefix to the entries: `li[data-testid^="hub-mission-"]`)
 3. The canvas - only through the scene report. Never pixels.
@@ -765,6 +805,7 @@ The config starts the server itself and reuses one that is already running. It d
 **If a data-testid doesn't exist, ADD IT to the site first** (`index.html` or `src/ui`), as an attribute-only change. Don't settle for alternatives. **If the scene report cannot say it, ADD IT to the report.**
 
 ### ALWAYS Required
+
 - Page objects for ALL element access - never `page.getByTestId()` in a spec
 - `test.step()` wrapping every action and check, named in plain words
 - `{ test, expect }` from `../fixtures`, and the `sitePage` fixture
@@ -776,6 +817,7 @@ The config starts the server itself and reuses one that is already running. It d
 - A reason, in words, for every desktop-only skip and every timeout longer than the default
 
 ### NEVER Do
+
 - Direct `page.getByTestId()`, `page.getByRole()`, or `page.locator()` in spec files - use page objects
 - Wrapper methods for 1-3 line actions in page objects
 - `goto()` methods on page objects

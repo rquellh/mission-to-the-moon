@@ -1,3 +1,4 @@
+import type { FlightPlan, StateFix } from '../../../sim/types.ts';
 /**
  * The Gemini VII flight plan: the published facts the flight path is built
  * from (see src/sim/types.ts for the format and units, and src/sim/ for how
@@ -134,23 +135,24 @@
  *   the carrier lifted it aboard; its drift of about 2 miles (section
  *   6.3.2) is not drawn. Gemini VI-A's path ends at its touchdown.
  */
-import type { Citation, Cited, ElapsedTime } from "../../types.ts";
-import type { FlightPlan, StateFix } from "../../../sim/types.ts";
+import type { Citation, Cited, ElapsedTime } from '../../types.ts';
 
 /* ------------------------------------------------------------------ */
 /* Citation helpers.                                                   */
 /* ------------------------------------------------------------------ */
 
-const MISSION_REPORT = "https://www.ibiblio.org/apollo/Documents/Gemini7MissionReport.pdf";
-const SUPPLEMENTAL = "https://www.ibiblio.org/apollo/Documents/Gemini-6-7-PostFlightReports.pdf";
-const TRANSCRIPT = "https://www.nasa.gov/wp-content/uploads/2026/01/gt06-tec.pdf";
-const RENDEZVOUS_PAPER = "https://ntrs.nasa.gov/api/citations/19680005473/downloads/19680005473.pdf";
-const CHRONOLOGY_1965 = "https://www.nasa.gov/history/SP-4002/p3a.htm";
-const CHRONOLOGY_TABLE_A = "https://www.nasa.gov/history/SP-4002/app1a.htm";
+const MISSION_REPORT = 'https://www.ibiblio.org/apollo/Documents/Gemini7MissionReport.pdf';
+const SUPPLEMENTAL = 'https://www.ibiblio.org/apollo/Documents/Gemini-6-7-PostFlightReports.pdf';
+const TRANSCRIPT = 'https://www.nasa.gov/wp-content/uploads/2026/01/gt06-tec.pdf';
+const RENDEZVOUS_PAPER =
+  'https://ntrs.nasa.gov/api/citations/19680005473/downloads/19680005473.pdf';
+const CHRONOLOGY_1965 = 'https://www.nasa.gov/history/SP-4002/p3a.htm';
+const CHRONOLOGY_TABLE_A = 'https://www.nasa.gov/history/SP-4002/app1a.htm';
 const GEMINI_8_REPORT =
-  "https://web.archive.org/web/20250908153858/https://www.nasa.gov/wp-content/uploads/static/history/alsj/43455667-Gemini-Program-Mission-Report-Gemini-Viii.pdf";
+  'https://web.archive.org/web/20250908153858/https://www.nasa.gov/wp-content/uploads/static/history/alsj/43455667-Gemini-Program-Mission-Report-Gemini-Viii.pdf';
 /** The Horizons query for each sky table, at the times below (printed by tools/sky.mjs). */
-const HORIZONS_TIMES = "&TLIST_TYPE=%27CAL%27&TLIST=%271965-12-04%2019:30:03.702%27,%271965-12-09%2018:41:58.702%27,%271965-12-15%2013:37:26.47%27,%271965-12-18%2013:28:07.702%27,%271965-12-18%2014:05:04.702%27";
+const HORIZONS_TIMES =
+  '&TLIST_TYPE=%27CAL%27&TLIST=%271965-12-04%2019:30:03.702%27,%271965-12-09%2018:41:58.702%27,%271965-12-15%2013:37:26.47%27,%271965-12-18%2013:28:07.702%27,%271965-12-18%2014:05:04.702%27';
 const HORIZONS_QUERY = (command: string, center: string, quantities: string): string =>
   `https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27${command}%27&CENTER=%27${center}%27&QUANTITIES=%27${quantities}%27&OBJ_DATA=%27NO%27&CSV_FORMAT=%27YES%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27${HORIZONS_TIMES}`;
 
@@ -164,42 +166,54 @@ function at(elapsed: ElapsedTime, citation: Citation, ...more: Citation[]): Cite
 
 /** The Gemini VII mission report, at a printed page (and the scan's PDF page). */
 function report(locator: string): Citation {
-  return { source: "gemini-6a-gemini-vii-mission-report", locator, url: MISSION_REPORT };
+  return { source: 'gemini-6a-gemini-vii-mission-report', locator, url: MISSION_REPORT };
 }
 
 /** Table 4.2-I, sequence of events, "Actual time, g.e.t." column. */
-const sequence = (row: string, page: "4-12 (PDF page 90)" | "4-13 (PDF page 91)"): Citation =>
+const sequence = (row: string, page: '4-12 (PDF page 90)' | '4-13 (PDF page 91)'): Citation =>
   report(`Table 4.2-I, "Sequence of Events" (page ${page}), "${row}" row, actual time`);
 /** Table 4.3-I, trajectory parameters, "Actual, Final" column. */
 const trajectory = (condition: string, row: string): Citation =>
-  report(`Table 4.3-I, "Comparison of Planned and Actual Trajectory Parameters" (page 4-21, PDF page 99), ${condition}, "${row}" row, actual final column`);
+  report(
+    `Table 4.3-I, "Comparison of Planned and Actual Trajectory Parameters" (page 4-21, PDF page 99), ${condition}, "${row}" row, actual final column`,
+  );
 /** Table 4.3-II, the maneuvers, "Actual" column. */
-const maneuver = (name: string, row: string, page: "4-23 (PDF page 101)" | "4-24 (PDF page 102)"): Citation =>
-  report(`Table 4.3-II, "Gemini VII Maneuvers" (page ${page}), ${name}, "${row}" row, actual column`);
+const maneuver = (
+  name: string,
+  row: string,
+  page: '4-23 (PDF page 101)' | '4-24 (PDF page 102)',
+): Citation =>
+  report(
+    `Table 4.3-II, "Gemini VII Maneuvers" (page ${page}), ${name}, "${row}" row, actual column`,
+  );
 /** Table 4.3-III, orbital elements before and after each maneuver, "Actual, Final" columns. */
-const elements = (maneuverName: string, when: "before" | "after", row: string): Citation =>
-  report(`Table 4.3-III, "Comparison of Orbital Elements for Maneuvers" (page 4-25, PDF page 103), ${maneuverName}, "${row}" row, ${when} maneuver, actual final column`);
+const elements = (maneuverName: string, when: 'before' | 'after', row: string): Citation =>
+  report(
+    `Table 4.3-III, "Comparison of Orbital Elements for Maneuvers" (page 4-25, PDF page 103), ${maneuverName}, "${row}" row, ${when} maneuver, actual final column`,
+  );
 /** Table 4.3-IV, orbital elements every 16th revolution, "Actual, Final" column. */
 const revolution = (rev: string, row: string): Citation =>
-  report(`Table 4.3-IV, "Comparison of Orbital Elements - Concluded" (page 4-27, PDF page 105), revolution ${rev}, "${row}" row, actual final column (heights above the launch complex 19 radius)`);
+  report(
+    `Table 4.3-IV, "Comparison of Orbital Elements - Concluded" (page 4-27, PDF page 105), revolution ${rev}, "${row}" row, actual final column (heights above the launch complex 19 radius)`,
+  );
 
 /** Appendix 1, Table A (General) of the Gemini chronology. */
-const tableA = (column: "VII" | "VI-A", rows: string): Citation => ({
-  source: "gemini-chronology",
+const tableA = (column: 'VII' | 'VI-A', rows: string): Citation => ({
+  source: 'gemini-chronology',
   locator: `Appendix 1, Table A (General), ${column} column: ${rows}`,
   url: CHRONOLOGY_TABLE_A,
 });
 
 /** On the Shoulders of Titans, chapter XII (printed page; the PDF page is 21 more). */
 const titans = (page: number, words: string): Citation => ({
-  source: "on-the-shoulders-of-titans",
+  source: 'on-the-shoulders-of-titans',
   locator: `Chapter XII, "Spirit of 76", page ${page} (PDF page ${page + 21}): ${words}`,
 });
 
 /** A line of the Gemini VI transcript, on Gemini VI-A's clock: its time as printed, the speaker, and the words. */
 function transcript(time: string, words: string, page: number): Citation {
   return {
-    source: "gemini-6a-voice-transcript",
+    source: 'gemini-6a-voice-transcript',
     locator: `Page ${page} (PDF page ${page + 1}), ${time} on Gemini VI-A's clock: "${words}"`,
     url: TRANSCRIPT,
   };
@@ -207,19 +221,19 @@ function transcript(time: string, words: string, page: number): Citation {
 
 /** Table I of the GT-7/6 Re-entry Mission Reconstruction Report (Supplemental Report 5 to Gemini VI-A's mission report). */
 const reentry = (row: string): Citation => ({
-  source: "gemini-6a-supplemental-report-5",
+  source: 'gemini-6a-supplemental-report-5',
   locator: `GT-7/6 Re-entry Mission Reconstruction Report, Table I "(S/C 6) (T_E = 92170.375 sec)" (page 2, PDF page 61), ${row}`,
   url: SUPPLEMENTAL,
 });
 
 const horizons = (target: string, quantity: string, time: string, url: string): Citation => ({
-  source: "jpl-horizons",
+  source: 'jpl-horizons',
   locator: `Observer table, ${target}, ${quantity}, ${time} UT`,
   url,
 });
-const MOON_FROM_EARTH = HORIZONS_QUERY("301", "500@399", "31");
-const EARTH_FROM_MOON = HORIZONS_QUERY("399", "500@301", "14");
-const SUN_FROM_EARTH = HORIZONS_QUERY("10", "500@399", "31");
+const MOON_FROM_EARTH = HORIZONS_QUERY('301', '500@399', '31');
+const EARTH_FROM_MOON = HORIZONS_QUERY('399', '500@301', '14');
+const SUN_FROM_EARTH = HORIZONS_QUERY('10', '500@399', '31');
 
 /* ------------------------------------------------------------------ */
 /* Clock arithmetic.                                                   */
@@ -230,30 +244,43 @@ function clockTime(seconds: number): ElapsedTime {
   const total = Math.round(seconds * 100) / 100;
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total - hours * 3600) / 60);
-  const rest = (total - hours * 3600 - minutes * 60).toFixed(2).replace(/\.?0+$/, "");
-  const [whole = "0", fraction] = rest.split(".");
-  return `${String(hours).padStart(3, "0")}:${String(minutes).padStart(2, "0")}:${whole.padStart(2, "0")}${fraction ? `.${fraction}` : ""}` as ElapsedTime;
+  const rest = (total - hours * 3600 - minutes * 60).toFixed(2).replace(/\.?0+$/, '');
+  const [whole = '0', fraction] = rest.split('.');
+  return `${String(hours).padStart(3, '0')}:${String(minutes).padStart(2, '0')}:${whole.padStart(2, '0')}${fraction ? `.${fraction}` : ''}` as ElapsedTime;
 }
 
 function seconds(elapsed: string): number {
-  const [h = "0", m = "0", s = "0"] = elapsed.split(":");
+  const [h = '0', m = '0', s = '0'] = elapsed.split(':');
   return Number(h) * 3600 + Number(m) * 60 + Number(s);
 }
 
 /** A printed start plus a printed duration in seconds (our sum). */
-function plus(start: ElapsedTime, duration: number, citation: Citation, ...more: Citation[]): Cited<ElapsedTime> {
+function plus(
+  start: ElapsedTime,
+  duration: number,
+  citation: Citation,
+  ...more: Citation[]
+): Cited<ElapsedTime> {
   return { value: clockTime(seconds(start) + duration), citations: [citation, ...more] };
 }
 
 /** Gemini VI-A's lift-off on Gemini VII's clock, as the Gemini VII report prints it. */
-const GEMINI_6A_OFFSET = "258:07:22.77";
+const GEMINI_6A_OFFSET = '258:07:22.77';
 const BOTH_LIFTOFFS: [Citation, Citation] = [
-  report('Section 4.1, "Actual Mission" (page 4-6, PDF page 84): "Gemini VI-A was launched at 13:37:26.47 G.m.t. (258:07:22.77 g.e.t. of Gemini VII)"'),
-  report('Table 4.2-I, "Sequence of Events" (page 4-12, PDF page 90), "Lift-off (pad disconnect separation) (19:30:03.702 G.m.t.)" row: Gemini VII\'s clock zero (the difference of the two lift-off times is 258:07:22.768, our arithmetic)'),
+  report(
+    'Section 4.1, "Actual Mission" (page 4-6, PDF page 84): "Gemini VI-A was launched at 13:37:26.47 G.m.t. (258:07:22.77 g.e.t. of Gemini VII)"',
+  ),
+  report(
+    'Table 4.2-I, "Sequence of Events" (page 4-12, PDF page 90), "Lift-off (pad disconnect separation) (19:30:03.702 G.m.t.)" row: Gemini VII\'s clock zero (the difference of the two lift-off times is 258:07:22.768, our arithmetic)',
+  ),
 ];
 
 /** A time on Gemini VI-A's clock, moved to Gemini VII's: plus 258:07:22.77 (our sum). */
-function onGemini7Clock(gemini6aClock: string, citation: Citation, ...more: Citation[]): Cited<ElapsedTime> {
+function onGemini7Clock(
+  gemini6aClock: string,
+  citation: Citation,
+  ...more: Citation[]
+): Cited<ElapsedTime> {
   return {
     value: clockTime(seconds(GEMINI_6A_OFFSET) + seconds(gemini6aClock)),
     citations: [citation, ...more, ...BOTH_LIFTOFFS],
@@ -264,53 +291,83 @@ function onGemini7Clock(gemini6aClock: string, citation: Citation, ...more: Cita
 /* Gemini VII's times.                                                 */
 /* ------------------------------------------------------------------ */
 
-const LIFTOFF = at("000:00:00", sequence("Lift-off (pad disconnect separation) (19:30:03.702 G.m.t.)", "4-12 (PDF page 90)"));
+const LIFTOFF = at(
+  '000:00:00',
+  sequence('Lift-off (pad disconnect separation) (19:30:03.702 G.m.t.)', '4-12 (PDF page 90)'),
+);
 /** Spacecraft separation, 368.79 seconds after lift-off. */
 const INSERTION = at(
-  "000:06:08.79",
-  sequence("Spacecraft separation (shaped charge fire)", "4-13 (PDF page 91)"),
-  trajectory("spacecraft separation", "Time from lift-off, sec (368.79)"),
+  '000:06:08.79',
+  sequence('Spacecraft separation (shaped charge fire)', '4-13 (PDF page 91)'),
+  trajectory('spacecraft separation', 'Time from lift-off, sec (368.79)'),
 );
-const D4D7 = at("000:21:17", sequence("D-4/D-7 experiment maneuver", "4-13 (PDF page 91)"));
-const D4D7_END = plus("000:21:17", 21.2, maneuver("D-4/D-7 experiment", "Δt, sec (21.2)", "4-23 (PDF page 101)"), sequence("D-4/D-7 experiment maneuver", "4-13 (PDF page 91)"));
-const PERIGEE_ADJUST = at("003:47:59", sequence("Perigee adjust maneuver", "4-13 (PDF page 91)"));
-const PERIGEE_ADJUST_END = plus("003:47:59", 76.2, maneuver("perigee adjust", "Δt, sec (76.2)", "4-23 (PDF page 101)"), sequence("Perigee adjust maneuver", "4-13 (PDF page 91)"));
+const D4D7 = at('000:21:17', sequence('D-4/D-7 experiment maneuver', '4-13 (PDF page 91)'));
+const D4D7_END = plus(
+  '000:21:17',
+  21.2,
+  maneuver('D-4/D-7 experiment', 'Δt, sec (21.2)', '4-23 (PDF page 101)'),
+  sequence('D-4/D-7 experiment maneuver', '4-13 (PDF page 91)'),
+);
+const PERIGEE_ADJUST = at('003:47:59', sequence('Perigee adjust maneuver', '4-13 (PDF page 91)'));
+const PERIGEE_ADJUST_END = plus(
+  '003:47:59',
+  76.2,
+  maneuver('perigee adjust', 'Δt, sec (76.2)', '4-23 (PDF page 101)'),
+  sequence('Perigee adjust maneuver', '4-13 (PDF page 91)'),
+);
 const PHASE_ADJUST: Cited<ElapsedTime> = {
-  ...at("069:43:21", sequence("Phasing maneuver", "4-13 (PDF page 91)")),
+  ...at('069:43:21', sequence('Phasing maneuver', '4-13 (PDF page 91)')),
   discrepancy:
-    'Table 4.3-II (page 4-23) and section 4.1 (page 4-4) give the phase adjustment as 69:43:19; Table 4.2-I gives 69:43:19 as planned and 69:43:21 as actual. We follow the sequence of events\' actual time.',
+    "Table 4.3-II (page 4-23) and section 4.1 (page 4-4) give the phase adjustment as 69:43:19; Table 4.2-I gives 69:43:19 as planned and 69:43:21 as actual. We follow the sequence of events' actual time.",
 };
-const PHASE_ADJUST_END = plus("069:43:21", 16.5, maneuver("phase adjust", "Δt, sec (16.5)", "4-23 (PDF page 101)"), sequence("Phasing maneuver", "4-13 (PDF page 91)"));
-const CIRCULARIZE = at("119:11:55", report('Table 4.2-I, "Sequence of Events" (page 4-13, PDF page 91), first "Circularization maneuver" row, actual time 119:11:55'), maneuver("circular perigee adjust", "Maneuver initiate", "4-24 (PDF page 102)"));
+const PHASE_ADJUST_END = plus(
+  '069:43:21',
+  16.5,
+  maneuver('phase adjust', 'Δt, sec (16.5)', '4-23 (PDF page 101)'),
+  sequence('Phasing maneuver', '4-13 (PDF page 91)'),
+);
+const CIRCULARIZE = at(
+  '119:11:55',
+  report(
+    'Table 4.2-I, "Sequence of Events" (page 4-13, PDF page 91), first "Circularization maneuver" row, actual time 119:11:55',
+  ),
+  maneuver('circular perigee adjust', 'Maneuver initiate', '4-24 (PDF page 102)'),
+);
 const CIRCULARIZE_END = plus(
-  "119:55:01",
+  '119:55:01',
   15,
-  maneuver("circular apogee adjust", "Δt, sec (15)", "4-24 (PDF page 102)"),
-  report('Table 4.2-I, "Sequence of Events" (page 4-13, PDF page 91), second "Circularization maneuver" row, actual time 119:55:01'),
+  maneuver('circular apogee adjust', 'Δt, sec (15)', '4-24 (PDF page 102)'),
+  report(
+    'Table 4.2-I, "Sequence of Events" (page 4-13, PDF page 91), second "Circularization maneuver" row, actual time 119:55:01',
+  ),
 );
 const RETROFIRE = at(
-  "329:58:04",
-  sequence("Retrofire initiation", "4-13 (PDF page 91)"),
-  tableA("VII", '"G.E.T. to retrofire (hr; min; sec)" row, 329:58:04'),
+  '329:58:04',
+  sequence('Retrofire initiation', '4-13 (PDF page 91)'),
+  tableA('VII', '"G.E.T. to retrofire (hr; min; sec)" row, 329:58:04'),
 );
 /** The end of the drawn retrofire: the retrograde section's jettison, 45 seconds after retrofire (our sum). */
 const RETRO_SECTION_OFF = plus(
-  "329:58:04",
+  '329:58:04',
   45,
-  report('Section 7.1.2.4, "Preretrofire and retrofire" (page 7-57, PDF page 313): "The retrograde section of the adapter was jettisoned at TR + 45 seconds"'),
-  sequence("Retrofire initiation", "4-13 (PDF page 91)"),
+  report(
+    'Section 7.1.2.4, "Preretrofire and retrofire" (page 7-57, PDF page 313): "The retrograde section of the adapter was jettisoned at TR + 45 seconds"',
+  ),
+  sequence('Retrofire initiation', '4-13 (PDF page 91)'),
 );
-const DROGUE = at("330:29:30", sequence("Drogue parachute deployment", "4-13 (PDF page 91)"));
+const DROGUE = at('330:29:30', sequence('Drogue parachute deployment', '4-13 (PDF page 91)'));
 const LANDING = at(
-  "330:35:01",
-  sequence("Landing", "4-13 (PDF page 91)"),
-  tableA("VII", '"G.E.T. to touchdown (hr; min; sec)" row, 330:35:01'),
+  '330:35:01',
+  sequence('Landing', '4-13 (PDF page 91)'),
+  tableA('VII', '"G.E.T. to touchdown (hr; min; sec)" row, 330:35:01'),
 );
 /** The end of Gemini VII's path: the carrier had the spacecraft aboard (given to the minute). */
 const ABOARD: Cited<ElapsedTime> = {
   ...at(
-    "331:38:00",
-    report('Section 6.3.2, "Location and Retrieval" (page 6-18, PDF page 238): "The carrier had the spacecraft onboard at 331:38 g.e.t." (given to the minute; seconds written as 00)'),
+    '331:38:00',
+    report(
+      'Section 6.3.2, "Location and Retrieval" (page 6-18, PDF page 238): "The carrier had the spacecraft onboard at 331:38 g.e.t." (given to the minute; seconds written as 00)',
+    ),
   ),
   discrepancy:
     'The chronology (Appendix 1, Table A) gives the spacecraft\'s recovery as 10:08 a.m. e.s.t., which is 331:37:56 (our arithmetic). Section 1.0 of the report says "approximately 1 hour and 5 minutes after landing". We follow section 6.3.2.',
@@ -322,36 +379,56 @@ const ABOARD: Cited<ElapsedTime> = {
 
 const LIFTOFF_6A = at(GEMINI_6A_OFFSET, ...BOTH_LIFTOFFS);
 /** Insertion: the computer's injection conditions are for 358.557 seconds after Gemini VI-A's lift-off. */
-const INSERTION_6A = onGemini7Clock(
-  "000:05:58.557",
-  {
-    source: "gemini-6a-supplemental-report-5",
-    locator: 'Gemini GT-6A Post Flight Analysis Report (ascent), Table 3, "IGS Injection Conditions (At Approximately SECO +20: 358.557)" (page 10, PDF page 16)',
-    url: SUPPLEMENTAL,
-  },
+const INSERTION_6A = onGemini7Clock('000:05:58.557', {
+  source: 'gemini-6a-supplemental-report-5',
+  locator:
+    'Gemini GT-6A Post Flight Analysis Report (ascent), Table 3, "IGS Injection Conditions (At Approximately SECO +20: 358.557)" (page 10, PDF page 16)',
+  url: SUPPLEMENTAL,
+});
+const HEIGHT_ADJUST_6A = onGemini7Clock(
+  '001:34:04',
+  transcript('01:34:04, command pilot', '... MARK. Burning.', 17),
 );
-const HEIGHT_ADJUST_6A = onGemini7Clock("001:34:04", transcript("01:34:04, command pilot", "... MARK. Burning.", 17));
-const HEIGHT_ADJUST_6A_END = onGemini7Clock("001:34:27", transcript("01:34:27, command pilot", "MARK. Burn complete.", 17));
-const PHASE_ADJUST_6A = onGemini7Clock("002:18:02", transcript("02:18:02, command pilot", "MARK.", 22));
-const PHASE_ADJUST_6A_END = onGemini7Clock("002:19:17", transcript("02:19:17, command pilot", "MARK.", 23));
-const PLANE_CHANGE_6A = onGemini7Clock("002:42:08", transcript("02:42:08, pilot", "MARK.", 30));
-const PLANE_CHANGE_6A_END = onGemini7Clock("002:42:47", transcript("02:42:47, command pilot", "Burn complete.", 30));
-const COELLIPTIC_6A = onGemini7Clock("003:47:40", transcript("03:47:40, command pilot", "Burning.", 43));
+const HEIGHT_ADJUST_6A_END = onGemini7Clock(
+  '001:34:27',
+  transcript('01:34:27, command pilot', 'MARK. Burn complete.', 17),
+);
+const PHASE_ADJUST_6A = onGemini7Clock(
+  '002:18:02',
+  transcript('02:18:02, command pilot', 'MARK.', 22),
+);
+const PHASE_ADJUST_6A_END = onGemini7Clock(
+  '002:19:17',
+  transcript('02:19:17, command pilot', 'MARK.', 23),
+);
+const PLANE_CHANGE_6A = onGemini7Clock('002:42:08', transcript('02:42:08, pilot', 'MARK.', 30));
+const PLANE_CHANGE_6A_END = onGemini7Clock(
+  '002:42:47',
+  transcript('02:42:47, command pilot', 'Burn complete.', 30),
+);
+const COELLIPTIC_6A = onGemini7Clock(
+  '003:47:40',
+  transcript('03:47:40, command pilot', 'Burning.', 43),
+);
 /** The coelliptic burn's end: its start plus the 54 seconds On the Shoulders of Titans gives (our sum). */
 const COELLIPTIC_6A_END = onGemini7Clock(
-  "003:48:34",
-  titans(287, '"at 3 hours 47 minutes, the aft thrusters fired for 54 seconds" (the end, 3:48:34 on Gemini VI-A\'s clock, is the transcript\'s start, 03:47:40, plus 54 seconds: our sum)'),
-  transcript("03:47:40, command pilot", "Burning.", 43),
+  '003:48:34',
+  titans(
+    287,
+    '"at 3 hours 47 minutes, the aft thrusters fired for 54 seconds" (the end, 3:48:34 on Gemini VI-A\'s clock, is the transcript\'s start, 03:47:40, plus 54 seconds: our sum)',
+  ),
+  transcript('03:47:40, command pilot', 'Burning.', 43),
 );
 /** Terminal phase initiation: 19,139 seconds (5:18:59) on Gemini VI-A's clock. */
 const TPI_6A = onGemini7Clock(
-  "005:18:59",
+  '005:18:59',
   {
-    source: "gemini-6a-supplemental-report-5",
-    locator: 'Gemini GT-6 Rendezvous and Catch-up Post Flight Report, Introduction (page 1, PDF page 50): "The closed loop Rendezvous phase between 17,702 and 20,641 seconds TPI at 19,139 seconds elapsed time"',
+    source: 'gemini-6a-supplemental-report-5',
+    locator:
+      'Gemini GT-6 Rendezvous and Catch-up Post Flight Report, Introduction (page 1, PDF page 50): "The closed loop Rendezvous phase between 17,702 and 20,641 seconds TPI at 19,139 seconds elapsed time"',
     url: SUPPLEMENTAL,
   },
-  transcript("05:18:58, command pilot", "We're burning.", 58),
+  transcript('05:18:58, command pilot', "We're burning.", 58),
 );
 /**
  * The start of station keeping: 5:56:00 on Gemini VI-A's clock. The Gemini
@@ -359,47 +436,72 @@ const TPI_6A = onGemini7Clock(
  * 5:50:37 on Gemini VI-A's clock (our arithmetic), when braking began.
  */
 const ARRIVAL = onGemini7Clock(
-  "005:56:00",
-  { source: "gemini-chronology", locator: 'Appendix 1, Table B (Orbital Operations), VI-A rows: Station keeping, Ground Elapsed Time "To begin (hr:min:sec)" 5:56:00', url: "https://www.nasa.gov/history/SP-4002/app1b.htm" },
-  { source: "gemini-chronology", locator: 'Part III (A), December 15, 1965: "final braking maneuvers at 5 hours 50 minutes into the flight. Rendezvous was technically accomplished and stationkeeping began some 6 minutes later when the two spacecraft were about 120 feet apart and their relative motion had stopped."', url: CHRONOLOGY_1965 },
+  '005:56:00',
+  {
+    source: 'gemini-chronology',
+    locator:
+      'Appendix 1, Table B (Orbital Operations), VI-A rows: Station keeping, Ground Elapsed Time "To begin (hr:min:sec)" 5:56:00',
+    url: 'https://www.nasa.gov/history/SP-4002/app1b.htm',
+  },
+  {
+    source: 'gemini-chronology',
+    locator:
+      'Part III (A), December 15, 1965: "final braking maneuvers at 5 hours 50 minutes into the flight. Rendezvous was technically accomplished and stationkeeping began some 6 minutes later when the two spacecraft were about 120 feet apart and their relative motion had stopped."',
+    url: CHRONOLOGY_1965,
+  },
 );
 const SEPARATION_6A: Cited<ElapsedTime> = {
   ...at(
-    "269:30:00",
-    report('Section 4.1, "Actual Mission" (page 4-6, PDF page 84): "At approximately 269:30 g.e.t., the Gemini VI-A crew performed a separation maneuver" (given to the minute; seconds written as 00)'),
+    '269:30:00',
+    report(
+      'Section 4.1, "Actual Mission" (page 4-6, PDF page 84): "At approximately 269:30 g.e.t., the Gemini VI-A crew performed a separation maneuver" (given to the minute; seconds written as 00)',
+    ),
   ),
   discrepancy:
     "The chronology's Appendix 1, Table B ends Gemini VI-A's station keeping 5:17:29 after it began at 5:56:00 on Gemini VI-A's clock, which is 269:20:51.77 on Gemini VII's (our arithmetic). We follow the Gemini VII mission report.",
 };
 /** 22:00 on Gemini VI-A's clock, when its crew read a radar range of 17.63 nautical miles to Gemini VII. */
 const RANGE_READING_6A = onGemini7Clock(
-  "022:00:00",
-  transcript("22:06:15, pilot", "Roger. 21:50, we have a range of 22.24 nautical miles; at 22:00, we have a range of 17.63 nautical miles.", 108),
+  '022:00:00',
+  transcript(
+    '22:06:15, pilot',
+    'Roger. 21:50, we have a range of 22.24 nautical miles; at 22:00, we have a range of 17.63 nautical miles.',
+    108,
+  ),
 );
 const RETROFIRE_6A = onGemini7Clock(
-  "025:15:58",
-  tableA("VI-A", '"G.E.T. to retrofire (hr; min; sec)" row, 25:15:58'),
-  transcript("25:15:49, capsule communicator", "10, 9, 8, 7, 6, 5, 4, 3, 2, 1, Retrofire.", 122),
+  '025:15:58',
+  tableA('VI-A', '"G.E.T. to retrofire (hr; min; sec)" row, 25:15:58'),
+  transcript('25:15:49, capsule communicator', '10, 9, 8, 7, 6, 5, 4, 3, 2, 1, Retrofire.', 122),
 );
 /** Not the end of the burn itself: the moment Schirra read out its velocity change (see the header). */
-const RETROFIRE_6A_READOUT = onGemini7Clock("025:16:28", transcript("25:16:28, command pilot", "... 309 aft, 1 right ...", 122));
+const RETROFIRE_6A_READOUT = onGemini7Clock(
+  '025:16:28',
+  transcript('25:16:28, command pilot', '... 309 aft, 1 right ...', 122),
+);
 /**
  * The computer's state at about 400,000 feet: T_E = 92,170.375 seconds,
  * read as time from Gemini VI-A's lift-off (25:36:10.375 on its clock; see
  * the header).
  */
 const ENTRY_INTERFACE_6A = onGemini7Clock(
-  "025:36:10.375",
+  '025:36:10.375',
   reentry('heading "(S/C 6) (T_E = 92170.375 sec)"'),
   {
-    source: "gemini-6a-supplemental-report-5",
+    source: 'gemini-6a-supplemental-report-5',
     locator:
       'GT-7/6 Re-entry Mission Reconstruction Report, page 4 (PDF page 63): "For GT-6, the first available telemetry record was at time 91133.86 sec, which corresponds to an integration time from retro of TT = 172.25 sec" (91,133.86 less 172.25 seconds is 25:16:01.61, 3.61 seconds after the chronology\'s retrofire time, 25:15:58: our arithmetic, and why T_E is read as time from lift-off)',
     url: SUPPLEMENTAL,
   },
 );
-const DROGUE_6A = onGemini7Clock("025:45:55", transcript("25:45:55, command pilot", "Drogue is out.", 127));
-const LANDING_6A = onGemini7Clock("025:51:24", tableA("VI-A", '"G.E.T. to touchdown (hr; min; sec)" row, 25:51:24'));
+const DROGUE_6A = onGemini7Clock(
+  '025:45:55',
+  transcript('25:45:55, command pilot', 'Drogue is out.', 127),
+);
+const LANDING_6A = onGemini7Clock(
+  '025:51:24',
+  tableA('VI-A', '"G.E.T. to touchdown (hr; min; sec)" row, 25:51:24'),
+);
 
 /* ------------------------------------------------------------------ */
 /* Places.                                                             */
@@ -413,68 +515,104 @@ const LANDING_6A = onGemini7Clock("025:51:24", tableA("VI-A", '"G.E.T. to touchd
  * (see missions/gemini-8/flight.ts).
  */
 const PAD_19_ESTIMATE: [Citation, ...Citation[]] = [
-  report('Section 1.0, "Mission Summary" (page 1-1, PDF page 31): Gemini VII "was launched from Complex 19, Cape Kennedy, Florida"'),
-  { source: "gemini-chronology", locator: 'Part III (A), December 15, 1965: Gemini VI-A "was launched from complex 19"', url: CHRONOLOGY_1965 },
+  report(
+    'Section 1.0, "Mission Summary" (page 1-1, PDF page 31): Gemini VII "was launched from Complex 19, Cape Kennedy, Florida"',
+  ),
   {
-    source: "gemini-8-mission-report",
+    source: 'gemini-chronology',
+    locator: 'Part III (A), December 15, 1965: Gemini VI-A "was launched from complex 19"',
+    url: CHRONOLOGY_1965,
+  },
+  {
+    source: 'gemini-8-mission-report',
     locator:
       'Section 1.0 (page 1-1): the spacecraft "was launched from Complex 19"; our estimate of where Complex 19 is, not a printed value: the point from which a great circle at the flight azimuth reaches the BECO point after the BECO range (the Gemini VIII plan\'s pad estimate)',
     url: GEMINI_8_REPORT,
   },
   {
-    source: "gemini-8-mission-report",
+    source: 'gemini-8-mission-report',
     locator:
       'Table 4.3-I, "Comparison of Planned and Actual Gemini Space Vehicle Trajectory Parameters" (pages 4-22 and 4-23), BECO, "Geodetic latitude, deg north; Longitude, deg west; Range, n. mi. (28.36 N, 79.61 W, 51.4)" row, actual final column',
     url: GEMINI_8_REPORT,
   },
-  { source: "gemini-8-mission-report", locator: 'Section 4.1 (page 4-1): "the GLV was launched ... on a rendezvous launch azimuth of 99.9 degrees"', url: GEMINI_8_REPORT },
+  {
+    source: 'gemini-8-mission-report',
+    locator:
+      'Section 4.1 (page 4-1): "the GLV was launched ... on a rendezvous launch azimuth of 99.9 degrees"',
+    url: GEMINI_8_REPORT,
+  },
 ];
-const PAD_19 = { latitude: cite(28.51, ...PAD_19_ESTIMATE), longitude: cite(-80.57, ...PAD_19_ESTIMATE) };
+const PAD_19 = {
+  latitude: cite(28.51, ...PAD_19_ESTIMATE),
+  longitude: cite(-80.57, ...PAD_19_ESTIMATE),
+};
 
 /** Where Gemini VII came down, and floated until the carrier lifted it aboard. */
 const SPLASHDOWN = {
   latitude: {
-    ...cite(25 + 25.1 / 60, report('Table 4.3-I, "Comparison of Planned and Actual Trajectory Parameters - Concluded" (page 4-22, PDF page 100), landing point, "Latitude" row, actual final column, "25°25.1\' N." (based on final Grand Turk Island radar tracking data)')),
+    ...cite(
+      25 + 25.1 / 60,
+      report(
+        'Table 4.3-I, "Comparison of Planned and Actual Trajectory Parameters - Concluded" (page 4-22, PDF page 100), landing point, "Latitude" row, actual final column, "25°25.1\' N." (based on final Grand Turk Island radar tracking data)',
+      ),
+    ),
     discrepancy:
       "The chronology's Appendix 1, Table A gives 25°25'01\" N, 70°06'07\" W, and NASA's Gemini VII page 25.42 N, 70.10 W. The recovery ship placed the spacecraft at pickup at 25°21.9' N, 70°08.8' W, about 2 miles from where it landed (section 6.3.2). We follow Table 4.3-I's final column. The report does not say whether this latitude is geodetic; we draw it as a map latitude.",
   },
-  longitude: cite(-(70 + 6.7 / 60), report('Table 4.3-I, "Comparison of Planned and Actual Trajectory Parameters - Concluded" (page 4-22, PDF page 100), landing point, "Longitude" row, actual final column, "70°06.7\' W."')),
+  longitude: cite(
+    -(70 + 6.7 / 60),
+    report(
+      'Table 4.3-I, "Comparison of Planned and Actual Trajectory Parameters - Concluded" (page 4-22, PDF page 100), landing point, "Longitude" row, actual final column, "70°06.7\' W."',
+    ),
+  ),
 };
 
 /** Where Gemini VI-A came down. */
 const SPLASHDOWN_6A = {
-  latitude: cite(23 + 35 / 60, tableA("VI-A", 'Landing coordinates, Lat. row, "23°35\' N."')),
-  longitude: cite(-(67 + 50 / 60), tableA("VI-A", 'Landing coordinates, Long. row, "67°50\' W."')),
+  latitude: cite(23 + 35 / 60, tableA('VI-A', 'Landing coordinates, Lat. row, "23°35\' N."')),
+  longitude: cite(-(67 + 50 / 60), tableA('VI-A', 'Landing coordinates, Long. row, "67°50\' W."')),
 };
 
 /* ------------------------------------------------------------------ */
 /* Shared values.                                                      */
 /* ------------------------------------------------------------------ */
 
-const PROGRADE = cite<"prograde">("prograde", trajectory("spacecraft separation", "Space-fixed heading angle, deg E of N (89.88)"));
-const PROGRADE_6A = cite<"prograde">("prograde", tableA("VI-A", 'Launch azimuth row, "81.4°" (eastward)'));
+const PROGRADE = cite<'prograde'>(
+  'prograde',
+  trajectory('spacecraft separation', 'Space-fixed heading angle, deg E of N (89.88)'),
+);
+const PROGRADE_6A = cite<'prograde'>(
+  'prograde',
+  tableA('VI-A', 'Launch azimuth row, "81.4°" (eastward)'),
+);
 
 /** Gemini VII's orbit right after circularization, held to Gemini VI-A's insertion (see the header). */
 const CIRCULAR = {
-  apoapsis: cite(162.8, elements("Circularize revolution 75/76", "after", "Apogee, n. mi.")),
-  periapsis: cite(160.5, elements("Circularize revolution 75/76", "after", "Perigee, n. mi.")),
+  apoapsis: cite(162.8, elements('Circularize revolution 75/76', 'after', 'Apogee, n. mi.')),
+  periapsis: cite(160.5, elements('Circularize revolution 75/76', 'after', 'Perigee, n. mi.')),
 };
 
 /** Gemini VI-A after its height adjustment: 272 km, 147 nautical miles (our conversion). */
 const APOGEE_AFTER_HEIGHT_ADJUST_6A = cite(
   147,
-  titans(286, '"The perigee remained the same, but the acceleration kicked the apogee up to 272 kilometers"'),
+  titans(
+    286,
+    '"The perigee remained the same, but the acceleration kicked the apogee up to 272 kilometers"',
+  ),
 );
 const PERIGEE_AFTER_PHASE_ADJUST_6A = cite(
   121,
-  titans(286, '"to raise the chase vehicle\'s perigee to 224 kilometers" (121 nautical miles, our conversion; the apogee is left where the height adjustment put it, our reading)'),
+  titans(
+    286,
+    '"to raise the chase vehicle\'s perigee to 224 kilometers" (121 nautical miles, our conversion; the apogee is left where the height adjustment put it, our reading)',
+  ),
 );
 /** Gemini VI-A's orbit for the night, as the chronology lists it at retrofire. */
 const NIGHT_ORBIT_6A = {
-  apoapsis: cite(168.1, tableA("VI-A", 'At retrofire, "Apogee (n.m.)" row (revolution 16)')),
-  periapsis: cite(153.0, tableA("VI-A", 'At retrofire, "Perigee (n.m.)" row (revolution 16)')),
-  inclination: cite(28.89, tableA("VI-A", 'At retrofire, "Inclination angle" row, "28.89°"')),
-  period: cite(90.54, tableA("VI-A", 'At retrofire, "Period (min.)" row, 90.54')),
+  apoapsis: cite(168.1, tableA('VI-A', 'At retrofire, "Apogee (n.m.)" row (revolution 16)')),
+  periapsis: cite(153.0, tableA('VI-A', 'At retrofire, "Perigee (n.m.)" row (revolution 16)')),
+  inclination: cite(28.89, tableA('VI-A', 'At retrofire, "Inclination angle" row, "28.89°"')),
+  period: cite(90.54, tableA('VI-A', 'At retrofire, "Period (min.)" row, 90.54')),
 };
 
 /* ------------------------------------------------------------------ */
@@ -482,172 +620,387 @@ const NIGHT_ORBIT_6A = {
 /* ------------------------------------------------------------------ */
 
 export const flight: FlightPlan = {
-  missionId: "gemini-7",
+  missionId: 'gemini-7',
 
   // Five samples across the two weeks: lift-off, the circularization,
   // Gemini VI-A's lift-off, retrofire, and landing.
   sky: [
     {
       time: LIFTOFF,
-      moonEclipticLongitude: cite(23.1360912, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-12-04 19:30:03.702", MOON_FROM_EARTH)),
-      subLunarLongitude: cite(16.807517, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-12-04 19:30:03.702", EARTH_FROM_MOON)),
-      sunEclipticLongitude: cite(252.4518274, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-12-04 19:30:03.702", SUN_FROM_EARTH)),
+      moonEclipticLongitude: cite(
+        23.1360912,
+        horizons(
+          "Moon (301) from Earth's center",
+          'ObsEcLon',
+          '1965-12-04 19:30:03.702',
+          MOON_FROM_EARTH,
+        ),
+      ),
+      subLunarLongitude: cite(
+        16.807517,
+        horizons(
+          "Earth (399) from the Moon's center",
+          'ObsSub-LON',
+          '1965-12-04 19:30:03.702',
+          EARTH_FROM_MOON,
+        ),
+      ),
+      sunEclipticLongitude: cite(
+        252.4518274,
+        horizons(
+          "Sun (10) from Earth's center",
+          'ObsEcLon',
+          '1965-12-04 19:30:03.702',
+          SUN_FROM_EARTH,
+        ),
+      ),
     },
     {
       time: CIRCULARIZE,
-      moonEclipticLongitude: cite(91.667829, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-12-09 18:41:58.702", MOON_FROM_EARTH)),
-      subLunarLongitude: cite(93.075511, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-12-09 18:41:58.702", EARTH_FROM_MOON)),
-      sunEclipticLongitude: cite(257.4940244, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-12-09 18:41:58.702", SUN_FROM_EARTH)),
+      moonEclipticLongitude: cite(
+        91.667829,
+        horizons(
+          "Moon (301) from Earth's center",
+          'ObsEcLon',
+          '1965-12-09 18:41:58.702',
+          MOON_FROM_EARTH,
+        ),
+      ),
+      subLunarLongitude: cite(
+        93.075511,
+        horizons(
+          "Earth (399) from the Moon's center",
+          'ObsSub-LON',
+          '1965-12-09 18:41:58.702',
+          EARTH_FROM_MOON,
+        ),
+      ),
+      sunEclipticLongitude: cite(
+        257.4940244,
+        horizons(
+          "Sun (10) from Earth's center",
+          'ObsEcLon',
+          '1965-12-09 18:41:58.702',
+          SUN_FROM_EARTH,
+        ),
+      ),
     },
     {
       // 13:37:26.47 G.m.t. is 258:07:22.768 on Gemini VII's clock (our arithmetic).
-      time: at("258:07:22.768", ...BOTH_LIFTOFFS),
-      moonEclipticLongitude: cite(175.4079018, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-12-15 13:37:26.47", MOON_FROM_EARTH)),
-      subLunarLongitude: cite(249.392912, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-12-15 13:37:26.47", EARTH_FROM_MOON)),
-      sunEclipticLongitude: cite(263.379067, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-12-15 13:37:26.47", SUN_FROM_EARTH)),
+      time: at('258:07:22.768', ...BOTH_LIFTOFFS),
+      moonEclipticLongitude: cite(
+        175.4079018,
+        horizons(
+          "Moon (301) from Earth's center",
+          'ObsEcLon',
+          '1965-12-15 13:37:26.47',
+          MOON_FROM_EARTH,
+        ),
+      ),
+      subLunarLongitude: cite(
+        249.392912,
+        horizons(
+          "Earth (399) from the Moon's center",
+          'ObsSub-LON',
+          '1965-12-15 13:37:26.47',
+          EARTH_FROM_MOON,
+        ),
+      ),
+      sunEclipticLongitude: cite(
+        263.379067,
+        horizons(
+          "Sun (10) from Earth's center",
+          'ObsEcLon',
+          '1965-12-15 13:37:26.47',
+          SUN_FROM_EARTH,
+        ),
+      ),
     },
     {
       time: RETROFIRE,
-      moonEclipticLongitude: cite(215.9479455, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-12-18 13:28:07.702", MOON_FROM_EARTH)),
-      subLunarLongitude: cite(285.508813, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-12-18 13:28:07.702", EARTH_FROM_MOON)),
-      sunEclipticLongitude: cite(266.4261109, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-12-18 13:28:07.702", SUN_FROM_EARTH)),
+      moonEclipticLongitude: cite(
+        215.9479455,
+        horizons(
+          "Moon (301) from Earth's center",
+          'ObsEcLon',
+          '1965-12-18 13:28:07.702',
+          MOON_FROM_EARTH,
+        ),
+      ),
+      subLunarLongitude: cite(
+        285.508813,
+        horizons(
+          "Earth (399) from the Moon's center",
+          'ObsSub-LON',
+          '1965-12-18 13:28:07.702',
+          EARTH_FROM_MOON,
+        ),
+      ),
+      sunEclipticLongitude: cite(
+        266.4261109,
+        horizons(
+          "Sun (10) from Earth's center",
+          'ObsEcLon',
+          '1965-12-18 13:28:07.702',
+          SUN_FROM_EARTH,
+        ),
+      ),
     },
     {
       time: LANDING,
-      moonEclipticLongitude: cite(216.2856684, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-12-18 14:05:04.702", MOON_FROM_EARTH)),
-      subLunarLongitude: cite(276.561854, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-12-18 14:05:04.702", EARTH_FROM_MOON)),
-      sunEclipticLongitude: cite(266.4522392, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-12-18 14:05:04.702", SUN_FROM_EARTH)),
+      moonEclipticLongitude: cite(
+        216.2856684,
+        horizons(
+          "Moon (301) from Earth's center",
+          'ObsEcLon',
+          '1965-12-18 14:05:04.702',
+          MOON_FROM_EARTH,
+        ),
+      ),
+      subLunarLongitude: cite(
+        276.561854,
+        horizons(
+          "Earth (399) from the Moon's center",
+          'ObsSub-LON',
+          '1965-12-18 14:05:04.702',
+          EARTH_FROM_MOON,
+        ),
+      ),
+      sunEclipticLongitude: cite(
+        266.4522392,
+        horizons(
+          "Sun (10) from Earth's center",
+          'ObsEcLon',
+          '1965-12-18 14:05:04.702',
+          SUN_FROM_EARTH,
+        ),
+      ),
     },
   ],
 
   ships: [
     {
-      id: "gemini",
-      name: "Gemini VII spacecraft",
-      role: "main",
+      id: 'gemini',
+      name: 'Gemini VII spacecraft',
+      role: 'main',
       phases: [
         {
-          kind: "ascent",
-          label: "Launch",
-          body: "earth",
+          kind: 'ascent',
+          label: 'Launch',
+          body: 'earth',
           start: LIFTOFF,
           end: INSERTION,
           site: PAD_19,
-          track: [ascentPoint("BECO", 155.61, 34, 28.6, -79.57)],
+          track: [ascentPoint('BECO', 155.61, 34, 28.6, -79.57)],
         },
         {
-          kind: "orbit",
-          label: "Ten and a half days in orbit",
-          body: "earth",
+          kind: 'orbit',
+          label: 'Ten and a half days in orbit',
+          body: 'earth',
           start: INSERTION,
           end: INSERTION_6A,
-          apoapsis: cite(177.1, elements("Station keeping and D-4/D-7 experiment", "before", "Apogee, n. mi."), tableA("VII", 'At insertion, "Apogee (n.m.)" row')),
-          periapsis: cite(87.2, elements("Station keeping and D-4/D-7 experiment", "before", "Perigee, n. mi."), tableA("VII", 'At insertion, "Perigee (n.m.)" row')),
-          inclination: cite(28.89, elements("Station keeping and D-4/D-7 experiment", "before", "Inclination, deg."), tableA("VII", 'At insertion, "Inclination angle" row, "28.89°"')),
+          apoapsis: cite(
+            177.1,
+            elements('Station keeping and D-4/D-7 experiment', 'before', 'Apogee, n. mi.'),
+            tableA('VII', 'At insertion, "Apogee (n.m.)" row'),
+          ),
+          periapsis: cite(
+            87.2,
+            elements('Station keeping and D-4/D-7 experiment', 'before', 'Perigee, n. mi.'),
+            tableA('VII', 'At insertion, "Perigee (n.m.)" row'),
+          ),
+          inclination: cite(
+            28.89,
+            elements('Station keeping and D-4/D-7 experiment', 'before', 'Inclination, deg.'),
+            tableA('VII', 'At insertion, "Inclination angle" row, "28.89°"'),
+          ),
           sense: PROGRADE,
           startFix: {
-            latitude: cite(29.05, trajectory("spacecraft separation", "Geodetic latitude, deg North")),
-            longitude: cite(-69.45, trajectory("spacecraft separation", "Longitude, deg West (printed 69.45 west)")),
-            altitude: cite(87.2, trajectory("spacecraft separation", "Altitude, n. mi.")),
-            speed: cite(25_793, trajectory("spacecraft separation", "Space-fixed velocity, ft/sec")),
-            flightPathAngle: cite(0.05, trajectory("spacecraft separation", "Space-fixed flight-path angle, deg")),
-            heading: cite(89.88, trajectory("spacecraft separation", "Space-fixed heading angle, deg E of N")),
+            latitude: cite(
+              29.05,
+              trajectory('spacecraft separation', 'Geodetic latitude, deg North'),
+            ),
+            longitude: cite(
+              -69.45,
+              trajectory('spacecraft separation', 'Longitude, deg West (printed 69.45 west)'),
+            ),
+            altitude: cite(87.2, trajectory('spacecraft separation', 'Altitude, n. mi.')),
+            speed: cite(
+              25_793,
+              trajectory('spacecraft separation', 'Space-fixed velocity, ft/sec'),
+            ),
+            flightPathAngle: cite(
+              0.05,
+              trajectory('spacecraft separation', 'Space-fixed flight-path angle, deg'),
+            ),
+            heading: cite(
+              89.88,
+              trajectory('spacecraft separation', 'Space-fixed heading angle, deg E of N'),
+            ),
           },
           sizes: [
             // The separation maneuver of the D-4/D-7 experiment, a step.
             {
               time: D4D7,
-              apoapsis: cite(177.1, elements("Station keeping and D-4/D-7 experiment", "before", "Apogee, n. mi.")),
-              periapsis: cite(87.2, elements("Station keeping and D-4/D-7 experiment", "before", "Perigee, n. mi.")),
+              apoapsis: cite(
+                177.1,
+                elements('Station keeping and D-4/D-7 experiment', 'before', 'Apogee, n. mi.'),
+              ),
+              periapsis: cite(
+                87.2,
+                elements('Station keeping and D-4/D-7 experiment', 'before', 'Perigee, n. mi.'),
+              ),
             },
             {
               time: D4D7_END,
-              apoapsis: cite(174.4, elements("Station keeping and D-4/D-7 experiment", "after", "Apogee, n. mi.")),
-              periapsis: cite(88.2, elements("Station keeping and D-4/D-7 experiment", "after", "Perigee, n. mi.")),
+              apoapsis: cite(
+                174.4,
+                elements('Station keeping and D-4/D-7 experiment', 'after', 'Apogee, n. mi.'),
+              ),
+              periapsis: cite(
+                88.2,
+                elements('Station keeping and D-4/D-7 experiment', 'after', 'Perigee, n. mi.'),
+              ),
             },
             // The perigee adjustment on revolution 3, so the orbit would last two weeks.
             {
               time: PERIGEE_ADJUST,
-              apoapsis: cite(174.3, elements("Perigee adjust revolution 3", "before", "Apogee, n. mi.")),
-              periapsis: cite(88.2, elements("Perigee adjust revolution 3", "before", "Perigee, n. mi.")),
+              apoapsis: cite(
+                174.3,
+                elements('Perigee adjust revolution 3', 'before', 'Apogee, n. mi.'),
+              ),
+              periapsis: cite(
+                88.2,
+                elements('Perigee adjust revolution 3', 'before', 'Perigee, n. mi.'),
+              ),
             },
             {
               time: PERIGEE_ADJUST_END,
-              apoapsis: cite(174.3, elements("Perigee adjust revolution 3", "after", "Apogee, n. mi.")),
-              periapsis: cite(119.6, elements("Perigee adjust revolution 3", "after", "Perigee, n. mi.")),
+              apoapsis: cite(
+                174.3,
+                elements('Perigee adjust revolution 3', 'after', 'Apogee, n. mi.'),
+              ),
+              periapsis: cite(
+                119.6,
+                elements('Perigee adjust revolution 3', 'after', 'Perigee, n. mi.'),
+              ),
             },
             // The phase adjustment on revolution 44.
             {
               time: PHASE_ADJUST,
-              apoapsis: cite(170.9, elements("Phase adjust revolution 44", "before", "Apogee, n. mi.")),
-              periapsis: cite(119.5, elements("Phase adjust revolution 44", "before", "Perigee, n. mi.")),
+              apoapsis: cite(
+                170.9,
+                elements('Phase adjust revolution 44', 'before', 'Apogee, n. mi.'),
+              ),
+              periapsis: cite(
+                119.5,
+                elements('Phase adjust revolution 44', 'before', 'Perigee, n. mi.'),
+              ),
             },
             {
               time: PHASE_ADJUST_END,
-              apoapsis: cite(170.9, elements("Phase adjust revolution 44", "after", "Apogee, n. mi.")),
-              periapsis: cite(126.5, elements("Phase adjust revolution 44", "after", "Perigee, n. mi.")),
+              apoapsis: cite(
+                170.9,
+                elements('Phase adjust revolution 44', 'after', 'Apogee, n. mi.'),
+              ),
+              periapsis: cite(
+                126.5,
+                elements('Phase adjust revolution 44', 'after', 'Perigee, n. mi.'),
+              ),
             },
             // The two circularization firings, drawn as one change (see the header).
             {
               time: CIRCULARIZE,
-              apoapsis: cite(168.2, elements("Circularize revolution 75/76", "before", "Apogee, n. mi.")),
-              periapsis: cite(126.0, elements("Circularize revolution 75/76", "before", "Perigee, n. mi.")),
+              apoapsis: cite(
+                168.2,
+                elements('Circularize revolution 75/76', 'before', 'Apogee, n. mi.'),
+              ),
+              periapsis: cite(
+                126.0,
+                elements('Circularize revolution 75/76', 'before', 'Perigee, n. mi.'),
+              ),
             },
             { time: CIRCULARIZE_END, ...CIRCULAR },
           ],
           // Where Gemini VII was when Gemini VI-A reached orbit (see the header).
           endRange: {
-            target: "gemini-6a",
-            side: "ahead",
+            target: 'gemini-6a',
+            side: 'ahead',
             range: {
-              ...cite(1075.6, titans(286, '"At insertion, the chase vehicle trailed its target by 1992 kilometers" (1075.6 nautical miles, our conversion)')),
-              discrepancy: "NSSDCA says Gemini 6A trailed Gemini 7 by about 1,900 km at insertion. We follow On the Shoulders of Titans.",
+              ...cite(
+                1075.6,
+                titans(
+                  286,
+                  '"At insertion, the chase vehicle trailed its target by 1992 kilometers" (1075.6 nautical miles, our conversion)',
+                ),
+              ),
+              discrepancy:
+                'NSSDCA says Gemini 6A trailed Gemini 7 by about 1,900 km at insertion. We follow On the Shoulders of Titans.',
             },
           },
         },
         {
-          kind: "orbit",
-          label: "With company, then alone again",
-          body: "earth",
+          kind: 'orbit',
+          label: 'With company, then alone again',
+          body: 'earth',
           start: INSERTION_6A,
           end: RETROFIRE,
           ...CIRCULAR,
-          inclination: cite(28.89, revolution("160", "Inclination, deg")),
+          inclination: cite(28.89, revolution('160', 'Inclination, deg')),
           sense: PROGRADE,
-          period: cite(90.57, revolution("160", "Period, min"), revolution("206 (prior to retrofire)", "Period, min")),
+          period: cite(
+            90.57,
+            revolution('160', 'Period, min'),
+            revolution('206 (prior to retrofire)', 'Period, min'),
+          ),
           sizes: [
             {
               time: RETROFIRE,
-              apoapsis: cite(163.6, revolution("206 (prior to retrofire)", "Apogee, n. mi."), tableA("VII", 'At retrofire, "Apogee (n.m.)" row (revolution 206)')),
-              periapsis: cite(156.5, revolution("206 (prior to retrofire)", "Perigee, n. mi."), tableA("VII", 'At retrofire, "Perigee (n.m.)" row (revolution 206)')),
+              apoapsis: cite(
+                163.6,
+                revolution('206 (prior to retrofire)', 'Apogee, n. mi.'),
+                tableA('VII', 'At retrofire, "Apogee (n.m.)" row (revolution 206)'),
+              ),
+              periapsis: cite(
+                156.5,
+                revolution('206 (prior to retrofire)', 'Perigee, n. mi.'),
+                tableA('VII', 'At retrofire, "Perigee (n.m.)" row (revolution 206)'),
+              ),
             },
           ],
         },
         {
-          kind: "burn",
-          label: "Retrofire",
-          body: "earth",
+          kind: 'burn',
+          label: 'Retrofire',
+          body: 'earth',
           start: RETROFIRE,
           end: RETRO_SECTION_OFF,
-          deltaV: cite(318.5, report('Table 5.1.8-III, "Retrograde Rocket System Performance" (page 5-65, PDF page 183), "Total ΔV, ft/sec" row, actual column')),
+          deltaV: cite(
+            318.5,
+            report(
+              'Table 5.1.8-III, "Retrograde Rocket System Performance" (page 5-65, PDF page 183), "Total ΔV, ft/sec" row, actual column',
+            ),
+          ),
         },
         {
-          kind: "entry",
-          label: "Entry and splashdown",
+          kind: 'entry',
+          label: 'Entry and splashdown',
           start: RETRO_SECTION_OFF,
           end: LANDING,
           drogue: DROGUE,
           // 50,000 feet, in nautical miles (our conversion).
           drogueAltitude: cite(
             8.23,
-            report('Section 7.1.2.5, "Reentry and landing" (page 7-58, PDF page 314): "the drogue was deployed at 50K feet"'),
+            report(
+              'Section 7.1.2.5, "Reentry and landing" (page 7-58, PDF page 314): "the drogue was deployed at 50K feet"',
+            ),
           ),
           splashdown: SPLASHDOWN,
         },
         {
-          kind: "surface",
-          label: "Floating until the carrier lifts it aboard",
-          body: "earth",
+          kind: 'surface',
+          label: 'Floating until the carrier lifts it aboard',
+          body: 'earth',
           start: LANDING,
           end: ABOARD,
           site: SPLASHDOWN,
@@ -655,126 +1008,170 @@ export const flight: FlightPlan = {
       ],
     },
     {
-      id: "gemini-6a",
-      name: "Gemini VI-A spacecraft",
-      role: "target",
+      id: 'gemini-6a',
+      name: 'Gemini VI-A spacecraft',
+      role: 'target',
       phases: [
         {
-          kind: "ascent",
+          kind: 'ascent',
           label: "Gemini VI-A's launch",
-          body: "earth",
+          body: 'earth',
           start: LIFTOFF_6A,
           end: INSERTION_6A,
           site: PAD_19,
-          azimuth: cite(81.4, tableA("VI-A", 'Launch azimuth row, "81.4°"')),
+          azimuth: cite(81.4, tableA('VI-A', 'Launch azimuth row, "81.4°"')),
         },
         {
-          kind: "orbit",
+          kind: 'orbit',
           label: "Gemini VI-A's first orbit",
-          body: "earth",
+          body: 'earth',
           start: INSERTION_6A,
           end: HEIGHT_ADJUST_6A,
-          apoapsis: cite(140.0, tableA("VI-A", 'At insertion, "Apogee (n.m.)" row')),
-          periapsis: cite(86.9, tableA("VI-A", 'At insertion, "Perigee (n.m.)" row')),
-          inclination: cite(28.97, tableA("VI-A", 'At insertion, "Inclination angle" row, "28.97°"')),
+          apoapsis: cite(140.0, tableA('VI-A', 'At insertion, "Apogee (n.m.)" row')),
+          periapsis: cite(86.9, tableA('VI-A', 'At insertion, "Perigee (n.m.)" row')),
+          inclination: cite(
+            28.97,
+            tableA('VI-A', 'At insertion, "Inclination angle" row, "28.97°"'),
+          ),
           sense: PROGRADE_6A,
         },
-        { kind: "burn", label: "Gemini VI-A: height adjustment", body: "earth", start: HEIGHT_ADJUST_6A, end: HEIGHT_ADJUST_6A_END },
         {
-          kind: "orbit",
-          label: "Gemini VI-A: higher apogee",
-          body: "earth",
+          kind: 'burn',
+          label: 'Gemini VI-A: height adjustment',
+          body: 'earth',
+          start: HEIGHT_ADJUST_6A,
+          end: HEIGHT_ADJUST_6A_END,
+        },
+        {
+          kind: 'orbit',
+          label: 'Gemini VI-A: higher apogee',
+          body: 'earth',
           start: HEIGHT_ADJUST_6A_END,
           end: PHASE_ADJUST_6A,
           apoapsis: APOGEE_AFTER_HEIGHT_ADJUST_6A,
-          periapsis: cite(86.9, titans(286, '"The perigee remained the same"'), tableA("VI-A", 'At insertion, "Perigee (n.m.)" row')),
+          periapsis: cite(
+            86.9,
+            titans(286, '"The perigee remained the same"'),
+            tableA('VI-A', 'At insertion, "Perigee (n.m.)" row'),
+          ),
           sense: PROGRADE_6A,
         },
-        { kind: "burn", label: "Gemini VI-A: phase adjustment", body: "earth", start: PHASE_ADJUST_6A, end: PHASE_ADJUST_6A_END },
         {
-          kind: "orbit",
-          label: "Gemini VI-A: higher perigee",
-          body: "earth",
+          kind: 'burn',
+          label: 'Gemini VI-A: phase adjustment',
+          body: 'earth',
+          start: PHASE_ADJUST_6A,
+          end: PHASE_ADJUST_6A_END,
+        },
+        {
+          kind: 'orbit',
+          label: 'Gemini VI-A: higher perigee',
+          body: 'earth',
           start: PHASE_ADJUST_6A_END,
           end: PLANE_CHANGE_6A,
           apoapsis: APOGEE_AFTER_HEIGHT_ADJUST_6A,
           periapsis: PERIGEE_AFTER_PHASE_ADJUST_6A,
           sense: PROGRADE_6A,
         },
-        { kind: "burn", label: "Gemini VI-A: plane change", body: "earth", start: PLANE_CHANGE_6A, end: PLANE_CHANGE_6A_END },
         {
-          kind: "orbit",
+          kind: 'burn',
+          label: 'Gemini VI-A: plane change',
+          body: 'earth',
+          start: PLANE_CHANGE_6A,
+          end: PLANE_CHANGE_6A_END,
+        },
+        {
+          kind: 'orbit',
           label: "Gemini VI-A in Gemini VII's plane",
-          body: "earth",
+          body: 'earth',
           start: PLANE_CHANGE_6A_END,
           end: COELLIPTIC_6A,
           apoapsis: APOGEE_AFTER_HEIGHT_ADJUST_6A,
           periapsis: PERIGEE_AFTER_PHASE_ADJUST_6A,
           sense: PROGRADE_6A,
         },
-        { kind: "burn", label: "Gemini VI-A: coelliptic maneuver", body: "earth", start: COELLIPTIC_6A, end: COELLIPTIC_6A_END },
         {
-          kind: "orbit",
-          label: "Gemini VI-A below and behind Gemini VII",
-          body: "earth",
+          kind: 'burn',
+          label: 'Gemini VI-A: coelliptic maneuver',
+          body: 'earth',
+          start: COELLIPTIC_6A,
+          end: COELLIPTIC_6A_END,
+        },
+        {
+          kind: 'orbit',
+          label: 'Gemini VI-A below and behind Gemini VII',
+          body: 'earth',
           start: COELLIPTIC_6A_END,
           end: TPI_6A,
           // The coelliptic orbit: 270 by 274 km, 146 by 148 nautical miles (our conversion).
-          apoapsis: cite(148, titans(287, '"The result was almost a circle, measuring 270 by 274 kilometers"')),
-          periapsis: cite(146, titans(287, '"The result was almost a circle, measuring 270 by 274 kilometers"')),
+          apoapsis: cite(
+            148,
+            titans(287, '"The result was almost a circle, measuring 270 by 274 kilometers"'),
+          ),
+          periapsis: cite(
+            146,
+            titans(287, '"The result was almost a circle, measuring 270 by 274 kilometers"'),
+          ),
           sense: PROGRADE_6A,
           endRange: {
-            target: "gemini",
-            range: cite(
-              29,
-              {
-                source: "gemini-rendezvous-summary",
-                locator:
-                  'Table 2-IV, "Rendezvous Propellant Usage" (page 18 of the Gemini Summary Conference, PDF page 12), VI-A row, "Conditions at start of terminal phase": "Δh = 15 n. mi.", "ΔX = 25 n. mi." (29 nautical miles in a straight line, our arithmetic)',
-                url: RENDEZVOUS_PAPER,
-              },
-            ),
+            target: 'gemini',
+            range: cite(29, {
+              source: 'gemini-rendezvous-summary',
+              locator:
+                'Table 2-IV, "Rendezvous Propellant Usage" (page 18 of the Gemini Summary Conference, PDF page 12), VI-A row, "Conditions at start of terminal phase": "Δh = 15 n. mi.", "ΔX = 25 n. mi." (29 nautical miles in a straight line, our arithmetic)',
+              url: RENDEZVOUS_PAPER,
+            }),
           },
         },
         {
           // The whole final approach, drawn as one blend (see the header).
-          kind: "burn",
-          label: "Gemini VI-A closes in",
-          body: "earth",
+          kind: 'burn',
+          label: 'Gemini VI-A closes in',
+          body: 'earth',
           start: TPI_6A,
           end: ARRIVAL,
         },
         {
-          kind: "station",
-          label: "Flying in formation",
+          kind: 'station',
+          label: 'Flying in formation',
           start: ARRIVAL,
           end: SEPARATION_6A,
-          target: "gemini",
+          target: 'gemini',
           // About 120 feet, in nautical miles (our conversion).
-          range: cite(
-            0.0197,
-            { source: "gemini-chronology", locator: 'Part III (A), December 15, 1965: station keeping began "when the two spacecraft were about 120 feet apart"', url: CHRONOLOGY_1965 },
-          ),
+          range: cite(0.0197, {
+            source: 'gemini-chronology',
+            locator:
+              'Part III (A), December 15, 1965: station keeping began "when the two spacecraft were about 120 feet apart"',
+            url: CHRONOLOGY_1965,
+          }),
         },
         {
-          kind: "orbit",
-          label: "Gemini VI-A: apart for the night",
-          body: "earth",
+          kind: 'orbit',
+          label: 'Gemini VI-A: apart for the night',
+          body: 'earth',
           start: SEPARATION_6A,
           end: RANGE_READING_6A,
           ...NIGHT_ORBIT_6A,
           sense: PROGRADE_6A,
-          from: "gemini",
+          from: 'gemini',
           // Gemini VI-A was ahead of Gemini VII overnight (see the header).
           endRange: {
-            target: "gemini",
-            side: "ahead",
+            target: 'gemini',
+            side: 'ahead',
             range: {
               ...cite(
                 17.63,
-                transcript("22:06:15, pilot", "Roger. 21:50, we have a range of 22.24 nautical miles; at 22:00, we have a range of 17.63 nautical miles.", 108),
-                transcript("21:43:25, pilot", "Okay, he'll be aft of me. That's correct, right?", 107),
-                transcript("21:43:32, capsule communicator", "That is affirm.", 107),
+                transcript(
+                  '22:06:15, pilot',
+                  'Roger. 21:50, we have a range of 22.24 nautical miles; at 22:00, we have a range of 17.63 nautical miles.',
+                  108,
+                ),
+                transcript(
+                  '21:43:25, pilot',
+                  "Okay, he'll be aft of me. That's correct, right?",
+                  107,
+                ),
+                transcript('21:43:32, capsule communicator', 'That is affirm.', 107),
               ),
               discrepancy:
                 "On the Shoulders of Titans (page 289) says the crews settled down 16 kilometers apart; the chronology's December 15 entry says Gemini 6A withdrew to about 30 miles, and NSSDCA to roughly 50 km. We pin the path to the radar range the crew read at 22:00.",
@@ -782,43 +1179,68 @@ export const flight: FlightPlan = {
           },
         },
         {
-          kind: "orbit",
-          label: "Gemini VI-A: the last orbits",
-          body: "earth",
+          kind: 'orbit',
+          label: 'Gemini VI-A: the last orbits',
+          body: 'earth',
           start: RANGE_READING_6A,
           end: RETROFIRE_6A,
           ...NIGHT_ORBIT_6A,
           sense: PROGRADE_6A,
         },
-        { kind: "burn", label: "Gemini VI-A: retrofire", body: "earth", start: RETROFIRE_6A, end: RETROFIRE_6A_READOUT },
         {
-          kind: "coast",
-          label: "Gemini VI-A falls toward the atmosphere",
-          body: "earth",
+          kind: 'burn',
+          label: 'Gemini VI-A: retrofire',
+          body: 'earth',
+          start: RETROFIRE_6A,
+          end: RETROFIRE_6A_READOUT,
+        },
+        {
+          kind: 'coast',
+          label: 'Gemini VI-A falls toward the atmosphere',
+          body: 'earth',
           start: RETROFIRE_6A_READOUT,
           end: ENTRY_INTERFACE_6A,
-          sense: cite("prograde", reentry('telemetry ("T/M") row, heading "ψ_E" 92.242 degrees (eastward)')),
+          sense: cite(
+            'prograde',
+            reentry('telemetry ("T/M") row, heading "ψ_E" 92.242 degrees (eastward)'),
+          ),
           // The onboard computer's state at about 400,000 feet. The fall
           // from retrofire is the Kepler path through it, run back in time.
           endFix: {
-            latitude: cite(28.822, reentry('telemetry row, "φ" 28.822 degrees (geocentric, our reading; see the header)')),
-            latitudeKind: "geocentric",
-            longitude: cite(-99.519, reentry('telemetry row, "θ_E" 260.481 degrees east, which is 99.519 degrees west')),
-            altitude: cite(65.58, reentry('telemetry row, "r_s" 21,307,736 ft from Earth\'s center (65.58 nautical miles above the ellipsoid, our arithmetic)')),
+            latitude: cite(
+              28.822,
+              reentry(
+                'telemetry row, "φ" 28.822 degrees (geocentric, our reading; see the header)',
+              ),
+            ),
+            latitudeKind: 'geocentric',
+            longitude: cite(
+              -99.519,
+              reentry('telemetry row, "θ_E" 260.481 degrees east, which is 99.519 degrees west'),
+            ),
+            altitude: cite(
+              65.58,
+              reentry(
+                'telemetry row, "r_s" 21,307,736 ft from Earth\'s center (65.58 nautical miles above the ellipsoid, our arithmetic)',
+              ),
+            ),
             speed: cite(24_389.179, reentry('telemetry row, "V_E" 24389.179 fps')),
             flightPathAngle: cite(-1.422, reentry('telemetry row, "γ" -1.422 degrees')),
             heading: cite(92.242, reentry('telemetry row, "ψ_E" 92.242 degrees')),
-            velocityFrame: "earth-fixed",
+            velocityFrame: 'earth-fixed',
           },
         },
         {
-          kind: "entry",
-          label: "Gemini VI-A: entry and splashdown",
+          kind: 'entry',
+          label: 'Gemini VI-A: entry and splashdown',
           start: ENTRY_INTERFACE_6A,
           end: LANDING_6A,
           drogue: DROGUE_6A,
           // 14,000 meters, in nautical miles (our conversion).
-          drogueAltitude: cite(7.56, titans(291, '"deployed the drogue parachute at 14 000 meters"')),
+          drogueAltitude: cite(
+            7.56,
+            titans(291, '"deployed the drogue parachute at 14 000 meters"'),
+          ),
           splashdown: SPLASHDOWN_6A,
         },
       ],
@@ -827,11 +1249,23 @@ export const flight: FlightPlan = {
 };
 
 /** A launch vehicle point from Table 4.3-I (geodetic latitude; longitude printed west). */
-function ascentPoint(condition: string, secondsFromLiftoff: number, altitude: number, latitude: number, longitude: number): StateFix {
+function ascentPoint(
+  condition: string,
+  secondsFromLiftoff: number,
+  altitude: number,
+  latitude: number,
+  longitude: number,
+): StateFix {
   return {
-    time: { value: clockTime(secondsFromLiftoff), citations: [trajectory(condition, "Time from lift-off, sec")] },
-    altitude: cite(altitude, trajectory(condition, "Altitude, n. mi.")),
-    latitude: cite(latitude, trajectory(condition, "Geodetic latitude, deg North")),
-    longitude: cite(longitude, trajectory(condition, `Longitude, deg West (printed ${-longitude} west)`)),
+    time: {
+      value: clockTime(secondsFromLiftoff),
+      citations: [trajectory(condition, 'Time from lift-off, sec')],
+    },
+    altitude: cite(altitude, trajectory(condition, 'Altitude, n. mi.')),
+    latitude: cite(latitude, trajectory(condition, 'Geodetic latitude, deg North')),
+    longitude: cite(
+      longitude,
+      trajectory(condition, `Longitude, deg West (printed ${-longitude} west)`),
+    ),
   };
 }

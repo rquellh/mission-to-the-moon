@@ -5,8 +5,15 @@
  * clock). Each part's details have their own file beside its module.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { mountMission, navigation, screen, visitedMissions, within, type Frames } from '../test/test-utils.ts';
 import { copy } from '../content/copy.ts';
+import {
+  mountMission,
+  navigation,
+  screen,
+  visitedMissions,
+  within,
+  type Frames,
+} from '../test/test-utils.ts';
 
 describe('the mission interface', () => {
   describe('rendering', () => {
@@ -28,7 +35,9 @@ describe('the mission interface', () => {
 
       const list = screen.getByRole('dialog', { name: 'Mission to the Moon' });
       expect(list).toBeVisible();
-      expect(within(list).getByRole('heading', { level: 2, name: 'Mission to the Moon' })).toHaveFocus();
+      expect(
+        within(list).getByRole('heading', { level: 2, name: 'Mission to the Moon' }),
+      ).toHaveFocus();
       expect(document.title).toBe('Mission to the Moon');
     });
   });
@@ -52,7 +61,9 @@ describe('the mission interface', () => {
       await user.click(screen.getByRole('slider', { name: 'Mission time' }));
       await user.keyboard('{PageUp}');
 
-      expect(screen.getByRole('heading', { level: 3, name: 'First stage separates' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 3, name: 'First stage separates' }),
+      ).toBeInTheDocument();
     });
 
     it('pauses the clock while the mission list is open, and plays on when it closes', async () => {
@@ -91,8 +102,12 @@ describe('the mission interface', () => {
       frames.advance(3);
 
       expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('On the way…');
-      expect(screen.getByRole('heading', { level: 3, name: 'Burn toward the Moon' })).toBeInTheDocument();
-      expect(within(screen.getByRole('region', { name: 'Timeline' })).queryByText('02:44:16')).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 3, name: 'Burn toward the Moon' }),
+      ).toBeInTheDocument();
+      expect(
+        within(screen.getByRole('region', { name: 'Timeline' })).queryByText('02:44:16'),
+      ).not.toBeInTheDocument();
     });
 
     it('notes the visit on this device once, however often it starts', async () => {
@@ -125,13 +140,18 @@ describe('the mission interface', () => {
       expect(screen.getByText(copy.errors.noWebGL)).toBeVisible();
       expect(screen.queryByRole('button', { name: 'Earth' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument();
-      expect(screen.getByRole('dialog', { name: 'Mission to the Moon' })).toHaveAccessibleDescription(
+      expect(
+        screen.getByRole('dialog', { name: 'Mission to the Moon' }),
+      ).toHaveAccessibleDescription(
         /^Choose a flight and follow it, from liftoff to splashdown\. This browser can’t show the 3D view/,
       );
     });
 
     it('offers Reload when the 3D view may load next time', async () => {
-      const { user } = await mountMission('gemini-8', { no3D: { note: copy.errors.scene, offerReload: true }, start: 'explore' });
+      const { user } = await mountMission('gemini-8', {
+        no3D: { note: copy.errors.scene, offerReload: true },
+        start: 'explore',
+      });
 
       await user.click(screen.getByRole('button', { name: 'Reload' }));
 
@@ -154,10 +174,9 @@ describe('the mission interface', () => {
       await user.click(screen.getByRole('button', { name: 'Next event' }));
       settle(frames);
 
-      expect(screen.getByText('In orbit around Earth, 11 minutes after liftoff, day 1 of the flight.')).toHaveAttribute(
-        'aria-live',
-        'polite',
-      );
+      expect(
+        screen.getByText('In orbit around Earth, 11 minutes after liftoff, day 1 of the flight.'),
+      ).toHaveAttribute('aria-live', 'polite');
       expect(screen.queryByText(/^First stage separates,/)).not.toBeInTheDocument();
     });
 

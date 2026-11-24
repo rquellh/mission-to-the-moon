@@ -11,7 +11,10 @@ export interface NightSide {
  * side and the terminator. The floor is the surface color times `tint`
  * (linear), faded out across the terminator, so the day side is unchanged.
  */
-export function addNightSide(material: MeshLambertMaterial | MeshStandardMaterial, tint: Color): NightSide {
+export function addNightSide(
+  material: MeshLambertMaterial | MeshStandardMaterial,
+  tint: Color,
+): NightSide {
   const uniforms = {
     uNightSun: { value: new Vector3(1, 0, 0) },
     uNightTint: { value: tint.clone() },

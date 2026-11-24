@@ -42,7 +42,12 @@ export function sourcesCitedBy(bundle: MissionBundle): Set<string> {
       return;
     }
     // A citation is the only shape with both a source and a locator.
-    if ('source' in value && 'locator' in value && typeof value.source === 'string' && typeof value.locator === 'string') {
+    if (
+      'source' in value &&
+      'locator' in value &&
+      typeof value.source === 'string' &&
+      typeof value.locator === 'string'
+    ) {
       found.add(value.source);
     }
     const items: unknown[] = Object.values(value);

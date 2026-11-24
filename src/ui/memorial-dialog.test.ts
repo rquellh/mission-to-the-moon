@@ -5,11 +5,20 @@
  * (and whether) the answer comes.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { later, mountMission, navigation, screen, waitFor, within, type User } from '../test/test-utils.ts';
 import { loadMemorial } from '../content/missions/index.ts';
 import type { Memorial } from '../content/types.ts';
+import {
+  later,
+  mountMission,
+  navigation,
+  screen,
+  waitFor,
+  within,
+  type User,
+} from '../test/test-utils.ts';
 
-const openApollo1 = (user: User): Promise<void> => user.click(screen.getByRole('button', { name: 'Read about Apollo 1' }));
+const openApollo1 = (user: User): Promise<void> =>
+  user.click(screen.getByRole('button', { name: 'Read about Apollo 1' }));
 
 describe('the memorial page', () => {
   describe('loading', () => {
@@ -40,13 +49,23 @@ describe('the memorial page', () => {
 
       const page = screen.getByRole('dialog', { name: 'Apollo 1' });
       expect(await within(page).findByText('January 27, 1967')).toBeInTheDocument();
-      expect(within(page).getByRole('img', { name: /^Ed White, Gus Grissom, and Roger Chaffee/ })).toBeInTheDocument();
+      expect(
+        within(page).getByRole('img', { name: /^Ed White, Gus Grissom, and Roger Chaffee/ }),
+      ).toBeInTheDocument();
       expect(within(page).getByRole('heading', { level: 3, name: 'The crew' })).toBeInTheDocument();
       expect(within(page).getByText('Edward H. White II')).toBeInTheDocument();
       expect(within(page).getByText('Senior pilot')).toBeInTheDocument();
-      expect(within(page).getByRole('heading', { level: 3, name: 'What happened' })).toBeInTheDocument();
-      expect(within(page).getByRole('heading', { level: 3, name: 'How they are remembered' })).toBeInTheDocument();
-      expect(within(page).getByText(/^Apollo 1 was going to be the first Apollo flight with astronauts on board\./)).toBeInTheDocument();
+      expect(
+        within(page).getByRole('heading', { level: 3, name: 'What happened' }),
+      ).toBeInTheDocument();
+      expect(
+        within(page).getByRole('heading', { level: 3, name: 'How they are remembered' }),
+      ).toBeInTheDocument();
+      expect(
+        within(page).getByText(
+          /^Apollo 1 was going to be the first Apollo flight with astronauts on board\./,
+        ),
+      ).toBeInTheDocument();
       expect(within(page).getAllByText(/^Sources \(\d+\)$/).length).toBeGreaterThan(4);
     });
 
@@ -72,7 +91,11 @@ describe('the memorial page', () => {
       await openApollo1(user);
       const page = screen.getByRole('dialog', { name: 'Apollo 1' });
 
-      expect(await within(page).findByText('This page did not load. Check your connection and reload the page.')).toBeInTheDocument();
+      expect(
+        await within(page).findByText(
+          'This page did not load. Check your connection and reload the page.',
+        ),
+      ).toBeInTheDocument();
 
       await user.click(within(page).getByRole('button', { name: 'Reload' }));
 
@@ -108,7 +131,9 @@ describe('the memorial page', () => {
       const closedEarly = later<Memorial>();
       const openedAgain = later<Memorial>();
       const answers = [closedEarly, openedAgain];
-      const { user } = await mountMission('apollo-11', { loadMemorial: () => (answers.shift() ?? later<Memorial>()).promise });
+      const { user } = await mountMission('apollo-11', {
+        loadMemorial: () => (answers.shift() ?? later<Memorial>()).promise,
+      });
       await openApollo1(user);
       await user.click(screen.getByRole('button', { name: 'Close' }));
       await openApollo1(user);

@@ -1,3 +1,4 @@
+import type { FlightPlan } from '../../../sim/types.ts';
 /**
  * The Gemini IV flight plan: the published facts the flight path is built
  * from (see src/sim/types.ts for the format and units, and src/sim/ for how
@@ -85,18 +86,18 @@
  *   until the carrier lifted it aboard; its drift to the pickup point
  *   (section 6.3.2) is not drawn.
  */
-import type { Citation, Cited, ElapsedTime } from "../../types.ts";
-import type { FlightPlan } from "../../../sim/types.ts";
+import type { Citation, Cited, ElapsedTime } from '../../types.ts';
 
 /* ------------------------------------------------------------------ */
 /* Citation helpers.                                                   */
 /* ------------------------------------------------------------------ */
 
-const MISSION_REPORT = "https://ntrs.nasa.gov/api/citations/19670095754/downloads/19670095754.pdf";
+const MISSION_REPORT = 'https://ntrs.nasa.gov/api/citations/19670095754/downloads/19670095754.pdf';
 const GEMINI_8_REPORT =
-  "https://web.archive.org/web/20250908153858/https://www.nasa.gov/wp-content/uploads/static/history/alsj/43455667-Gemini-Program-Mission-Report-Gemini-Viii.pdf";
+  'https://web.archive.org/web/20250908153858/https://www.nasa.gov/wp-content/uploads/static/history/alsj/43455667-Gemini-Program-Mission-Report-Gemini-Viii.pdf';
 /** The Horizons query for each sky table, at the times below (printed by tools/sky.mjs). */
-const HORIZONS_TIMES = "&TLIST_TYPE=%27CAL%27&TLIST=%271965-06-03%2015:15:59.562%27,%271965-06-04%2013:15:59.562%27,%271965-06-06%2019:01:42.562%27,%271965-06-07%2016:56:00.562%27,%271965-06-07%2017:12:11.562%27";
+const HORIZONS_TIMES =
+  '&TLIST_TYPE=%27CAL%27&TLIST=%271965-06-03%2015:15:59.562%27,%271965-06-04%2013:15:59.562%27,%271965-06-06%2019:01:42.562%27,%271965-06-07%2016:56:00.562%27,%271965-06-07%2017:12:11.562%27';
 const HORIZONS_QUERY = (command: string, center: string, quantities: string): string =>
   `https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27${command}%27&CENTER=%27${center}%27&QUANTITIES=%27${quantities}%27&OBJ_DATA=%27NO%27&CSV_FORMAT=%27YES%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&ANG_FORMAT=%27DEG%27&TIME_TYPE=%27UT%27${HORIZONS_TIMES}`;
 
@@ -109,41 +110,47 @@ function at(elapsed: ElapsedTime, citation: Citation, ...more: Citation[]): Cite
 }
 
 function report(locator: string): Citation {
-  return { source: "gemini-4-mission-report", locator, url: MISSION_REPORT };
+  return { source: 'gemini-4-mission-report', locator, url: MISSION_REPORT };
 }
 
 /** Table 4-I, sequence of events, "Actual time, g.e.t." column. */
-const events = (row: string, page: "4-12 (PDF page 90)" | "4-13 (PDF page 91)"): Citation =>
+const events = (row: string, page: '4-12 (PDF page 90)' | '4-13 (PDF page 91)'): Citation =>
   report(`Table 4-I, "Sequence of Events" (page ${page}), "${row}" row, actual time`);
-const launchEvent = (row: string): Citation => events(row, "4-12 (PDF page 90)");
-const flightEvent = (row: string): Citation => events(row, "4-13 (PDF page 91)");
+const launchEvent = (row: string): Citation => events(row, '4-12 (PDF page 90)');
+const flightEvent = (row: string): Citation => events(row, '4-13 (PDF page 91)');
 /** Table 4-II, trajectory parameters, "Actual, Final" column. */
 const trajectory = (condition: string, row: string): Citation =>
-  report(`Table 4-II, "Comparison of Planned and Actual Trajectory Parameters" (page 4-14, PDF page 92), ${condition}, "${row}" row, actual final column`);
+  report(
+    `Table 4-II, "Comparison of Planned and Actual Trajectory Parameters" (page 4-14, PDF page 92), ${condition}, "${row}" row, actual final column`,
+  );
 /** Table 4-III, orbital elements, "Actual, Final" column. */
 const elements = (revolution: string, row: string): Citation =>
-  report(`Table 4-III, "Comparison of Orbital Elements" (page 4-15, PDF page 93), revolution ${revolution}, "${row}" row, actual final column`);
+  report(
+    `Table 4-III, "Comparison of Orbital Elements" (page 4-15, PDF page 93), revolution ${revolution}, "${row}" row, actual final column`,
+  );
 /** Table 4-IV, the station-keeping firings (times printed in minutes and seconds). */
-const stationKeeping = (page: "4-16 (PDF page 94)" | "4-17 (PDF page 95)", row: string): Citation =>
-  report(`Table 4-IV, "Detailed List of Maneuvers During Gemini IV Station-Keeping Attempt" (page ${page}), ${row}`);
+const stationKeeping = (page: '4-16 (PDF page 94)' | '4-17 (PDF page 95)', row: string): Citation =>
+  report(
+    `Table 4-IV, "Detailed List of Maneuvers During Gemini IV Station-Keeping Attempt" (page ${page}), ${row}`,
+  );
 const horizons = (target: string, quantity: string, time: string, url: string): Citation => ({
-  source: "jpl-horizons",
+  source: 'jpl-horizons',
   locator: `Observer table, ${target}, ${quantity}, ${time} UT`,
   url,
 });
-const MOON_FROM_EARTH = HORIZONS_QUERY("301", "500@399", "31");
-const EARTH_FROM_MOON = HORIZONS_QUERY("399", "500@301", "14");
-const SUN_FROM_EARTH = HORIZONS_QUERY("10", "500@399", "31");
+const MOON_FROM_EARTH = HORIZONS_QUERY('301', '500@399', '31');
+const EARTH_FROM_MOON = HORIZONS_QUERY('399', '500@301', '14');
+const SUN_FROM_EARTH = HORIZONS_QUERY('10', '500@399', '31');
 
 /** Seconds on the mission clock as "hhh:mm:ss.sss". */
 function clockTime(seconds: number): ElapsedTime {
   const total = Math.round(seconds * 1000) / 1000;
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total - hours * 3600) / 60);
-  const rest = (total - hours * 3600 - minutes * 60).toFixed(3).replace(/\.?0+$/, "");
-  const [whole = "0", fraction] = rest.split(".");
-  const secondsText = whole.padStart(2, "0") + (fraction ? `.${fraction}` : "");
-  return `${String(hours).padStart(3, "0")}:${String(minutes).padStart(2, "0")}:${secondsText}` as ElapsedTime;
+  const rest = (total - hours * 3600 - minutes * 60).toFixed(3).replace(/\.?0+$/, '');
+  const [whole = '0', fraction] = rest.split('.');
+  const secondsText = whole.padStart(2, '0') + (fraction ? `.${fraction}` : '');
+  return `${String(hours).padStart(3, '0')}:${String(minutes).padStart(2, '0')}:${secondsText}` as ElapsedTime;
 }
 
 /** A time the report prints in seconds from lift-off. */
@@ -160,51 +167,80 @@ function degrees(whole: number, minutes: number): number {
 /* Times on the mission clock.                                         */
 /* ------------------------------------------------------------------ */
 
-const LIFTOFF = at("000:00:00", launchEvent("Lift-off (pad disconnect separation) (15:15:59.562 G.m.t.)"));
+const LIFTOFF = at(
+  '000:00:00',
+  launchEvent('Lift-off (pad disconnect separation) (15:15:59.562 G.m.t.)'),
+);
 const INSERTION: Cited<ElapsedTime> = {
-  ...fromLiftoff(365.6, trajectory("spacecraft separation", "Time from lift-off, sec")),
-  discrepancy: "Table 4-I gives spacecraft separation as 365.55 seconds after lift-off. The orbit starts at Table 4-II's 365.6, the moment of its published state.",
+  ...fromLiftoff(365.6, trajectory('spacecraft separation', 'Time from lift-off, sec')),
+  discrepancy:
+    "Table 4-I gives spacecraft separation as 365.55 seconds after lift-off. The orbit starts at Table 4-II's 365.6, the moment of its published state.",
 };
 /** The first firing toward the stage (Table 4-IV prints 8:47.164, minutes and seconds). */
 const STATION_KEEPING_START = at(
-  "000:08:47.164",
-  stationKeeping("4-16 (PDF page 94)", 'first firing after separation, "Time (g.e.t.), min:sec" 8:47.164'),
+  '000:08:47.164',
+  stationKeeping(
+    '4-16 (PDF page 94)',
+    'first firing after separation, "Time (g.e.t.), min:sec" 8:47.164',
+  ),
 );
 /** The last firing (Table 4-IV prints 86:46.297, minutes and seconds) plus its 4.25 seconds (our sum). */
 const STATION_KEEPING_END = fromLiftoff(
   86 * 60 + 46.297 + 4.25,
-  stationKeeping("4-17 (PDF page 95)", 'last firing, "Time (g.e.t.), min:sec" 86:46.297 and "Length of burn, sec" 4.25'),
+  stationKeeping(
+    '4-17 (PDF page 95)',
+    'last firing, "Time (g.e.t.), min:sec" 86:46.297 and "Length of burn, sec" 4.25',
+  ),
 );
 const PRE_RETROFIRE = at(
-  "097:28:02",
-  flightEvent("Preretrofire maneuver initiate"),
-  report('Section 4.1, "Actual Mission" (page 4-4, PDF page 82): "In revolution 62 at 97:28:02 g.e.t., a preretrograde orbital attitude and maneuvers system (OAMS) maneuver was initiated"'),
+  '097:28:02',
+  flightEvent('Preretrofire maneuver initiate'),
+  report(
+    'Section 4.1, "Actual Mission" (page 4-4, PDF page 82): "In revolution 62 at 97:28:02 g.e.t., a preretrograde orbital attitude and maneuvers system (OAMS) maneuver was initiated"',
+  ),
 );
 const RETROFIRE: Cited<ElapsedTime> = {
   ...at(
-    "097:40:00.7",
-    report('Section 5.1.8.3, "Retrograde rocket system" (page 5-34, PDF page 150): "At 97:40:00.7 g.e.t. ignition of retrorocket number 1 occurred"'),
-    report('Change sheet, Change 1 of December 9, 1965 (PDF page 3), pen-and-ink change 11: "Change actual time of retrofire to 97:40:00.70 g.e.t."'),
+    '097:40:00.7',
+    report(
+      'Section 5.1.8.3, "Retrograde rocket system" (page 5-34, PDF page 150): "At 97:40:00.7 g.e.t. ignition of retrorocket number 1 occurred"',
+    ),
+    report(
+      'Change sheet, Change 1 of December 9, 1965 (PDF page 3), pen-and-ink change 11: "Change actual time of retrofire to 97:40:00.70 g.e.t."',
+    ),
   ),
-  discrepancy: "Table 4-I gives retrofire as 97:40:01, to the second. We follow the tenths of a second in section 5.1.8.3.",
+  discrepancy:
+    'Table 4-I gives retrofire as 97:40:01, to the second. We follow the tenths of a second in section 5.1.8.3.',
 };
 /** The last of the four retrorockets fired (the time it burned out is not printed). */
 const LAST_RETROROCKET = at(
-  "097:40:17.2",
-  report('Table 5.1-X, "Sequential Events" (page 5-60, PDF page 176), "Retrorocket no. 4 fire" 97:40:17.2'),
-  report('Section 5.1.8.3, "Retrograde rocket system" (page 5-34, PDF page 150): retrorocket number 1 was "followed by the remaining motors in the normal firing sequence"'),
+  '097:40:17.2',
+  report(
+    'Table 5.1-X, "Sequential Events" (page 5-60, PDF page 176), "Retrorocket no. 4 fire" 97:40:17.2',
+  ),
+  report(
+    'Section 5.1.8.3, "Retrograde rocket system" (page 5-34, PDF page 150): retrorocket number 1 was "followed by the remaining motors in the normal firing sequence"',
+  ),
 );
 const ENTRY_INTERFACE = at(
-  "097:42:31",
-  report('Table 5.1-IV, "Guidance and Control Summary Chart" - Concluded (page 5-55, PDF page 171), "400 000 feet" row, actual time'),
-  report('Section 4.1, "Actual Mission" (page 4-4, PDF page 82): the command pilot "held full-lift attitude for 21 seconds beyond the 400 000-foot altitude"; section 5.1.5.2.3 (page 5-18, PDF page 134): "a full-lift attitude was held until 97:42:52.5 g.e.t."'),
+  '097:42:31',
+  report(
+    'Table 5.1-IV, "Guidance and Control Summary Chart" - Concluded (page 5-55, PDF page 171), "400 000 feet" row, actual time',
+  ),
+  report(
+    'Section 4.1, "Actual Mission" (page 4-4, PDF page 82): the command pilot "held full-lift attitude for 21 seconds beyond the 400 000-foot altitude"; section 5.1.5.2.3 (page 5-18, PDF page 134): "a full-lift attitude was held until 97:42:52.5 g.e.t."',
+  ),
 );
-const LANDING = at("097:56:12", flightEvent("Landing"));
+const LANDING = at('097:56:12', flightEvent('Landing'));
 /** The end of the path: the carrier had the spacecraft on its deck. */
 const SPACECRAFT_ABOARD = at(
-  "100:12:00",
-  report('Section 6.3.2, "Location and Retrieval" (page 6-12, PDF page 247): "The U.S.S. Wasp was alongside the spacecraft at 100:05 g.e.t. and had the spacecraft on the deck 7 minutes later" (to the minute; seconds written as 00; the sum is ours)'),
-  report('Section 1.0, "Mission Summary" (page 1-1, PDF page 36): "the recovery of the spacecraft by the prime recovery ship, the aircraft carrier U.S.S. Wasp, ... at 2:28 p.m. e.s.t."'),
+  '100:12:00',
+  report(
+    'Section 6.3.2, "Location and Retrieval" (page 6-12, PDF page 247): "The U.S.S. Wasp was alongside the spacecraft at 100:05 g.e.t. and had the spacecraft on the deck 7 minutes later" (to the minute; seconds written as 00; the sum is ours)',
+  ),
+  report(
+    'Section 1.0, "Mission Summary" (page 1-1, PDF page 36): "the recovery of the spacecraft by the prime recovery ship, the aircraft carrier U.S.S. Wasp, ... at 2:28 p.m. e.s.t."',
+  ),
 );
 
 /* ------------------------------------------------------------------ */
@@ -219,22 +255,25 @@ const SPACECRAFT_ABOARD = at(
  * missions/gemini-8/flight.ts). Every crewed Gemini flew from this pad.
  */
 const PAD_19_ESTIMATE: [Citation, ...Citation[]] = [
-  report('Section 1.0, "Mission Summary" (page 1-1, PDF page 36): Gemini IV "was launched from Complex 19 at Cape Kennedy, Florida"'),
+  report(
+    'Section 1.0, "Mission Summary" (page 1-1, PDF page 36): Gemini IV "was launched from Complex 19 at Cape Kennedy, Florida"',
+  ),
   {
-    source: "gemini-8-mission-report",
+    source: 'gemini-8-mission-report',
     locator:
       'Section 1.0 (page 1-1): the spacecraft "was launched from Complex 19"; our estimate of where Complex 19 is, not a printed value: the point from which a great circle at the flight azimuth reaches the BECO point after the BECO range',
     url: GEMINI_8_REPORT,
   },
   {
-    source: "gemini-8-mission-report",
+    source: 'gemini-8-mission-report',
     locator:
       'Table 4.3-I, "Comparison of Planned and Actual Gemini Space Vehicle Trajectory Parameters" (pages 4-22 and 4-23), BECO, "Geodetic latitude, deg north; Longitude, deg west; Range, n. mi. (28.36 N, 79.61 W, 51.4)" row, actual final column',
     url: GEMINI_8_REPORT,
   },
   {
-    source: "gemini-8-mission-report",
-    locator: 'Section 4.1 (page 4-1): "the GLV was launched ... on a rendezvous launch azimuth of 99.9 degrees"',
+    source: 'gemini-8-mission-report',
+    locator:
+      'Section 4.1 (page 4-1): "the GLV was launched ... on a rendezvous launch azimuth of 99.9 degrees"',
     url: GEMINI_8_REPORT,
   },
 ];
@@ -248,79 +287,210 @@ const SPLASHDOWN = {
   latitude: {
     ...cite(
       degrees(27, 44),
-      trajectory("landing point", "Latitude, deg:min North (printed 27:44)"),
-      report('Section 4.1, "Actual Mission" (page 4-4, PDF page 82): "Landing occurred at 97:56:12 g.e.t. at 27:44 North latitude and 74:14 West longitude, as reported by the recovery ship"'),
+      trajectory('landing point', 'Latitude, deg:min North (printed 27:44)'),
+      report(
+        'Section 4.1, "Actual Mission" (page 4-4, PDF page 82): "Landing occurred at 97:56:12 g.e.t. at 27:44 North latitude and 74:14 West longitude, as reported by the recovery ship"',
+      ),
     ),
     discrepancy:
       "The mission report's summary (section 1.0, page 1-1) gives 27 degrees 44 minutes north, 74 degrees 11 minutes west, the same as the calculated landing position the carrier received (section 6.3.2, page 6-11), and NASA's Gemini IV page and NSSDCA give 27.73 N, 74.18 W, which matches it. We follow Table 4-II's final column and section 4.1: 27 degrees 44 minutes north, 74 degrees 14 minutes west. The report does not say whether this latitude is geodetic; we draw it as a map latitude.",
   },
   longitude: cite(
     -degrees(74, 14),
-    trajectory("landing point", "Longitude, deg:min West (printed 74:14)"),
-    report('Section 4.1, "Actual Mission" (page 4-4, PDF page 82): "27:44 North latitude and 74:14 West longitude, as reported by the recovery ship"'),
+    trajectory('landing point', 'Longitude, deg:min West (printed 74:14)'),
+    report(
+      'Section 4.1, "Actual Mission" (page 4-4, PDF page 82): "27:44 North latitude and 74:14 West longitude, as reported by the recovery ship"',
+    ),
   ),
 };
 
-const PROGRADE: Cited<"prograde"> = cite("prograde", trajectory("spacecraft separation", "Space-fixed heading angle, deg East of North (78.90)"));
+const PROGRADE: Cited<'prograde'> = cite(
+  'prograde',
+  trajectory('spacecraft separation', 'Space-fixed heading angle, deg East of North (78.90)'),
+);
 
 /* ------------------------------------------------------------------ */
 /* The plan.                                                           */
 /* ------------------------------------------------------------------ */
 
 export const flight: FlightPlan = {
-  missionId: "gemini-4",
+  missionId: 'gemini-4',
 
   // Five samples across the four days: lift-off, the return to the flight
   // plan, the computer failure, retrofire, and landing.
   sky: [
     {
       time: LIFTOFF,
-      moonEclipticLongitude: cite(124.5778996, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-06-03 15:15:59.562", MOON_FROM_EARTH)),
-      subLunarLongitude: cite(7.121872, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-06-03 15:15:59.562", EARTH_FROM_MOON)),
-      sunEclipticLongitude: cite(72.8150286, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-06-03 15:15:59.562", SUN_FROM_EARTH)),
+      moonEclipticLongitude: cite(
+        124.5778996,
+        horizons(
+          "Moon (301) from Earth's center",
+          'ObsEcLon',
+          '1965-06-03 15:15:59.562',
+          MOON_FROM_EARTH,
+        ),
+      ),
+      subLunarLongitude: cite(
+        7.121872,
+        horizons(
+          "Earth (399) from the Moon's center",
+          'ObsSub-LON',
+          '1965-06-03 15:15:59.562',
+          EARTH_FROM_MOON,
+        ),
+      ),
+      sunEclipticLongitude: cite(
+        72.8150286,
+        horizons(
+          "Sun (10) from Earth's center",
+          'ObsEcLon',
+          '1965-06-03 15:15:59.562',
+          SUN_FROM_EARTH,
+        ),
+      ),
     },
     {
       time: at(
-        "022:00:00",
-        report('Section 4.1, "Actual Mission" (page 4-3, PDF page 81): "The crew was instructed to return to the normal flight plan at 22 hours g.e.t." (given to the hour)'),
+        '022:00:00',
+        report(
+          'Section 4.1, "Actual Mission" (page 4-3, PDF page 81): "The crew was instructed to return to the normal flight plan at 22 hours g.e.t." (given to the hour)',
+        ),
       ),
-      moonEclipticLongitude: cite(137.9032298, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-06-04 13:15:59.562", MOON_FROM_EARTH)),
-      subLunarLongitude: cite(50.132268, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-06-04 13:15:59.562", EARTH_FROM_MOON)),
-      sunEclipticLongitude: cite(73.6929342, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-06-04 13:15:59.562", SUN_FROM_EARTH)),
+      moonEclipticLongitude: cite(
+        137.9032298,
+        horizons(
+          "Moon (301) from Earth's center",
+          'ObsEcLon',
+          '1965-06-04 13:15:59.562',
+          MOON_FROM_EARTH,
+        ),
+      ),
+      subLunarLongitude: cite(
+        50.132268,
+        horizons(
+          "Earth (399) from the Moon's center",
+          'ObsSub-LON',
+          '1965-06-04 13:15:59.562',
+          EARTH_FROM_MOON,
+        ),
+      ),
+      sunEclipticLongitude: cite(
+        73.6929342,
+        horizons(
+          "Sun (10) from Earth's center",
+          'ObsEcLon',
+          '1965-06-04 13:15:59.562',
+          SUN_FROM_EARTH,
+        ),
+      ),
     },
     {
       time: at(
-        "075:45:43",
-        report('Section 4.1, "Actual Mission" (page 4-3, PDF page 81): "At approximately 75:45:43 g.e.t., the command pilot had trouble turning off the computer"'),
+        '075:45:43',
+        report(
+          'Section 4.1, "Actual Mission" (page 4-3, PDF page 81): "At approximately 75:45:43 g.e.t., the command pilot had trouble turning off the computer"',
+        ),
       ),
-      moonEclipticLongitude: cite(169.5035609, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-06-06 19:01:42.562", MOON_FROM_EARTH)),
-      subLunarLongitude: cite(352.043667, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-06-06 19:01:42.562", EARTH_FROM_MOON)),
-      sunEclipticLongitude: cite(75.8370376, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-06-06 19:01:42.562", SUN_FROM_EARTH)),
+      moonEclipticLongitude: cite(
+        169.5035609,
+        horizons(
+          "Moon (301) from Earth's center",
+          'ObsEcLon',
+          '1965-06-06 19:01:42.562',
+          MOON_FROM_EARTH,
+        ),
+      ),
+      subLunarLongitude: cite(
+        352.043667,
+        horizons(
+          "Earth (399) from the Moon's center",
+          'ObsSub-LON',
+          '1965-06-06 19:01:42.562',
+          EARTH_FROM_MOON,
+        ),
+      ),
+      sunEclipticLongitude: cite(
+        75.8370376,
+        horizons(
+          "Sun (10) from Earth's center",
+          'ObsEcLon',
+          '1965-06-06 19:01:42.562',
+          SUN_FROM_EARTH,
+        ),
+      ),
     },
     {
-      time: at("097:40:01", flightEvent("Retrofire")),
-      moonEclipticLongitude: cite(181.9372164, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-06-07 16:56:00.562", MOON_FROM_EARTH)),
-      subLunarLongitude: cite(33.908719, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-06-07 16:56:00.562", EARTH_FROM_MOON)),
-      sunEclipticLongitude: cite(76.7101509, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-06-07 16:56:00.562", SUN_FROM_EARTH)),
+      time: at('097:40:01', flightEvent('Retrofire')),
+      moonEclipticLongitude: cite(
+        181.9372164,
+        horizons(
+          "Moon (301) from Earth's center",
+          'ObsEcLon',
+          '1965-06-07 16:56:00.562',
+          MOON_FROM_EARTH,
+        ),
+      ),
+      subLunarLongitude: cite(
+        33.908719,
+        horizons(
+          "Earth (399) from the Moon's center",
+          'ObsSub-LON',
+          '1965-06-07 16:56:00.562',
+          EARTH_FROM_MOON,
+        ),
+      ),
+      sunEclipticLongitude: cite(
+        76.7101509,
+        horizons(
+          "Sun (10) from Earth's center",
+          'ObsEcLon',
+          '1965-06-07 16:56:00.562',
+          SUN_FROM_EARTH,
+        ),
+      ),
     },
     {
       time: LANDING,
-      moonEclipticLongitude: cite(182.0887128, horizons("Moon (301) from Earth's center", "ObsEcLon", "1965-06-07 17:12:11.562", MOON_FROM_EARTH)),
-      subLunarLongitude: cite(29.988807, horizons("Earth (399) from the Moon's center", "ObsSub-LON", "1965-06-07 17:12:11.562", EARTH_FROM_MOON)),
-      sunEclipticLongitude: cite(76.7209001, horizons("Sun (10) from Earth's center", "ObsEcLon", "1965-06-07 17:12:11.562", SUN_FROM_EARTH)),
+      moonEclipticLongitude: cite(
+        182.0887128,
+        horizons(
+          "Moon (301) from Earth's center",
+          'ObsEcLon',
+          '1965-06-07 17:12:11.562',
+          MOON_FROM_EARTH,
+        ),
+      ),
+      subLunarLongitude: cite(
+        29.988807,
+        horizons(
+          "Earth (399) from the Moon's center",
+          'ObsSub-LON',
+          '1965-06-07 17:12:11.562',
+          EARTH_FROM_MOON,
+        ),
+      ),
+      sunEclipticLongitude: cite(
+        76.7209001,
+        horizons(
+          "Sun (10) from Earth's center",
+          'ObsEcLon',
+          '1965-06-07 17:12:11.562',
+          SUN_FROM_EARTH,
+        ),
+      ),
     },
   ],
 
   ships: [
     {
-      id: "gemini",
-      name: "Gemini IV spacecraft",
-      role: "main",
+      id: 'gemini',
+      name: 'Gemini IV spacecraft',
+      role: 'main',
       phases: [
         {
-          kind: "ascent",
-          label: "Launch",
-          body: "earth",
+          kind: 'ascent',
+          label: 'Launch',
+          body: 'earth',
           start: LIFTOFF,
           end: INSERTION,
           site: PAD_19,
@@ -340,85 +510,109 @@ export const flight: FlightPlan = {
           // to it.
         },
         {
-          kind: "orbit",
-          label: "Four days in orbit",
-          body: "earth",
+          kind: 'orbit',
+          label: 'Four days in orbit',
+          body: 'earth',
           start: INSERTION,
           end: RETROFIRE,
-          apoapsis: cite(152.2, elements("Insertion", "Apogee, n. mi.")),
-          periapsis: cite(87.6, elements("Insertion", "Perigee, n. mi.")),
-          inclination: cite(32.53, elements("Insertion", "Inclination, deg")),
+          apoapsis: cite(152.2, elements('Insertion', 'Apogee, n. mi.')),
+          periapsis: cite(87.6, elements('Insertion', 'Perigee, n. mi.')),
+          inclination: cite(32.53, elements('Insertion', 'Inclination, deg')),
           sense: PROGRADE,
           startFix: {
-            latitude: cite(30.97, trajectory("spacecraft separation", "Geodetic latitude, deg North")),
-            longitude: cite(-69.88, trajectory("spacecraft separation", "Longitude, deg West (printed 69.88 west)")),
-            altitude: cite(87.6, trajectory("spacecraft separation", "Altitude, n. mi.")),
-            speed: cite(25_743, trajectory("spacecraft separation", "Space-fixed velocity, ft/sec")),
-            flightPathAngle: cite(0.07, trajectory("spacecraft separation", "Space-fixed flight-path angle, deg")),
-            heading: cite(78.9, trajectory("spacecraft separation", "Space-fixed heading angle, deg East of North (printed 78.90)")),
+            latitude: cite(
+              30.97,
+              trajectory('spacecraft separation', 'Geodetic latitude, deg North'),
+            ),
+            longitude: cite(
+              -69.88,
+              trajectory('spacecraft separation', 'Longitude, deg West (printed 69.88 west)'),
+            ),
+            altitude: cite(87.6, trajectory('spacecraft separation', 'Altitude, n. mi.')),
+            speed: cite(
+              25_743,
+              trajectory('spacecraft separation', 'Space-fixed velocity, ft/sec'),
+            ),
+            flightPathAngle: cite(
+              0.07,
+              trajectory('spacecraft separation', 'Space-fixed flight-path angle, deg'),
+            ),
+            heading: cite(
+              78.9,
+              trajectory(
+                'spacecraft separation',
+                'Space-fixed heading angle, deg East of North (printed 78.90)',
+              ),
+            ),
           },
           sizes: [
             // The station-keeping attempt: the insertion orbit until the
             // first firing toward the stage, the raised orbit after the last.
             {
               time: STATION_KEEPING_START,
-              apoapsis: cite(152.2, elements("Insertion", "Apogee, n. mi.")),
-              periapsis: cite(87.6, elements("Insertion", "Perigee, n. mi.")),
+              apoapsis: cite(152.2, elements('Insertion', 'Apogee, n. mi.')),
+              periapsis: cite(87.6, elements('Insertion', 'Perigee, n. mi.')),
             },
             {
               time: STATION_KEEPING_END,
               apoapsis: cite(
                 159.9,
-                elements("2 (after station-keeping)", "Apogee, n. mi."),
-                report('Section 4.1, "Actual Mission" (page 4-2, PDF page 80): "Maneuvers performed up to this time had resulted in a 90.4 by 159.9 nautical-mile orbit"'),
+                elements('2 (after station-keeping)', 'Apogee, n. mi.'),
+                report(
+                  'Section 4.1, "Actual Mission" (page 4-2, PDF page 80): "Maneuvers performed up to this time had resulted in a 90.4 by 159.9 nautical-mile orbit"',
+                ),
               ),
-              periapsis: cite(90.4, elements("2 (after station-keeping)", "Perigee, n. mi.")),
+              periapsis: cite(90.4, elements('2 (after station-keeping)', 'Perigee, n. mi.')),
             },
             // Four days of slow decay, to the last revolution before the
             // pre-retrofire maneuver.
             {
               time: PRE_RETROFIRE,
-              apoapsis: cite(136.5, elements("61", "Apogee, n. mi.")),
-              periapsis: cite(86.1, elements("61", "Perigee, n. mi.")),
+              apoapsis: cite(136.5, elements('61', 'Apogee, n. mi.')),
+              periapsis: cite(86.1, elements('61', 'Perigee, n. mi.')),
             },
           ],
         },
         {
-          kind: "burn",
-          label: "Retrofire",
-          body: "earth",
+          kind: 'burn',
+          label: 'Retrofire',
+          body: 'earth',
           start: RETROFIRE,
           end: LAST_RETROROCKET,
           deltaV: cite(
             333.5,
-            report('Section 5.1.8.3, "Retrograde rocket system" (page 5-34, PDF page 150): "The actual imparted spacecraft velocity decrement of 333.5 ft/sec"'),
+            report(
+              'Section 5.1.8.3, "Retrograde rocket system" (page 5-34, PDF page 150): "The actual imparted spacecraft velocity decrement of 333.5 ft/sec"',
+            ),
           ),
         },
         {
-          kind: "coast",
-          label: "Falling toward the atmosphere",
-          body: "earth",
+          kind: 'coast',
+          label: 'Falling toward the atmosphere',
+          body: 'earth',
           start: LAST_RETROROCKET,
           end: ENTRY_INTERFACE,
           sense: PROGRADE,
         },
         {
-          kind: "entry",
-          label: "Entry and splashdown",
+          kind: 'entry',
+          label: 'Entry and splashdown',
           start: ENTRY_INTERFACE,
           end: LANDING,
-          drogue: at("097:50:53", flightEvent("Drogue deployment")),
+          drogue: at('097:50:53', flightEvent('Drogue deployment')),
           // 40,000 feet, in nautical miles (our conversion).
           drogueAltitude: cite(
             6.58,
-            report('Section 5.1.11, "Landing System" (page 5-47, PDF page 163): "the drogue parachute was deployed at an altitude of 40 000 feet instead of the normal altitude of 50 000 feet"'),
+            report(
+              'Section 5.1.11, "Landing System" (page 5-47, PDF page 163): "the drogue parachute was deployed at an altitude of 40 000 feet instead of the normal altitude of 50 000 feet"',
+            ),
           ),
           splashdown: SPLASHDOWN,
         },
         {
-          kind: "surface",
-          label: "Floating until the carrier lifts it aboard",
-          body: "earth",
+          kind: 'surface',
+          label: 'Floating until the carrier lifts it aboard',
+          body: 'earth',
           start: LANDING,
           end: SPACECRAFT_ABOARD,
           site: SPLASHDOWN,
@@ -427,4 +621,3 @@ export const flight: FlightPlan = {
     },
   ],
 };
-

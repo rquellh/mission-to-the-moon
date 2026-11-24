@@ -5,14 +5,20 @@
 import { describe, expect, it } from 'vitest';
 import { mountMission, screen, within } from '../test/test-utils.ts';
 
-const viewButtons = (): HTMLElement[] => within(screen.getByRole('group', { name: 'Look at' })).getAllByRole('button');
+const viewButtons = (): HTMLElement[] =>
+  within(screen.getByRole('group', { name: 'Look at' })).getAllByRole('button');
 
 describe('the view controls', () => {
   describe('rendering', () => {
     it('offers Earth, Moon, Ship, and Both on a flight to the Moon', async () => {
       await mountMission('apollo-17', { start: 'explore' });
 
-      expect(viewButtons().map((button) => button.textContent)).toEqual(['Earth', 'Moon', 'Ship', 'Both']);
+      expect(viewButtons().map((button) => button.textContent)).toEqual([
+        'Earth',
+        'Moon',
+        'Ship',
+        'Both',
+      ]);
     });
 
     it('offers Earth and Ship on a flight that stayed in Earth orbit', async () => {
@@ -64,7 +70,9 @@ describe('the view controls', () => {
 
       expect(director.scaleMode).toBe('true');
       expect(toggle).toHaveAttribute('aria-pressed', 'true');
-      expect(screen.getByText('True scale: the Moon is about 30 Earth-widths away')).toBeInTheDocument();
+      expect(
+        screen.getByText('True scale: the Moon is about 30 Earth-widths away'),
+      ).toBeInTheDocument();
     });
 
     it('switches an Earth-orbit flight to true scale and back', async () => {

@@ -21,9 +21,21 @@ import type { StoryMap } from '../app/contract.ts';
 import { outlineOf, sourcesCitedBy } from '../app/outline.ts';
 import { MissionPlayer } from '../app/player.ts';
 import { homeView, nearestView } from '../app/views.ts';
-import { isReady, loadBundle, loadMemorial, summaries, summaryFor } from '../content/missions/index.ts';
 import type { MissionBundle } from '../content/missions/bundle.ts';
-import { elapsedToSeconds, type AudioClip, type Memorial, type Mission, type MissionSummary } from '../content/types.ts';
+import {
+  isReady,
+  loadBundle,
+  loadMemorial,
+  summaries,
+  summaryFor,
+} from '../content/missions/index.ts';
+import {
+  elapsedToSeconds,
+  type AudioClip,
+  type Memorial,
+  type Mission,
+  type MissionSummary,
+} from '../content/types.ts';
 import { extraFor, extras, isExtraReady } from '../extras/index.ts';
 import type { Extra } from '../extras/types.ts';
 import { buildFlightPath, createStoryTime } from '../sim/index.ts';
@@ -98,7 +110,12 @@ function prepare(id: string): Promise<Prepared> {
         toStory: (seconds) => storyTime.toStory(seconds),
         toElapsed: (seconds) => storyTime.toMission(seconds),
       };
-      return { bundle, story, start: keys[0] ?? path.start, end: keys[keys.length - 1] ?? path.end };
+      return {
+        bundle,
+        story,
+        start: keys[0] ?? path.start,
+        end: keys[keys.length - 1] ?? path.end,
+      };
     });
     prepared.set(id, ready);
   }
@@ -125,14 +142,19 @@ function addressOf(id: string): string {
 
 function makeUser(): User {
   // With fake timers on, the visitor's pauses between keys move them along.
-  return userEvent.setup({ advanceTimers: (ms) => (vi.isFakeTimers() ? void vi.advanceTimersByTime(ms) : undefined) });
+  return userEvent.setup({
+    advanceTimers: (ms) => (vi.isFakeTimers() ? void vi.advanceTimersByTime(ms) : undefined),
+  });
 }
 
 /**
  * Mount the whole interface for a real mission, the way the site does, and
  * begin as `options.start` asks.
  */
-export async function mountMission(id: string, options: MountOptions = {}): Promise<MountedMission> {
+export async function mountMission(
+  id: string,
+  options: MountOptions = {},
+): Promise<MountedMission> {
   const { bundle, story, start, end } = await prepare(id);
   const mission = options.story ? options.story(bundle.mission) : bundle.mission;
   setScreen({ wide: options.wide ?? false });
@@ -140,10 +162,14 @@ export async function mountMission(id: string, options: MountOptions = {}): Prom
 
   const frames = fakeFrames();
   const player = new MissionPlayer(start, end, story, frames.now);
-  const atEvent = options.event ? mission.events.find((event) => event.id === options.event) : undefined;
+  const atEvent = options.event
+    ? mission.events.find((event) => event.id === options.event)
+    : undefined;
   if (options.event && !atEvent) throw new Error(`${mission.name} has no event "${options.event}"`);
   if (atEvent) player.seek(elapsedToSeconds(atEvent.elapsed));
-  const director = new FakeDirector(atEvent ? nearestView(mission, atEvent.view) : homeView(mission));
+  const director = new FakeDirector(
+    atEvent ? nearestView(mission, atEvent.view) : homeView(mission),
+  );
 
   const interfaceOptions: InterfaceOptions = {
     mission,
@@ -162,7 +188,9 @@ export async function mountMission(id: string, options: MountOptions = {}): Prom
       options.loadExtra ??
       ((extraId) => {
         const meta = extraFor(extraId);
-        return meta ? Promise.resolve(standInExtra(meta)) : Promise.reject(new Error(`There is no extra "${extraId}"`));
+        return meta
+          ? Promise.resolve(standInExtra(meta))
+          : Promise.reject(new Error(`There is no extra "${extraId}"`));
       }),
     player,
     director,
@@ -206,6 +234,7 @@ export function visitedMissions(): VisitedMissions | undefined {
   const raw = window.localStorage.getItem('mission-to-the-moon/site/visited-missions');
   if (raw === null) return undefined;
   const stored: unknown = JSON.parse(raw);
-  if (Array.isArray(stored) && stored.every((id): id is string => typeof id === 'string')) return stored;
+  if (Array.isArray(stored) && stored.every((id): id is string => typeof id === 'string'))
+    return stored;
   throw new Error(`The visited missions are stored as ${raw}, which is not a list of mission ids`);
 }

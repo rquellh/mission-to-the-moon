@@ -25,7 +25,10 @@ export function fillPhoto(figure: HTMLElement, photo: Photo): void {
     figure.hidden = true;
   });
   const caption = el('figcaption', 'card__credit');
-  caption.append(`${copy.card.photoCredit} ${photo.credit}. `, externalLink(photo.sourceUrl, copy.card.original));
+  caption.append(
+    `${copy.card.photoCredit} ${photo.credit}. `,
+    externalLink(photo.sourceUrl, copy.card.original),
+  );
   figure.replaceChildren(image, caption);
   figure.hidden = false;
 }

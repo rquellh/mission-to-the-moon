@@ -12,9 +12,9 @@ import {
   EARTH_FLATTENING,
   EARTH_MEAN_RADIUS_KM,
   MOON_RADIUS,
-} from "../../content/physical-constants.ts";
-import { elapsedToSeconds } from "../../content/types.ts";
-import type { Fix, FlightPath, FlightPlan, Phase } from "../types.ts";
+} from '../../content/physical-constants.ts';
+import { elapsedToSeconds } from '../../content/types.ts';
+import type { Fix, FlightPath, FlightPlan, Phase } from '../types.ts';
 
 const DEG = Math.PI / 180;
 const MIXES = [0, 0.37, 1];
@@ -44,7 +44,7 @@ function pos(path: FlightPath, ship: string, t: number, mix: number): number[] {
 /** Map (geodetic) latitude of an Earth fix, degrees. */
 function mapLatitude(fix: Fix): number {
   const lat = fix.latitude.value;
-  if (fix.latitudeKind !== "geocentric") return lat;
+  if (fix.latitudeKind !== 'geocentric') return lat;
   return Math.atan(Math.tan(lat * DEG) / (1 - EARTH_FLATTENING) ** 2) / DEG;
 }
 
@@ -52,15 +52,28 @@ function mapLatitude(fix: Fix): number {
  * Where a point on Earth's drawn surface is in the scene at t, from the
  * documented globe convention only (see flight-path.test.ts).
  */
-export function earthSurfacePoint(path: FlightPath, latDeg: number, lonDeg: number, t: number): number[] {
+export function earthSurfacePoint(
+  path: FlightPath,
+  latDeg: number,
+  lonDeg: number,
+  t: number,
+): number[] {
   const lat = latDeg * DEG;
   const lon = lonDeg * DEG;
   const local = [Math.cos(lat) * Math.cos(lon), Math.sin(lat), -Math.cos(lat) * Math.sin(lon)];
-  return rotY(rotX(rotY(local, path.earthSpinAngle(t)), -EARTH_AXIAL_TILT_RAD), path.earthAxisAngle(t));
+  return rotY(
+    rotX(rotY(local, path.earthSpinAngle(t)), -EARTH_AXIAL_TILT_RAD),
+    path.earthAxisAngle(t),
+  );
 }
 
 /** A point on the Moon's surface at scale mix `mix`, per src/scene/moon.ts. */
-export function moonSurfacePoint(path: FlightPath, latDeg: number, lonDeg: number, mix: number): number[] {
+export function moonSurfacePoint(
+  path: FlightPath,
+  latDeg: number,
+  lonDeg: number,
+  mix: number,
+): number[] {
   const lat = latDeg * DEG;
   const lon = lonDeg * DEG;
   const c = [0, 0, 0];
@@ -83,20 +96,29 @@ export function phaseProblems(plan: FlightPlan, path: FlightPath): string[] {
     }
     const first = elapsedToSeconds(ship.phases[0].start.value);
     const last = elapsedToSeconds(ship.phases[ship.phases.length - 1]!.end.value);
-    if (track.start !== first || track.end !== last) problems.push(`${ship.id}: path runs ${track.start} to ${track.end}, plan ${first} to ${last}`);
+    if (track.start !== first || track.end !== last)
+      problems.push(
+        `${ship.id}: path runs ${track.start} to ${track.end}, plan ${first} to ${last}`,
+      );
     ship.phases.forEach((phase, i) => {
       const t0 = elapsedToSeconds(phase.start.value);
       const t1 = elapsedToSeconds(phase.end.value);
       if (!(t1 > t0)) problems.push(`${ship.id} ${phase.label}: ends before it starts`);
       if (i > 0 && t0 !== elapsedToSeconds(ship.phases[i - 1]!.end.value)) {
-        problems.push(`${ship.id} ${phase.label}: starts at ${phase.start.value}, not where the previous phase ends`);
+        problems.push(
+          `${ship.id} ${phase.label}: starts at ${phase.start.value}, not where the previous phase ends`,
+        );
       }
-      if (path.phaseAt(ship.id, t0) !== phase) problems.push(`${ship.id} ${phase.label}: not reported at its start ${phase.start.value}`);
-      if (path.phaseAt(ship.id, t0 + (t1 - t0) * 0.999) !== phase) problems.push(`${ship.id} ${phase.label}: not reported before its end ${phase.end.value}`);
+      if (path.phaseAt(ship.id, t0) !== phase)
+        problems.push(`${ship.id} ${phase.label}: not reported at its start ${phase.start.value}`);
+      if (path.phaseAt(ship.id, t0 + (t1 - t0) * 0.999) !== phase)
+        problems.push(`${ship.id} ${phase.label}: not reported before its end ${phase.end.value}`);
     });
   }
-  if (path.start !== Math.min(...path.ships.map((s) => s.start))) problems.push("path start is not the first ship's start");
-  if (path.end !== Math.max(...path.ships.map((s) => s.end))) problems.push("path end is not the last ship's end");
+  if (path.start !== Math.min(...path.ships.map((s) => s.start)))
+    problems.push("path start is not the first ship's start");
+  if (path.end !== Math.max(...path.ships.map((s) => s.end)))
+    problems.push("path end is not the last ship's end");
   return problems;
 }
 
@@ -105,10 +127,10 @@ export function phaseProblems(plan: FlightPlan, path: FlightPath): string[] {
  * Elsewhere the path must be smooth.
  */
 function smoothAcross(prev: Phase, next: Phase): boolean {
-  const kinks: Phase["kind"][] = ["burn", "surface", "entry"];
+  const kinks: Phase['kind'][] = ['burn', 'surface', 'entry'];
   if (kinks.includes(prev.kind) || kinks.includes(next.kind)) return false;
   // Undocking and leaving station: a separation thrust.
-  return prev.kind !== "docked" && prev.kind !== "station";
+  return prev.kind !== 'docked' && prev.kind !== 'station';
 }
 
 /** No jumps in position anywhere, and no kinks in velocity where nothing fires. */
@@ -120,7 +142,10 @@ export function continuityProblems(plan: FlightPlan, path: FlightPath): string[]
       const t = elapsedToSeconds(phase.start.value);
       for (const mix of MIXES) {
         const gap = dist(pos(path, ship.id, t - 1e-3, mix), pos(path, ship.id, t + 1e-3, mix));
-        if (!(gap < 1e-4)) problems.push(`${ship.id} jumps ${gap.toExponential(2)} Earth radii at ${phase.start.value} (${phase.label}), mix ${mix}`);
+        if (!(gap < 1e-4))
+          problems.push(
+            `${ship.id} jumps ${gap.toExponential(2)} Earth radii at ${phase.start.value} (${phase.label}), mix ${mix}`,
+          );
       }
       if (!smoothAcross(ship.phases[i - 1]!, phase)) return;
       const h = 2;
@@ -130,7 +155,10 @@ export function continuityProblems(plan: FlightPlan, path: FlightPath): string[]
       const v1 = [0, 1, 2].map((k) => (b[k]! - a[k]!) / h);
       const v2 = [0, 1, 2].map((k) => (c[k]! - b[k]!) / h);
       const jump = dist(v1, v2) / Math.max(Math.hypot(...v1), 1e-9);
-      if (!(jump < 0.02)) problems.push(`${ship.id} velocity changes by ${(jump * 100).toFixed(2)}% at ${phase.start.value} (${phase.label})`);
+      if (!(jump < 0.02))
+        problems.push(
+          `${ship.id} velocity changes by ${(jump * 100).toFixed(2)}% at ${phase.start.value} (${phase.label})`,
+        );
     });
   }
   // Every position is a number, at every scale.
@@ -163,11 +191,15 @@ export function surfaceProblems(plan: FlightPlan, path: FlightPath, toleranceKm 
     const dE = Math.hypot(p[0]!, p[1]!, p[2]!);
     const dM = dist(p, moon);
     if (dE < 1 - tol) {
-      problems.push(`${ship} is ${((1 - dE) * EARTH_MEAN_RADIUS_KM).toFixed(1)} km below Earth's surface at ${t.toFixed(1)} s (${path.phaseAt(ship, t)?.label})`);
+      problems.push(
+        `${ship} is ${((1 - dE) * EARTH_MEAN_RADIUS_KM).toFixed(1)} km below Earth's surface at ${t.toFixed(1)} s (${path.phaseAt(ship, t)?.label})`,
+      );
       return false;
     }
     if (dM < MOON_RADIUS - tol) {
-      problems.push(`${ship} is ${((MOON_RADIUS - dM) * EARTH_MEAN_RADIUS_KM).toFixed(1)} km below the Moon's surface at ${t.toFixed(1)} s (${path.phaseAt(ship, t)?.label})`);
+      problems.push(
+        `${ship} is ${((MOON_RADIUS - dM) * EARTH_MEAN_RADIUS_KM).toFixed(1)} km below the Moon's surface at ${t.toFixed(1)} s (${path.phaseAt(ship, t)?.label})`,
+      );
       return false;
     }
     return true;
@@ -176,7 +208,10 @@ export function surfaceProblems(plan: FlightPlan, path: FlightPath, toleranceKm 
     const line = path.polyline(ship.id);
     if (!line) continue;
     for (let i = 0; i < line.times.length; i++) {
-      if (!check(ship.id, line.times[i]!, Array.from(line.truePositions.subarray(3 * i, 3 * i + 3)))) break;
+      if (
+        !check(ship.id, line.times[i]!, Array.from(line.truePositions.subarray(3 * i, 3 * i + 3)))
+      )
+        break;
     }
     for (const phase of ship.phases) {
       const t0 = elapsedToSeconds(phase.start.value);
@@ -201,20 +236,38 @@ export function endProblems(plan: FlightPlan, path: FlightPath): string[] {
     for (const mix of MIXES) {
       const p = pos(path, ship.id, t, mix);
       let expected: number[] | undefined;
-      if (last.kind === "entry") expected = earthSurfacePoint(path, mapLatitude(last.splashdown), last.splashdown.longitude.value, t);
-      else if (last.kind === "surface" && last.body === "earth") expected = earthSurfacePoint(path, mapLatitude(last.site), last.site.longitude.value, t);
-      else if (last.kind === "surface") expected = moonSurfacePoint(path, last.site.latitude.value, last.site.longitude.value, mix);
+      if (last.kind === 'entry')
+        expected = earthSurfacePoint(
+          path,
+          mapLatitude(last.splashdown),
+          last.splashdown.longitude.value,
+          t,
+        );
+      else if (last.kind === 'surface' && last.body === 'earth')
+        expected = earthSurfacePoint(path, mapLatitude(last.site), last.site.longitude.value, t);
+      else if (last.kind === 'surface')
+        expected = moonSurfacePoint(path, last.site.latitude.value, last.site.longitude.value, mix);
       if (expected && !(dist(p, expected) < 1e-7)) {
-        problems.push(`${ship.id} ends ${(dist(p, expected) * EARTH_MEAN_RADIUS_KM).toFixed(3)} km from its published end point (${last.label}), mix ${mix}`);
+        problems.push(
+          `${ship.id} ends ${(dist(p, expected) * EARTH_MEAN_RADIUS_KM).toFixed(3)} km from its published end point (${last.label}), mix ${mix}`,
+        );
       }
     }
     // A splashdown followed by floating: the entry ends at the splashdown point too.
     ship.phases.forEach((phase) => {
-      if (phase.kind !== "entry") return;
+      if (phase.kind !== 'entry') return;
       const te = elapsedToSeconds(phase.end.value);
       const p = pos(path, ship.id, te, 1);
-      const expected = earthSurfacePoint(path, mapLatitude(phase.splashdown), phase.splashdown.longitude.value, te);
-      if (!(dist(p, expected) < 1e-7)) problems.push(`${ship.id} splashes down ${(dist(p, expected) * EARTH_MEAN_RADIUS_KM).toFixed(3)} km from the published point`);
+      const expected = earthSurfacePoint(
+        path,
+        mapLatitude(phase.splashdown),
+        phase.splashdown.longitude.value,
+        te,
+      );
+      if (!(dist(p, expected) < 1e-7))
+        problems.push(
+          `${ship.id} splashes down ${(dist(p, expected) * EARTH_MEAN_RADIUS_KM).toFixed(3)} km from the published point`,
+        );
     });
   }
   return problems;
@@ -236,7 +289,8 @@ export function stretchProblems(plan: FlightPlan, path: FlightPath, factor = 3):
     const track = path.ships.find((s) => s.id === ship.id);
     if (!track) continue;
     for (const mix of [0, 1]) {
-      const speed = (a: number, b: number) => dist(pos(path, ship.id, a, mix), pos(path, ship.id, b, mix)) / (b - a);
+      const speed = (a: number, b: number) =>
+        dist(pos(path, ship.id, a, mix), pos(path, ship.id, b, mix)) / (b - a);
       for (const phase of ship.phases) {
         const t0 = elapsedToSeconds(phase.start.value);
         const t1 = elapsedToSeconds(phase.end.value);
@@ -253,7 +307,7 @@ export function stretchProblems(plan: FlightPlan, path: FlightPath, factor = 3):
         const allowed = factor * Math.max(before, after) * (t1 - t0) + 1e-6;
         if (traveled > allowed) {
           problems.push(
-            `${ship.id} travels ${(traveled / allowed * factor).toFixed(1)} times as far as its speed allows in ${phase.label} (${phase.start.value} to ${phase.end.value}), mix ${mix}`,
+            `${ship.id} travels ${((traveled / allowed) * factor).toFixed(1)} times as far as its speed allows in ${phase.label} (${phase.start.value} to ${phase.end.value}), mix ${mix}`,
           );
         }
       }

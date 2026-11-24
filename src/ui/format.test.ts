@@ -25,7 +25,10 @@ const HOUR = 3600;
 /** Apollo 11's story, launched on New Year's Eve 1968 for two days: no real flight crossed a new year. */
 const acrossTheNewYear: Mission = {
   ...apollo11,
-  launch: { ...apollo11.launch!, value: { ...apollo11.launch!.value, utc: '1968-12-31T12:00:00Z' } },
+  launch: {
+    ...apollo11.launch!,
+    value: { ...apollo11.launch!.value, utc: '1968-12-31T12:00:00Z' },
+  },
   duration: { ...apollo11.duration!, value: '048:00:00' },
 };
 

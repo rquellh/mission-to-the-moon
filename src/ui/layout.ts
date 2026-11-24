@@ -23,7 +23,10 @@ function isShown(element: HTMLElement): boolean {
  * whenever a part changes size, appears, or disappears, or the window
  * changes. The 3D view fills the window, so the window is the reference.
  */
-export function watchViewInsets(parts: readonly CoveringPart[], onChange: (insets: ViewInsets) => void): () => void {
+export function watchViewInsets(
+  parts: readonly CoveringPart[],
+  onChange: (insets: ViewInsets) => void,
+): () => void {
   const wide = wideLayoutQuery();
   let last = '';
   let frame: number | null = null;

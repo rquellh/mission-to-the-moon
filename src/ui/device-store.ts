@@ -35,7 +35,9 @@ const SITE_KEYS = new Set(['visited-missions']);
 /** Note that a mission's tour or exploring has started: its id joins "visited-missions", oldest first, once. */
 export function recordVisit(missionId: string): void {
   const stored = read<unknown>('site/visited-missions');
-  const ids = Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : [];
+  const ids = Array.isArray(stored)
+    ? stored.filter((id): id is string => typeof id === 'string')
+    : [];
   if (ids.includes(missionId)) return;
   write('site/visited-missions', [...new Set(ids), missionId]);
 }
@@ -48,7 +50,8 @@ export function extraStore(extraId: string): ExtraContext['store'] {
     },
     set(key: string, value: unknown): void {
       if (SITE_KEYS.has(key)) {
-        if (import.meta.env.DEV) console.warn(`"${key}" is kept by the site; extras can read it but not change it.`);
+        if (import.meta.env.DEV)
+          console.warn(`"${key}" is kept by the site; extras can read it but not change it.`);
         return;
       }
       write(`extras/${extraId}/${key}`, value);
