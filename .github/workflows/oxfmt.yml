@@ -15,10 +15,13 @@ concurrency:
 
 jobs:
   # This job changes no file. It fails when a file is not in the project's
-  # format, and `npm run format` fixes that. deploy.yml calls this job and waits
-  # for it, so an unformatted file stops the publish. The rule on the repository
-  # that guards main names only `vitest` and `playwright`; add the check name
-  # `oxfmt` there to make an unformatted file stop a merge as well.
+  # format, and `npm run format` fixes that.
+  #
+  # A rule on the repository requires this job, by the name `oxfmt`, before
+  # anything merges into main. Rename it and every pull request waits forever
+  # on a check that never reports; change the rule's check name with it.
+  # deploy.yml calls this job too and waits for it, so an unformatted file
+  # stops the publish as well as the merge.
   oxfmt:
     runs-on: ubuntu-latest
     steps:

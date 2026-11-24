@@ -43,7 +43,7 @@ The site uses relative paths, so `dist/` works from any subpath. Each mission, a
 
 A pull request runs four workflows from `.github/workflows/` side by side: `oxlint.yml` lints the code, `oxfmt.yml` checks the format, `vitest.yml` runs the content, flight math, and interface tests, and `playwright.yml` builds the site and runs the browser tests against the build. It publishes nothing. Pushing to `main` runs `deploy.yml`, which runs all four again, builds the site, and publishes it to GitHub Pages only if all four pass (turn on Pages with "GitHub Actions" as the source in the repository settings).
 
-`main` is protected: a repository rule (Settings → Rules) requires the `vitest` and `playwright` checks to pass before a commit reaches `main`, so changes go through a pull request and a direct push of untested work is turned away. The `oxlint` and `oxfmt` checks are not in that rule, so a lint error or an unformatted file stops the publish but not the merge.
+`main` is protected: a repository rule (Settings → Rules) requires all four checks (`oxlint`, `oxfmt`, `vitest`, and `playwright`) to pass before a commit reaches `main`, so changes go through a pull request and a direct push of unchecked work is turned away. A lint error or an unformatted file stops the merge, the same as a failing test.
 
 ## Tests
 
