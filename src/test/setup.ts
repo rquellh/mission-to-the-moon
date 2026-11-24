@@ -3,9 +3,10 @@
  *
  * - Adds the jest-dom matchers (toBeInTheDocument, toBeVisible, toHaveAccessibleName, ...).
  * - Fills in the browser features jsdom lacks (src/test/browser.ts).
- * - After each test: closes any open dialog (so the page can tidy up), empties
- *   the page and the device's storage, puts the screen, sound, and address
- *   back, and undoes every stub and spy. Each test starts from a fresh page.
+ * - After each test: closes any open dialog (so the page can tidy up), stops
+ *   the timers the page left waiting, empties the page and the device's
+ *   storage, puts the screen, sound, and address back, and undoes every stub
+ *   and spy. Each test starts from a fresh page.
  */
 import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
