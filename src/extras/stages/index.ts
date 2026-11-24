@@ -600,8 +600,9 @@ function frameLoop(callback: (dt: number) => void): () => void {
   const step = (now: number): void => {
     const dt = last === null ? 0 : Math.min(0.1, (now - last) / 1000);
     last = now;
-    callback(dt);
+    // The next frame is asked for first, so a callback that stops the loop (the climb is over) cancels it.
     frame = requestAnimationFrame(step);
+    callback(dt);
   };
   frame = requestAnimationFrame(step);
   return () => cancelAnimationFrame(frame);

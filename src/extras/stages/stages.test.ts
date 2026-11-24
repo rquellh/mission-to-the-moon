@@ -106,5 +106,22 @@ describe('drop the stages', () => {
       expect(within(theSheet()).getByRole('button', { name: 'Drop it' })).toHaveFocus();
       expect(within(theSheet()).queryByRole('region', { name: 'Up next' })).not.toBeInTheDocument();
     });
+
+    it('leaves the result as the visitor has it while the screen keeps drawing', async () => {
+      const { user, frames } = await mountMission('apollo-11', { event: 'liftoff', loadExtra });
+      await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
+      const next = await climbToOrbit(user, frames);
+      await user.click(within(next).getByRole('button', { name: 'More to explore' }));
+
+      frames.advance(1);
+
+      expect(within(theSheet()).getByRole('button', { name: 'Try another rocket' })).toBeVisible();
+      expect(
+        within(theSheet()).getByRole('heading', {
+          level: 3,
+          name: 'Pick up Apollo 11 after liftoff',
+        }),
+      ).toHaveFocus();
+    });
   });
 });
