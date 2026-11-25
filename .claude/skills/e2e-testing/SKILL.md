@@ -503,7 +503,7 @@ test.describe('Deep links', () => {
 **A wait that is long by design** gets `test.slow()` and its own timeout on that one assertion, with a comment saying why:
 
 ```typescript
-// A trip takes 5 to 14 seconds, and longer on a busy machine drawing in software.
+// A trip takes 5 to 15 seconds, and longer on a busy machine drawing in software.
 test.slow();
 ...
 await expect(tourPage.panel).toHaveAttribute('data-phase', 'stopped', { timeout: 45_000 });

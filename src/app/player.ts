@@ -23,6 +23,20 @@ const TRIP_MAX_FRAME_SECONDS = 1;
  */
 const TRIP_EASE_SECONDS = 1.5;
 
+/*
+ * A trip with more story to cover than it has real seconds is squeezed. It
+ * plays its first TRIP_DEPART_SECONDS and its last TRIP_ARRIVE_SECONDS (real
+ * seconds, eases included) at normal speed, 1 story second per real second,
+ * the pace of exploring, and hurries through the stretch between. What
+ * happens just after one stop and just before the next is then seen at the
+ * pace it was made for, and only the middle of the trip goes by fast. The
+ * trip speeds up to its hurried pace over TRIP_HURRY_EASE_SECONDS, and slows
+ * back down over as many, so the change of pace does not jolt.
+ */
+const TRIP_DEPART_SECONDS = 6;
+export const TRIP_ARRIVE_SECONDS = 4;
+const TRIP_HURRY_EASE_SECONDS = 1;
+
 /** A playTo trip under way. Times are real seconds; places are story seconds. */
 interface Trip {
   from: number;
@@ -38,12 +52,18 @@ export interface TripProgress {
 }
 
 /**
- * How far along a trip is, from 0 to 1, after `elapsed` of its `seconds`,
- * and how fast it is going then, in whole trips per real second. The speed
- * rises from zero along half a cosine wave, holds, and falls back the same way.
+ * How far along a trip is, from 0 to 1, after `elapsed` of its `seconds`
+ * (real seconds), and how fast it is going then, in whole trips per real
+ * second. The trip covers `storySeconds` of story. The speed rises from zero
+ * along half a cosine wave, holds, and falls back the same way. A squeezed
+ * trip (see TRIP_DEPART_SECONDS) holds normal speed for a while at each end
+ * and hurries in between.
  */
-export function tripShape(elapsed: number, seconds: number): TripProgress {
+export function tripShape(elapsed: number, seconds: number, storySeconds: number): TripProgress {
   if (!(seconds > 0)) return { share: 1, pace: 0 };
+  const squeezed = squeezedShape(elapsed, seconds, storySeconds);
+  if (squeezed) return squeezed;
+  // One pace between the two eases, as fast as the trip needs.
   const u = Math.min(1, Math.max(0, elapsed / seconds));
   const ramp = Math.min(0.5, TRIP_EASE_SECONDS / seconds);
   // The top speed, in trips per unit of u, that makes the whole trip come to exactly 1.
@@ -54,6 +74,60 @@ export function tripShape(elapsed: number, seconds: number): TripProgress {
   if (u < ramp) return { share: rampShare(u), pace: rampSlope(u) / seconds };
   if (u > 1 - ramp) return { share: 1 - rampShare(1 - u), pace: rampSlope(1 - u) / seconds };
   return { share: top * (ramp / 2 + (u - ramp)), pace: top / seconds };
+}
+
+/** A stretch of a trip, in real seconds, over which the pace (story seconds per real second) goes from one value to another along half a cosine wave, or holds when the two are equal. */
+interface PaceStretch {
+  seconds: number;
+  from: number;
+  to: number;
+}
+
+/**
+ * tripShape for a squeezed trip, or null when the trip is not squeezed or is
+ * too short for normal speed at both ends with room to hurry between. It
+ * then takes the one-pace shape.
+ */
+function squeezedShape(
+  elapsed: number,
+  seconds: number,
+  storySeconds: number,
+): TripProgress | null {
+  if (!(storySeconds > seconds)) return null;
+  const ease = TRIP_EASE_SECONDS;
+  const hurryEase = TRIP_HURRY_EASE_SECONDS;
+  // Real seconds of the hurried pace, counting half of each ease into and out of it.
+  const hurrying = seconds - TRIP_DEPART_SECONDS - TRIP_ARRIVE_SECONDS - hurryEase;
+  // Its two eases must not overlap.
+  if (hurrying < hurryEase) return null;
+  // The story covered at normal speed and in the eases, so the hurry covers the rest.
+  const unhurried = TRIP_DEPART_SECONDS + TRIP_ARRIVE_SECONDS - ease + hurryEase;
+  const hurry = (storySeconds - unhurried) / hurrying;
+  if (hurry < 1) return null;
+  const stretches: readonly PaceStretch[] = [
+    { seconds: ease, from: 0, to: 1 },
+    { seconds: TRIP_DEPART_SECONDS - ease, from: 1, to: 1 },
+    { seconds: hurryEase, from: 1, to: hurry },
+    { seconds: hurrying - hurryEase, from: hurry, to: hurry },
+    { seconds: hurryEase, from: hurry, to: 1 },
+    { seconds: TRIP_ARRIVE_SECONDS - ease, from: 1, to: 1 },
+    { seconds: ease, from: 1, to: 0 },
+  ];
+  let left = Math.min(seconds, Math.max(0, elapsed));
+  let covered = 0;
+  for (const { seconds: length, from, to } of stretches) {
+    if (!(length > 0)) continue;
+    if (left <= length) {
+      const angle = (Math.PI * left) / length;
+      const pace = from + ((to - from) * (1 - Math.cos(angle))) / 2;
+      covered +=
+        from * left + (to - from) * (left / 2 - (length / (2 * Math.PI)) * Math.sin(angle));
+      return { share: Math.min(1, covered / storySeconds), pace: pace / storySeconds };
+    }
+    covered += ((from + to) / 2) * length;
+    left -= length;
+  }
+  return { share: 1, pace: 0 };
 }
 
 /**
@@ -109,7 +183,8 @@ export class MissionPlayer implements Player {
     if (!this.isPlaying) return 0;
     const trip = this.trip;
     if (!trip) return this.playRate;
-    return Math.abs(trip.to - trip.from) * tripShape(trip.elapsed, trip.seconds).pace;
+    const span = Math.abs(trip.to - trip.from);
+    return span * tripShape(trip.elapsed, trip.seconds, span).pace;
   }
 
   seek(elapsedSeconds: number): void {
@@ -197,8 +272,8 @@ export class MissionPlayer implements Player {
         this.isPlaying = false;
         this.frame = null;
       } else {
-        this.storyNow =
-          trip.from + (trip.to - trip.from) * tripShape(trip.elapsed, trip.seconds).share;
+        const { share } = tripShape(trip.elapsed, trip.seconds, Math.abs(trip.to - trip.from));
+        this.storyNow = trip.from + (trip.to - trip.from) * share;
         this.frame = requestAnimationFrame(this.step);
       }
       this.notify();

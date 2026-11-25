@@ -184,11 +184,20 @@ const LONG_LUNAR_STAY_REVOLUTIONS = 40;
  * per second of real time) the model fades out and its orbit shows as a
  * bright ring, and the ship view holds a steady view of the body with the
  * orbit in frame. A stopped clock always shows the model at its true place.
+ * Even a lap in a few seconds sends the body whirling behind a ship the
+ * camera chases, so the model starts to fade at a lap in about six seconds
+ * and is gone by a lap in four. A slower lap stays a model the camera
+ * follows: a lander's last orbit before its descent, at normal speed, takes
+ * about nine.
  */
-const FAST_FORWARD_PACE = 0.5;
+const FAST_FORWARD_PACE = 0.25;
 /** The fade starts at this share of FAST_FORWARD_PACE. */
 const FAST_FORWARD_ONSET = 0.7;
-/** The fast-forward level (0 to 1) at which the interface is told it is on, and off again (see Stage.fastForward). */
+/**
+ * The fast-forward level (0 to 1) at which the interface is told it is on, and
+ * off again (see Stage.fastForward). The ship view holds its steady view until
+ * the level drops below FAST_FORWARD_OFF (see updateCamera).
+ */
 const FAST_FORWARD_ON = 0.6;
 const FAST_FORWARD_OFF = 0.3;
 /** How quickly the look changes, in seconds of real time (at once under reduced motion). */
@@ -2194,7 +2203,14 @@ export class Stage implements Director {
       // The controls nudge the target by rounding errors each frame; only a real move needs drawing, so a still scene stops drawing.
       if (delta.lengthSq() > 1e-24) moved = true;
     }
-    const fast = this.viewNow === 'spacecraft' && this.chaseReady ? this.followed.fastForward : 0;
+    const level = this.viewNow === 'spacecraft' && this.chaseReady ? this.followed.fastForward : 0;
+    // The ship view moves to its steady view as the fast-forward level rises. As
+    // it falls, the view holds until the level drops below FAST_FORWARD_OFF, when
+    // the interface stops saying "Fast forward", and only then eases back to the
+    // chase. A tour trip waiting to move the camera to its stop's view moves it at
+    // that moment (see src/app/tour.ts), so the camera goes there from the steady view
+    // instead of swooping back in to the ship and out again.
+    const fast = Math.min(level / FAST_FORWARD_OFF, Math.max(level, this.fastView.level));
     this.updateFastView(fast);
     this.controls.enabled = fast < 0.02;
     if (this.viewNow === 'spacecraft' && this.chaseReady) {

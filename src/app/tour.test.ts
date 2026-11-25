@@ -8,9 +8,11 @@ import assert from 'node:assert/strict';
  *
  * Run: npx vitest run src/app/tour.test.ts
  */
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { flight as apollo8Flight } from '../content/missions/apollo-8/flight.ts';
 import { story as apollo8 } from '../content/missions/apollo-8/story.ts';
+import { flight as apollo11Flight } from '../content/missions/apollo-11/flight.ts';
+import { story as apollo11 } from '../content/missions/apollo-11/story.ts';
 import { flight as apollo12Flight } from '../content/missions/apollo-12/flight.ts';
 import { story as apollo12 } from '../content/missions/apollo-12/story.ts';
 import { flight as apollo15Flight } from '../content/missions/apollo-15/flight.ts';
@@ -23,6 +25,7 @@ import type { FlightPlan } from '../sim/types.ts';
 import type { Director, StoryMap } from './contract.ts';
 import { MissionPlayer, tripShape } from './player.ts';
 import {
+  EARLY_VIEW_MISSION_SECONDS,
   SKIP_GUARD_MS,
   Tour,
   TRIP_MAX_SECONDS,
@@ -82,22 +85,42 @@ function setUp(mission: Mission, plan: FlightPlan, screen: Screen, options: Tour
     map,
     screen.now,
   );
-  // Every view the tour asks for, and when.
-  const views: Array<{ view: EventView; atMs: number }> = [];
+  // Every view the tour asks for, when, and how fast the clock was going then.
+  const views: Array<{ view: EventView; atMs: number; speed: number }> = [];
+  const listeners = new Set<(director: Director) => void>();
+  let viewNow: EventView = 'earth';
+  let fastForwardNow = false;
   const director: Director = {
     scaleMode: 'readable',
-    view: 'earth',
+    get view() {
+      return viewNow;
+    },
+    get fastForward() {
+      return fastForwardNow;
+    },
     setScaleMode() {},
     setView(view) {
-      views.push({ view, atMs: screen.now() });
+      viewNow = view;
+      views.push({ view, atMs: screen.now(), speed: player.speed });
+      for (const listener of listeners) listener(director);
     },
     setViewInsets() {},
-    subscribe: () => () => {},
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
   };
   return {
     player,
     views,
     tour: new Tour(mission, player, director, { now: screen.now, ...options }),
+    /** The scene starts or stops showing its fast-forward view, and says so. */
+    setFastForward(on: boolean): void {
+      fastForwardNow = on;
+      for (const listener of listeners) listener(director);
+    },
   };
 }
 
@@ -205,7 +228,7 @@ describe('how long a trip takes', () => {
     assert.equal(tripSeconds(0.1), TRIP_MIN_SECONDS);
     assert.equal(tripSeconds(53.8), TRIP_MAX_SECONDS);
     assert.equal(TRIP_MIN_SECONDS, 5);
-    assert.equal(TRIP_MAX_SECONDS, 14);
+    assert.equal(TRIP_MAX_SECONDS, 15);
   });
 
   it('a short hop still takes the shortest trip (Apollo 12: liftoff to the lightning)', () => {
@@ -259,21 +282,94 @@ describe('how long a trip takes', () => {
 
   it('eases out of one stop and into the next', () => {
     for (const seconds of [3, 5, 9.4, 14]) {
-      assert.equal(tripShape(0, seconds).share, 0);
-      assert.equal(tripShape(0, seconds).pace, 0, 'it sets off from a standstill');
-      assert.ok(Math.abs(tripShape(seconds, seconds).share - 1) < 1e-12);
-      assert.ok(tripShape(seconds, seconds).pace < 1e-12, 'it comes to rest at the stop');
+      // A trip as long as the story it covers.
+      const shape = (elapsed: number) => tripShape(elapsed, seconds, seconds);
+      assert.equal(shape(0).share, 0);
+      assert.equal(shape(0).pace, 0, 'it sets off from a standstill');
+      assert.ok(Math.abs(shape(seconds).share - 1) < 1e-12);
+      assert.ok(shape(seconds).pace < 1e-12, 'it comes to rest at the stop');
       let last = 0;
       for (let i = 1; i <= 1000; i += 1) {
-        const now = tripShape((seconds * i) / 1000, seconds).share;
+        const now = shape((seconds * i) / 1000).share;
         assert.ok(now >= last - 1e-12, 'it only moves forward');
         // No step is much larger than the top speed allows: no jumps anywhere.
         assert.ok(now - last <= 2.5 / 1000 + 1e-9, `a smooth step at ${i}`);
         last = now;
       }
       // The first half second covers less than the average pace would.
-      assert.ok(tripShape(0.5, seconds).share < 0.5 / seconds);
-      assert.ok(1 - tripShape(seconds - 0.5, seconds).share < 0.5 / seconds);
+      assert.ok(shape(0.5).share < 0.5 / seconds);
+      assert.ok(1 - shape(seconds - 0.5).share < 0.5 / seconds);
+    }
+  });
+});
+
+describe('a long stretch squeezed into the longest trip', () => {
+  const seconds = TRIP_MAX_SECONDS;
+  /** Real seconds between `from` and `to`, every `step`. */
+  const times = (from: number, to: number, step = 0.01): number[] =>
+    Array.from({ length: Math.round((to - from) / step) + 1 }, (_, i) => from + i * step);
+
+  // Story seconds to cover, and the pace that covers them: the first 6 and last 4 real
+  // seconds cover 9.5 story seconds between them, eases and all, so 25.5 leaves 16 for
+  // the 4 seconds of hurry. 53.8 is the longest stretch between two stops of any tour.
+  describe.each([
+    [25.5, 4],
+    [53.8, 11.075],
+  ])('%s story seconds in the longest trip', (span, hurry) => {
+    const shape = (elapsed: number) => tripShape(elapsed, seconds, span);
+    /** Story seconds per real second. */
+    const storyPace = (elapsed: number): number => span * shape(elapsed).pace;
+
+    it('sets off from a standstill, only moves forward, and comes to rest on the stop when planned', () => {
+      expect(shape(0)).toEqual({ share: 0, pace: 0 });
+      let last = 0;
+      for (const t of times(0, seconds)) {
+        const { share } = shape(t);
+        expect(share).toBeGreaterThanOrEqual(last);
+        last = share;
+      }
+      expect(shape(seconds).share).toBeCloseTo(1, 12);
+      expect(storyPace(seconds)).toBeCloseTo(0, 12);
+    });
+
+    it('plays at normal speed after easing off from the stop and before easing in to the next', () => {
+      for (const t of [...times(1.5, 6), ...times(11, 13.5)])
+        expect(storyPace(t)).toBeCloseTo(1, 9);
+    });
+
+    it('hurries only in between, at the one pace that arrives on time', () => {
+      const fastest = Math.max(...times(0, seconds).map(storyPace));
+
+      expect(fastest).toBeCloseTo(hurry, 9);
+      for (const t of times(7, 10)) expect(storyPace(t)).toBeCloseTo(hurry, 9);
+      for (const t of [...times(0, 7), ...times(10, seconds)])
+        expect(storyPace(t)).toBeLessThanOrEqual(hurry + 1e-9);
+    });
+
+    it('says how fast it is going: the pace is the rate at which it moves along', () => {
+      const h = 1e-4;
+      for (const t of times(0.05, seconds - 0.05, 0.05)) {
+        const slope = (span * (shape(t + h).share - shape(t - h).share)) / (2 * h);
+        expect(slope).toBeCloseTo(storyPace(t), 5);
+      }
+    });
+  });
+
+  it('a stretch no longer than the trip holds one pace between its two eases, as before', () => {
+    for (const span of [5, 12, seconds]) {
+      for (const t of times(1.5, seconds - 1.5, 0.25)) {
+        const { share, pace } = tripShape(t, seconds, span);
+        expect(share).toBeCloseTo((t - 0.75) / (seconds - 1.5), 12);
+        expect(pace).toBeCloseTo(1 / (seconds - 1.5), 12);
+      }
+    }
+  });
+
+  it('a trip too short for normal speed at both ends and a hurry between holds one pace between its eases', () => {
+    for (const short of [10, 11.5]) {
+      for (const t of times(1.5, short - 1.5, 0.25)) {
+        expect(tripShape(t, short, 40).share).toBeCloseTo((t - 0.75) / (short - 1.5), 12);
+      }
     }
   });
 });
@@ -300,6 +396,104 @@ describe('the camera on a trip', () => {
       );
       assert.equal(views[1]!.view, tour.stop!.view);
     }
+  });
+
+  /** Apollo 11's tour at "Eagle undocks" (ship view), with Next pressed for "The Eagle has landed" (Moon view). */
+  function leavingEagleUndocks(screen: Screen) {
+    const set = setUp(apollo11, apollo11Flight, screen);
+    const { tour } = set;
+    const at = tour.stops.findIndex((stop) => stop.id === 'undocking');
+    expect(tour.stops[at + 1]?.id).toBe('landing');
+    tour.start(at);
+    travel(tour, screen);
+    expect(set.views.map(({ view }) => view)).toEqual(['spacecraft']);
+    tour.next();
+    return { ...set, startMs: screen.now() };
+  }
+
+  it("on a long stretch, moves to the stop's view as the clock settles back to normal speed, and arrives on time", () => {
+    for (const [, frameMs] of screens) {
+      const screen = fakeScreen(frameMs);
+      const { player, tour, views, startMs } = leavingEagleUndocks(screen);
+
+      const took = travel(tour, screen);
+
+      // Seen on the first frame at or after the planned moment.
+      const frame = frameMs / 1000 + 1e-6;
+      const movedAt = (views[1]!.atMs - startMs) / 1000;
+      expect(views).toHaveLength(2);
+      expect(views[1]?.view).toBe('moon');
+      expect(movedAt).toBeGreaterThanOrEqual(TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS - 1e-6);
+      expect(movedAt).toBeLessThanOrEqual(TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS + frame);
+      expect(views[1]?.speed).toBeCloseTo(1, 9);
+      expect(took).toBeGreaterThanOrEqual(TRIP_MAX_SECONDS - 1e-6);
+      expect(took).toBeLessThanOrEqual(TRIP_MAX_SECONDS + frame);
+      assertAtStop(tour, player, 'The Eagle has landed');
+    }
+  });
+
+  it("when the ship view's fast-forward view ends on the way, moves to the stop's view then, and still arrives on time", () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour, views, startMs, setFastForward } = leavingEagleUndocks(screen);
+
+    wait(screen, 7);
+    setFastForward(true);
+    wait(screen, 2.5);
+    expect(views).toHaveLength(1);
+    setFastForward(false);
+    const movedAt = (screen.now() - startMs) / 1000;
+    const took = movedAt + travel(tour, screen);
+
+    expect(views).toHaveLength(2);
+    expect(views[1]?.view).toBe('moon');
+    expect((views[1]!.atMs - startMs) / 1000).toBeCloseTo(movedAt, 6);
+    expect(movedAt).toBeLessThan(TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS);
+    expect(took).toBeGreaterThanOrEqual(TRIP_MAX_SECONDS - 1e-6);
+    expect(took).toBeLessThanOrEqual(TRIP_MAX_SECONDS + 1 / 60 + 1e-6);
+    assertAtStop(tour, player, 'The Eagle has landed');
+  });
+
+  it("a fast-forward view that ends hours before the stop leaves the move to the stop's view as planned", () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour, views, startMs, setFastForward } = leavingEagleUndocks(screen);
+
+    // A second into the trip the landing is still two and a half hours off.
+    wait(screen, 0.5);
+    setFastForward(true);
+    wait(screen, 0.5);
+    setFastForward(false);
+    expect(elapsedToSeconds('102:45:39.9') - player.time).toBeGreaterThan(
+      EARLY_VIEW_MISSION_SECONDS,
+    );
+    travel(tour, screen);
+
+    const movedAt = (views[1]!.atMs - startMs) / 1000;
+    expect(views).toHaveLength(2);
+    expect(views[1]?.view).toBe('moon');
+    expect(movedAt).toBeGreaterThanOrEqual(TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS - 1e-6);
+    expect(movedAt).toBeLessThanOrEqual(TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS + 1 / 60 + 1e-6);
+    assertAtStop(tour, player, 'The Eagle has landed');
+  });
+
+  it("a fast-forward view that ends outside the ship view leaves the move to the stop's view as planned", () => {
+    const screen = fakeScreen(1000 / 60);
+    const { tour, views, setFastForward } = setUp(apollo8, apollo8Flight, screen);
+    tour.start(tour.total - 2);
+    travel(tour, screen);
+    expect(views.map(({ view }) => view)).toEqual(['journey']);
+    const startMs = screen.now();
+    tour.next();
+
+    wait(screen, 6);
+    setFastForward(true);
+    wait(screen, 2);
+    setFastForward(false);
+    travel(tour, screen);
+
+    const movedAt = (views[1]!.atMs - startMs) / 1000;
+    expect(views).toHaveLength(2);
+    expect(movedAt).toBeGreaterThanOrEqual(TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS - 1e-6);
+    expect(movedAt).toBeLessThanOrEqual(TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS + 1 / 60 + 1e-6);
   });
 
   it("Skip arrives in the stop's view; leaving the tour keeps the view it is in", () => {
@@ -526,6 +720,32 @@ describe("the mission clock's playTo", () => {
       assert.equal(player.playing, false);
       assert.equal(player.speed, 0);
       assert.ok(took >= 7 - 1e-6 && took <= 7 + frameMs / 1000 + 1e-6, `took ${took} s`);
+    });
+  }
+
+  for (const [screenName, frameMs] of screens) {
+    it(`a squeezed trip tells its true pace on the way and lands on time, ${screenName}`, () => {
+      const screen = fakeScreen(frameMs);
+      const player = make(screen);
+      player.seekStory(10);
+      // 25.5 story seconds in the longest trip: normal speed at both ends, 4 in the middle.
+      player.playTo(35.5, TRIP_MAX_SECONDS);
+      const startMs = screen.now();
+      const paces: Array<[number, number]> = [];
+      while (player.playing && screen.now() - startMs < 20_000) {
+        screen.frame();
+        paces.push([(screen.now() - startMs) / 1000, player.speed]);
+      }
+      const took = (screen.now() - startMs) / 1000;
+
+      expect(player.storyTime).toBe(35.5);
+      expect(took).toBeGreaterThanOrEqual(TRIP_MAX_SECONDS - 1e-6);
+      expect(took).toBeLessThanOrEqual(TRIP_MAX_SECONDS + frameMs / 1000 + 1e-6);
+      const paceWhen = (from: number, to: number): number[] =>
+        paces.flatMap(([t, pace]) => (t >= from && t <= to ? [pace] : []));
+      for (const pace of [...paceWhen(1.5, 6), ...paceWhen(11, 13.5)])
+        expect(pace).toBeCloseTo(1, 9);
+      for (const pace of paceWhen(7, 10)) expect(pace).toBeCloseTo(4, 9);
     });
   }
 
