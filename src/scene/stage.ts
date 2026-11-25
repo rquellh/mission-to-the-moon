@@ -24,7 +24,14 @@ import { homeView, nearestView } from '../app/views';
 import { EARTH_MEAN_RADIUS_KM, EARTH_RADIUS, MOON_RADIUS } from '../content/physical-constants';
 import { elapsedToSeconds, type ElapsedTime, type EventView, type Mission } from '../content/types';
 import type { LeftBehind, VehicleChange } from '../content/vehicle-types';
-import { partsFromDocked, type FlightPath, type Phase, type ShipTrack } from '../sim';
+import {
+  approachesAtEvents,
+  closesToDocked,
+  partsFromDocked,
+  type FlightPath,
+  type Phase,
+  type ShipTrack,
+} from '../sim';
 import {
   AMBIENT_INTENSITY,
   BODY_VIEW_ANGLE_DEG,
@@ -293,6 +300,14 @@ const PAIR_ARRANGE_STORY_SECONDS = 1.5;
  */
 const STATION_GAP_LENGTHS = 0.9;
 /**
+ * Keeping station, the two share the larger one's scale, but are drawn
+ * larger where that would show the smaller one at less than this share of
+ * its own size. Eagle's ascent stage is under a quarter of Columbia's length:
+ * at Columbia's scale it would be a speck beside it, closing in to dock and
+ * docked. A whole lunar module, or a Gemini beside an Agena, is not affected.
+ */
+const PAIR_SMALL_SHARE = 0.5;
+/**
  * Parting from docked, that gap opens over this many story seconds, so the
  * two are seen to part at any pace of the clock (in lunar orbit it can run
  * many mission minutes a second). It is open
@@ -300,7 +315,7 @@ const STATION_GAP_LENGTHS = 0.9;
  * keeping, comes first, so a stop there shows the two apart.
  */
 const STATION_OPEN_STORY_SECONDS = 1.5;
-/** Mission seconds over which that gap closes before docking, at most (see pairNow). */
+/** Mission seconds over which that gap closes before docking, when the station keeping plays for less than PAIR_CLOSE_STORY_SECONDS (see pairNow). */
 const STATION_CLOSE_MISSION_SECONDS = 120;
 const STATION_FIT_SHARE = 0.45;
 const PAIR_CLOSE_STORY_SECONDS = 1.5;
@@ -401,6 +416,12 @@ interface PairNow {
   readonly moment: PairMoment | null;
   /** Station keeping: how much of the full gap is drawn, 0 to 1 (less just after undocking and just before docking). */
   readonly opening: number;
+  /**
+   * The mission time whose shapes set the pair's faces and scale: now, or,
+   * for two that have just docked, the moment before they did, so the
+   * docked pair stays where and as large as the two were drawn meeting.
+   */
+  readonly shapesAt: number;
 }
 
 /** A docking or an undocking of a target ship with the main ship. */
@@ -1216,31 +1237,37 @@ export class Stage implements Director {
   }
 
   /**
-   * Ships keeping station without docking: each `station` phase, and each
-   * rendezvous past its `alongside` time that no docking of the two follows
-   * (Gemini 8's is drawn as an approach to docking, see findPairings). The
-   * ship that stays put is the one the story follows then (or the main
-   * ship); the other is drawn beside it.
+   * Ships keeping station without docking: each `station` phase, each
+   * rendezvous past its `alongside` time, and each final approach to a
+   * docking at an event (see approachesAtEvents), unless the main ship
+   * docks with a target there (Gemini 8's is drawn as an approach to
+   * docking, see findPairings). The ship that stays put is the one the story
+   * follows then (or the main ship); the other is drawn beside it.
    */
   private findStations(): StationSpan[] {
     const spans: StationSpan[] = [];
+    const approaches = approachesAtEvents(this.path, this.eventSeconds);
     for (const chaser of this.ships) {
       const phases = chaser.track.phases;
       phases.forEach((phase, k) => {
         let from: number;
         let target: string;
-        const after = phases[k + 1];
         if (phase.kind === 'station') {
           from = phaseStart(phase);
           target = phase.target;
-        } else if (phase.kind === 'rendezvous' && phase.alongside) {
-          const next = phases[k + 1];
-          const docks = next?.kind === 'docked' && next.target === phase.target;
+        } else if (phase.kind === 'rendezvous') {
+          const docks = closesToDocked(phases, k);
           const paired = this.pairings.some(
             (pairing) => pairing.target.id === phase.target && chaser === this.main,
           );
           if (docks && paired) return;
-          from = elapsedToSeconds(phase.alongside.value);
+          // Its final approach to a docking at an event, from when it came alongside.
+          const approach = docks
+            ? approaches.find((one) => Math.abs(one.end - phaseEnd(phase)) < 1e-6)
+            : undefined;
+          if (phase.alongside) from = elapsedToSeconds(phase.alongside.value);
+          else if (approach) from = approach.start;
+          else return;
           target = phase.target;
         } else {
           return;
@@ -1263,7 +1290,7 @@ export class Stage implements Director {
           to,
           // A lander's first phase parts it from the ship that carried it.
           opens: partsFromDocked(phases, k),
-          closes: after?.kind === 'docked' && after.target === target,
+          closes: closesToDocked(phases, k),
           openBy: Math.min(to, ...this.eventSeconds.filter((time) => time > from + 1e-6)),
         });
       });
@@ -2613,6 +2640,7 @@ export class Stage implements Director {
             gapPixels: closing * this.roomFor(meters),
             moment,
             opening: 1,
+            shapesAt: t,
           },
           meters,
         );
@@ -2622,17 +2650,18 @@ export class Stage implements Director {
       if (!span.anchor.exists || !span.mover.exists) continue;
       const from = toStory(span.from);
       const to = toStory(span.to);
+      // The two let go of their places after the station keeping (or docking), sooner when
+      // one of them is gone soon after, so the pair is not cut off half let go (Apollo 15's
+      // ascent stage was cast off hours after docking, under two story seconds later).
+      const gone = toStory(Math.min(span.anchor.track.end, span.mover.track.end));
+      const letGo = Math.max(
+        to,
+        Math.min(to + PAIR_CLOSE_STORY_SECONDS, gone - PAIR_ARRANGE_STORY_SECONDS),
+      );
       let arranged: number;
       if (story < from) arranged = smoothstep(from - PAIR_ARRANGE_STORY_SECONDS, from, story);
       else if (story <= to) arranged = 1;
-      else
-        arranged =
-          1 -
-          smoothstep(
-            to + PAIR_CLOSE_STORY_SECONDS,
-            to + PAIR_CLOSE_STORY_SECONDS + PAIR_ARRANGE_STORY_SECONDS,
-            story,
-          );
+      else arranged = 1 - smoothstep(letGo, letGo + PAIR_ARRANGE_STORY_SECONDS, story);
       if (arranged <= 0) continue;
       const meters = this.metersApart(span.anchor, span.mover, t);
       if (!Number.isFinite(meters)) continue;
@@ -2640,15 +2669,25 @@ export class Stage implements Director {
       // parting is seen at any pace of the clock (see STATION_OPEN_STORY_SECONDS).
       const openStory = Math.min(STATION_OPEN_STORY_SECONDS, toStory(span.openBy) - from);
       const since = openStory > 1e-9 ? (story - from) / openStory : 1;
-      // Closing in to dock, it closes. Timed by story time or by mission time,
-      // whichever is further along, so a station keeping that plays for less
-      // than PAIR_CLOSE_STORY_SECONDS still shows the gap before it closes.
-      const until = Math.max(
-        (to - story) / PAIR_CLOSE_STORY_SECONDS,
-        (span.to - t) / STATION_CLOSE_MISSION_SECONDS,
-      );
-      const opening =
-        (span.opens ? smoothstep(0, 1, since) : 1) * (span.closes ? smoothstep(0, 1, until) : 1);
+      // Closing in to dock, it closes: at a steady pace over the whole station
+      // keeping when that plays for PAIR_CLOSE_STORY_SECONDS or more (a final
+      // approach with a stretch of its own, see approachesAtEvents), so the two
+      // are seen closing in until they touch. A shorter one closes by story time
+      // or by mission time, whichever is less far along, so it still shows the
+      // gap before it closes.
+      let left = 1;
+      if (span.closes && to - from >= PAIR_CLOSE_STORY_SECONDS)
+        left = MathUtils.clamp((to - story) / (to - from), 0, 1);
+      else if (span.closes)
+        left = smoothstep(
+          0,
+          1,
+          Math.max(
+            (to - story) / PAIR_CLOSE_STORY_SECONDS,
+            (span.to - t) / STATION_CLOSE_MISSION_SECONDS,
+          ),
+        );
+      const opening = (span.opens ? smoothstep(0, 1, since) : 1) * left;
       // Once the station keeping is over, the room grows with their real distance over a
       // stretch of story time, not at once: the path can move one of them kilometers away
       // in a burn of a few mission seconds (Apollo 10's and 11's separation burns).
@@ -2668,6 +2707,8 @@ export class Stage implements Director {
           gapPixels: room,
           moment: null,
           opening,
+          // Once docked, the one that docked into the other's model has no parts of its own.
+          shapesAt: span.closes ? Math.min(t, span.to - 1e-3) : t,
         },
         meters,
       );
@@ -2922,20 +2963,30 @@ export class Stage implements Director {
     const moverModel = moverIndex >= 0 ? models[moverIndex] : undefined;
 
     // Two ships keeping station: the gap drawn between them (meters at their shared scale), and how far the pair reaches from the anchor.
+    // Both from their shapes at pair.shapesAt (see PairNow).
     let stationGap = 0;
     let stationReach = 0;
+    // Just docked into the mover's model (Eagle into Columbia's), the anchor has no parts of its own.
+    let anchorMerged = false;
     if (pair && !pair.moment && anchorModel && moverModel) {
-      const a = anchorModel.shapeAt(t);
-      const m = moverModel.shapeAt(t);
+      const a = anchorModel.shapeAt(pair.shapesAt);
+      const m = moverModel.shapeAt(pair.shapesAt);
       stationGap =
         STATION_GAP_LENGTHS * Math.min(anchorModel.shapeLength(a), moverModel.shapeLength(m));
       stationReach = anchorModel.faceOf(a).distance + stationGap + moverModel.shapeLength(m);
+      anchorMerged =
+        pair.shapesAt < t && anchorModel.shapeParts(anchorModel.shapeAt(t)).length === 0;
     }
     let anchorUnits = 0;
     let anchorSizeScale = 1;
+    /** The scale the pair shares, meters per CSS pixel (0 when there is no pair). */
+    let pairScale = 0;
     if (anchorModel) {
       const ship = this.ships[anchorIndex] as ShipState;
-      context.sizeScale = anchorSizeScale = sizeScaleOf(ship);
+      // A pair is drawn at the size of the ship the story follows, whichever of the two that is.
+      context.sizeScale = anchorSizeScale = pair
+        ? Math.max(sizeScaleOf(pair.anchor), sizeScaleOf(pair.mover))
+        : sizeScaleOf(ship);
       context.unitsPerPixel = anchorUnits = this.unitsPerPixelAt(
         ship.position,
         ship.exists,
@@ -2944,17 +2995,23 @@ export class Stage implements Director {
       context.metersPerPixel = 0;
       context.opacity = this.opacityOf(ship) * (1 - companion(ship));
       if (pair && moverModel) {
-        // Grow or shrink toward the size the two share: the docked pair's, or the larger of their own.
+        // Grow or shrink toward the size the two share: the docked pair's, or the larger of their
+        // own, but large enough to show the smaller one (see PAIR_SMALL_SHARE).
         const own = anchorModel.metersPerPixelOf(anchorModel.shapeAt(t), context);
-        const together = pair.moment
-          ? anchorModel.metersPerPixelOf(pair.moment.docked, context)
-          : Math.max(
-              own,
-              moverModel.metersPerPixelOf(moverModel.shapeAt(t), context),
-              stationReach / (STATION_FIT_SHARE * clearPixels),
-            );
-        if (own > 0 && together > 0)
-          context.metersPerPixel = MathUtils.lerp(own, together, pair.arranged);
+        if (pair.moment) {
+          pairScale = anchorModel.metersPerPixelOf(pair.moment.docked, context);
+        } else {
+          const ownA = anchorModel.metersPerPixelOf(anchorModel.shapeAt(pair.shapesAt), context);
+          const ownM = moverModel.metersPerPixelOf(moverModel.shapeAt(pair.shapesAt), context);
+          const smaller = Math.min(ownA, ownM);
+          const showsSmaller = smaller > 0 ? smaller / PAIR_SMALL_SHARE : Infinity;
+          pairScale = Math.max(
+            Math.min(Math.max(ownA, ownM), showsSmaller),
+            stationReach / (STATION_FIT_SHARE * clearPixels),
+          );
+        }
+        if (own > 0 && pairScale > 0)
+          context.metersPerPixel = MathUtils.lerp(own, pairScale, pair.arranged);
       }
       anchorModel.update(closeUp(ship, anchorModel, ship), context);
     }
@@ -2968,7 +3025,8 @@ export class Stage implements Director {
       context.metersPerPixel = 0;
       context.unitsPerPixel = this.unitsPerPixelAt(ship.position, ship.exists, tanHalf);
       context.opacity = this.opacityOf(ship) * (1 - companion(ship));
-      const anchorScale = anchorModel?.drawnMetersPerPixel ?? 0;
+      // An anchor merged into this ship's model is not drawn: the pair's scale stands in for its own.
+      const anchorScale = anchorMerged ? pairScale : (anchorModel?.drawnMetersPerPixel ?? 0);
       const spread = pair !== null && (pair.arranged > 0 || this.viewNow === 'spacecraft');
       if (pair && spread && anchorModel && i === moverIndex && anchorUnits > 0 && anchorScale > 0) {
         // Never on top of the other ship in the ship view; in its place beside it from station keeping on (an illustration).
@@ -2992,12 +3050,15 @@ export class Stage implements Director {
           drawn.up.lerpVectors(ship.up, anchor.up, w).normalize();
         } else {
           // Off the anchor's nose, face to face.
-          const anchorFace = anchorModel.faceOf(anchorModel.shapeAt(t));
+          const anchorFace = anchorModel.faceOf(anchorModel.shapeAt(pair.shapesAt));
           const moverFace = model.faceOf(model.shapeAt(t));
           this.faceDirection(anchor, anchorFace, this.dockDirection);
-          const minPixels =
-            (anchorFace.distance + moverFace.distance) / anchorScale +
-            Math.max(pair.gapPixels, stationGap / anchorScale) * pair.opening;
+          // Docked into this one's model, the anchor is now its facing end: that end stays where
+          // the anchor stood (a lunar module stands on its base) until the two let go.
+          const minPixels = anchorMerged
+            ? (moverFace.distance / anchorScale) * w
+            : (anchorFace.distance + moverFace.distance) / anchorScale +
+              Math.max(pair.gapPixels, stationGap / anchorScale) * pair.opening;
           this.besideAnchor(
             anchor,
             ship,
