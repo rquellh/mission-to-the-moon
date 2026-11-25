@@ -53,9 +53,10 @@ export const TRANSITION_MS = 1500;
 export const CAMERA_MOVE_MS = [1500, 3000] as const;
 /**
  * The fastest a camera move turns the picture, in degrees a second, where
- * CAMERA_MOVE_MS leaves it time to. A little under the 90 the owner asked
- * for, as a move's end can move on the way (the ship view follows its craft)
- * and a slow frame bunches a move's turn.
+ * CAMERA_MOVE_MS leaves it time to. A working figure, not one the owner
+ * gave: moves that turned the picture at over 200 a second read as a lurch
+ * in a recording. Kept a little under 90, as a move's end can move on the way
+ * (the ship view follows its craft) and a slow frame bunches a move's turn.
  */
 export const CAMERA_TURN_DEG_PER_S = 80;
 /** A shorter move, for reframing after the interface changes size. */

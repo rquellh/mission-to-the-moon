@@ -110,8 +110,10 @@ export const EARLY_VIEW_MISSION_SECONDS = 3600;
  * cannot say counts as settled. The same wait ends the hold on a parting's
  * event (see PARTING_HOLD_SECONDS). A Skip does not wait: the button says the
  * tour will be at the stop, so it is, with the camera still on its way.
+ * A little longer than the scene's longest camera move (CAMERA_MOVE_MS in
+ * src/scene/config.ts), which starts a frame after it is asked for.
  */
-export const CAMERA_SETTLE_MAX_SECONDS = 3;
+export const CAMERA_SETTLE_MAX_SECONDS = 3.5;
 
 /**
  * A stop at a parting (see TourOptions.partings) rests this many story
