@@ -823,12 +823,13 @@ export class Stage implements Director {
   /**
    * Move the camera to a view. With `instant`, jump there (also the case
    * with reduced motion). A view the mission does not offer becomes the
-   * nearest one it does.
+   * nearest one it does. `at` (see Director.setView) is not used yet: the
+   * view is framed for the spacecraft as it is now.
    */
-  setView(view: EventView, instant = false): void {
+  setView(view: EventView, options: { at?: number; instant?: boolean } = {}): void {
     this.viewNow = nearestView(this.options.mission, view);
     this.userMovedCamera = false;
-    this.pendingView = instant || !this.running ? 'instant' : 'tween';
+    this.pendingView = options.instant || !this.running ? 'instant' : 'tween';
     if (view === 'spacecraft') {
       this.chaseReady = false;
       this.chaseDirection.copy(CHASE_OFFSET);

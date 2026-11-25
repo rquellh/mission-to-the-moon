@@ -199,7 +199,7 @@ async function main(): Promise<void> {
   motion.addEventListener('change', () => stage.setReducedMotion(motion.matches));
   // A view in the address wins; an event in the address brings its own view, as a tour stop does.
   const startView = link.view ?? atEvent?.view ?? null;
-  if (startView) stage.setView(nearestView(mission, startView), true);
+  if (startView) stage.setView(nearestView(mission, startView), { instant: true });
 
   // 4. The interface, connected to the clock and the scene.
   const ui = mountInterface({ ...shared, director: stage, has3D: true });
