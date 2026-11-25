@@ -20,18 +20,24 @@ import { flight as apollo15Flight } from '../content/missions/apollo-15/flight.t
 import { story as apollo15 } from '../content/missions/apollo-15/story.ts';
 import { flight as gemini7Flight } from '../content/missions/gemini-7/flight.ts';
 import { story as gemini7 } from '../content/missions/gemini-7/story.ts';
+import { flight as gemini10Flight } from '../content/missions/gemini-10/flight.ts';
+import { story as gemini10 } from '../content/missions/gemini-10/story.ts';
 import { elapsedToSeconds, type EventView, type Mission } from '../content/types.ts';
 import { buildFlightPath, createStoryTime, partingsAtEvents, storyKeyTimes } from '../sim/index.ts';
 import type { FlightPlan } from '../sim/types.ts';
 import type { Director, StoryMap } from './contract.ts';
 import { MissionPlayer, tripShape } from './player.ts';
 import {
+  CAMERA_SETTLE_MAX_SECONDS,
   EARLY_VIEW_MISSION_SECONDS,
   PARTING_HOLD_SECONDS,
   PARTING_REST_MAX_SHARE,
   PARTING_REST_STORY_SECONDS,
   PARTING_VIEW_SETTLE_SECONDS,
-  restPlaySeconds,
+  playSeconds,
+  RUN_UP_MAX_MISSION_SECONDS,
+  RUN_UP_MIN_STORY_SECONDS,
+  RUN_UP_STORY_SECONDS,
   SKIP_GUARD_MS,
   Tour,
   TRIP_MAX_SECONDS,
@@ -70,8 +76,18 @@ function fakeScreen(frameMs: number) {
   };
 }
 
-/** The player and tour, built the way main.ts builds them. */
-function setUp(mission: Mission, plan: FlightPlan, screen: Screen, options: TourOptions = {}) {
+/**
+ * The player and tour, built the way main.ts builds them. `scene` says
+ * whether the fake scene reports a moving camera (`Director.moving`): left
+ * out, it does not say, as the real scene did when this was written.
+ */
+function setUp(
+  mission: Mission,
+  plan: FlightPlan,
+  screen: Screen,
+  options: TourOptions = {},
+  scene: { reportsMoving?: boolean } = {},
+) {
   const path = buildFlightPath(plan);
   const eventTimes = mission.events.map((event) => elapsedToSeconds(event.elapsed));
   const story = createStoryTime(storyKeyTimes(path, eventTimes));
@@ -87,11 +103,12 @@ function setUp(mission: Mission, plan: FlightPlan, screen: Screen, options: Tour
     map,
     screen.now,
   );
-  // Every view the tour asks for, when, and how fast the clock was going then.
-  const views: Array<{ view: EventView; atMs: number; speed: number }> = [];
+  // Every view the tour asks for, when, how fast the clock was going then, and the moment it asked to frame.
+  const views: Array<{ view: EventView; atMs: number; speed: number; at: number | undefined }> = [];
   const listeners = new Set<(director: Director) => void>();
   let viewNow: EventView = 'earth';
   let fastForwardNow = false;
+  let movingNow = false;
   const director: Director = {
     scaleMode: 'readable',
     get view() {
@@ -101,9 +118,9 @@ function setUp(mission: Mission, plan: FlightPlan, screen: Screen, options: Tour
       return fastForwardNow;
     },
     setScaleMode() {},
-    setView(view) {
+    setView(view, viewOptions) {
       viewNow = view;
-      views.push({ view, atMs: screen.now(), speed: player.speed });
+      views.push({ view, atMs: screen.now(), speed: player.speed, at: viewOptions?.at });
       for (const listener of listeners) listener(director);
     },
     setViewInsets() {},
@@ -114,6 +131,8 @@ function setUp(mission: Mission, plan: FlightPlan, screen: Screen, options: Tour
       };
     },
   };
+  // A scene that says whether its camera is moving has the member at all; one that does not, lacks it.
+  if (scene.reportsMoving) Object.defineProperty(director, 'moving', { get: () => movingNow });
   return {
     player,
     views,
@@ -125,6 +144,11 @@ function setUp(mission: Mission, plan: FlightPlan, screen: Screen, options: Tour
     /** The scene starts or stops showing its fast-forward view, and says so. */
     setFastForward(on: boolean): void {
       fastForwardNow = on;
+      for (const listener of listeners) listener(director);
+    },
+    /** The scene's camera starts or stops moving, and the scene says so (with `reportsMoving`). */
+    setMoving(on: boolean): void {
+      movingNow = on;
       for (const listener of listeners) listener(director);
     },
   };
@@ -157,6 +181,13 @@ function assertAtStop(tour: Tour, player: MissionPlayer, what: string): void {
 
 const storyOf = (player: MissionPlayer, tour: Tour, index: number): number =>
   player.story.toStory(elapsedToSeconds(tour.stops[index]!.elapsed));
+
+/** What the tour's listeners hear from now on: its phase and the stop on screen, each time it tells them. */
+function heard(tour: Tour): string[] {
+  const told: string[] = [];
+  tour.subscribe(() => told.push(`${tour.phase}: ${tour.shownStop?.id ?? 'none'}`));
+  return told;
+}
 
 const flights: Array<[string, Mission, FlightPlan]> = [
   ['Gemini 7', gemini7, gemini7Flight],
@@ -502,6 +533,63 @@ describe('the camera on a trip', () => {
     expect(movedAt).toBeLessThanOrEqual(TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS + 1 / 60 + 1e-6);
   });
 
+  /** Apollo 11's tour at a stop, with Next pressed for the one after. */
+  function leavingApollo11(stopId: string, screen: Screen) {
+    const set = setUp(apollo11, apollo11Flight, screen);
+    const at = set.tour.stops.findIndex((stop) => stop.id === stopId);
+    set.tour.start(at);
+    travel(set.tour, screen);
+    expect(set.views).toHaveLength(1);
+    set.tour.next();
+    return { ...set, startMs: screen.now() };
+  }
+
+  it.each([
+    ['the Moon view: "Eagle undocks" to "The Eagle has landed"', 'undocking', 'moon'],
+    ['the journey view: "Back together" to "Heading home"', 'docking', 'journey'],
+  ] as const)(
+    'heading for %s, waits while fast forward shows when the move is due, and moves as it ends',
+    (_name, from, view) => {
+      const screen = fakeScreen(1000 / 60);
+      const { player, tour, views, startMs, setFastForward } = leavingApollo11(from, screen);
+      const due = TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS;
+      wait(screen, due - 1);
+      setFastForward(true);
+
+      wait(screen, 2.5);
+      expect(views).toHaveLength(1);
+      setFastForward(false);
+      const endedAt = (screen.now() - startMs) / 1000;
+      const took = endedAt + travel(tour, screen);
+
+      expect(views).toHaveLength(2);
+      expect(views[1]?.view).toBe(view);
+      expect((views[1]!.atMs - startMs) / 1000).toBeCloseTo(endedAt, 6);
+      expect(took).toBeGreaterThanOrEqual(TRIP_MAX_SECONDS - 1e-6);
+      expect(took).toBeLessThanOrEqual(TRIP_MAX_SECONDS + 1 / 60 + 1e-6);
+      assertAtStop(tour, player, tour.stop!.title);
+    },
+  );
+
+  it('a fast-forward view that lasts until the stop moves the camera on arriving', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour, views, setFastForward } = setUp(apollo8, apollo8Flight, screen);
+    tour.start(tour.stops.findIndex((stop) => stop.id === 'christmas-eve-broadcast'));
+    travel(tour, screen);
+    expect(views.map(({ view }) => view)).toEqual(['moon']);
+    tour.next();
+    expect(tour.stop?.id).toBe('transearth-injection');
+
+    wait(screen, 1);
+    setFastForward(true);
+    travel(tour, screen);
+
+    expect(views.map(({ view }) => view)).toEqual(['moon', 'journey']);
+    // On the frame that arrives, not when it was due, four seconds before.
+    expect(views[1]?.atMs).toBe(screen.now());
+    assertAtStop(tour, player, 'Heading home');
+  });
+
   it("Skip arrives in the stop's view; leaving the tour keeps the view it is in", () => {
     const screen = fakeScreen(1000 / 60);
     const { tour, views } = setUp(apollo8, apollo8Flight, screen);
@@ -526,8 +614,12 @@ describe('a stop where two craft part: Eagle undocks from Columbia', () => {
   const separation = elapsedToSeconds('100:39:52.9');
 
   /** Apollo 11's tour at "Into orbit around the Moon" (Moon view), with Next pressed for "Eagle undocks" (Ship view). */
-  function headingForEagleUndocks(screen: Screen, options: TourOptions = {}) {
-    const set = setUp(apollo11, apollo11Flight, screen, options);
+  function headingForEagleUndocks(
+    screen: Screen,
+    options: TourOptions = {},
+    scene: { reportsMoving?: boolean } = {},
+  ) {
+    const set = setUp(apollo11, apollo11Flight, screen, options, scene);
     const { player, tour } = set;
     const at = tour.stops.findIndex((stop) => stop.id === 'undocking');
     tour.start(at - 1);
@@ -543,7 +635,13 @@ describe('a stop where two craft part: Eagle undocks from Columbia', () => {
 
   /** Draw frames until the tour stops, noting each: real seconds since `startMs`, the clock, and the tour. */
   function follow(tour: Tour, player: MissionPlayer, screen: Screen, startMs: number) {
-    const samples: Array<{ at: number; story: number; playing: boolean; phase: string }> = [];
+    const samples: Array<{
+      at: number;
+      story: number;
+      playing: boolean;
+      phase: string;
+      shown: string | undefined;
+    }> = [];
     while (tour.phase === 'traveling' && screen.now() - startMs < 40_000) {
       screen.frame();
       samples.push({
@@ -551,6 +649,7 @@ describe('a stop where two craft part: Eagle undocks from Columbia', () => {
         story: player.storyTime,
         playing: player.playing,
         phase: tour.phase,
+        shown: tour.shownStop?.id,
       });
     }
     return samples;
@@ -596,10 +695,10 @@ describe('a stop where two craft part: Eagle undocks from Columbia', () => {
       const playing = samples.filter(({ at }) => at >= playsOn.at);
       const last = playing[playing.length - 1]!;
       expect(last.at - playsOn.at).toBeGreaterThanOrEqual(
-        restPlaySeconds(PARTING_REST_STORY_SECONDS) - 1e-6,
+        playSeconds(PARTING_REST_STORY_SECONDS) - 1e-6,
       );
       expect(last.at - playsOn.at).toBeLessThanOrEqual(
-        restPlaySeconds(PARTING_REST_STORY_SECONDS) + frame,
+        playSeconds(PARTING_REST_STORY_SECONDS) + frame,
       );
       for (let i = 1; i < playing.length - 1; i += 1) {
         expect(playing[i]!.story).toBeGreaterThanOrEqual(playing[i - 1]!.story);
@@ -610,6 +709,8 @@ describe('a stop where two craft part: Eagle undocks from Columbia', () => {
       // About 100:24, twelve minutes after the undocking, and long before Columbia's separation burn.
       expect(player.time).toBeGreaterThan(elapsedToSeconds('100:24:00'));
       expect(player.time).toBeLessThan(elapsedToSeconds('100:24:30'));
+      // The Ship view was asked to frame the two there, not at the undocking.
+      expect(views[1]?.at).toBeCloseTo(player.time, 3);
       // The card stays on its stop, and the clock stays put.
       wait(screen, 2);
       expectAtRest(tour, player, rest);
@@ -669,6 +770,86 @@ describe('a stop where two craft part: Eagle undocks from Columbia', () => {
     expect(playsOn.at - movedAt).toBeLessThanOrEqual(PARTING_VIEW_SETTLE_SECONDS + 1 / 60 + 1e-6);
   });
 
+  it('shows the stop just left until the clock reaches the undocking, then "Eagle undocks" as the hold begins, not at rest', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour, event, startMs } = headingForEagleUndocks(screen);
+    const told = heard(tour);
+
+    const samples = follow(tour, player, screen, startMs);
+
+    const reached = samples.findIndex(({ story }) => story === event);
+    expect(new Set(samples.slice(0, reached).map(({ shown }) => shown))).toEqual(
+      new Set(['lunar-orbit-insertion']),
+    );
+    expect(new Set(samples.slice(reached).map(({ shown }) => shown))).toEqual(
+      new Set(['undocking']),
+    );
+    expect(samples[reached]).toMatchObject({ phase: 'traveling', playing: false });
+    expect(told).toEqual(['traveling: undocking', 'stopped: undocking']);
+  });
+
+  describe('with a scene that says when its camera is moving', () => {
+    it('holds on the event only as long as the hold, when the camera has already settled', () => {
+      const screen = fakeScreen(1000 / 60);
+      const { player, tour, views, event, rest, startMs, setFastForward } = headingForEagleUndocks(
+        screen,
+        {},
+        { reportsMoving: true },
+      );
+      // The camera moves on reaching the event, and the scene says at once that it has settled.
+      setFastForward(true);
+
+      const samples = follow(tour, player, screen, startMs);
+
+      const reached = samples.find(({ story }) => story === event)!;
+      const playsOn = samples.find(({ at, playing }) => at > reached.at && playing)!;
+      expect((views[1]!.atMs - startMs) / 1000).toBeCloseTo(reached.at, 9);
+      expect(playsOn.at - reached.at).toBeGreaterThanOrEqual(PARTING_HOLD_SECONDS - 1e-6);
+      expect(playsOn.at - reached.at).toBeLessThanOrEqual(PARTING_HOLD_SECONDS + 1 / 60 + 1e-6);
+      expectAtRest(tour, player, rest);
+    });
+
+    it('holds on the event until the camera has settled, and then plays the two apart', () => {
+      const screen = fakeScreen(1000 / 60);
+      const { player, tour, event, rest, setMoving } = headingForEagleUndocks(
+        screen,
+        {},
+        { reportsMoving: true },
+      );
+      untilTheEvent(player, screen, event);
+      setMoving(true);
+
+      wait(screen, PARTING_HOLD_SECONDS + 1);
+      expect(player.storyTime).toBe(event);
+      expect(player.playing).toBe(false);
+      setMoving(false);
+      screen.frame();
+
+      expect(player.playing).toBe(true);
+      travel(tour, screen);
+      expectAtRest(tour, player, rest);
+    });
+
+    it('plays on after 3 seconds when the scene never says the camera has settled', () => {
+      const screen = fakeScreen(1000 / 60);
+      const { player, tour, event, startMs, setMoving } = headingForEagleUndocks(
+        screen,
+        {},
+        { reportsMoving: true },
+      );
+      setMoving(true);
+
+      const samples = follow(tour, player, screen, startMs);
+
+      const reached = samples.find(({ story }) => story === event)!;
+      const playsOn = samples.find(({ at, playing }) => at > reached.at && playing)!;
+      expect(playsOn.at - reached.at).toBeGreaterThanOrEqual(CAMERA_SETTLE_MAX_SECONDS - 1e-6);
+      expect(playsOn.at - reached.at).toBeLessThanOrEqual(
+        CAMERA_SETTLE_MAX_SECONDS + 1 / 60 + 1e-6,
+      );
+    });
+  });
+
   it.each([
     ['on the trip', (_player: MissionPlayer, screen: Screen) => wait(screen, 2)],
     [
@@ -718,27 +899,35 @@ describe('a stop where two craft part: Eagle undocks from Columbia', () => {
     assertAtStop(tour, player, 'The Eagle has landed');
   });
 
-  it('Back from the landing, and starting at the stop, play the run-up, hold, play on, and rest', () => {
+  it('Back from the landing, and starting at the stop, cut to the event, hold, play on, and rest', () => {
     const screen = fakeScreen(1000 / 60);
-    const { player, tour, at, rest } = headingForEagleUndocks(screen);
+    const { player, tour, at, event, rest } = headingForEagleUndocks(screen);
     travel(tour, screen, 30);
     tour.next();
     travel(tour, screen);
     expect(tour.stop?.id).toBe('landing');
-    // The run-up, the short hold, and the play on to the rest point, each landing on a frame.
-    const planned = 3 + PARTING_HOLD_SECONDS + restPlaySeconds(PARTING_REST_STORY_SECONDS);
+    // The 30 minutes before the undocking are a quarter of a story second, too little for a run-up.
+    expect(event - player.story.toStory(undocking - RUN_UP_MAX_MISSION_SECONDS)).toBeLessThan(
+      RUN_UP_MIN_STORY_SECONDS,
+    );
+    const playOn = playSeconds(PARTING_REST_STORY_SECONDS);
 
+    // From the Moon view: the camera moves to the Ship view at once, and the hold lets it settle.
     tour.back();
+    expect(player.storyTime).toBe(event);
+    expect(tour.phase).toBe('traveling');
     const backTook = travel(tour, screen);
     expectAtRest(tour, player, rest);
+    // Already in the Ship view: the short hold.
     tour.start(at);
+    expect(player.storyTime).toBe(event);
     const startTook = travel(tour, screen);
 
     expectAtRest(tour, player, rest);
-    for (const took of [backTook, startTook]) {
-      expect(took).toBeGreaterThanOrEqual(planned - 1e-6);
-      expect(took).toBeLessThanOrEqual(planned + 3 / 60 + 1e-6);
-    }
+    expect(backTook).toBeGreaterThanOrEqual(PARTING_VIEW_SETTLE_SECONDS + playOn - 1e-6);
+    expect(backTook).toBeLessThanOrEqual(PARTING_VIEW_SETTLE_SECONDS + playOn + 3 / 60 + 1e-6);
+    expect(startTook).toBeGreaterThanOrEqual(PARTING_HOLD_SECONDS + playOn - 1e-6);
+    expect(startTook).toBeLessThanOrEqual(PARTING_HOLD_SECONDS + playOn + 3 / 60 + 1e-6);
   });
 
   it('with reduced motion, goes straight to the rest point', () => {
@@ -801,47 +990,256 @@ describe('Next on the way to a stop', () => {
   });
 });
 
-describe('the short run-up stays as it was', () => {
-  it('starting, going back, and starting over cut to just before the stop and play 3 seconds', () => {
+describe('the stop on screen', () => {
+  it('is none until the tour starts, and none once it has finished', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { tour } = setUp(gemini7, gemini7Flight, screen);
+    expect(tour.shownStop).toBeNull();
+    tour.start(tour.total - 1);
+    travel(tour, screen);
+    expect(tour.shownStop?.id).toBe('splashdown');
+
+    tour.next();
+
+    expect(tour.phase).toBe('finished');
+    expect(tour.shownStop).toBeNull();
+  });
+
+  it('on a trip, is the stop just left until the clock reaches the next one', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour } = setUp(apollo8, apollo8Flight, screen);
+    tour.start(0);
+    const told = heard(tour);
+    tour.next();
+    const target = storyOf(player, tour, 1);
+
+    const shown = new Set<string | undefined>();
+    while (tour.phase === 'traveling') {
+      screen.frame();
+      if (player.storyTime < target) shown.add(tour.shownStop?.id);
+    }
+
+    expect(shown).toEqual(new Set(['liftoff']));
+    expect(tour.shownStop?.id).toBe('translunar-injection');
+    expect(told).toEqual(['traveling: liftoff', 'stopped: translunar-injection']);
+  });
+
+  it('on a run-up, follows the clock: the stop before, until the clock reaches the stop', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { tour } = setUp(apollo11, apollo11Flight, screen);
+    tour.start(2);
+    travel(tour, screen);
+    expect(tour.shownStop?.id).toBe('transposition-docking');
+    const told = heard(tour);
+
+    // The run-up to the burn starts in Earth orbit, half an hour before it.
+    tour.back();
+    travel(tour, screen);
+
+    expect(told).toEqual(['traveling: liftoff', 'stopped: translunar-injection']);
+  });
+
+  it('before the first stop, is the first stop (Gemini 10: the Agena flies first)', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour } = setUp(gemini10, gemini10Flight, screen);
+    const told = heard(tour);
+
+    tour.start(0);
+    expect(player.time).toBeLessThan(0);
+    travel(tour, screen);
+
+    expect(told).toEqual(['traveling: liftoff', 'stopped: liftoff']);
+  });
+});
+
+describe('stopping once the camera has settled', () => {
+  /** Apollo 8 at liftoff, with Next pressed for "Leaving Earth behind", in a scene that says when its camera moves. */
+  function onTheWay(screen: Screen) {
+    const set = setUp(apollo8, apollo8Flight, screen, {}, { reportsMoving: true });
+    set.tour.start(0);
+    expect(set.tour.phase).toBe('stopped');
+    set.tour.next();
+    return { ...set, startMs: screen.now(), event: elapsedToSeconds(set.tour.stops[1]!.elapsed) };
+  }
+
+  it('stays on the way at the stop while the camera is still moving, and stops once it has settled', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour, setMoving, event } = onTheWay(screen);
+    wait(screen, TRIP_MAX_SECONDS - 1);
+    setMoving(true);
+
+    wait(screen, 2);
+
+    expect(tour.phase).toBe('traveling');
+    expect(player.playing).toBe(false);
+    expect(player.time).toBeCloseTo(event, 6);
+    expect(tour.shownStop?.id).toBe('translunar-injection');
+    setMoving(false);
+    assertAtStop(tour, player, 'Leaving Earth behind');
+  });
+
+  it('stops 3 seconds after arriving at most, when the scene never says the camera has settled', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour, setMoving } = onTheWay(screen);
+    setMoving(true);
+
+    const took = travel(tour, screen, 30);
+
+    expect(took).toBeGreaterThanOrEqual(TRIP_MAX_SECONDS + CAMERA_SETTLE_MAX_SECONDS - 1e-6);
+    expect(took).toBeLessThanOrEqual(TRIP_MAX_SECONDS + CAMERA_SETTLE_MAX_SECONDS + 2 / 60 + 1e-6);
+    assertAtStop(tour, player, 'Leaving Earth behind');
+  });
+
+  it('Skip arrives and waits for the camera too; Skip again stops at once', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour, setMoving, event } = onTheWay(screen);
+    wait(screen, 2);
+    setMoving(true);
+
+    tour.next();
+
+    expect(tour.phase).toBe('traveling');
+    expect(player.time).toBeCloseTo(event, 6);
+    tour.next();
+    assertAtStop(tour, player, 'Leaving Earth behind');
+  });
+
+  it('waits for the camera after a cut straight to a stop as well', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour, setMoving } = setUp(
+      apollo11,
+      apollo11Flight,
+      screen,
+      {},
+      { reportsMoving: true },
+    );
+    setMoving(true);
+
+    // "Into orbit around the Moon" has too little in its last 30 minutes for a run-up.
+    tour.start(3);
+
+    expect(tour.phase).toBe('traveling');
+    expect(tour.shownStop?.id).toBe('lunar-orbit-insertion');
+    setMoving(false);
+    assertAtStop(tour, player, 'Into orbit around the Moon');
+  });
+});
+
+describe('the moment each view frames', () => {
+  it("is where the clock rests at the stop, on every move to a stop's view", () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour, views, setFastForward } = setUp(apollo11, apollo11Flight, screen);
+    /** Arrive, then check each move the tour asked for on the way against where the clock rests. */
+    const arrive = (from: number): void => {
+      travel(tour, screen, 30);
+      expect(tour.phase).toBe('stopped');
+      for (const { at } of views.slice(from)) expect(at).toBeCloseTo(player.time, 2);
+    };
+
+    tour.start(0);
+    arrive(0);
+    for (let stop = 1; stop < tour.total; stop += 1) {
+      const from = views.length;
+      tour.next();
+      // A time-lapse late in every trip, so some moves wait for it to end.
+      wait(screen, 10);
+      setFastForward(true);
+      wait(screen, 2);
+      setFastForward(false);
+      arrive(from);
+    }
+    // Back, and Skip.
+    let from = views.length;
+    tour.back();
+    arrive(from);
+    from = views.length;
+    tour.next();
+    wait(screen, 1);
+    tour.next();
+    arrive(from);
+
+    // One move for every stop reached.
+    expect(views).toHaveLength(tour.total + 2);
+  });
+});
+
+describe('the short run-up', () => {
+  it('starting, going back, and starting over cut to shortly before the stop and play up to it, never faster than exploring', () => {
     for (const [, frameMs] of screens) {
       const screen = fakeScreen(frameMs);
       const { player, tour } = setUp(apollo15, apollo15Flight, screen);
-      const tolerance = frameMs / 1000 + 1e-6;
-      const runUp = (what: string, go: () => void): void => {
+      const frame = frameMs / 1000 + 1e-6;
+      const runUp = (go: () => void): void => {
         go();
-        assert.equal(tour.phase, 'traveling', `${what}: on the way`);
+        expect(tour.phase).toBe('traveling');
         const target = storyOf(player, tour, tour.index);
-        assert.ok(
-          Math.abs(player.storyTime - Math.max(0, target - 3 * player.rate)) < 1e-9,
-          `${what}: starts 3 story seconds before`,
-        );
-        const took = travel(tour, screen);
-        assert.ok(took >= 3 - 1e-6 && took <= 3 + tolerance, `${what}: took ${took.toFixed(3)} s`);
-        assertAtStop(tour, player, what);
+        const eventTime = elapsedToSeconds(tour.stops[tour.index]!.elapsed);
+        const story = target - player.storyTime;
+        const mission = eventTime - player.time;
+        // No more than 3 story seconds before the stop, and no more than 30 minutes: one or the other.
+        expect(story).toBeLessThanOrEqual(RUN_UP_STORY_SECONDS + 1e-9);
+        expect(mission).toBeLessThanOrEqual(RUN_UP_MAX_MISSION_SECONDS + 1e-6);
+        expect(
+          Math.min(RUN_UP_STORY_SECONDS - story, (RUN_UP_MAX_MISSION_SECONDS - mission) / 60),
+        ).toBeCloseTo(0, 6);
+        let fastest = 0;
+        const startMs = screen.now();
+        while (tour.phase === 'traveling' && screen.now() - startMs < 10_000) {
+          screen.frame();
+          fastest = Math.max(fastest, player.speed);
+        }
+        const took = (screen.now() - startMs) / 1000;
+        // At normal speed between the eases, one story second per real second, and no faster.
+        expect(fastest).toBeLessThanOrEqual(1 + 1e-9);
+        expect(took).toBeGreaterThanOrEqual(playSeconds(story) - 1e-6);
+        expect(took).toBeLessThanOrEqual(playSeconds(story) + frame);
+        assertAtStop(tour, player, `run-up to stop ${tour.index + 1}`);
       };
-      runUp('start', () => tour.start(3));
-      runUp('back', () => tour.back());
+      // Landing at Hadley: the last 30 minutes, 1.6 story seconds.
+      runUp(() => tour.start(3));
+      runUp(() => tour.back());
       // Back partway through a trip returns to the stop just left.
       tour.next();
       wait(screen, 2);
-      assert.equal(tour.index, 3);
-      runUp('back during a trip', () => tour.back());
-      assert.equal(tour.index, 2);
-      // Starting again from the ending.
+      expect(tour.index).toBe(3);
+      runUp(() => tour.back());
+      expect(tour.index).toBe(2);
+      // Starting again from the ending: the last 3 story seconds before splashdown, under 7 minutes.
       tour.start(tour.total - 1);
       travel(tour, screen);
       tour.next();
-      assert.equal(tour.phase, 'finished');
-      runUp('back from the ending', () => tour.back());
-      assert.equal(tour.index, tour.total - 1);
+      expect(tour.phase).toBe('finished');
+      runUp(() => tour.back());
+      expect(tour.index).toBe(tour.total - 1);
       // Starting over from the ending: the first stop is at the start of the story, so the tour is there at once.
       tour.next();
       tour.start(0);
       assertAtStop(tour, player, 'start over');
-      // At double speed the run-up covers twice the story in the same real time, as before.
-      player.setRate(2);
-      runUp('start at double speed', () => tour.start(4));
+      // The speed chosen for exploring makes no difference: a run-up leaves it alone, as a trip does.
+      player.setRate(4);
+      runUp(() => tour.start(5));
+      expect(player.rate).toBe(4);
     }
+  });
+
+  it('cuts straight to a stop when 30 minutes before it is less than a story second', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour, views } = setUp(apollo11, apollo11Flight, screen);
+    const orbit = tour.stops.findIndex((stop) => stop.id === 'lunar-orbit-insertion');
+    // The orbit insertion closes a three-day coast: its last 30 minutes are a seventh of a story second.
+    expect(
+      storyOf(player, tour, orbit) -
+        player.story.toStory(elapsedToSeconds('075:49:50.37') - RUN_UP_MAX_MISSION_SECONDS),
+    ).toBeLessThan(RUN_UP_MIN_STORY_SECONDS);
+
+    tour.start(orbit);
+
+    assertAtStop(tour, player, 'Into orbit around the Moon, at once');
+    expect(views.map(({ view }) => view)).toEqual(['moon']);
+    tour.next();
+    travel(tour, screen, 30);
+    tour.back();
+    assertAtStop(tour, player, 'Back to Into orbit around the Moon, at once');
   });
 
   it('with reduced motion, every move jumps straight to the stop', () => {
@@ -867,10 +1265,10 @@ describe('the short run-up stays as it was', () => {
     travel(tour, screen);
     player.seekStory(player.storyTime + 1);
     tour.next();
-    const target = storyOf(player, tour, 1);
-    assert.ok(
-      Math.abs(player.storyTime - (target - 3)) < 1e-9,
-      'a run-up, not a trip from wherever the clock is',
+    // A run-up, not a trip from wherever the clock is: the last 30 minutes before leaving Earth.
+    expect(elapsedToSeconds(tour.stops[1]!.elapsed) - RUN_UP_MAX_MISSION_SECONDS).toBeCloseTo(
+      player.time,
+      6,
     );
     travel(tour, screen);
     assertAtStop(tour, player, 'stop 2');
