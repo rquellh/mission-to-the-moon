@@ -12,7 +12,12 @@ import { existsSync, readdirSync } from 'node:fs';
  * Run with `npm test`. Each mission gets its own group of tests, named by
  * its folder.
  */
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import {
+  RUN_UP_MAX_MISSION_SECONDS,
+  RUN_UP_MIN_STORY_SECONDS,
+  RUN_UP_STORY_SECONDS,
+} from '../../app/tour.ts';
 import { SOURCE_GROUPS, SOURCES, type Source } from '../../content/sources.ts';
 import {
   elapsedToSeconds,
@@ -24,6 +29,7 @@ import {
 import type { LeftBehind, VehicleChange } from '../../content/vehicle-types.ts';
 import { buildFlightPath } from '../build.ts';
 import { AnchoredOrbit } from '../segments.ts';
+import { createStoryTime, storyKeyTimes } from '../story-time.ts';
 import type { FlightPlan } from '../types.ts';
 import {
   continuityProblems,
@@ -430,6 +436,31 @@ for (const folder of flights) {
     it('reader text writes durations of a minute or more in minutes and seconds', () => {
       const problems = rawDurations(story, 'story');
       assert.equal(problems.length, 0, report(problems));
+    });
+
+    it('has a run-up to every tour stop, but one at the very start of the clock', () => {
+      if (!folder.path) return assert.fail('the plan does not build');
+      // As the tour measures it (Tour.runUpFrom): the last few story seconds, or the last 30 minutes if fewer.
+      const eventTimes = story.events.map((event) => elapsedToSeconds(event.elapsed));
+      const clock = createStoryTime(storyKeyTimes(folder.path, eventTimes));
+      const runUps = story.events
+        .filter((event) => event.inTour)
+        .map((event) => {
+          const t = elapsedToSeconds(event.elapsed);
+          const at = clock.toStory(t);
+          const from = Math.max(
+            0,
+            at - RUN_UP_STORY_SECONDS,
+            clock.toStory(t - RUN_UP_MAX_MISSION_SECONDS),
+          );
+          return { id: event.id, at, seconds: at - from };
+        });
+
+      const short = runUps.filter(
+        ({ at, seconds }) => at >= RUN_UP_MIN_STORY_SECONDS && seconds < RUN_UP_MIN_STORY_SECONDS,
+      );
+
+      expect(short).toEqual([]);
     });
   });
 

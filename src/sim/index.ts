@@ -5,7 +5,7 @@
  *   const path = buildFlightPath(flight);
  *   path.position("csm", t, mix, out);       // false when the ship does not exist at t
  *   path.polyline("csm");                     // typed arrays for drawing
- *   const story = createStoryTime(storyKeyTimes(path, eventTimes)); // watchable timeline clock
+ *   const story = createStoryTime(storyKeyTimes(path, eventTimes)); // watchable timeline clock, eased into and out of each event
  *
  * Pure TypeScript: no three.js, no DOM.
  */
@@ -14,6 +14,12 @@ export {
   approachesAtEvents,
   closesToDocked,
   createStoryTime,
+  EASE_FULL_PACE,
+  EASE_GENTLE_PACE,
+  EASE_MIDDLE_STORY_SECONDS,
+  EASE_RAMP_MISSION_SECONDS,
+  EASE_SHOULDER_STORY_SECONDS,
+  EASE_START_PACE,
   partingsAtEvents,
   partsFromDocked,
   storyIntervalLength,
