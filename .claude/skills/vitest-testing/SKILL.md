@@ -348,7 +348,7 @@ it('sets off for the next stop, and arrives when the trip is over', async () => 
 });
 ```
 
-Draw "enough" frames (`A_WHOLE_TRIP` is 16 seconds, longer than any trip) and check where things ended up. How long a trip takes, its easing, and when the camera moves are the tour's own tests (`src/app/tour.test.ts`); an interface test never measures them.
+Draw "enough" frames (`A_WHOLE_TRIP` is 16 seconds, longer than any trip) and check where things ended up. A stop where two craft part (Apollo 11's "Eagle undocks") takes longer: after its trip the clock holds on the event and plays on to rest just after it, up to 22 seconds in all. How long a trip takes, its easing, and when the camera moves are the tour's own tests (`src/app/tour.test.ts`); an interface test never measures them.
 
 ### Sound: `sound`
 
@@ -1061,7 +1061,7 @@ import { story as gemini8 } from '../content/missions/gemini-8/story.ts';
 
 - **New tests assert with `expect`.** The older flight tests use `node:assert/strict` (declared in `src/sim/test/node-shim.d.ts`, since there is no `@types/node`). Leave them as they are; do not convert them, and do not add `node:assert` to new files.
 - **Rules about content** (events in order, every citation resolves, every photo and recording exists, no durations in raw seconds, summaries match their stories) live in `src/sim/test/all-missions.test.ts`, once, for every mission. Add a new rule there, not an interface test per mission.
-- **The tour's timing** (trip length, easing, the camera's lead before arrival, a stalled tab) lives in `src/app/tour.test.ts`, with its own fake screen. Interface tests only check that a trip arrives.
+- **The tour's timing** (trip length, easing, the camera's lead before arrival, the hold and rest at a parting, a stalled tab) lives in `src/app/tour.test.ts`, with its own fake screen. Interface tests only check that a trip arrives.
 - **What the end of a flight suggests** (the next flight not flown yet, the extra to try, the extra to explore, the flights collected), and what the end of a run in an extra suggests (the other hands-on extra), lives in `src/app/related.test.ts`, as tables of real summaries, stories, and extras' metas. Interface tests only check that the ending and "Up next" show what they are told.
 - **Flight path math** lives in `src/sim/test/`.
 

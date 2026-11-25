@@ -54,29 +54,55 @@ export function partsFromDocked(phases: readonly Phase[], k: number): boolean {
 }
 
 /**
+ * A lander parting from the ship it was docked to, at one of the flight's
+ * events, and then keeping station beside it. Both times are mission seconds.
+ */
+export interface Parting {
+  /** The event's time, when the two part. */
+  readonly start: number;
+  /** When the station keeping ends and the two go their own ways. */
+  readonly end: number;
+}
+
+/**
+ * Every place where an event marks a lander's undocking and the lander then
+ * keeps station beside the ship it left (see partsFromDocked). The story
+ * clock gives each its own stretch (see storyKeyTimes), and the tour lets
+ * the two be seen parting at a stop there.
+ */
+export function partingsAtEvents(
+  path: { readonly ships: readonly ShipTrack[] },
+  eventTimes: readonly number[],
+): Parting[] {
+  const isEvent = (time: number): boolean =>
+    eventTimes.some((event) => Math.abs(event - time) < 1e-6);
+  const partings: Parting[] = [];
+  for (const ship of path.ships) {
+    if (ship.role !== 'lander') continue;
+    ship.phases.forEach((phase, k) => {
+      const start = elapsedToSeconds(phase.start.value);
+      if (partsFromDocked(ship.phases, k) && isEvent(start))
+        partings.push({ start, end: elapsedToSeconds(phase.end.value) });
+    });
+  }
+  return partings;
+}
+
+/**
  * The mission times a flight's story clock is built from: the path's two
  * ends and every event, so each stretch between two events plays for a
- * watchable length. One more: when an event marks a lander's undocking and
- * the lander then keeps station beside the ship it left, the end of that
- * station keeping, so the two flying side by side play as their own stretch
- * rather than the first moments of a long one. (Other station keeping adds
- * no key: as keys, it would lengthen some flights by 10 to 34 seconds.)
+ * watchable length. One more for each parting (see partingsAtEvents): the
+ * end of its station keeping, so the two flying side by side play as their
+ * own stretch rather than the first moments of a long one. (Other station
+ * keeping adds no key: as keys, it would lengthen some flights by 10 to 34
+ * seconds.)
  */
 export function storyKeyTimes(
   path: { readonly start: number; readonly end: number; readonly ships: readonly ShipTrack[] },
   eventTimes: readonly number[],
 ): number[] {
-  const keys = [path.start, path.end, ...eventTimes];
-  const isEvent = (time: number): boolean =>
-    eventTimes.some((event) => Math.abs(event - time) < 1e-6);
-  for (const ship of path.ships) {
-    if (ship.role !== 'lander') continue;
-    ship.phases.forEach((phase, k) => {
-      if (partsFromDocked(ship.phases, k) && isEvent(elapsedToSeconds(phase.start.value)))
-        keys.push(elapsedToSeconds(phase.end.value));
-    });
-  }
-  return keys;
+  const partingEnds = partingsAtEvents(path, eventTimes).map((parting) => parting.end);
+  return [path.start, path.end, ...eventTimes, ...partingEnds];
 }
 
 /** Builds a story clock from any list of mission times (sorted or not). */

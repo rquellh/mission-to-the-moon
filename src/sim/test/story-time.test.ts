@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, expect, it } from 'vitest';
+import { flight as apollo8Flight } from '../../content/missions/apollo-8/flight.ts';
+import { story as apollo8 } from '../../content/missions/apollo-8/story.ts';
 import { flight as apollo11Flight } from '../../content/missions/apollo-11/flight.ts';
 import { story as apollo11 } from '../../content/missions/apollo-11/story.ts';
 import { flight as apollo16Flight } from '../../content/missions/apollo-16/flight.ts';
@@ -8,7 +10,12 @@ import { flight as gemini12Flight } from '../../content/missions/gemini-12/fligh
 import { story as gemini12 } from '../../content/missions/gemini-12/story.ts';
 import { elapsedToSeconds, type Mission } from '../../content/types.ts';
 import { buildFlightPath } from '../build.ts';
-import { createStoryTime, storyIntervalLength, storyKeyTimes } from '../story-time.ts';
+import {
+  createStoryTime,
+  partingsAtEvents,
+  storyIntervalLength,
+  storyKeyTimes,
+} from '../story-time.ts';
 import type { FlightPlan } from '../types.ts';
 
 /** Every phase boundary of every ship, as the timeline might pass them. */
@@ -72,14 +79,34 @@ describe('story time', () => {
   });
 });
 
-describe('story keys', () => {
-  /** The keys a flight's clock is built from, as main.ts builds them, and its event times. */
-  function keysOf(plan: FlightPlan, mission: Mission) {
-    const events = mission.events.map((event) => elapsedToSeconds(event.elapsed));
-    const path = buildFlightPath(plan);
-    return { path, events, keys: storyKeyTimes(path, events) };
-  }
+/** The keys a flight's clock is built from, as main.ts builds them, and its event times. */
+function keysOf(plan: FlightPlan, mission: Mission) {
+  const events = mission.events.map((event) => elapsedToSeconds(event.elapsed));
+  const path = buildFlightPath(plan);
+  return { path, events, keys: storyKeyTimes(path, events) };
+}
 
+describe('partings at events', () => {
+  it('find Eagle undocking from Columbia, with the end of its station keeping beside it (Apollo 11)', () => {
+    const { path, events } = keysOf(apollo11Flight, apollo11);
+
+    expect(partingsAtEvents(path, events)).toEqual([
+      { start: elapsedToSeconds('100:12:00'), end: elapsedToSeconds('100:39:52.9') },
+    ]);
+  });
+
+  it.each([
+    ['a flight with no lander (Apollo 8)', apollo8Flight, apollo8],
+    ['a lander that undocks with no event there (Apollo 16)', apollo16Flight, apollo16],
+    ['a main ship that undocks into station keeping (Gemini 12)', gemini12Flight, gemini12],
+  ])('find none for %s', (_name, plan, mission) => {
+    const { path, events } = keysOf(plan, mission);
+
+    expect(partingsAtEvents(path, events)).toEqual([]);
+  });
+});
+
+describe('story keys', () => {
   it('give a lander flying beside the ship it undocked from, at an event, a stretch of its own', () => {
     const { path, keys } = keysOf(apollo11Flight, apollo11);
     const beside = path.ships.find((ship) => ship.role === 'lander')?.phases[0];

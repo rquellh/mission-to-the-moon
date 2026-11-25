@@ -4,14 +4,16 @@ import {
   type Mission,
   type MissionEvent,
 } from '../content/types.ts';
+import type { Parting } from '../sim/story-time.ts';
 import type { Director, Player } from './contract.ts';
-import { TRIP_ARRIVE_SECONDS } from './player.ts';
+import { TRIP_ARRIVE_SECONDS, TRIP_EASE_SECONDS } from './player.ts';
 import { nearestView } from './views.ts';
 
 /**
  * Where the tour is:
  * - "off": not touring.
- * - "traveling": the clock is playing up to the next stop.
+ * - "traveling": the clock is playing up to the next stop (at a parting,
+ *   holding on its event and then playing on to where it rests).
  * - "stopped": paused at a stop, waiting for Next.
  * - "finished": past the last stop, showing the ending.
  */
@@ -25,6 +27,13 @@ export interface TourOptions {
   leadInSeconds?: number;
   /** When this returns true, jump straight to each stop instead of playing up to it. */
   jumpStraight?: () => boolean;
+  /**
+   * Where a lander parts from the ship it was docked to at an event and then
+   * keeps station beside it (see partingsAtEvents in src/sim/story-time.ts).
+   * A stop at one of these events plays the parting and rests just after it
+   * (see PARTING_REST_STORY_SECONDS).
+   */
+  partings?: readonly Parting[];
   /** Real time in milliseconds; tests pass their own clock. */
   now?: () => number;
 }
@@ -58,7 +67,8 @@ export const SKIP_GUARD_MS = 400;
  * It is as long as a squeezed trip's arrival at normal speed, so the camera
  * moves as the clock settles back to that speed, and the stop's view shows
  * the run-in to the stop at the pace exploring would. The camera moves
- * sooner when the ship view's fast-forward view ends on the way (see
+ * sooner when the ship view's fast-forward view ends on the way, and later
+ * when the scene is still fast-forwarding on the way to the ship view (see
  * watchScene).
  */
 export const VIEW_LEAD_SECONDS = TRIP_ARRIVE_SECONDS;
@@ -73,6 +83,38 @@ export const VIEW_LEAD_SECONDS = TRIP_ARRIVE_SECONDS;
 export const EARLY_VIEW_MISSION_SECONDS = 3600;
 
 /**
+ * A stop at a parting (see TourOptions.partings) rests this many story
+ * seconds after its event rather than on it. At the event the two craft are
+ * still docked; the scene draws them parting over the first 1.5 story seconds
+ * of their station keeping. Resting later lets the stop show what its event
+ * says: the two parted, and flying side by side for a moment.
+ */
+export const PARTING_REST_STORY_SECONDS = 3;
+
+/**
+ * A parting's rest point comes no later than this share of the way through
+ * its station keeping, in story time, so the two are still side by side there
+ * and the next trip sets off before they go their own ways.
+ */
+export const PARTING_REST_MAX_SHARE = 0.6;
+
+/**
+ * Arriving at a parting, the clock holds still on the event for this many
+ * real seconds before playing on to the rest point, so the two are seen
+ * docked before they part.
+ */
+export const PARTING_HOLD_SECONDS = 1;
+
+/**
+ * The hold also lasts until this many real seconds after the camera moved to
+ * the stop's view, so the move (about 1.5 seconds) has settled before the two
+ * part. A camera that moved on reaching the event (see watchScene) makes the
+ * hold this long; one that moved a few seconds before leaves the hold at
+ * PARTING_HOLD_SECONDS.
+ */
+export const PARTING_VIEW_SETTLE_SECONDS = 2;
+
+/**
  * Travel may take this much longer than planned, in real seconds, before the
  * tour arrives anyway. The clock keeps to time on its own; this is a safety net.
  */
@@ -84,26 +126,47 @@ export function tripSeconds(storySeconds: number): number {
 }
 
 /**
+ * Real seconds of the play from a parting's event to its rest point, this
+ * many story seconds later: at normal speed (1 story second per real second,
+ * the pace of exploring) between a trip's usual eases out of the event and
+ * into the rest point. Each ease covers half the story it would at that pace.
+ */
+export function restPlaySeconds(storySeconds: number): number {
+  return storySeconds + TRIP_EASE_SECONDS;
+}
+
+/**
  * The guided tour: steps through the mission's events marked `inTour`. For
  * each stop it moves the camera to the event's view (or the nearest view the
  * mission offers), plays the clock up to the event, pauses there, and waits
  * for Next. Next flies the whole stretch from one stop to the next, moving
  * the camera near the end; starting, going back, and starting over play a
- * short run-up to the stop instead, with the camera moved at once.
+ * short run-up to the stop instead, with the camera moved at once. At a
+ * parting (see TourOptions.partings) the clock holds on the event for a
+ * moment, then plays on to rest just after it, with the two craft apart.
  */
 export class Tour {
   readonly stops: readonly MissionEvent[];
 
   private phaseNow: TourPhase = 'off';
   private indexNow = 0;
+  /** Story seconds the clock is playing to: the stop's event, then, at a parting, its rest point. */
   private targetStory = 0;
+  /** Mission seconds of the stop's event. */
   private stopSeconds = 0;
+  /** Where the clock rests at the stop, in mission and story seconds: the event, or a parting's rest point. */
+  private restSeconds = 0;
+  private restStory = 0;
+  /** Real time in milliseconds when the clock's hold on a parting's event ends; null when not holding. */
+  private holdUntilMs: number | null = null;
   private stopWatching: (() => void) | null = null;
   private travelStartMs = 0;
   private travelDeadlineMs = 0;
   /** The stop's view, while a trip waits to move the camera to it (see VIEW_LEAD_SECONDS). */
   private viewLater: EventView | null = null;
   private viewAtMs = 0;
+  /** Real time in milliseconds when the camera last moved to a different view on the way to this stop. */
+  private viewMovedMs = Number.NEGATIVE_INFINITY;
   /** Stops listening to the scene while a trip waits to move the camera (see watchScene). */
   private stopWatchingScene: (() => void) | null = null;
   /** True once the ship view has shown the scene's fast-forward view on this trip. */
@@ -166,7 +229,7 @@ export class Tour {
       this.finish();
     } else {
       // Fly from this stop, unless something has moved the clock away from it.
-      const atStop = Math.abs(this.player.storyTime - this.targetStory) < 1e-6;
+      const atStop = Math.abs(this.player.storyTime - this.restStory) < 1e-6;
       this.goTo(this.indexNow + 1, atStop ? 'trip' : 'run-up');
     }
   }
@@ -209,6 +272,10 @@ export class Tour {
     this.indexNow = index;
     this.stopSeconds = elapsedToSeconds(stop.elapsed);
     this.targetStory = this.player.story.toStory(this.stopSeconds);
+    this.restSeconds = this.restFor(this.stopSeconds, this.targetStory);
+    // Through the same map as arrive's seek, so the two agree exactly.
+    this.restStory = this.player.story.toStory(this.restSeconds);
+    this.viewMovedMs = Number.NEGATIVE_INFINITY;
     const view = nearestView(this.mission, stop.view);
     const trip = way === 'trip' && !this.options.jumpStraight?.();
     const seconds = trip
@@ -219,10 +286,9 @@ export class Tour {
       this.viewLater = view;
       this.viewAtMs = now + (seconds - VIEW_LEAD_SECONDS) * 1000;
       this.sawFastForward = false;
-      // Heading for the ship view, the chase the camera returns to is where it is going anyway.
-      if (view !== 'spacecraft') this.stopWatchingScene = this.director.subscribe(this.watchScene);
+      this.stopWatchingScene = this.director.subscribe(this.watchScene);
     } else {
-      this.director.setView(view);
+      this.moveCamera(view);
     }
     if (this.options.jumpStraight?.()) {
       this.arrive();
@@ -255,29 +321,48 @@ export class Tour {
   /**
    * Arrive when the clock reaches the stop, or stops for any other reason
    * (a pause or a jump ends the trip early), or travel has taken far too long.
-   * On the way, move the camera to the stop's view when it is time.
+   * On the way, move the camera to the stop's view when it is time. At a
+   * parting, reaching the event starts the hold there instead (see holdAtEvent).
    */
   private readonly watchTravel = (player: Player): void => {
     if (this.phaseNow !== 'traveling') return;
-    if (this.viewLater && this.now() >= this.viewAtMs) this.showStopView();
+    if (this.holdUntilMs !== null) {
+      // Anything else that moves the clock during the hold ends it at the rest point.
+      if (player.playing || player.storyTime !== this.targetStory) this.arrive();
+      return;
+    }
+    if (this.viewLater && this.now() >= this.viewAtMs && !this.waitingOutFastForward())
+      this.showStopView();
     // Exactly: a trip eases in so gently that it is within a hair of the stop
     // for its last few milliseconds, and it lands on the stop by itself.
     const reached = player.storyTime >= this.targetStory;
-    if (reached || !player.playing || this.now() > this.travelDeadlineMs) this.arrive();
+    if (reached && this.restStory - this.targetStory > 1e-6) this.holdAtEvent();
+    else if (reached || !player.playing || this.now() > this.travelDeadlineMs) this.arrive();
   };
 
   /**
-   * In the ship view, a trip can carry the ship around its body too fast to
-   * follow, and the scene then holds a steady view of the body instead of
-   * chasing the ship. When that ends while the trip still waits to move the
-   * camera, and the stop is near (see EARLY_VIEW_MISSION_SECONDS), the camera
-   * moves to the stop's view at once: otherwise the ship view would swoop back
-   * in to chase the ship only to pull out again for the stop's view moments
-   * later.
+   * A trip can carry the ship around its body too fast to follow, and the
+   * scene then shows its fast-forward view: the ship fades and its orbit shows
+   * as a ring, in a steady view of the body. Two moves of the camera wait on it.
+   *
+   * Heading for the ship view, the move waits while the scene is still
+   * fast-forwarding when its time comes (see VIEW_LEAD_SECONDS), until the
+   * fast-forward view ends or the trip arrives: the ship view would only swap
+   * one wide view of the ring for another, then cut in to the ship on arrival.
+   * One steady view through the whole time-lapse and one move in to the ship
+   * at the end reads better.
+   *
+   * In the ship view, when the fast-forward view ends while the trip still
+   * waits to move the camera, and the stop is near (see
+   * EARLY_VIEW_MISSION_SECONDS), the camera moves to the stop's view at once:
+   * otherwise the ship view would swoop back in to chase the ship only to pull
+   * out again for the stop's view moments later.
    */
   private readonly watchScene = (director: Director): void => {
     if (this.phaseNow !== 'traveling' || !this.viewLater) return;
-    if (director.view !== 'spacecraft') {
+    if (this.viewLater === 'spacecraft') {
+      if (this.now() >= this.viewAtMs && !director.fastForward) this.showStopView();
+    } else if (director.view !== 'spacecraft') {
       this.sawFastForward = false;
     } else if (director.fastForward) {
       this.sawFastForward = true;
@@ -288,15 +373,80 @@ export class Tour {
     }
   };
 
+  /** True while a move to the ship view waits for the scene's fast-forward view to end (see watchScene). */
+  private waitingOutFastForward(): boolean {
+    return this.viewLater === 'spacecraft' && this.director.fastForward === true;
+  }
+
+  /**
+   * Mission seconds where the clock rests at a stop whose event is at
+   * `eventSeconds` (`eventStory` in story seconds): the event itself, or for
+   * a parting a little after it (see PARTING_REST_STORY_SECONDS).
+   */
+  private restFor(eventSeconds: number, eventStory: number): number {
+    const parting = this.options.partings?.find(
+      ({ start }) => Math.abs(start - eventSeconds) < 1e-6,
+    );
+    if (!parting) return eventSeconds;
+    const besideStory = this.player.story.toStory(parting.end) - eventStory;
+    if (!(besideStory > 0)) return eventSeconds;
+    const after = Math.min(PARTING_REST_STORY_SECONDS, PARTING_REST_MAX_SHARE * besideStory);
+    return this.player.story.toElapsed(eventStory + after);
+  }
+
+  /**
+   * At a parting's event: hold the clock still there, so the two craft are
+   * seen docked once the camera has settled, then play on to the rest point
+   * (see PARTING_HOLD_SECONDS). The tour is still on its way throughout.
+   */
+  private holdAtEvent(): void {
+    // Not listening while the clock is put exactly on the event (a trip lands
+    // there by itself; a clock played on from a trip has gone past it).
+    this.stopWatching?.();
+    this.stopWatching = null;
+    // A move that waited out the fast-forward view goes now.
+    this.showStopView();
+    if (this.player.playing || this.player.storyTime !== this.targetStory) {
+      this.player.pause();
+      this.player.seekStory(this.targetStory);
+    }
+    this.holdUntilMs = Math.max(
+      this.now() + PARTING_HOLD_SECONDS * 1000,
+      this.viewMovedMs + PARTING_VIEW_SETTLE_SECONDS * 1000,
+    );
+    this.stopWatching = this.player.subscribe(this.watchTravel);
+    requestAnimationFrame(this.watchHold);
+  }
+
+  /** On each frame of a hold, play on to the rest point once it is over. */
+  private readonly watchHold = (): void => {
+    if (this.holdUntilMs === null) return;
+    if (this.now() < this.holdUntilMs) {
+      requestAnimationFrame(this.watchHold);
+      return;
+    }
+    this.holdUntilMs = null;
+    const seconds = restPlaySeconds(this.restStory - this.targetStory);
+    this.targetStory = this.restStory;
+    this.travelDeadlineMs = this.now() + (seconds + TRAVEL_GRACE_SECONDS) * 1000;
+    this.player.playTo(this.restStory, seconds);
+  };
+
   private now(): number {
     return this.options.now ? this.options.now() : performance.now();
+  }
+
+  /** Move the camera to a view, noting when it moves to a different one (see PARTING_VIEW_SETTLE_SECONDS). */
+  private moveCamera(view: EventView): void {
+    if (this.director.view !== view) this.viewMovedMs = this.now();
+    this.director.setView(view);
   }
 
   /** Move the camera to the stop's view, if a trip is still waiting to. */
   private showStopView(): void {
     const view = this.viewLater;
     this.viewLater = null;
-    if (view) this.director.setView(view);
+    if (view) this.moveCamera(view);
   }
 
   private arrive(): void {
@@ -305,7 +455,7 @@ export class Tour {
     this.stopTravel();
     this.phaseNow = 'stopped';
     this.player.pause();
-    this.player.seek(this.stopSeconds);
+    this.player.seek(this.restSeconds);
     this.notify();
   }
 
@@ -316,13 +466,17 @@ export class Tour {
     this.notify();
   }
 
-  /** Stop watching the clock. A view still waiting is dropped: the tour is leaving, or heading elsewhere. */
+  /**
+   * Stop watching the clock. A view still waiting, and a hold on a parting's
+   * event, are dropped: the tour has arrived, is leaving, or is heading elsewhere.
+   */
   private stopTravel(): void {
     this.stopWatching?.();
     this.stopWatching = null;
     this.stopWatchingScene?.();
     this.stopWatchingScene = null;
     this.viewLater = null;
+    this.holdUntilMs = null;
   }
 
   private notify(): void {

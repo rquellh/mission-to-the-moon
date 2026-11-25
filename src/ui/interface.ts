@@ -6,6 +6,7 @@ import { credits } from '../content/credits';
 import type { MissionBundle } from '../content/missions/bundle';
 import type { Memorial, Mission, MissionSummary } from '../content/types';
 import type { Extra, ExtraMeta } from '../extras/types';
+import type { Parting } from '../sim';
 import { renderAbout, renderHowDrawn } from './about-dialog';
 import { pauseAllAudio } from './audio-player';
 import { renderCredits } from './credits-dialog';
@@ -55,6 +56,8 @@ export interface InterfaceOptions {
   /** Load an extra's code when it is opened. */
   loadExtra(id: string): Promise<Extra>;
   player: Player;
+  /** Where a lander parts from its ship at an event, for the tour to show (see partingsAtEvents). */
+  partings: readonly Parting[];
   director: Director;
   /** False when there is no 3D view (for example, without WebGL). */
   has3D: boolean;
@@ -224,7 +227,10 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   });
 
   /* The moment card, its two doors, and the tour ---------------------- */
-  const tour = new Tour(mission, player, director, { jumpStraight: () => motion.matches });
+  const tour = new Tour(mission, player, director, {
+    jumpStraight: () => motion.matches,
+    partings: options.partings,
+  });
   // The doors change what covers the 3D view; a resize alone may not show it (the card only moves).
   const dock = setUpDock({ has3D, onLayout: () => remeasure() });
   const records = setUpRecords({ index, reducedMotion: () => motion.matches });

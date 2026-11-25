@@ -17,7 +17,7 @@ import {
 import { elapsedToSeconds, type EventView, type MissionSummary } from './content/types';
 import { extraFor, extras, hasExtra, isExtraReady, loadExtra } from './extras';
 import type { Stage } from './scene/stage';
-import { buildFlightPath, createStoryTime, storyKeyTimes } from './sim';
+import { buildFlightPath, createStoryTime, partingsAtEvents, storyKeyTimes } from './sim';
 import { byId, reducedMotionQuery } from './ui/dom';
 import { mountInterface, setUpMissionList, type MissionInterface } from './ui/interface';
 import { setUpStatus } from './ui/status';
@@ -45,18 +45,15 @@ function addressOf(id: string): string {
 
 /**
  * Load a flight and build its path and story time. Story time gives every
- * stretch between two events a watchable length (see storyKeyTimes).
+ * stretch between two events a watchable length (see storyKeyTimes). The
+ * partings are where the tour stops to show a lander leave its ship.
  */
 async function prepareFlight(id: string) {
   const bundle = await loadBundle(id);
   const path = buildFlightPath(bundle.flight);
-  const storyTime = createStoryTime(
-    storyKeyTimes(
-      path,
-      bundle.mission.events.map((event) => elapsedToSeconds(event.elapsed)),
-    ),
-  );
-  return { bundle, path, storyTime };
+  const eventTimes = bundle.mission.events.map((event) => elapsedToSeconds(event.elapsed));
+  const storyTime = createStoryTime(storyKeyTimes(path, eventTimes));
+  return { bundle, path, storyTime, partings: partingsAtEvents(path, eventTimes) };
 }
 
 /**
@@ -125,7 +122,7 @@ async function main(): Promise<void> {
     );
     return;
   }
-  const { bundle, path, storyTime } = flight;
+  const { bundle, path, storyTime, partings } = flight;
   const mission = bundle.mission;
   const story: StoryMap = {
     duration: storyTime.length,
@@ -154,6 +151,7 @@ async function main(): Promise<void> {
     isExtraDraft: (meta: (typeof extras)[number]) => !isExtraReady(meta),
     loadExtra,
     player,
+    partings,
   };
 
   /** Begin where the address asks: the welcome, a tour, exploring, a memorial page, or an extra. */
