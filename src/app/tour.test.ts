@@ -32,10 +32,11 @@ import {
 } from '../sim/index.ts';
 import type { FlightPlan } from '../sim/types.ts';
 import type { Director, StoryMap } from './contract.ts';
-import { MissionPlayer, tripShape } from './player.ts';
+import { MissionPlayer, TRIP_DEPART_SECONDS, tripShape } from './player.ts';
 import {
   CAMERA_SETTLE_MAX_SECONDS,
   EARLY_VIEW_MISSION_SECONDS,
+  HURRY_VIEW_MISSION_SECONDS,
   PARTING_HOLD_SECONDS,
   PARTING_REST_MAX_SHARE,
   PARTING_REST_STORY_SECONDS,
@@ -460,7 +461,8 @@ describe('the camera on a trip', () => {
   it("on a long stretch, moves to the stop's view as the clock settles back to normal speed, and arrives on time", () => {
     for (const [, frameMs] of screens) {
       const screen = fakeScreen(frameMs);
-      const { player, tour, views, startMs } = leavingEagleUndocks(screen);
+      // Three days from the ship view to the Moon view: too far for the early move.
+      const { player, tour, views, startMs } = leavingApollo11('transposition-docking', screen);
 
       const took = travel(tour, screen);
 
@@ -474,51 +476,90 @@ describe('the camera on a trip', () => {
       expect(views[1]?.speed).toBeCloseTo(1, 9);
       expect(took).toBeGreaterThanOrEqual(TRIP_MAX_SECONDS - 1e-6);
       expect(took).toBeLessThanOrEqual(TRIP_MAX_SECONDS + frame);
+      assertAtStop(tour, player, 'Into orbit around the Moon');
+    }
+  });
+
+  it("on a hurried trip from the ship view to a stop in a body's view a few hours off, moves to the stop's view as the hurry begins", () => {
+    for (const [, frameMs] of screens) {
+      const screen = fakeScreen(frameMs);
+      const { player, tour, views, startMs } = leavingEagleUndocks(screen);
+      expect(elapsedToSeconds('102:45:39.9') - player.time).toBeLessThan(
+        HURRY_VIEW_MISSION_SECONDS,
+      );
+
+      const took = travel(tour, screen);
+
+      const frame = frameMs / 1000 + 1e-6;
+      const movedAt = (views[1]!.atMs - startMs) / 1000;
+      expect(views).toHaveLength(2);
+      expect(views[1]?.view).toBe('moon');
+      expect(movedAt).toBeGreaterThanOrEqual(TRIP_DEPART_SECONDS - 1e-6);
+      expect(movedAt).toBeLessThanOrEqual(TRIP_DEPART_SECONDS + frame);
+      // Still at the pace of exploring: the hurry starts as the camera leaves.
+      expect(views[1]?.speed).toBeLessThan(1.1);
+      expect(took).toBeGreaterThanOrEqual(TRIP_MAX_SECONDS - 1e-6);
+      expect(took).toBeLessThanOrEqual(TRIP_MAX_SECONDS + frame);
       assertAtStop(tour, player, 'The Eagle has landed');
     }
   });
 
-  it("when the ship view's fast-forward view ends on the way, moves to the stop's view then, and still arrives on time", () => {
+  /** Apollo 15's tour at the spacewalk on the way home (ship view), with Next pressed for the splashdown (Earth view), two days on. */
+  function leavingApollo15Spacewalk(screen: Screen) {
+    const set = setUp(apollo15, apollo15Flight, screen);
+    const { tour } = set;
+    const at = tour.stops.findIndex((stop) => stop.id === 'spacewalk');
+    expect(tour.stops[at + 1]?.id).toBe('splashdown');
+    tour.start(at);
+    travel(tour, screen);
+    expect(set.views.map(({ view }) => view)).toEqual(['spacecraft']);
+    tour.next();
+    const splashdown = elapsedToSeconds(tour.stops[at + 1]!.elapsed);
+    return { ...set, startMs: screen.now(), splashdown };
+  }
+
+  it("when the ship view's fast-forward view ends on the way, within the hour before the stop, moves to the stop's view then, and still arrives on time", () => {
     const screen = fakeScreen(1000 / 60);
-    const { player, tour, views, startMs, setFastForward } = leavingEagleUndocks(screen);
+    const { player, tour, views, startMs, setFastForward, splashdown } =
+      leavingApollo15Spacewalk(screen);
 
     wait(screen, 7);
     setFastForward(true);
     wait(screen, 2.5);
     expect(views).toHaveLength(1);
+    expect(splashdown - player.time).toBeLessThan(EARLY_VIEW_MISSION_SECONDS);
     setFastForward(false);
     const movedAt = (screen.now() - startMs) / 1000;
     const took = movedAt + travel(tour, screen);
 
     expect(views).toHaveLength(2);
-    expect(views[1]?.view).toBe('moon');
+    expect(views[1]?.view).toBe('earth');
     expect((views[1]!.atMs - startMs) / 1000).toBeCloseTo(movedAt, 6);
     expect(movedAt).toBeLessThan(TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS);
     expect(took).toBeGreaterThanOrEqual(TRIP_MAX_SECONDS - 1e-6);
     expect(took).toBeLessThanOrEqual(TRIP_MAX_SECONDS + 1 / 60 + 1e-6);
-    assertAtStop(tour, player, 'The Eagle has landed');
+    assertAtStop(tour, player, tour.stop!.title);
   });
 
-  it("a fast-forward view that ends hours before the stop leaves the move to the stop's view as planned", () => {
+  it("a fast-forward view that ends days before the stop leaves the move to the stop's view as planned", () => {
     const screen = fakeScreen(1000 / 60);
-    const { player, tour, views, startMs, setFastForward } = leavingEagleUndocks(screen);
+    const { player, tour, views, startMs, setFastForward, splashdown } =
+      leavingApollo15Spacewalk(screen);
 
-    // A second into the trip the landing is still two and a half hours off.
+    // A second into the trip the splashdown is still two days off.
     wait(screen, 0.5);
     setFastForward(true);
     wait(screen, 0.5);
     setFastForward(false);
-    expect(elapsedToSeconds('102:45:39.9') - player.time).toBeGreaterThan(
-      EARLY_VIEW_MISSION_SECONDS,
-    );
+    expect(splashdown - player.time).toBeGreaterThan(HURRY_VIEW_MISSION_SECONDS);
     travel(tour, screen);
 
     const movedAt = (views[1]!.atMs - startMs) / 1000;
     expect(views).toHaveLength(2);
-    expect(views[1]?.view).toBe('moon');
+    expect(views[1]?.view).toBe('earth');
     expect(movedAt).toBeGreaterThanOrEqual(TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS - 1e-6);
     expect(movedAt).toBeLessThanOrEqual(TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS + 1 / 60 + 1e-6);
-    assertAtStop(tour, player, 'The Eagle has landed');
+    assertAtStop(tour, player, tour.stop!.title);
   });
 
   it("a fast-forward view that ends outside the ship view leaves the move to the stop's view as planned", () => {
@@ -554,14 +595,23 @@ describe('the camera on a trip', () => {
   }
 
   it.each([
-    ['the Moon view: "Eagle undocks" to "The Eagle has landed"', 'undocking', 'moon'],
-    ['the journey view: "Back together" to "Heading home"', 'docking', 'journey'],
+    [
+      'the Moon view: "Eagle undocks" to "The Eagle has landed"',
+      'undocking',
+      'moon',
+      TRIP_DEPART_SECONDS,
+    ],
+    [
+      'the journey view: "Back together" to "Heading home"',
+      'docking',
+      'journey',
+      TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS,
+    ],
   ] as const)(
     'heading for %s, waits while fast forward shows when the move is due, and moves as it ends',
-    (_name, from, view) => {
+    (_name, from, view, due) => {
       const screen = fakeScreen(1000 / 60);
       const { player, tour, views, startMs, setFastForward } = leavingApollo11(from, screen);
-      const due = TRIP_MAX_SECONDS - VIEW_LEAD_SECONDS;
       wait(screen, due - 1);
       setFastForward(true);
 

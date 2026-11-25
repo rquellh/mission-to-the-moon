@@ -6,7 +6,12 @@ import {
 } from '../content/types.ts';
 import type { Parting } from '../sim/story-time.ts';
 import type { Director, Player } from './contract.ts';
-import { TRIP_ARRIVE_SECONDS, TRIP_EASE_SECONDS } from './player.ts';
+import {
+  TRIP_ARRIVE_SECONDS,
+  TRIP_DEPART_SECONDS,
+  TRIP_EASE_SECONDS,
+  tripHurries,
+} from './player.ts';
 import { nearestView } from './views.ts';
 
 /**
@@ -82,13 +87,15 @@ export const SKIP_GUARD_MS = 400;
  * this many real seconds before arriving. The view chosen for a stop frames
  * the stop itself, so from the start of a long trip the spacecraft would often
  * be out of it (the Moon view, while the ship is still days from the Moon).
- * The camera's move takes about 1.5 seconds, so the arrival is framed as the
+ * The camera's move takes up to 3 seconds, so the arrival is framed as the
  * stop intends. A trip this short or shorter moves the camera at the start.
  * It is as long as a squeezed trip's arrival at normal speed, so the camera
  * moves as the clock settles back to that speed, and the stop's view shows
  * the run-in to the stop at the pace exploring would. The camera moves
- * sooner when the ship view's fast-forward view ends on the way, and later
- * when the scene is still fast-forwarding when it is due (see watchScene).
+ * sooner on a short hurried trip out of the ship view (see
+ * HURRY_VIEW_MISSION_SECONDS) and when the ship view's fast-forward view ends
+ * on the way, and later when the scene is still fast-forwarding when it is
+ * due (see watchScene).
  */
 export const VIEW_LEAD_SECONDS = TRIP_ARRIVE_SECONDS;
 
@@ -100,6 +107,24 @@ export const VIEW_LEAD_SECONDS = TRIP_ARRIVE_SECONDS;
  * with no ship in it.
  */
 export const EARLY_VIEW_MISSION_SECONDS = 3600;
+
+/**
+ * A trip that hurries (see tripShape in player.ts) from the ship view to a
+ * stop in the Earth or Moon view no more than this far off, in mission
+ * seconds, moves the camera to the stop's view as its hurry begins, not
+ * shortly before arriving. A ship that near a stop in a body's view is going
+ * round that body already (nothing crosses between Earth and Moon in three
+ * hours), so the stop's view shows the hurry as well as the ship view would:
+ * the same body, and the same ring when the ship goes round too fast to
+ * follow. Staying in the ship view instead costs two camera moves close
+ * together, back to its steady fast-forward view and then round to the
+ * stop's view moments later, the second of them while the stop's own action
+ * is playing (Apollo 11 from "Eagle undocks" to the landing: the powered
+ * descent played under a swinging camera). Farther off, the ship view's
+ * time-lapse is long enough to settle into, and the ship may be far from the
+ * stop's body.
+ */
+export const HURRY_VIEW_MISSION_SECONDS = 3 * 3600;
 
 /**
  * On reaching a stop, the tour stays on its way while the scene says its
@@ -368,7 +393,8 @@ export class Tour {
     const now = this.now();
     if (trip && seconds > VIEW_LEAD_SECONDS) {
       this.viewLater = view;
-      this.viewAtMs = now + (seconds - VIEW_LEAD_SECONDS) * 1000;
+      const early = this.leavesShipViewEarly(view, seconds, this.targetStory - from);
+      this.viewAtMs = now + (early ? TRIP_DEPART_SECONDS : seconds - VIEW_LEAD_SECONDS) * 1000;
       this.sawFastForward = false;
       this.stopWatchingScene = this.director.subscribe(this.watchScene);
     } else {
@@ -402,6 +428,18 @@ export class Tour {
     this.notify();
     this.stopWatching = this.player.subscribe(this.watchTravel);
     this.player.playTo(this.targetStory, seconds);
+  }
+
+  /**
+   * True when a trip of `seconds` real seconds over `storySeconds` of story
+   * to a stop in `view` should move the camera there as its hurry begins (see
+   * HURRY_VIEW_MISSION_SECONDS).
+   */
+  private leavesShipViewEarly(view: EventView, seconds: number, storySeconds: number): boolean {
+    if (this.director.view !== 'spacecraft') return false;
+    if (view !== 'earth' && view !== 'moon') return false;
+    if (this.stopSeconds - this.player.time > HURRY_VIEW_MISSION_SECONDS) return false;
+    return tripHurries(seconds, storySeconds);
   }
 
   /**
