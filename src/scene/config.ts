@@ -39,6 +39,16 @@ export const STAR_BRIGHTNESS = 0.5;
 
 /** Camera transition and scale-change duration, in milliseconds. */
 export const TRANSITION_MS = 1500;
+/**
+ * A camera move that swings far around Earth or the Moon takes longer, so
+ * the ground does not race by: a swing of up to the first angle takes the
+ * move's usual time, and one of the second angle or more takes
+ * LONG_SWING_MS / TRANSITION_MS times as long, evenly in between. Angles in
+ * degrees.
+ */
+export const SWING_ANGLES_DEG = [45, 150] as const;
+/** How long a camera move between views takes at most, for the longest swing, in milliseconds. */
+export const LONG_SWING_MS = 2400;
 /** A shorter move, for reframing after the interface changes size. */
 export const REFRAME_MS = 450;
 
