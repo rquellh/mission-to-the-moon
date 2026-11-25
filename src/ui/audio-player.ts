@@ -8,7 +8,7 @@ import { mediaUrl } from './photo';
 export interface AudioPlayer {
   /** The whole player, for "Tell me more": Play and Pause with the length and progress, the words, and the credit. */
   readonly element: HTMLElement;
-  /** A second Play and Pause for the same recording, for the card: "Hear the recording" with its length. */
+  /** A second Play and Pause for the same recording, for the card: "Listen" (with its length on a wide screen). */
   readonly button: HTMLElement;
   /** Stop and go back to the start. */
   stop(): void;
@@ -46,17 +46,39 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) pauseAllAudio();
 });
 
+/** What a button says while the recording is stopped or paused, and while it loads. */
+interface Words {
+  readonly play: string;
+  readonly playLabel: (length: string) => string;
+  readonly loading: string;
+}
+
+/** The player in "Tell me more" says what it is and that it is loading. */
+const fullWords: Words = {
+  play: copy.audio.play,
+  playLabel: copy.audio.playLabel,
+  loading: copy.audio.loading,
+};
+
+/** The card's button is short. Once pressed it says Pause, which is what pressing it again does. */
+const cardWords: Words = {
+  play: copy.audio.listen,
+  playLabel: copy.audio.listenLabel,
+  loading: copy.audio.pause,
+};
+
 /** One Play and Pause button, with its words, its time, and a status beside it that says what happened. */
 interface Control {
+  readonly words: Words;
   readonly toggle: HTMLButtonElement;
   readonly label: HTMLSpanElement;
   readonly time: HTMLSpanElement;
   readonly status: HTMLParagraphElement;
 }
 
-function makeControl(className: string): Control {
+function makeControl(className: string, words: Words): Control {
   const toggle = button(className);
-  const label = el('span', 'audio__label', copy.audio.play);
+  const label = el('span', 'audio__label', words.play);
   // The length is in the button's spoken label, so its digits are not read twice.
   const time = el('span', 'audio__time');
   time.setAttribute('aria-hidden', 'true');
@@ -64,14 +86,14 @@ function makeControl(className: string): Control {
   // State changes are spoken here, next to the button that caused them.
   const status = el('p', 'visually-hidden');
   status.setAttribute('role', 'status');
-  return { toggle, label, time, status };
+  return { words, toggle, label, time, status };
 }
 
 /**
  * A recording with two ways to play it that share one state: the whole
  * player (one Play/Pause button with the length, the words always written
  * out, speaker then words, and the credit with a link to the original) and
- * a single "Hear the recording" button for the card. Starting it from
+ * a single "Listen" button for the card. Starting it from
  * either shows it playing in both. It never plays by itself, and the file
  * is fetched only when it is first asked to play. It stops when neither of
  * its buttons can be seen (the card is hidden and "Tell me more" is closed).
@@ -80,7 +102,7 @@ export function createAudioPlayer(clip: AudioClip): AudioPlayer {
   const root = el('section', 'audio');
   root.setAttribute('aria-label', copy.audio.label);
 
-  const full = makeControl('button audio__toggle');
+  const full = makeControl('button audio__toggle', fullWords);
   const bar = el('span', 'audio__bar');
   bar.setAttribute('aria-hidden', 'true');
   bar.append(el('span', 'audio__played'));
@@ -106,7 +128,7 @@ export function createAudioPlayer(clip: AudioClip): AudioPlayer {
   root.append(controls, transcript, ...(note ? [note] : []), credit, full.status);
 
   // The card's button: the same state, with no bar or words of its own.
-  const mini = makeControl('button audio-mini__toggle');
+  const mini = makeControl('button audio-mini__toggle', cardWords);
   const miniRoot = el('div', 'audio-mini');
   miniRoot.append(mini.toggle, mini.status);
 
@@ -120,9 +142,7 @@ export function createAudioPlayer(clip: AudioClip): AudioPlayer {
     const on = state === 'loading' || state === 'playing';
     const total = audio && Number.isFinite(audio.duration) ? audio.duration : clip.seconds;
     const at = audio && state !== 'idle' ? audio.currentTime : 0;
-    const words =
-      state === 'loading' ? copy.audio.loading : on ? copy.audio.pause : copy.audio.play;
-    const name = on ? copy.audio.pauseLabel : copy.audio.playLabel(spokenLength(clip.seconds));
+    const length = spokenLength(clip.seconds);
     const shownTime =
       state === 'idle' || state === 'failed'
         ? clockText(total)
@@ -130,8 +150,13 @@ export function createAudioPlayer(clip: AudioClip): AudioPlayer {
     root.classList.toggle('audio--on', on);
     miniRoot.classList.toggle('audio--on', on);
     for (const control of [full, mini]) {
-      control.label.textContent = words;
-      control.toggle.setAttribute('aria-label', name);
+      const { words } = control;
+      control.label.textContent =
+        state === 'loading' ? words.loading : on ? copy.audio.pause : words.play;
+      control.toggle.setAttribute(
+        'aria-label',
+        on ? copy.audio.pauseLabel : words.playLabel(length),
+      );
       control.time.textContent = shownTime;
     }
     bar.style.setProperty('--progress', String(total > 0 ? Math.min(1, at / total) : 0));

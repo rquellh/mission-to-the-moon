@@ -124,10 +124,10 @@ describe('play and Controls', () => {
   describe('the clock', () => {
     it('reads the mission time and the day of a long flight, by Play on a phone', async () => {
       const { user } = await mountMission('apollo-11', { event: 'landing' });
-      const where = within(theCard()).getByRole('group', { name: 'Where the flight is' });
 
       await openControls(user);
 
+      const where = within(theCard()).getByRole('group', { name: 'Where the flight is' });
       expect(within(where).getByText('102:45:39')).toBeVisible();
       expect(within(where).getByText('since liftoff')).toBeVisible();
       expect(within(where).getByText('Day 5')).toBeVisible();

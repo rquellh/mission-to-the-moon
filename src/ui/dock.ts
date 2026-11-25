@@ -30,10 +30,14 @@ export interface Dock {
 /**
  * The moment card's two doors, each a toggle that opens and closes on its
  * own. "Tell me more" opens the records of the moment: a panel at the side
- * on a wide screen, one sheet with the card on a phone. "Controls" opens the
- * tools for moving through the flight inside the card, and "Look at" with
- * True scale at the top left. Neither is needed to follow the flight, and
- * neither is remembered from one visit to the next.
+ * on a wide screen, one sheet with the card on a phone. While they are open
+ * they tell the moment, and the card steps back to Play, where the flight
+ * is (the chapter and the day), and Controls. The door steps aside with the story, so
+ * opening moves focus to the records' heading, and Close or Escape gives it
+ * back to the door. "Controls" opens the tools for moving through the flight
+ * inside the card, and "Look at" with True scale at the top left. Neither is
+ * needed to follow the flight, and neither is remembered from one visit to
+ * the next.
  */
 export function setUpDock({ has3D, onLayout }: DockOptions): Dock {
   const panel = byId('records', HTMLElement);
@@ -82,10 +86,14 @@ export function setUpDock({ has3D, onLayout }: DockOptions): Dock {
     views.hidden = !toolsOpen || !has3D;
     // The end of the flight takes the moment's place, with its own button where Play was.
     play.hidden = ending;
-    status.hidden = ending;
-    // On a phone, the clock takes the place of the chapter and the day while the tools are open.
-    where.hidden = toolsOpen;
+    // Beside Play, the chapter and the day show only while "Tell me more" has taken the
+    // story's place: otherwise the story's eyebrow says them, and the progress strip has the
+    // room. On a phone the clock takes their place while the tools are open; on a wide
+    // screen the clock is among the tools.
+    const clockBesidePlay = toolsOpen && !wide.matches;
+    where.hidden = !recordsOpen || clockBesidePlay;
     clock.hidden = !toolsOpen;
+    status.hidden = ending || (where.hidden && !clockBesidePlay);
   };
 
   // The clock sits among the tools on a wide screen, and in the card's status on a phone.
@@ -93,6 +101,7 @@ export function setUpDock({ has3D, onLayout }: DockOptions): Dock {
     if (wide.matches) chapterPick?.before(clock);
     else status.append(clock);
     closeButton.setAttribute('aria-label', wide.matches ? copy.close : copy.card.tellLess);
+    render();
   };
   wide.addEventListener('change', fitLayout);
   fitLayout();
@@ -128,7 +137,6 @@ export function setUpDock({ has3D, onLayout }: DockOptions): Dock {
     onLayout();
   });
 
-  render();
   return {
     openRecords,
     get recordsOpen() {

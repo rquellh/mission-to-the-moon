@@ -51,8 +51,8 @@ export function reducedMotionQuery(): MediaQueryList {
 
 /**
  * The wide layout: the moment card floats at the bottom and "Tell me more"
- * opens as a panel at the side. Keep in step with the media query in
- * main.css.
+ * opens as a panel at the side. Keep in step with the media queries in
+ * main.css (the wide layout's, and the phone's card, its opposite).
  */
 export function wideLayoutQuery(): MediaQueryList {
   return window.matchMedia('(min-width: 860px), (min-width: 600px) and (orientation: landscape)');

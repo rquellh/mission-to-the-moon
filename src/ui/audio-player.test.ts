@@ -1,7 +1,7 @@
 /**
  * The recording of Apollo 11's landing ("The Eagle has landed", 15
- * seconds): the whole player in "Tell me more", and "Hear the recording" on
- * the card, which share one recording. Sound is the edge here: the test
+ * seconds): the whole player in "Tell me more", and "Listen" on the card,
+ * which share one recording. Sound is the edge here: the test
  * plays the part of the speakers with `sound` (it starts, plays on, ends,
  * or does not load).
  */
@@ -98,8 +98,14 @@ describe('the recording player', () => {
       const { user, recording } = await atTheLanding();
 
       await user.click(
-        within(theCard()).getByRole('button', { name: 'Hear the recording, 15 seconds' }),
+        within(theCard()).getByRole('button', { name: 'Listen to the recording, 15 seconds' }),
       );
+
+      // The card's short button says Pause at once, while the file loads: what pressing it again does.
+      expect(
+        within(theCard()).getByRole('button', { name: 'Pause the recording' }),
+      ).toHaveTextContent('Pause');
+
       sound.starts();
 
       expect(
@@ -224,7 +230,7 @@ describe('the recording player', () => {
         within(next).getByRole('button', { name: 'Hear the recording, 10 seconds' }),
       ).toBeInTheDocument();
       expect(
-        within(theCard()).getByRole('button', { name: 'Hear the recording, 10 seconds' }),
+        within(theCard()).getByRole('button', { name: 'Listen to the recording, 10 seconds' }),
       ).toBeInTheDocument();
     });
   });

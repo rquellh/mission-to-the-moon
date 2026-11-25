@@ -68,10 +68,8 @@ describe('the mission interface', () => {
       await user.click(screen.getByRole('button', { name: 'Explore on my own' }));
 
       expect(screen.getByRole('button', { name: 'Play' })).toHaveFocus();
-      const where = screen.getByRole('group', { name: 'Where the flight is' });
-      expect(within(where).getByText('Launch')).toBeVisible();
-      expect(within(where).getByText('Day 1 of 9')).toBeVisible();
-      expect(screen.getByRole('heading', { level: 3, name: 'Liftoff' })).toBeInTheDocument();
+      const story = screen.getByRole('article', { name: 'Liftoff' });
+      expect(within(story).getByText('Launch · Day 1 · July 16, 1969')).toBeVisible();
     });
 
     it('moves the card along with the clock', async () => {
@@ -124,7 +122,7 @@ describe('the mission interface', () => {
         screen.getByRole('heading', { level: 3, name: 'Burn toward the Moon' }),
       ).toBeInTheDocument();
       // The events passed on the way go by too quickly to read, so the card does not show them.
-      expect(screen.getByRole('group', { name: 'Where the flight is' })).not.toHaveTextContent(
+      expect(screen.getByRole('region', { name: 'What is happening' })).not.toHaveTextContent(
         '02:44:16',
       );
     });

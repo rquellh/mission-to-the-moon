@@ -7,10 +7,12 @@ import { EVENTS, URLS } from '../utils/vars';
 
 /**
  * The moment card's two doors, in a real browser on a desktop and a phone:
- * "Tell me more" opens the records with focus on their title and gives
- * focus back to its door, and "Controls" opens the tools. What each holds,
- * and every way to close them, are tested in the interface tests
- * (src/ui/records.test.ts, src/ui/timeline.test.ts).
+ * "Tell me more" opens the records with focus on their title, the card
+ * stepping back to Play, where the flight is, and Controls while they are
+ * open (only the stylesheet does that), and gives focus back to its door;
+ * "Controls" opens the tools. What each holds, and every way to close them,
+ * are tested in the interface tests (src/ui/records.test.ts,
+ * src/ui/timeline.test.ts).
  */
 test.describe("The moment card's doors", () => {
   test('a visitor opens Tell me more, closes it, and steps on with Controls', async ({
@@ -45,9 +47,18 @@ test.describe("The moment card's doors", () => {
       await expect(recordsPage.recording).toBeVisible();
     });
 
-    await test.step('Close shuts them and gives focus back to the door', async () => {
+    await test.step('While they are open, the card steps back to Play, where the flight is, and Controls', async () => {
+      await expect(cardPage.card).toBeHidden();
+      await expect(cardPage.recordsToggle).toBeHidden();
+      await expect(timelinePage.play).toBeVisible();
+      await expect(cardPage.statusChapter).toBeVisible();
+      await expect(cardPage.controlsToggle).toBeVisible();
+    });
+
+    await test.step('Close shuts them, brings the card back, and gives focus back to the door', async () => {
       await recordsPage.close.click();
       await expect(recordsPage.records).toBeHidden();
+      await expect(cardPage.card).toBeVisible();
       await expect(cardPage.recordsToggle).toHaveAttribute('aria-expanded', 'false');
       await expect(cardPage.recordsToggle).toBeFocused();
     });
