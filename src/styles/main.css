@@ -1965,7 +1965,15 @@ body.is-welcome .hud {
   font-weight: 650;
   line-height: 1.25;
   color: var(--color-text);
+  /* Every figure the same width, so the count does not shift as it goes up. */
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* The orbits the ship really flies during fast forward, after "Fast forward ·". */
+.clock__orbits::before {
+  content: '· ';
+  content: '· ' / '';
 }
 
 /* Chapter and speed menus. */

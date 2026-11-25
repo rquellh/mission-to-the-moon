@@ -103,6 +103,12 @@ export interface Director {
   setDrawing?(drawing: boolean): void;
   /** True while the followed ship circles too fast to follow and the scene shows its calm fast-forward view. Subscribers are told when it changes. */
   readonly fastForward?: boolean;
+  /**
+   * The laps (whole and part) the followed ship has really flown around its
+   * body since the fast forward now showing began; 0 when none shows.
+   * Subscribers are told when its whole part changes, no more than four times a second.
+   */
+  readonly fastForwardLaps?: number;
   /** True while the camera is on its way to a view, or back to the ship from its fast-forward view. Subscribers are told when it changes. */
   readonly moving?: boolean;
   /** Hear when the view or the scale mode changes. Returns a function that stops listening. */

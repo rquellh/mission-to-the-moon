@@ -20,6 +20,7 @@ export class FakeDirector implements Director {
   private viewNow: EventView;
   private scaleNow: ScaleMode = 'readable';
   private fastNow = false;
+  private lapsNow = 0;
   private drawingNow = true;
   private readonly listeners = new Set<(director: Director) => void>();
 
@@ -37,6 +38,10 @@ export class FakeDirector implements Director {
 
   get fastForward(): boolean {
     return this.fastNow;
+  }
+
+  get fastForwardLaps(): number {
+    return this.lapsNow;
   }
 
   /** False while the interface has asked the scene to stop drawing (an extra covers it). */
@@ -75,9 +80,16 @@ export class FakeDirector implements Director {
     this.setView(view);
   }
 
-  /** The followed ship starts (or stops) circling too fast to follow. */
+  /** The followed ship starts (or stops) circling too fast to follow. Either way, no laps are counted yet. */
   setFastForward(fast: boolean): void {
     this.fastNow = fast;
+    this.lapsNow = 0;
+    this.notify();
+  }
+
+  /** During fast forward, the ship has really flown this many laps (whole and part) since it began. */
+  setFastForwardLaps(laps: number): void {
+    this.lapsNow = laps;
     this.notify();
   }
 

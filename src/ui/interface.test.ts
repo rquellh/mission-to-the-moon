@@ -157,6 +157,67 @@ describe('the mission interface', () => {
       director.setFastForward(false);
       expect(screen.getByText('Fast forward')).not.toBeVisible();
     });
+
+    // On the screen a dot stands between "Fast forward" and the count; screen readers skip it.
+    it('says "Fast forward" alone until the ship has really gone all the way around once', async () => {
+      const { user, director } = await mountMission('apollo-11', { start: 'explore' });
+      await user.click(screen.getByRole('button', { name: 'Controls' }));
+
+      director.setFastForward(true);
+      director.setFastForwardLaps(0.9);
+
+      expect(screen.getByText('Fast forward')).toBeVisible();
+      expect(screen.getByText('Fast forward')).toHaveTextContent(/^Fast forward$/);
+    });
+
+    it('counts the orbits the ship really flies, in whole orbits', async () => {
+      const { user, director } = await mountMission('apollo-11', { start: 'explore' });
+      await user.click(screen.getByRole('button', { name: 'Controls' }));
+      director.setFastForward(true);
+
+      director.setFastForwardLaps(1);
+      expect(screen.getByText('Fast forward')).toHaveTextContent(/^Fast forward 1 orbit$/);
+      expect(screen.getByText('1 orbit')).toBeVisible();
+
+      director.setFastForwardLaps(1.8);
+      expect(screen.getByText('Fast forward')).toHaveTextContent(/^Fast forward 1 orbit$/);
+
+      director.setFastForwardLaps(2.1);
+      expect(screen.getByText('Fast forward')).toHaveTextContent(/^Fast forward 2 orbits$/);
+
+      director.setFastForwardLaps(12.95);
+      expect(screen.getByText('Fast forward')).toHaveTextContent(/^Fast forward 12 orbits$/);
+    });
+
+    it('hides the count with fast forward, and starts the next one without it', async () => {
+      const { user, director } = await mountMission('apollo-11', { start: 'explore' });
+      await user.click(screen.getByRole('button', { name: 'Controls' }));
+      director.setFastForward(true);
+      director.setFastForwardLaps(3.4);
+      expect(screen.getByText('3 orbits')).toBeVisible();
+
+      director.setFastForward(false);
+
+      expect(screen.getByText('Fast forward')).not.toBeVisible();
+      expect(screen.getByText('Fast forward')).toHaveTextContent(/^Fast forward$/);
+
+      director.setFastForward(true);
+
+      expect(screen.getByText('Fast forward')).toBeVisible();
+      expect(screen.getByText('Fast forward')).toHaveTextContent(/^Fast forward$/);
+    });
+
+    it('explains itself to a visitor who points at it', async () => {
+      const { user, director } = await mountMission('apollo-11', { start: 'explore' });
+      await user.click(screen.getByRole('button', { name: 'Controls' }));
+
+      director.setFastForward(true);
+
+      expect(screen.getByText('Fast forward')).toHaveAttribute(
+        'title',
+        'The clock is running fast. The ship is shown gliding slowly around its orbit, not where it really is. The count shows how many times it has really gone around.',
+      );
+    });
   });
 
   describe('without a 3D view', () => {
@@ -263,6 +324,31 @@ describe('the mission interface', () => {
       settle(frames);
 
       expect(screen.queryByText(copy.timeline.fastForwardSpoken)).not.toBeInTheDocument();
+    });
+
+    it('says why the ship glides slowly, and never reads out the count as it goes up', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      const { user, director, frames } = await mountMission('apollo-11', { start: 'explore' });
+      await user.click(screen.getByRole('button', { name: 'Controls' }));
+      director.setFastForward(true);
+      settle(frames);
+      expect(
+        screen.getByText(
+          'Fast forward. The clock is running fast. The ship is shown gliding slowly around its orbit, and its path shows as a ring.',
+        ),
+      ).toHaveAttribute('aria-live', 'polite');
+
+      director.setFastForwardLaps(1);
+      settle(frames);
+      director.setFastForwardLaps(2);
+      settle(frames);
+
+      // The announcer still holds the explanation, and the count is in no live region of its own.
+      expect(screen.getByText(copy.timeline.fastForwardSpoken)).toHaveAttribute(
+        'aria-live',
+        'polite',
+      );
+      expect(screen.getByText('2 orbits').closest('[aria-live], [role="status"]')).toBeNull();
     });
   });
 });

@@ -180,10 +180,15 @@ export const copy = {
     day: (day: number) => `Day ${day}`,
     /** Under the chapter's name beside Play, on flights longer than two days. */
     dayOf: (day: number, total: number) => `Day ${day} of ${total}`,
-    /** Beside the clock while the ship circles too fast to follow and the view holds still. */
+    /** Beside the clock while the ship circles too fast to follow and is shown gliding slowly instead. */
     fastForward: 'Fast forward',
+    /** After "Fast forward", once the ship has really gone all the way around at least once. */
+    fastForwardOrbits: (count: number) => `${count} ${count === 1 ? 'orbit' : 'orbits'}`,
+    /** On "Fast forward", for a visitor who points at it. */
+    fastForwardHint:
+      'The clock is running fast. The ship is shown gliding slowly around its orbit, not where it really is. The count shows how many times it has really gone around.',
     fastForwardSpoken:
-      'Fast forward. The ship goes around too fast to see, so its path shows as a ring.',
+      'Fast forward. The clock is running fast. The ship is shown gliding slowly around its orbit, and its path shows as a ring.',
     /** On Play, which rests while the tour runs the clock. */
     lockedDuringTour: 'The tour runs the clock for you. Exit the tour to play it yourself.',
   },

@@ -208,14 +208,28 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   }
 
   // Fast forward: the scene says when the ship circles too fast to follow.
-  // A quiet mark shows by the clock, and screen readers hear why once, not
-  // on every lap.
+  // A quiet mark shows by the clock, counting the orbits the ship really
+  // flies once it has flown one. Screen readers hear why once, not on every
+  // lap: the mark is not a live region, so the count is only read when a
+  // visitor goes to it.
   const fastMark = byId('clock-fast', HTMLSpanElement);
-  fastMark.textContent = copy.timeline.fastForward;
+  const fastOrbits = el('span', 'clock__orbits');
+  fastOrbits.setAttribute('data-testid', 'clock-fast-forward-orbits');
+  fastOrbits.hidden = true;
+  fastMark.replaceChildren(`${copy.timeline.fastForward} `, fastOrbits);
+  fastMark.title = copy.timeline.fastForwardHint;
   let fastShown = false;
+  let orbitsShown = 0;
   let fastSpokenAt = -Infinity;
   director.subscribe(() => {
     const fast = director.fastForward === true;
+    const laps = fast ? (director.fastForwardLaps ?? 0) : 0;
+    const orbits = Number.isFinite(laps) && laps >= 1 ? Math.floor(laps) : 0;
+    if (orbits !== orbitsShown) {
+      orbitsShown = orbits;
+      fastOrbits.hidden = orbits === 0;
+      fastOrbits.textContent = orbits === 0 ? '' : copy.timeline.fastForwardOrbits(orbits);
+    }
     if (fast === fastShown) return;
     fastShown = fast;
     fastMark.hidden = !fast;
