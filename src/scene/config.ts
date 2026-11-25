@@ -37,18 +37,27 @@ export const SHIP_AMBIENT_INTENSITY = 0.9;
  */
 export const STAR_BRIGHTNESS = 0.5;
 
-/** Camera transition and scale-change duration, in milliseconds. */
+/** Scale-change duration, in milliseconds. */
 export const TRANSITION_MS = 1500;
 /**
- * A camera move that swings far around Earth or the Moon takes longer, so
- * the ground does not race by: a swing of up to the first angle takes the
- * move's usual time, and one of the second angle or more takes
- * LONG_SWING_MS / TRANSITION_MS times as long, evenly in between. Angles in
- * degrees.
+ * A camera move between views, and the ship view's moves into and out of its
+ * steady fast-forward view, take as long as they need for the picture never
+ * to turn faster than CAMERA_TURN_DEG_PER_S (its turn and its roll
+ * together), eased in and out: at least the first time here and at most the
+ * second, in milliseconds. A small move takes the first; the largest (a
+ * swing far around a body that rolls the picture over as well) the second,
+ * turning a little faster. The tour waits for a move to end before it says it
+ * has arrived, for at most CAMERA_SETTLE_MAX_SECONDS (src/app/tour.ts), which
+ * the second time must not exceed.
  */
-export const SWING_ANGLES_DEG = [45, 150] as const;
-/** How long a camera move between views takes at most, for the longest swing, in milliseconds. */
-export const LONG_SWING_MS = 2400;
+export const CAMERA_MOVE_MS = [1500, 3000] as const;
+/**
+ * The fastest a camera move turns the picture, in degrees a second, where
+ * CAMERA_MOVE_MS leaves it time to. A little under the 90 the owner asked
+ * for, as a move's end can move on the way (the ship view follows its craft)
+ * and a slow frame bunches a move's turn.
+ */
+export const CAMERA_TURN_DEG_PER_S = 80;
 /** A shorter move, for reframing after the interface changes size. */
 export const REFRAME_MS = 450;
 

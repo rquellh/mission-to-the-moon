@@ -250,54 +250,193 @@ export function swingAngle(from: CameraPose, to: CameraPose, center: Vector3): n
   return _fromDir.angleTo(_toDir);
 }
 
-const _sight = new Vector3();
-const _toSubject = new Vector3();
-const _offSight = new Quaternion();
-const _offSightPart = new Quaternion();
-const _upTurn = new Quaternion();
-const _upPart = new Quaternion();
+/**
+ * Where a point is seen from a camera pose: across (x, to the right) and up
+ * (y), each as a share of the point's distance in front of the camera. The
+ * picture is a flat projection of these, so a straight line between two
+ * spots is a straight line on the screen, and a spot inside the clear area
+ * at both ends of that line stays inside it all the way (see aimAt).
+ */
+export interface Spot {
+  x: number;
+  y: number;
+}
+
+/** Farther off the line of sight than this (as a Spot's share, about 76 degrees), a point is taken as out of sight. */
+const SPOT_LIMIT = 4;
+const _seen = new Vector3();
+const _seenTurn = new Quaternion();
 
 /**
- * A move between a wide view and a close view of a subject near a body (a
- * craft: `subject` names the end that looks at it), swinging around the
- * body as swingAround does, but keeping the subject in the picture all the
- * way. The camera goes where swingAround takes it; the line of sight turns
- * with it so the subject's angle off it shrinks evenly to nothing on the way
- * in (or grows evenly from nothing on the way out), never more than at the
- * wide end, where the subject is in the picture. A plain swing slides the
- * body's center across the picture instead, and can leave the craft outside
- * until the end. The picture rolls evenly from one end's up to the other's.
+ * Where `point` is seen from `pose` (see Spot), written to `out`. False when
+ * it is behind the camera or nearly beside it, where there is no such spot.
  */
-export function swingKeeping(
-  from: OrientedPose,
-  to: OrientedPose,
+export function seenAt(pose: OrientedPose, point: Vector3, out: Spot): boolean {
+  orientationOf(pose, _seenTurn).invert();
+  _seen.subVectors(point, pose.position).applyQuaternion(_seenTurn);
+  if (_seen.z > -1e-12) return false;
+  out.x = _seen.x / -_seen.z;
+  out.y = _seen.y / -_seen.z;
+  return Math.abs(out.x) < SPOT_LIMIT && Math.abs(out.y) < SPOT_LIMIT;
+}
+
+const _aim = new Quaternion();
+const _aimBack = new Quaternion();
+const _aimTurn = new Quaternion();
+const _have = new Vector3();
+const _want = new Vector3();
+
+/**
+ * Turn a pose's line of sight as little as possible so that `point` is seen
+ * at `spot` (see seenAt). The camera stays where it is, and so does the
+ * distance it looks to its target; its up turns with it. A camera move that
+ * does this at each step, with the spot taken a share of the way from where
+ * the point is seen at the start to where it is seen at the end, keeps the
+ * point on a straight line across the picture between the two.
+ */
+export function aimAt(pose: OrientedPose, point: Vector3, spot: Spot): void {
+  orientationOf(pose, _aim);
+  _have.subVectors(point, pose.position).applyQuaternion(_aimBack.copy(_aim).invert());
+  if (_have.lengthSq() < 1e-24) return;
+  _have.normalize();
+  _want.set(spot.x, spot.y, -1).normalize();
+  _aim.multiply(_aimTurn.setFromUnitVectors(_want, _have));
+  const look = pose.position.distanceTo(pose.target);
+  pose.target.set(0, 0, -1).applyQuaternion(_aim).multiplyScalar(look).add(pose.position);
+  pose.up.set(0, 1, 0).applyQuaternion(_aim);
+}
+
+const _toCenterSeen = new Vector3();
+const _limbTurn = new Quaternion();
+const _limbBack = new Quaternion();
+const _pitch = new Quaternion();
+const _pitchAxis = new Vector3(1, 0, 0);
+
+/**
+ * How high a body's outline reaches in a pose's picture, as an angle above
+ * the line of sight, measured about the picture's horizontal (so tipping the
+ * camera down raises it by just as much): NaN from inside the body, and
+ * Infinity when the body reaches round to the picture's horizontal, where
+ * it has no top edge. Leaves the camera's orientation in _limbTurn.
+ */
+function topAngle(pose: OrientedPose, center: Vector3, radius: number): number {
+  orientationOf(pose, _limbTurn);
+  _toCenterSeen
+    .subVectors(center, pose.position)
+    .applyQuaternion(_limbBack.copy(_limbTurn).invert());
+  const distance = _toCenterSeen.length();
+  if (distance <= radius) return Number.NaN;
+  _toCenterSeen.divideScalar(distance);
+  // The center's height, and the outline's reach above it, in the plane the camera tips in.
+  const across = Math.hypot(_toCenterSeen.y, _toCenterSeen.z);
+  const reach = radius / distance / Math.max(across, 1e-12);
+  if (reach >= 1) return Number.POSITIVE_INFINITY;
+  return Math.atan2(_toCenterSeen.y, -_toCenterSeen.z) + Math.asin(reach);
+}
+
+/**
+ * How high a body's top edge is in a pose's picture, as a Spot's height (see
+ * Spot): Infinity when it reaches above the picture altogether, and NaN from
+ * inside the body.
+ */
+export function bodyTop(pose: OrientedPose, center: Vector3, radius: number): number {
+  const angle = topAngle(pose, center, radius);
+  if (Number.isNaN(angle)) return angle;
+  return angle < Math.PI / 2 ? Math.tan(angle) : Number.POSITIVE_INFINITY;
+}
+
+/**
+ * Tip a pose's line of sight down, about the picture's horizontal and as
+ * little as it must, so the body's top edge is no lower in the picture than
+ * `floor` (see bodyTop). A camera that backs away from a body below it
+ * while turning to look at it would otherwise let the body sink out of the
+ * bottom of the picture (behind the card) on the way.
+ */
+export function keepBodyUp(
+  pose: OrientedPose,
   center: Vector3,
-  subject: 'from' | 'to',
-  t: number,
-  out: OrientedPose,
+  radius: number,
+  floor: number,
 ): void {
-  swingAround(from, to, center, t, out);
-  if (t <= 0 || t >= 1) return;
-  const inward = subject === 'to';
-  const target = inward ? to.target : from.target;
-  const wide = inward ? from : to;
-  // The turn from the subject to the line of sight, seen from the wide end, taken a share at a
-  // time, and carried around the body with the camera (swingAround leaves its turn so far,
-  // from the start, in _arcStep), so it stays the same turn as seen from the camera.
-  _toSubject.subVectors(target, wide.position).normalize();
-  _sight.subVectors(wide.target, wide.position).normalize();
-  arcTurn(_toSubject, _sight, wide.up, _offSight);
-  // Seen from the far end, it is taken back around the body to the start first.
-  if (!inward) _offSight.premultiply(_twist.copy(_arc).invert()).multiply(_arc);
-  _offSightPart.identity().slerp(_offSight, inward ? 1 - t : t);
-  _offSightPart.premultiply(_arcStep).multiply(_arcBack.copy(_arcStep).invert());
-  _sight.subVectors(target, out.position).normalize().applyQuaternion(_offSightPart);
-  const fromLook = Math.max(from.position.distanceTo(from.target), 1e-9);
-  const toLook = Math.max(to.position.distanceTo(to.target), 1e-9);
-  out.target.copy(out.position).addScaledVector(_sight, fromLook * (toLook / fromLook) ** t);
-  _upTurn.setFromUnitVectors(from.up, to.up);
-  _upPart.identity().slerp(_upTurn, t);
-  out.up.copy(from.up).applyQuaternion(_upPart);
+  if (!Number.isFinite(floor)) return;
+  const height = topAngle(pose, center, radius);
+  const wanted = Math.atan(floor);
+  // Not for a body whose top edge is behind the camera altogether.
+  if (!(height < wanted) || height <= -Math.PI / 2) return;
+  _limbTurn.multiply(_pitch.setFromAxisAngle(_pitchAxis, height - wanted));
+  const look = pose.position.distanceTo(pose.target);
+  pose.target.set(0, 0, -1).applyQuaternion(_limbTurn).multiplyScalar(look).add(pose.position);
+  pose.up.set(0, 1, 0).applyQuaternion(_limbTurn);
+}
+
+/**
+ * The easing of a camera move between views: it sets off and comes to rest
+ * gently, and its pace in the middle, its fastest, is π/2 times its average
+ * (a cubic ease's is three times).
+ */
+export function easeMove(t: number): number {
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  return (1 - Math.cos(Math.PI * t)) / 2;
+}
+
+/** Steps over which moveDuration measures a move. */
+const MOVE_SAMPLES = 48;
+const _sample: OrientedPose = { position: new Vector3(), target: new Vector3(), up: new Vector3() };
+const _turnA = new Quaternion();
+const _turnB = new Quaternion();
+
+/**
+ * How long a camera move takes, in milliseconds: the least time in which,
+ * eased by easeMove, the picture never turns faster than
+ * `degreesPerSecond` (its turn and its roll together, as the camera's
+ * orientation turns), but no less than `shortestMs` and no more than
+ * `longestMs`. A move that turns the picture far takes longer, and one that
+ * hardly turns it the shortest time. `poseAt(t, out)` writes the move's pose
+ * at `t`, from 0 (its start) to 1 (its end).
+ */
+export function moveDuration(
+  poseAt: (t: number, out: OrientedPose) => void,
+  degreesPerSecond: number,
+  shortestMs: number,
+  longestMs: number,
+): number {
+  const seconds = MathUtils.radToDeg(measureMove(poseAt).peak) / Math.max(degreesPerSecond, 1e-9);
+  return MathUtils.clamp(seconds * 1000, shortestMs, longestMs);
+}
+
+/**
+ * How far a camera move turns the picture in all (its turn and its roll
+ * together, as the camera's orientation turns), in radians. Of the ways a
+ * move can go, the one that turns it least is the calmest.
+ */
+export function moveTurn(poseAt: (t: number, out: OrientedPose) => void): number {
+  return measureMove(poseAt).total;
+}
+
+/** A move's turn of the camera, eased by easeMove: in all, and at its fastest (radians per unit of the move's time). */
+interface MoveTurn {
+  total: number;
+  peak: number;
+}
+
+const _measure: MoveTurn = { total: 0, peak: 0 };
+
+/** Measures a move's turn of the camera (see MoveTurn) at MOVE_SAMPLES eased steps. */
+function measureMove(poseAt: (t: number, out: OrientedPose) => void): MoveTurn {
+  _measure.total = 0;
+  _measure.peak = 0;
+  poseAt(0, _sample);
+  orientationOf(_sample, _turnA);
+  for (let i = 1; i <= MOVE_SAMPLES; i += 1) {
+    poseAt(easeMove(i / MOVE_SAMPLES), _sample);
+    orientationOf(_sample, _turnB);
+    const step = _turnA.angleTo(_turnB);
+    _measure.total += step;
+    _measure.peak = Math.max(_measure.peak, step * MOVE_SAMPLES);
+    _turnA.copy(_turnB);
+  }
+  return _measure;
 }
 
 /** How far off a body a wide view may look and still have it in sight (see swingBodyOf), in degrees. */
@@ -346,6 +485,34 @@ export function swingBodyOf<T extends SphereLike>(
 }
 
 /**
+ * Which way round a swing goes (see swingAround). Each turn of it can go the
+ * short way round or the long way: its swing around the body, and its roll
+ * about the line to the body. A move whose end moves on the way (the ship
+ * view follows its craft) keeps rolling the way it set off: `twist` is the
+ * roll it took last, in radians, which the next step stays nearest to, so
+ * the picture never flips over to roll the other way. NaN before the first
+ * step.
+ */
+export interface SwingWay {
+  readonly longArc: boolean;
+  readonly longTwist: boolean;
+  twist: number;
+}
+
+const _partAxis = new Vector3();
+
+/** A share of the turn `turn` (taken the short way round, or the long way when `long`), into `out`. */
+function partTurn(turn: Quaternion, share: number, long: boolean, out: Quaternion): Quaternion {
+  const sign = turn.w < 0 ? -1 : 1;
+  const across = Math.hypot(turn.x, turn.y, turn.z);
+  if (across < 1e-12) return out.identity();
+  let angle = 2 * Math.atan2(across, sign * turn.w);
+  if (long) angle -= 2 * Math.PI;
+  _partAxis.set(turn.x, turn.y, turn.z).multiplyScalar(sign / across);
+  return out.setFromAxisAngle(_partAxis, angle * share);
+}
+
+/**
  * Interpolate between two camera poses by swinging the camera around a body
  * at `center`, so a move between views goes around the body, never through
  * it or close past it. The camera's direction from the center turns along a
@@ -356,7 +523,8 @@ export function swingBodyOf<T extends SphereLike>(
  * where it is on the screen to where it ends up, and the picture rolls
  * evenly about it, without a flip. The target stays on the line of sight,
  * its distance changing geometrically, so it reaches each end's own target.
- * `t` runs from 0 (`from`) to 1 (`to`).
+ * `t` runs from 0 (`from`) to 1 (`to`). Each turn goes the short way round,
+ * or as `way` says (see SwingWay).
  */
 export function swingAround(
   from: OrientedPose,
@@ -364,6 +532,7 @@ export function swingAround(
   center: Vector3,
   t: number,
   out: OrientedPose,
+  way?: SwingWay,
 ): void {
   if (t <= 0 || t >= 1) {
     const end = t <= 0 ? from : to;
@@ -385,7 +554,7 @@ export function swingAround(
   const bend = lead * t * (1 - t);
   const distance = fromDistance * Math.exp(zoom * (t + bend));
   const turn = t - bend;
-  _arcStep.identity().slerp(_arc, turn);
+  partTurn(_arc, turn, way?.longArc ?? false, _arcStep);
 
   // The camera's turn from the start's orientation to the end's, as seen from
   // the swing, which carries the line to the body's center along with it. It
@@ -401,7 +570,21 @@ export function swingAround(
   if (_twist.lengthSq() < 1e-12) _twist.identity();
   else _twist.normalize();
   _across.copy(_twist).invert().multiply(_change);
-  _change.identity().slerp(_twist, turn).multiply(_share.identity().slerp(_across, turn));
+  // The roll about the line to the body, as a signed angle: the short way round, or as `way` has it.
+  let roll =
+    2 * Math.atan2(_twist.x * _toBody.x + _twist.y * _toBody.y + _twist.z * _toBody.z, _twist.w);
+  if (roll > Math.PI) roll -= 2 * Math.PI;
+  else if (roll <= -Math.PI) roll += 2 * Math.PI;
+  if (way) {
+    const other = roll > 0 ? roll - 2 * Math.PI : roll + 2 * Math.PI;
+    if (Number.isNaN(way.twist)) {
+      if (way.longTwist) roll = other;
+    } else if (Math.abs(other - way.twist) < Math.abs(roll - way.twist)) {
+      roll = other;
+    }
+    way.twist = roll;
+  }
+  _change.setFromAxisAngle(_toBody, roll * turn).multiply(partTurn(_across, turn, false, _share));
   _start.premultiply(_change).premultiply(_arcStep);
 
   const fromLook = Math.max(from.position.distanceTo(from.target), 1e-9);
