@@ -185,6 +185,8 @@ const LABEL_NEAR_MOON_RADII = [1.4, 2.2] as const;
 /** The room between the parts at a site and the first label under them, in CSS pixels, and how long a label takes to fade in or out, in seconds. */
 const LABEL_GAP_PX = 8;
 const LABEL_FADE_SECONDS = 0.5;
+/** For this many story seconds after liftoff, a part left behind is drawn at the size its lander is drawn (see updateFleet). */
+const LIFTOFF_SIZE_STORY_SECONDS = 1.5;
 const COMPANION_MARKER_M = 1500;
 const COMPANION_MARKER_PX = 9;
 /** Story seconds over which a ship's line fades out once its path has ended (see fadeEndedPaths). */
@@ -238,9 +240,15 @@ const RING_POINTS = 192;
 /** How quickly a ring eases to its craft's new orbit after a burn, in seconds of real time. */
 const RING_SETTLE_SECONDS = 0.15;
 /**
+ * A craft that goes behind Earth or the Moon fades out over this many
+ * seconds of real time, and fades in as it comes out, rather than vanishing
+ * or appearing at the limb in one frame.
+ */
+const HIDDEN_FADE_SECONDS = 0.25;
+/**
  * A seek of more than this many story seconds puts every craft straight
- * into or out of fast forward. A smaller one, such as the tour's last settle
- * onto a stop, cross-fades as playing does.
+ * into its new look (size, parachutes, fast forward). A smaller one, such as
+ * the tour's last settle onto a stop, eases as playing does.
  */
 const LEAP_STORY_SECONDS = 0.3;
 /*
@@ -393,6 +401,8 @@ interface ShipState extends ShipPose {
   readonly ringNow: Float32Array;
   readonly ringWanted: Float32Array;
   readonly ringCenter: Vector3;
+  /** How far it is in sight, 0 (behind Earth or the Moon) to 1 (see HIDDEN_FADE_SECONDS); NaN while it does not exist. */
+  seen: number;
 }
 
 /**
@@ -612,8 +622,11 @@ export class Stage implements Director {
   /** The Moon's and Earth's centers at true scale, for telling a closed lap (see closedLap). */
   private readonly moonAtTrueScale = [0, 0, 0];
   private readonly atOrigin = [0, 0, 0] as const;
-  /** The scale mix the rings were last drawn at. */
+  /** The scale mix the rings were last drawn at, and the view the craft were last drawn in. */
   private ringMix = Number.NaN;
+  private fleetView: EventView | null = null;
+  /** True from a move out of the journey view until the camera arrives (see updateFleet). */
+  private leavingJourney = false;
   /** How far the ship view is drawn close up for a spacewalk, 0 to 1, and where it is heading. */
   private walkLevel = 0;
   private walkWanted = 0;
@@ -690,6 +703,7 @@ export class Stage implements Director {
         ringNow: new Float32Array(RING_POINTS * 3),
         ringWanted: new Float32Array(RING_POINTS * 3),
         ringCenter: new Vector3(),
+        seen: Number.NaN,
         exists: false,
         position: new Vector3(),
         forward: new Vector3(1, 0, 0),
@@ -2555,13 +2569,16 @@ export class Stage implements Director {
       this.needsRender ||
       this.shipsTurning()
     ) {
-      this.renderFrame(dt, jumped);
+      this.renderFrame(dt, leapt);
     }
   };
 
-  /** True while a spacecraft keeps turning with the clock stopped (see ShipModel.idleTurning). */
+  /** True while a spacecraft keeps turning or fading with the clock stopped (see ShipModel.idleTurning). */
   private shipsTurning(): boolean {
     if (this.walkLevel !== this.walkWanted) return true;
+    for (const ship of this.ships) {
+      if (ship.seen > 0 && ship.seen < 1) return true;
+    }
     const ships = this.fleet?.ships ?? [];
     for (let i = 0; i < ships.length; i += 1) {
       if ((ships[i] as ShipModel).idleTurning) return true;
@@ -2571,10 +2588,48 @@ export class Stage implements Director {
 
   /** Scene units per CSS pixel at a point, for a model drawn there; 0 when it is hidden behind Earth or the Moon or behind the camera. */
   private unitsPerPixelAt(point: Vector3, exists: boolean, tanHalf: number): number {
-    // The journey view is a diagram: a ship behind Earth or the Moon is drawn anyway.
-    if (!exists || (this.viewNow !== 'journey' && this.occluded(point))) return 0;
+    if (!exists || this.behindBody(point)) return 0;
+    return this.depthUnitsPerPixel(point, tanHalf);
+  }
+
+  /** Scene units per CSS pixel at a point in front of the camera, whatever is in the way; 0 behind the camera. */
+  private depthUnitsPerPixel(point: Vector3, tanHalf: number): number {
     const depth = this.v1.subVectors(point, this.camera.position).dot(this.cameraForward);
     return depth > this.camera.near ? (2 * depth * tanHalf) / this.cssHeight : 0;
+  }
+
+  /**
+   * True when Earth or the Moon hides a point. The journey view is a
+   * diagram: a craft behind Earth or the Moon is drawn anyway, and still is
+   * while the camera moves from it to another view (see updateFleet).
+   */
+  private behindBody(point: Vector3): boolean {
+    return this.viewNow !== 'journey' && !this.leavingJourney && this.occluded(point);
+  }
+
+  /**
+   * Scene units per CSS pixel for a craft drawn at `point`, as
+   * unitsPerPixelAt, while it fades out behind Earth or the Moon and in as
+   * it comes out (see HIDDEN_FADE_SECONDS): this eases `ship.seen`, and is 0
+   * once it has faded out. A craft that has just come to exist is in sight
+   * or not at once.
+   */
+  private shipUnitsPerPixel(
+    ship: ShipState,
+    point: Vector3,
+    tanHalf: number,
+    dt: number,
+    snap: boolean,
+  ): number {
+    if (!ship.exists) {
+      ship.seen = Number.NaN;
+      return 0;
+    }
+    const units = this.depthUnitsPerPixel(point, tanHalf);
+    const wanted = units > 0 && !this.behindBody(point) ? 1 : 0;
+    if (Number.isNaN(ship.seen) || snap || this.reducedMotion) ship.seen = wanted;
+    else ship.seen = stepToward(ship.seen, wanted, dt / HIDDEN_FADE_SECONDS);
+    return ship.seen > 0 ? units : 0;
   }
 
   /** Their real distance apart at mission time t, in meters, or NaN when one does not exist. */
@@ -2829,14 +2884,24 @@ export class Stage implements Director {
     return this.dotMap;
   }
 
-  /** How visible a ship's model is now: it gives way to its ring in fast forward. */
+  /** How visible a ship's model is now: it gives way to its ring in fast forward, and fades out behind Earth or the Moon. */
   private opacityOf(ship: ShipState): number {
-    return 1 - smoothstep(0, 1, ship.crossFade);
+    const seen = Number.isNaN(ship.seen) ? 0 : ship.seen;
+    return (1 - smoothstep(0, 1, ship.crossFade)) * smoothstep(0, 1, seen);
   }
 
   /** Size, place, and show or hide each spacecraft for this frame. */
   private updateFleet(dt: number, snap: boolean): void {
     if (!this.fleet) return;
+    // A move out of the journey view draws a craft behind Earth or the Moon
+    // until the camera arrives, as the journey view does, so a craft just past
+    // a limb from there does not blink out on the way (see behindBody).
+    if (this.viewNow !== this.fleetView) {
+      this.leavingJourney = this.fleetView === 'journey';
+      this.fleetView = this.viewNow;
+    }
+    if (this.leavingJourney && this.pendingView === null && this.cameraTween === null)
+      this.leavingJourney = false;
     const context = this.poseContext;
     const t = this.player.time;
     context.time = t;
@@ -2951,8 +3016,9 @@ export class Stage implements Director {
     this.ships.forEach((ship, i) => {
       const marker = this.companionMarkers[i];
       if (!marker) return;
+      // It fades behind a body with its model (see shipUnitsPerPixel).
       const level = companion(ship) * this.opacityOf(ship);
-      const units = level > 0.01 ? this.unitsPerPixelAt(ship.position, true, tanHalf) : 0;
+      const units = level > 0.01 ? this.depthUnitsPerPixel(ship.position, tanHalf) : 0;
       marker.visible = units > 0;
       if (!marker.visible) return;
       marker.position.copy(ship.position);
@@ -2980,10 +3046,12 @@ export class Stage implements Director {
     if (anchorModel) {
       const ship = this.ships[anchorIndex] as ShipState;
       context.sizeScale = anchorSizeScale = sizeScaleOf(ship);
-      context.unitsPerPixel = anchorUnits = this.unitsPerPixelAt(
+      context.unitsPerPixel = anchorUnits = this.shipUnitsPerPixel(
+        ship,
         ship.position,
-        ship.exists,
         tanHalf,
+        dt,
+        snap,
       );
       context.metersPerPixel = 0;
       context.opacity = this.opacityOf(ship) * (1 - companion(ship));
@@ -3010,8 +3078,6 @@ export class Stage implements Director {
       let pose: ShipPose = ship;
       context.sizeScale = sizeScaleOf(ship);
       context.metersPerPixel = 0;
-      context.unitsPerPixel = this.unitsPerPixelAt(ship.position, ship.exists, tanHalf);
-      context.opacity = this.opacityOf(ship) * (1 - companion(ship));
       const anchorScale = anchorModel?.drawnMetersPerPixel ?? 0;
       const spread = pair !== null && (pair.arranged > 0 || this.viewNow === 'spacecraft');
       if (pair && spread && anchorModel && i === moverIndex && anchorUnits > 0 && anchorScale > 0) {
@@ -3056,12 +3122,15 @@ export class Stage implements Director {
         drawn.exists = true;
         drawn.position.copy(this.sitePosition);
         pose = drawn;
-        const units = this.unitsPerPixelAt(drawn.position, true, tanHalf);
+        const units = this.shipUnitsPerPixel(ship, drawn.position, tanHalf, dt, snap);
         context.unitsPerPixel = units > 0 ? MathUtils.lerp(units, anchorUnits, w) : 0;
         context.sizeScale = MathUtils.lerp(context.sizeScale, anchorSizeScale, w);
         const own = model.metersPerPixelOf(model.shapeAt(t), context);
         if (own > 0) context.metersPerPixel = MathUtils.lerp(own, anchorScale, w);
+      } else {
+        context.unitsPerPixel = this.shipUnitsPerPixel(ship, ship.position, tanHalf, dt, snap);
       }
+      context.opacity = this.opacityOf(ship) * (1 - companion(ship));
       model.update(closeUp(ship, model, pose), context);
     }
     context.glow = 1;
@@ -3078,18 +3147,23 @@ export class Stage implements Director {
       const shown = site !== undefined && t >= part.from - 1e-6;
       context.unitsPerPixel = this.unitsPerPixelAt(this.sitePosition, shown, tanHalf);
       // Sized like the ascent stage that lifted off from it (smaller in the journey view),
-      // or, while the lander still stands there, like the lander.
+      // or, while the lander still stands there, like the lander. Just after liftoff it
+      // takes the ascent stage's size as drawn, which eases from the whole lander's, so
+      // the two grow together rather than the part appearing at the larger size.
       if (journey) context.maxPixels = JOURNEY_LEFT_BEHIND_MAX_PX;
       context.sizeScale =
         screenScale *
         (this.viewNow === 'spacecraft' && this.followed.id === part.shipId ? SUBJECT_SCALE : 1);
       const landerIndex = this.ships.findIndex((ship) => ship.id === part.shipId);
       const lander = models[landerIndex];
-      const standing =
-        lander !== undefined &&
-        lander.root.visible &&
-        this.path.phaseAt(part.shipId, t)?.kind === 'surface';
-      context.metersPerPixel = standing ? lander.drawnMetersPerPixel : 0;
+      const phase = this.path.phaseAt(part.shipId, t)?.kind;
+      const drawnLander = lander !== undefined && lander.root.visible;
+      const standing = drawnLander && phase === 'surface';
+      const rising =
+        drawnLander &&
+        phase === 'ascent' &&
+        this.player.storyTime - this.player.story.toStory(part.from) < LIFTOFF_SIZE_STORY_SECONDS;
+      context.metersPerPixel = standing || rising ? lander.drawnMetersPerPixel : 0;
       part.update(shown, this.sitePosition, this.siteUp, site?.front ?? this.worldUp, context);
       // While the lander still stands there, the part is not left behind yet: no label.
       this.labelWanted[i] = !standing;
