@@ -249,7 +249,8 @@ export const copy = {
   tour: {
     label: 'Guided tour',
     stopOf: (index: number, total: number) => `Stop ${index} of ${total}`,
-    onTheWay: 'On the way…',
+    /** Before the counter while the tour travels: "On the way to Stop 5 of 12". */
+    onTheWayTo: 'On the way to',
     back: 'Back',
     next: 'Next',
     finish: 'Finish',

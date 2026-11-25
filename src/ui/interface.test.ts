@@ -119,7 +119,7 @@ describe('the mission interface', () => {
       frames.advance(3);
 
       expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent(
-        'Stop 2 of 12 On the way…',
+        'On the way to Stop 2 of 12',
       );
       // The card never names a moment the clock has not reached, and the events passed on
       // the way go by too quickly to read, so it does not show them either.

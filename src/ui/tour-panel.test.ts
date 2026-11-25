@@ -71,7 +71,7 @@ describe('the tour panel', () => {
 
       await user.click(within(panel).getByRole('button', { name: 'Next' }));
 
-      expect(panel).toHaveTextContent('Stop 2 of 6 On the way…');
+      expect(panel).toHaveTextContent('On the way to Stop 2 of 6');
       expect(within(panel).getByRole('button', { name: 'Skip to this stop' })).toHaveTextContent(
         'Skip',
       );
@@ -83,7 +83,7 @@ describe('the tour panel', () => {
       frames.advance(A_WHOLE_TRIP);
 
       expect(panel).toHaveTextContent('Stop 2 of 6');
-      expect(panel).not.toHaveTextContent('On the way…');
+      expect(panel).not.toHaveTextContent('On the way to');
       expect(within(panel).getByRole('button', { name: 'Next' })).toBeEnabled();
       expect(
         within(theCard()).getByRole('heading', { level: 3, name: 'The first orbit change' }),
@@ -99,7 +99,7 @@ describe('the tour panel', () => {
       await user.click(within(panel).getByRole('button', { name: 'Skip to this stop' }));
 
       expect(panel).toHaveTextContent('Stop 2 of 6');
-      expect(panel).not.toHaveTextContent('On the way…');
+      expect(panel).not.toHaveTextContent('On the way to');
       expect(within(panel).getByRole('button', { name: 'Next' })).toHaveFocus();
     });
 
@@ -127,7 +127,9 @@ describe('the tour panel', () => {
 
       await user.click(screen.getByRole('button', { name: 'Next' }));
 
-      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('On the way…');
+      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent(
+        'On the way to',
+      );
       expect(within(theCard()).getByRole('heading', { level: 3 })).toHaveTextContent('Liftoff');
       expect(
         within(theCard()).queryByRole('button', { name: 'Try it: Drop the stages' }),

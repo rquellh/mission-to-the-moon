@@ -58,11 +58,12 @@ export function setUpTourPanel(tour: Tour, { onExplore }: TourPanelOptions): voi
 
     if (phase === 'traveling' || phase === 'stopped') {
       const position = tour.index + 1;
-      count.replaceChildren(
-        el('strong', 'tour__count-number', copy.tour.stopOf(position, tour.total)),
-      );
+      const number = el('strong', 'tour__count-number', copy.tour.stopOf(position, tour.total));
+      // On the way, the card still tells the stop just left, so the counter
+      // says the number is where the tour is going, not where it is.
       if (phase === 'traveling')
-        count.append(' ', el('span', 'tour__count-note', copy.tour.onTheWay));
+        count.replaceChildren(el('span', 'tour__count-note', copy.tour.onTheWayTo), ' ', number);
+      else count.replaceChildren(number);
       dots.forEach((dot, i) => {
         dot.classList.toggle('tour__dot--done', i < tour.index);
         dot.classList.toggle('tour__dot--current', i === tour.index);

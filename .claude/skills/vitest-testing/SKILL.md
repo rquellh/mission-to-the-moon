@@ -335,7 +335,7 @@ it('sets off for the next stop, and arrives when the trip is over', async () => 
 
   await user.click(within(panel).getByRole('button', { name: 'Next' }));
 
-  expect(panel).toHaveTextContent('Stop 2 of 6 On the way…');
+  expect(panel).toHaveTextContent('On the way to Stop 2 of 6');
   expect(within(panel).getByRole('button', { name: 'Skip to this stop' })).toHaveTextContent(
     'Skip',
   );
@@ -343,7 +343,7 @@ it('sets off for the next stop, and arrives when the trip is over', async () => 
   frames.advance(A_WHOLE_TRIP);
 
   expect(panel).toHaveTextContent('Stop 2 of 6');
-  expect(panel).not.toHaveTextContent('On the way…');
+  expect(panel).not.toHaveTextContent('On the way to');
   expect(within(panel).getByRole('button', { name: 'Next' })).toBeEnabled();
 });
 ```
@@ -1130,7 +1130,7 @@ expect(document.getElementById('tour')?.dataset['phase']).toBe('stopped');
 
 // CORRECT - what the panel says
 expect(panel).toHaveTextContent('Stop 2 of 6');
-expect(panel).not.toHaveTextContent('On the way…');
+expect(panel).not.toHaveTextContent('On the way to');
 ```
 
 ### 7. Faking Every Timer
@@ -1174,7 +1174,7 @@ expect(secondsTaken).toBe(5);
 
 // CORRECT - draw enough frames, then check it arrived
 frames.advance(A_WHOLE_TRIP);
-expect(screen.getByRole('region', { name: 'Guided tour' })).not.toHaveTextContent('On the way…');
+expect(screen.getByRole('region', { name: 'Guided tour' })).not.toHaveTextContent('On the way to');
 ```
 
 ---
