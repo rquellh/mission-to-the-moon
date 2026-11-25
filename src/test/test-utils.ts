@@ -38,7 +38,7 @@ import {
 } from '../content/types.ts';
 import { extraFor, extras, isExtraReady } from '../extras/index.ts';
 import type { Extra } from '../extras/types.ts';
-import { buildFlightPath, createStoryTime } from '../sim/index.ts';
+import { buildFlightPath, createStoryTime, storyKeyTimes } from '../sim/index.ts';
 import { createAudioPlayer } from '../ui/audio-player.ts';
 import { mountInterface, type InterfaceOptions, type MissionInterface } from '../ui/interface.ts';
 import { setScreen } from './browser.ts';
@@ -107,11 +107,12 @@ function prepare(id: string): Promise<Prepared> {
     ready = loadBundle(id).then((bundle) => {
       if (bundle.mission.id !== id) throw new Error(`There is no mission "${id}"`);
       const path = buildFlightPath(bundle.flight);
-      const storyTime = createStoryTime([
-        path.start,
-        path.end,
-        ...bundle.mission.events.map((event) => elapsedToSeconds(event.elapsed)),
-      ]);
+      const storyTime = createStoryTime(
+        storyKeyTimes(
+          path,
+          bundle.mission.events.map((event) => elapsedToSeconds(event.elapsed)),
+        ),
+      );
       const keys = storyTime.keyTimes;
       const story: StoryMap = {
         duration: storyTime.length,

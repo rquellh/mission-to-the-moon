@@ -10,6 +10,7 @@ import {
   isInside,
   leftBehindOf,
   overlapping,
+  overlaps,
   partOf,
   shipOf,
 } from '../utils/scene-report';
@@ -137,6 +138,37 @@ test.describe('What the scene draws', () => {
           `What the label "${label.text}" covers`,
         ).toEqual([]);
       }
+    });
+  });
+
+  test('while Eagle flies beside Columbia after undocking, both are drawn, apart, clear of the card', async ({
+    sitePage,
+  }) => {
+    const missionPage = new MissionPage(sitePage);
+    const scenePage = new ScenePage(sitePage);
+    const beside = MOMENTS.APOLLO_11_BESIDE_COLUMBIA;
+
+    await test.step('Open the moment after undocking in the Ship view', async () => {
+      await sitePage.goto(URLS.TIME(beside.mission, beside.t, 'spacecraft'));
+      await missionPage.waitForLoad();
+      await scenePage.waitForLoad();
+    });
+
+    // The camera eases into the view, so wait for it to settle around the pair.
+    await test.step('The view follows Eagle, and Columbia is drawn beside it rather than over it', async () => {
+      await expect
+        .poll(async () => {
+          const report = await scenePage.report();
+          const eagle = shipOf(report, 'lm').box;
+          const columbia = shipOf(report, 'csm').box;
+          return {
+            followed: report.followed,
+            eagleClear: eagle !== null && isInside(eagle, report.clear),
+            columbiaClear: columbia !== null && isInside(columbia, report.clear),
+            apart: eagle !== null && columbia !== null && !overlaps(eagle, columbia),
+          };
+        })
+        .toEqual({ followed: 'lm', eagleClear: true, columbiaClear: true, apart: true });
     });
   });
 

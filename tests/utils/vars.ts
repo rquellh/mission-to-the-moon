@@ -111,6 +111,8 @@ export const EVENTS = {
 
 /** Mission times the tests open by address. */
 export const MOMENTS = {
+  /** Eight minutes after Apollo 11's Eagle undocks (100:12:00), before Columbia's separation burn: the two fly side by side. */
+  APOLLO_11_BESIDE_COLUMBIA: { mission: 'apollo-11', t: '100:20:00' },
   /** Thirteen seconds after Apollo 17's ascent stage lifts off (185:21:37): the descent stage and the rover are left behind, labeled. */
   APOLLO_17_AFTER_LIFTOFF: { mission: 'apollo-17', t: '185:21:50' },
 } as const;

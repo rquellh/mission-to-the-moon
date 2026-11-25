@@ -5,6 +5,8 @@
  * seconds when short and at most `maxSeconds` when days long. The map is
  * monotone, so it runs both ways.
  */
+import { elapsedToSeconds } from '../content/types.ts';
+import type { Phase, ShipTrack } from './types.ts';
 
 export interface StoryTimeOptions {
   /** Story length of a vanishingly short interval, seconds. Default 2. */
@@ -37,6 +39,44 @@ export function storyIntervalLength(interval: number, options: StoryTimeOptions 
   if (interval <= 0) return 0;
   const grow = Math.log1p(interval / knee) / Math.log1p(long / knee);
   return Math.min(max, min + (max - min) * grow);
+}
+
+/**
+ * Whether phase `k` of a ship's phases is station keeping that begins as the
+ * two craft part from docked: right after a docked phase with the same ship,
+ * or as the ship's first phase (a lander that rode on the other until then).
+ */
+export function partsFromDocked(phases: readonly Phase[], k: number): boolean {
+  const phase = phases[k];
+  if (phase?.kind !== 'station') return false;
+  const before = phases[k - 1];
+  return before === undefined || (before.kind === 'docked' && before.target === phase.target);
+}
+
+/**
+ * The mission times a flight's story clock is built from: the path's two
+ * ends and every event, so each stretch between two events plays for a
+ * watchable length. One more: when an event marks a lander's undocking and
+ * the lander then keeps station beside the ship it left, the end of that
+ * station keeping, so the two flying side by side play as their own stretch
+ * rather than the first moments of a long one. (Other station keeping adds
+ * no key: as keys, it would lengthen some flights by 10 to 34 seconds.)
+ */
+export function storyKeyTimes(
+  path: { readonly start: number; readonly end: number; readonly ships: readonly ShipTrack[] },
+  eventTimes: readonly number[],
+): number[] {
+  const keys = [path.start, path.end, ...eventTimes];
+  const isEvent = (time: number): boolean =>
+    eventTimes.some((event) => Math.abs(event - time) < 1e-6);
+  for (const ship of path.ships) {
+    if (ship.role !== 'lander') continue;
+    ship.phases.forEach((phase, k) => {
+      if (partsFromDocked(ship.phases, k) && isEvent(elapsedToSeconds(phase.start.value)))
+        keys.push(elapsedToSeconds(phase.end.value));
+    });
+  }
+  return keys;
 }
 
 /** Builds a story clock from any list of mission times (sorted or not). */

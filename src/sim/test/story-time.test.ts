@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { flight as apollo11Flight } from '../../content/missions/apollo-11/flight.ts';
-import { elapsedToSeconds } from '../../content/types.ts';
-import { createStoryTime, storyIntervalLength } from '../story-time.ts';
+import { story as apollo11 } from '../../content/missions/apollo-11/story.ts';
+import { flight as apollo16Flight } from '../../content/missions/apollo-16/flight.ts';
+import { story as apollo16 } from '../../content/missions/apollo-16/story.ts';
+import { flight as gemini12Flight } from '../../content/missions/gemini-12/flight.ts';
+import { story as gemini12 } from '../../content/missions/gemini-12/story.ts';
+import { elapsedToSeconds, type Mission } from '../../content/types.ts';
+import { buildFlightPath } from '../build.ts';
+import { createStoryTime, storyIntervalLength, storyKeyTimes } from '../story-time.ts';
+import type { FlightPlan } from '../types.ts';
 
 /** Every phase boundary of every ship, as the timeline might pass them. */
 const keyTimes = apollo11Flight.ships.flatMap((ship) =>
@@ -62,5 +69,37 @@ describe('story time', () => {
     assert.equal(empty.toStory(5), 0);
     const one = createStoryTime([42]);
     assert.equal(one.toMission(10), 42);
+  });
+});
+
+describe('story keys', () => {
+  /** The keys a flight's clock is built from, as main.ts builds them, and its event times. */
+  function keysOf(plan: FlightPlan, mission: Mission) {
+    const events = mission.events.map((event) => elapsedToSeconds(event.elapsed));
+    const path = buildFlightPath(plan);
+    return { path, events, keys: storyKeyTimes(path, events) };
+  }
+
+  it('give a lander flying beside the ship it undocked from, at an event, a stretch of its own', () => {
+    const { path, keys } = keysOf(apollo11Flight, apollo11);
+    const beside = path.ships.find((ship) => ship.role === 'lander')?.phases[0];
+    const undocking = elapsedToSeconds('100:12:00');
+    const apart = elapsedToSeconds('100:39:52.9');
+    const story = createStoryTime(keys);
+
+    expect(beside).toMatchObject({ kind: 'station', target: 'csm' });
+    expect(story.keyTimes).toContain(apart);
+    expect(story.toStory(apart) - story.toStory(undocking)).toBeCloseTo(
+      storyIntervalLength(apart - undocking),
+    );
+  });
+
+  it.each([
+    ['a lander that undocks with no event there (Apollo 16)', apollo16Flight, apollo16],
+    ['a main ship that undocks into station keeping (Gemini 12)', gemini12Flight, gemini12],
+  ])('add nothing for %s', (_name, plan, mission) => {
+    const { path, events, keys } = keysOf(plan, mission);
+
+    expect(keys).toEqual([path.start, path.end, ...events]);
   });
 });

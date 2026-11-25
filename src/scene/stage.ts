@@ -24,7 +24,7 @@ import { homeView, nearestView } from '../app/views';
 import { EARTH_MEAN_RADIUS_KM, EARTH_RADIUS, MOON_RADIUS } from '../content/physical-constants';
 import { elapsedToSeconds, type ElapsedTime, type EventView, type Mission } from '../content/types';
 import type { LeftBehind, VehicleChange } from '../content/vehicle-types';
-import type { FlightPath, Phase, ShipTrack } from '../sim';
+import { partsFromDocked, type FlightPath, type Phase, type ShipTrack } from '../sim';
 import {
   AMBIENT_INTENSITY,
   BODY_VIEW_ANGLE_DEG,
@@ -262,8 +262,16 @@ const PAIR_ARRANGE_STORY_SECONDS = 1.5;
  * of feet).
  */
 const STATION_GAP_LENGTHS = 0.9;
-/** Mission seconds over which that gap opens after undocking, or closes before docking, at most. */
-const STATION_OPEN_MISSION_SECONDS = 120;
+/**
+ * Parting from docked, that gap opens over this many story seconds, so the
+ * two are seen to part at any pace of the clock (in lunar orbit it can run
+ * many mission minutes a second). It is open
+ * sooner when the first event after the parting, or the end of the station
+ * keeping, comes first, so a stop there shows the two apart.
+ */
+const STATION_OPEN_STORY_SECONDS = 1.5;
+/** Mission seconds over which that gap closes before docking, at most (see pairNow). */
+const STATION_CLOSE_MISSION_SECONDS = 120;
 const STATION_FIT_SHARE = 0.45;
 const PAIR_CLOSE_STORY_SECONDS = 1.5;
 
@@ -348,6 +356,8 @@ interface StationSpan {
   /** True when the two were docked just before (they part from docked) or dock just after (they close in). */
   readonly opens: boolean;
   readonly closes: boolean;
+  /** Parting from docked: the mission time by which the gap is open at the latest (the first event after `from`, or `to`). */
+  readonly openBy: number;
 }
 
 /** The pair of ships drawn apart this frame, if any. */
@@ -1189,7 +1199,6 @@ export class Stage implements Director {
       phases.forEach((phase, k) => {
         let from: number;
         let target: string;
-        const before = phases[k - 1];
         const after = phases[k + 1];
         if (phase.kind === 'station') {
           from = phaseStart(phase);
@@ -1222,8 +1231,10 @@ export class Stage implements Director {
           mover: anchor === chaser ? other : chaser,
           from,
           to,
-          opens: before?.kind === 'docked' && before.target === target,
+          // A lander's first phase parts it from the ship that carried it.
+          opens: partsFromDocked(phases, k),
           closes: after?.kind === 'docked' && after.target === target,
+          openBy: Math.min(to, ...this.eventSeconds.filter((time) => time > from + 1e-6)),
         });
       });
     }
@@ -2522,24 +2533,36 @@ export class Stage implements Director {
       if (arranged <= 0) continue;
       const meters = this.metersApart(span.anchor, span.mover, t);
       if (!Number.isFinite(meters)) continue;
-      // Parting from docked, the gap opens; closing in to dock, it closes.
-      // Timed by story time or by mission time, whichever is further along, so it reads at any playback pace.
-      const since = Math.max(
-        (story - from) / PAIR_CLOSE_STORY_SECONDS,
-        (t - span.from) / STATION_OPEN_MISSION_SECONDS,
-      );
+      // Parting from docked, the gap opens over a stretch of story time, so the
+      // parting is seen at any pace of the clock (see STATION_OPEN_STORY_SECONDS).
+      const openStory = Math.min(STATION_OPEN_STORY_SECONDS, toStory(span.openBy) - from);
+      const since = openStory > 1e-9 ? (story - from) / openStory : 1;
+      // Closing in to dock, it closes. Timed by story time or by mission time,
+      // whichever is further along, so a station keeping that plays for less
+      // than PAIR_CLOSE_STORY_SECONDS still shows the gap before it closes.
       const until = Math.max(
         (to - story) / PAIR_CLOSE_STORY_SECONDS,
-        (span.to - t) / STATION_OPEN_MISSION_SECONDS,
+        (span.to - t) / STATION_CLOSE_MISSION_SECONDS,
       );
       const opening =
         (span.opens ? smoothstep(0, 1, since) : 1) * (span.closes ? smoothstep(0, 1, until) : 1);
+      // Once the station keeping is over, the room grows with their real distance over a
+      // stretch of story time, not at once: the path can move one of them kilometers away
+      // in a burn of a few mission seconds (Apollo 10's and 11's separation burns).
+      const room =
+        story > to
+          ? MathUtils.lerp(
+              this.roomFor(0),
+              this.roomFor(meters),
+              smoothstep(to, to + PAIR_CLOSE_STORY_SECONDS, story),
+            )
+          : this.roomFor(meters);
       consider(
         {
           anchor: span.anchor,
           mover: span.mover,
           arranged,
-          gapPixels: this.roomFor(meters),
+          gapPixels: room,
           moment: null,
           opening,
         },
@@ -2767,10 +2790,14 @@ export class Stage implements Director {
         !this.followed.exists
       )
         return 0;
-      if (pair && (pair.anchor === ship || pair.mover === ship)) return 0;
+      // One of the pair is a model. Two keeping station fade between the two as
+      // the pair forms or lets go, so the model does not turn into a dot at once.
+      const inPair = pair !== null && (pair.anchor === ship || pair.mover === ship);
+      const paired = inPair ? (pair.moment ? 1 : pair.arranged) : 0;
+      if (paired >= 1) return 0;
       const meters = this.metersApart(ship, this.followed, t);
       return Number.isFinite(meters)
-        ? smoothstep(COMPANION_MODEL_M, COMPANION_MARKER_M, meters)
+        ? (1 - paired) * smoothstep(COMPANION_MODEL_M, COMPANION_MARKER_M, meters)
         : 0;
     };
     const dotScale = (2 * COMPANION_MARKER_PX * tanHalf) / this.cssHeight;
