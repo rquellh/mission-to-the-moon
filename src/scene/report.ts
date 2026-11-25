@@ -27,6 +27,13 @@ export interface ScenePart {
 export interface SceneShip {
   /** The ship's id in the flight plan ("csm", "lm", "gemini", "agena", ...). */
   id: string;
+  /**
+   * True while the craft is in fast forward: it goes around its body too
+   * fast to draw, so its model gives way to a ring in its color. (A craft
+   * not drawn for another reason, such as being behind the Moon, is not.)
+   * The report's own `fastForward` is about the craft the story follows.
+   */
+  fastForward: boolean;
   /** Around everything of the craft that is drawn, or null when the craft is not drawn. Its soft glow is not counted. */
   box: SceneBox | null;
   /** The parts its shape has at this moment of the mission, whether or not they are on screen. */
@@ -55,7 +62,7 @@ export interface SceneReport {
   scaleMode: ScaleMode;
   /** The mission time being drawn, in seconds since liftoff. */
   time: number;
-  /** True while the scene shows its calm fast-forward view. */
+  /** True while the scene shows its calm fast-forward view: the craft the story follows is in fast forward. */
   fastForward: boolean;
   /** The canvas's size in CSS pixels. */
   canvas: { width: number; height: number };

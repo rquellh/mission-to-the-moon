@@ -46,6 +46,7 @@ import {
   type ScaleMode,
 } from './config';
 import { createEarth, type Earth } from './earth';
+import { closedLapStart, inFastForward, writeLap, type LapPath } from './fast-forward';
 import {
   divesPast,
   fitDistance,
@@ -191,35 +192,57 @@ const PATH_END_FADE_STORY_SECONDS = 1.5;
 /** A stay in lunar orbit of more revolutions than this fades loop by loop. */
 const LONG_LUNAR_STAY_REVOLUTIONS = 40;
 /*
- * Fast forward: on a long flight the story clock can carry a ship around
- * its body several times a second. Then the model would flicker around the
- * orbit and the ship view would whirl. Instead, past this pace (revolutions
- * per second of real time) the model fades out and its orbit shows as a
- * bright ring, and the ship view holds a steady view of the body with the
- * orbit in frame. A stopped clock always shows the model at its true place.
- * Even a lap in a few seconds sends the body whirling behind a ship the
- * camera chases, so the model starts to fade at a lap in about six seconds
- * and is gone by a lap in four. A slower lap stays a model the camera
- * follows: a lander's last orbit before its descent, at normal speed, takes
- * about nine.
+ * Fast forward: on a long flight the story clock can carry a craft around
+ * its body several times a second. Drawn, the model would whirl around the
+ * orbit, and the ship view with it. So each craft is either drawn or
+ * replaced by a bright ring in its color, never left half faded:
+ *
+ * - It is replaced once it goes around its body (on screen, at the pace the
+ *   clock runs now) faster than once in FAST_FORWARD_ON_LAP_SECONDS (7), and
+ *   drawn again once it slows to less than once in
+ *   FAST_FORWARD_OFF_LAP_SECONDS (8); see fast-forward.ts. A slower lap stays
+ *   a model the camera follows: a lander's last lap before its descent, at
+ *   normal speed, takes about 8.8 seconds.
+ * - Only while its path around now is a closed lap of its body (see
+ *   closedLapStart): a craft leaving orbit, arriving, or climbing from the
+ *   surface is drawn however fast it goes, so a ring never has a chord or a
+ *   spoke across it.
+ * - Never while it is docked to another craft (drawn as part of it) or
+ *   standing on a surface, and never with the clock stopped: then the model
+ *   is at its true place.
+ * - The model and the ring cross-fade over FAST_FORWARD_CROSSFADE_SECONDS.
+ *
+ * Each craft in fast forward has its own ring. The followed craft's turns on
+ * the "Fast forward" mark and the ship view's steady view of the body with
+ * the orbit in frame, which come and go more slowly (FAST_FORWARD_SECONDS).
  */
-const FAST_FORWARD_PACE = 0.25;
-/** The fade starts at this share of FAST_FORWARD_PACE. */
-const FAST_FORWARD_ONSET = 0.7;
+const FAST_FORWARD_CROSSFADE_SECONDS = 0.3;
 /**
- * The fast-forward level (0 to 1) at which the interface is told it is on, and
- * off again (see Stage.fastForward). The ship view holds its steady view until
- * the level drops below FAST_FORWARD_OFF (see updateCamera).
+ * The followed craft's fast-forward level (0 to 1, easing toward 1 or 0 over
+ * FAST_FORWARD_SECONDS of real time, at once on a jump or under reduced
+ * motion) at which the interface is told fast forward is on, and off again
+ * (see Stage.fastForward). The ship view holds its steady view until the
+ * level drops below FAST_FORWARD_OFF (see updateCamera).
  */
 const FAST_FORWARD_ON = 0.6;
 const FAST_FORWARD_OFF = 0.3;
-/** How quickly the look changes, in seconds of real time (at once under reduced motion). */
 const FAST_FORWARD_SECONDS = 0.45;
 /** The steady view: this many degrees off the orbit's axis, toward the ship. */
 const FAST_FORWARD_TILT_DEG = 52;
+/** A ring's width in CSS pixels, its opacity, and how far its craft's color is lightened toward white. */
 const FAST_FORWARD_RING_PX = 4;
-/** Points along the ring. */
+const RING_OPACITY = 0.9;
+const RING_LIGHTEN = 0.35;
+/** Points along a ring. */
 const RING_POINTS = 192;
+/** How quickly a ring eases to its craft's new orbit after a burn, in seconds of real time. */
+const RING_SETTLE_SECONDS = 0.15;
+/**
+ * A seek of more than this many story seconds puts every craft straight
+ * into or out of fast forward. A smaller one, such as the tour's last settle
+ * onto a stop, cross-fades as playing does.
+ */
+const LEAP_STORY_SECONDS = 0.3;
 /*
  * A spacewalk: the ship view draws the followed craft close up while its
  * parts include a spacewalker, so the figure, its tether, and the open
@@ -323,22 +346,9 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** The fractional index at which a never-decreasing array reaches `value` (clamped to its ends). */
-function indexAtValue(values: Float64Array, value: number): number {
-  const n = values.length;
-  if (n === 0) return 0;
-  if (value <= (values[0] as number)) return 0;
-  if (value >= (values[n - 1] as number)) return n - 1;
-  let lo = 0;
-  let hi = n - 1;
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >> 1;
-    if ((values[mid] as number) <= value) lo = mid;
-    else hi = mid;
-  }
-  const a = values[lo] as number;
-  const b = values[hi] as number;
-  return lo + (b > a ? (value - a) / (b - a) : 0);
+/** `value` moved toward `target` by at most `step`, without passing it. */
+function stepToward(value: number, target: number, step: number): number {
+  return value < target ? Math.min(target, value + step) : Math.max(target, value - step);
 }
 
 /** The two turns OrbitControls keeps between the camera's up and the world's up (its own `_quat` and `_quatInverse`). */
@@ -368,10 +378,21 @@ interface ShipState extends ShipPose {
   /** Revolutions flown around the nearer body at each sample of its path (see revolutionsOf), and the sample times. */
   revolutions: Float64Array | null;
   times: Float64Array | null;
+  /** Its path and those revolutions, for finding a closed lap (see closedLapStart). */
+  lap: LapPath | null;
   /** For a lander: the times it docks with another ship; it is followed only while apart on its way to one. */
   dockings: readonly number[];
-  /** How far its model is faded out for fast forward now, 0 to 1. */
+  /** True while it is in fast forward: its model replaced by its ring (see FAST_FORWARD_CROSSFADE_SECONDS). */
+  fast: boolean;
+  /** How far its model has given way to its ring, 0 (the model) to 1 (the ring). */
+  crossFade: number;
+  /** Its fast-forward level for the camera and the interface, 0 to 1 (see FAST_FORWARD_ON). */
   fastForward: number;
+  /** Its ring, the points it is drawn through now and those it eases toward, and its body's center. */
+  ring: OrbitRing | null;
+  readonly ringNow: Float32Array;
+  readonly ringWanted: Float32Array;
+  readonly ringCenter: Vector3;
 }
 
 /**
@@ -486,9 +507,7 @@ export class Stage implements Director {
   private pairings: Pairing[] = [];
   /** Ships keeping station with each other without docking, and when. */
   private stations: StationSpan[] = [];
-  /** The fast-forward ring, and the ship view's steady view while it shows (see FAST_FORWARD_PACE). */
-  private ring: OrbitRing | null = null;
-  private readonly ringPoints = new Float32Array(RING_POINTS * 3);
+  /** The ship view's steady view while the followed craft is in fast forward (see FAST_FORWARD_CROSSFADE_SECONDS). */
   private readonly fastView = {
     active: false,
     center: new Vector3(),
@@ -588,10 +607,13 @@ export class Stage implements Director {
   private readonly f5 = new Vector3();
   private readonly f6 = new Vector3();
   private readonly dockDirection = new Vector3();
-  private readonly ringColor = new Color();
-  private readonly white = new Color(0xffffff);
-  /** The farthest the ring reaches from its body's center (scene units). */
+  /** The farthest the followed craft's ring reaches from its body's center (scene units). */
   private ringRadius = 0;
+  /** The Moon's and Earth's centers at true scale, for telling a closed lap (see closedLap). */
+  private readonly moonAtTrueScale = [0, 0, 0];
+  private readonly atOrigin = [0, 0, 0] as const;
+  /** The scale mix the rings were last drawn at. */
+  private ringMix = Number.NaN;
   /** How far the ship view is drawn close up for a spacewalk, 0 to 1, and where it is heading. */
   private walkLevel = 0;
   private walkWanted = 0;
@@ -646,6 +668,7 @@ export class Stage implements Director {
       throw new WebGLUnavailableError(error);
     }
     this.path = options.path;
+    this.path.moonPosition(1, this.moonAtTrueScale);
     this.player = options.player;
     this.eventSeconds = options.mission.events.map((event) => elapsedToSeconds(event.elapsed));
     this.ships = this.path.ships.map((track, index): ShipState => {
@@ -658,8 +681,15 @@ export class Stage implements Director {
         launch: null,
         revolutions: null,
         times: null,
+        lap: null,
         dockings: track.phases.filter((phase) => phase.kind === 'docked').map(phaseStart),
+        fast: false,
+        crossFade: 0,
         fastForward: 0,
+        ring: null,
+        ringNow: new Float32Array(RING_POINTS * 3),
+        ringWanted: new Float32Array(RING_POINTS * 3),
+        ringCenter: new Vector3(),
         exists: false,
         position: new Vector3(),
         forward: new Vector3(1, 0, 0),
@@ -891,6 +921,7 @@ export class Stage implements Director {
         const names = model ? model.shapeParts(model.shapeAt(t)) : [];
         return {
           id: ship.id,
+          fastForward: ship.fast,
           box: model ? this.boxOnCanvas(model.root) : null,
           parts: names.map((name) => ({
             name,
@@ -987,7 +1018,7 @@ export class Stage implements Director {
     this.moon?.dispose();
     this.stars?.dispose();
     for (const line of this.lines) line.dispose();
-    this.ring?.dispose();
+    for (const ship of this.ships) ship.ring?.dispose();
     this.eventMarkers?.dispose();
     this.earthSites?.dispose();
     this.moonSites?.dispose();
@@ -1020,6 +1051,11 @@ export class Stage implements Director {
       const { revolutions, runs } = this.revolutionsOf(polyline);
       ship.revolutions = revolutions;
       ship.times = polyline.times;
+      ship.lap = {
+        revolutions,
+        truePositions: polyline.truePositions,
+        readablePositions: polyline.readablePositions,
+      };
       const fade: PathFade | null = runs.length > 0 ? { ...ORBIT_FADE, revolutions, runs } : null;
       const line = createPathLine(polyline, ship.color, i + 1, hidden, fade);
       this.lineOf.set(ship, line);
@@ -1028,10 +1064,16 @@ export class Stage implements Director {
       this.lines.push(line);
       this.scene.add(line.mesh);
     });
-    this.ring = createOrbitRing(0xffffff, FAST_FORWARD_RING_PX, RING_POINTS);
-    this.ring.mesh.renderOrder = 2 + this.ships.length;
-    this.ring.setResolution(this.cssWidth, this.cssHeight);
-    this.scene.add(this.ring.mesh);
+    // Each ship's fast-forward ring, in its color, lightened.
+    const white = new Color(0xffffff);
+    this.ships.forEach((ship, i) => {
+      const ring = createOrbitRing(0xffffff, FAST_FORWARD_RING_PX, RING_POINTS);
+      ring.setColor(new Color(ship.color).lerp(white, RING_LIGHTEN));
+      ring.mesh.renderOrder = 2 + this.ships.length + i;
+      ring.setResolution(this.cssWidth, this.cssHeight);
+      this.scene.add(ring.mesh);
+      ship.ring = ring;
+    });
 
     // Event markers, on the path of the ship the story follows at each event
     // (or, before that ship flies, of a ship that already does).
@@ -2420,7 +2462,7 @@ export class Stage implements Director {
     this.camera.fov = fieldOfViewFor(this.camera.aspect);
     this.updateClearArea();
     for (const line of this.lines) line.setResolution(width, height);
-    this.ring?.setResolution(width, height);
+    for (const ship of this.ships) ship.ring?.setResolution(width, height);
     for (const set of [this.eventMarkers, this.earthSites, this.moonSites])
       set?.setPixelRatio(ratio);
     this.reframeAfterLayout();
@@ -2477,6 +2519,8 @@ export class Stage implements Director {
     // which runs faster than the rate in the middle of a long trip.
     const jumped =
       step > (playing ? Math.max(0.3, this.player.speed * 0.25) : 1e-9) || (!playing && step > 0);
+    // The craft are put straight into their new look only by a real leap (see LEAP_STORY_SECONDS).
+    const leapt = jumped && step > LEAP_STORY_SECONDS;
     const paused = this.wasPlaying && !playing;
     this.lastStory = story;
     this.wasPlaying = playing;
@@ -2490,7 +2534,7 @@ export class Stage implements Director {
 
     const worldChanged = this.updateWorld();
     if (worldChanged) this.updateShips();
-    const fastForward = this.updateFastForward(dt, jumped);
+    const fastForward = this.updateFastForward(dt, jumped, leapt);
     const level = this.followed.fastForward;
     const shown =
       this.player.playing &&
@@ -2785,9 +2829,9 @@ export class Stage implements Director {
     return this.dotMap;
   }
 
-  /** How visible a ship's model is now (it fades out while many orbits pass in a moment). */
+  /** How visible a ship's model is now: it gives way to its ring in fast forward. */
   private opacityOf(ship: ShipState): number {
-    return 1 - ship.fastForward;
+    return 1 - smoothstep(0, 1, ship.crossFade);
   }
 
   /** Size, place, and show or hide each spacecraft for this frame. */
@@ -3115,21 +3159,33 @@ export class Stage implements Director {
   /* Fast forward                                                      */
   /* ---------------------------------------------------------------- */
 
-  /** Mission seconds that pass per second of real time now (0 when the clock is stopped). */
+  /**
+   * Mission seconds that pass per second of real time now (0 when the clock
+   * is stopped): the pace just ahead, so playing on from an event takes the
+   * pace of the stretch after it, not a blend with the one before.
+   */
   private missionPace(): number {
     if (!this.player.playing) return 0;
     const story = this.player.story;
     const s = this.player.storyTime;
-    const a = Math.max(0, s - 0.02);
-    const b = Math.min(story.duration, s + 0.02);
+    const b = Math.min(story.duration, s + 0.04);
+    const a = b - s < 0.01 ? Math.max(0, b - 0.04) : s;
     return b > a ? ((story.toElapsed(b) - story.toElapsed(a)) / (b - a)) * this.player.speed : 0;
   }
 
-  /** Revolutions per mission second a ship makes around its body at mission time t (from its path). */
-  private turnRate(ship: ShipState, t: number): number {
+  /**
+   * Revolutions per mission second a ship makes around its body at mission
+   * time t (from its path): 0 while it is docked to another ship or drawn as
+   * part of one, or stands on a surface.
+   */
+  private turnRate(ship: ShipState, index: number, t: number): number {
     const revolutions = ship.revolutions;
     const times = ship.times;
     if (!revolutions || !times || !ship.exists) return 0;
+    const phase = this.path.phaseAt(ship.id, t);
+    if (!phase || phase.kind === 'docked' || phase.kind === 'surface') return 0;
+    const model = this.fleet?.ships[index];
+    if (model && model.shapeParts(model.shapeAt(t)).length === 0) return 0;
     const step = 30;
     const a = valueAtIndex(revolutions, sampleIndexAt(times, t - step));
     const b = valueAtIndex(revolutions, sampleIndexAt(times, t + step));
@@ -3137,81 +3193,88 @@ export class Stage implements Director {
   }
 
   /**
-   * Fade each model out while its ship goes around its body faster than
-   * FAST_FORWARD_PACE on screen, and back in when the pace drops or the
-   * clock stops; draw the followed ship's orbit as a ring meanwhile.
-   * Returns true when anything changed.
+   * The start (in revolutions flown) of a closed lap of a ship's path through
+   * mission time t, or NaN when there is none (see closedLapStart).
    */
-  private updateFastForward(dt: number, jumped: boolean): boolean {
-    const pace = this.missionPace();
-    const t = this.player.time;
-    let changed = false;
-    for (const ship of this.ships) {
-      const revolutionsPerSecond = this.turnRate(ship, t) * pace;
-      const wanted = smoothstep(
-        FAST_FORWARD_PACE * FAST_FORWARD_ONSET,
-        FAST_FORWARD_PACE,
-        revolutionsPerSecond,
-      );
-      const before = ship.fastForward;
-      if (this.reducedMotion || jumped) ship.fastForward = wanted;
-      else ship.fastForward += (wanted - before) * (1 - Math.exp(-dt / FAST_FORWARD_SECONDS));
-      if (Math.abs(ship.fastForward - wanted) < 0.003) ship.fastForward = wanted;
-      if (ship.fastForward !== before) changed = true;
-    }
-    const level = this.followed.fastForward;
-    // The event markers would stand still on the ring while the ship goes around many times: they fade with the model.
-    if (changed) this.eventMarkers?.setOpacity(1 - level);
-    if (this.ring) {
-      if (level > 0.001 && this.writeRing(this.followed, t)) {
-        this.ring.setOpacity(0.9 * level);
-        this.ringColor.setHex(this.followed.color).lerp(this.white, 0.35);
-        this.ring.setColor(this.ringColor);
-        changed = true;
-      } else if (this.ring.mesh.visible) {
-        this.ring.setOpacity(0);
-        changed = true;
-      }
-    }
-    return changed;
+  private closedLap(ship: ShipState, t: number): number {
+    const lap = ship.lap;
+    const times = ship.times;
+    if (!lap || !times) return Number.NaN;
+    const now = valueAtIndex(lap.revolutions, sampleIndexAt(times, t));
+    const center = this.nearMoon(ship.position) ? this.moonAtTrueScale : this.atOrigin;
+    return closedLapStart(lap, now, center);
   }
 
-  /** The ring through one revolution of the ship's path around now (half before, half after), at the current scale. */
-  private writeRing(ship: ShipState, t: number): boolean {
-    const revolutions = ship.revolutions;
-    const times = ship.times;
-    const line = this.path.polyline(ship.id);
-    if (!revolutions || !times || !line || !this.ring) return false;
-    const now = valueAtIndex(revolutions, sampleIndexAt(times, t));
-    const from = indexAtValue(revolutions, now - 0.5);
-    const to = indexAtValue(revolutions, now + 0.5);
-    if (!(to > from)) return false;
-    const center = this.nearMoon(ship.position) ? this.moonCenter : this.origin;
-    let radius = 0;
-    const points = this.ringPoints;
-    for (let k = 0; k < RING_POINTS; k += 1) {
-      const index = from + ((to - from) * k) / RING_POINTS;
-      const i = Math.min(Math.floor(index), times.length - 2);
-      const u = index - i;
-      for (let c = 0; c < 3; c += 1) {
-        const r = MathUtils.lerp(
-          line.readablePositions[3 * i + c] ?? 0,
-          line.readablePositions[3 * i + 3 + c] ?? 0,
-          u,
-        );
-        const tr = MathUtils.lerp(
-          line.truePositions[3 * i + c] ?? 0,
-          line.truePositions[3 * i + 3 + c] ?? 0,
-          u,
-        );
-        points[3 * k + c] = MathUtils.lerp(r, tr, this.mix);
+  /**
+   * Put each ship in fast forward or take it out (see
+   * FAST_FORWARD_CROSSFADE_SECONDS), cross-fade its model and its ring, and
+   * draw its ring through the closed lap of its path around now, easing to
+   * a new lap after a burn. The ring keeps its last lap while it fades out.
+   * The followed ship's fast-forward level, for the camera and the interface,
+   * eases over FAST_FORWARD_SECONDS. `jumped` is any seek, `leapt` one of more
+   * than a moment (see LEAP_STORY_SECONDS). Returns true when anything changed.
+   */
+  private updateFastForward(dt: number, jumped: boolean, leapt: boolean): boolean {
+    const pace = this.missionPace();
+    const t = this.player.time;
+    const rescaled = this.mix !== this.ringMix;
+    this.ringMix = this.mix;
+    const settle = 1 - Math.exp(-dt / RING_SETTLE_SECONDS);
+    let changed = false;
+    this.ships.forEach((ship, index) => {
+      const lapping = inFastForward(this.turnRate(ship, index, t) * pace, ship.fast);
+      const start = lapping ? this.closedLap(ship, t) : Number.NaN;
+      const fast = !Number.isNaN(start);
+      const target = fast ? 1 : 0;
+      const at = leapt || this.reducedMotion;
+      if (fast && ship.lap) {
+        writeLap(ship.lap, start, this.mix, ship.ringWanted, RING_POINTS);
+        ship.ringCenter.copy(this.nearMoon(ship.position) ? this.moonCenter : this.origin);
+        // A ring that is not showing yet takes its lap as it is; one showing eases to a new one.
+        if (ship.crossFade <= 0 || at || rescaled) ship.ringNow.set(ship.ringWanted);
+        else {
+          const now = ship.ringNow;
+          const wanted = ship.ringWanted;
+          for (let k = 0; k < now.length; k += 1)
+            now[k] = (now[k] as number) + ((wanted[k] as number) - (now[k] as number)) * settle;
+        }
       }
-      this.v1.fromArray(points, 3 * k);
-      radius = Math.max(radius, this.v1.distanceTo(center));
+      const crossFade = ship.crossFade;
+      ship.crossFade = at
+        ? target
+        : stepToward(crossFade, target, dt / FAST_FORWARD_CROSSFADE_SECONDS);
+      const level = ship.fastForward;
+      if (this.reducedMotion || jumped) ship.fastForward = target;
+      else ship.fastForward += (target - level) * (1 - Math.exp(-dt / FAST_FORWARD_SECONDS));
+      if (Math.abs(ship.fastForward - target) < 0.003) ship.fastForward = target;
+      if (fast !== ship.fast || ship.crossFade !== crossFade || ship.fastForward !== level)
+        changed = true;
+      ship.fast = fast;
+      const ring = ship.ring;
+      if (!ring) return;
+      if (ship.crossFade > 0) {
+        if (fast) ring.setPoints(ship.ringNow, RING_POINTS);
+        ring.setOpacity(RING_OPACITY * smoothstep(0, 1, ship.crossFade));
+        changed = true;
+      } else if (ring.mesh.visible) {
+        ring.setOpacity(0);
+        changed = true;
+      }
+    });
+    // The steady view frames the followed ship's ring (see updateFastView).
+    const followed = this.followed;
+    if (followed.crossFade > 0) {
+      let radius = 0;
+      for (let k = 0; k < RING_POINTS; k += 1)
+        radius = Math.max(
+          radius,
+          this.v1.fromArray(followed.ringNow, 3 * k).distanceTo(followed.ringCenter),
+        );
+      this.ringRadius = radius;
     }
-    this.ring.setPoints(points, RING_POINTS);
-    this.ringRadius = radius;
-    return true;
+    // The event markers would stand still on the ring while the ship goes around many times: they fade with the model.
+    if (changed) this.eventMarkers?.setOpacity(1 - smoothstep(0, 1, followed.crossFade));
+    return changed;
   }
 
   /** True when a point is nearer the Moon than Earth (by height in body radii). */
