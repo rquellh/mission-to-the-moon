@@ -108,7 +108,8 @@ export const EARLY_VIEW_MISSION_SECONDS = 3600;
  * does not set off with the camera still swinging round, and a scene that
  * never says it has settled holds the tour up only briefly. A scene that
  * cannot say counts as settled. The same wait ends the hold on a parting's
- * event (see PARTING_HOLD_SECONDS).
+ * event (see PARTING_HOLD_SECONDS). A Skip does not wait: the button says the
+ * tour will be at the stop, so it is, with the camera still on its way.
  */
 export const CAMERA_SETTLE_MAX_SECONDS = 3;
 
@@ -298,7 +299,7 @@ export class Tour {
   next(): void {
     if (this.phaseNow === 'off' || this.phaseNow === 'finished') return;
     if (this.phaseNow === 'traveling') {
-      if (this.now() - this.travelStartMs >= SKIP_GUARD_MS) this.arrive();
+      if (this.now() - this.travelStartMs >= SKIP_GUARD_MS) this.arrive(true);
       return;
     }
     if (this.indexNow >= this.stops.length - 1) {
@@ -585,17 +586,17 @@ export class Tour {
   /**
    * Put the clock on the stop's rest point. The tour stops there, once the
    * camera has settled: while the scene says it is moving, the tour is still
-   * on its way (see CAMERA_SETTLE_MAX_SECONDS). Arriving again while it waits
-   * (Skip, pressed again) stops at once.
+   * on its way (see CAMERA_SETTLE_MAX_SECONDS). A Skip (`atOnce`) stops there
+   * without waiting, and so does arriving again while the tour waits.
    */
-  private arrive(): void {
+  private arrive(atOnce = false): void {
     const waited = this.settling();
     // A skip, or a trip cut short, arrives in the stop's own view all the same.
     this.showStopView();
     this.stopTravel();
     this.player.pause();
     this.player.seek(this.restSeconds);
-    if (waited || this.director.moving !== true) {
+    if (atOnce || waited || this.director.moving !== true) {
       this.stopHere();
       return;
     }

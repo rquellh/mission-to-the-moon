@@ -1090,17 +1090,14 @@ describe('stopping once the camera has settled', () => {
     assertAtStop(tour, player, 'Leaving Earth behind');
   });
 
-  it('Skip arrives and waits for the camera too; Skip again stops at once', () => {
+  it('Skip stops at the stop at once, with the camera still moving', () => {
     const screen = fakeScreen(1000 / 60);
-    const { player, tour, setMoving, event } = onTheWay(screen);
+    const { player, tour, setMoving } = onTheWay(screen);
     wait(screen, 2);
     setMoving(true);
 
     tour.next();
 
-    expect(tour.phase).toBe('traveling');
-    expect(player.time).toBeCloseTo(event, 6);
-    tour.next();
     assertAtStop(tour, player, 'Leaving Earth behind');
   });
 
