@@ -89,20 +89,79 @@ export function partingsAtEvents(
 }
 
 /**
+ * Whether phase `k` of a ship's phases brings it in to dock: closing in
+ * (`rendezvous`) or keeping station (`station`) beside a ship, right before
+ * a docked phase with that same ship.
+ */
+export function closesToDocked(phases: readonly Phase[], k: number): boolean {
+  const phase = phases[k];
+  if (phase?.kind !== 'rendezvous' && phase?.kind !== 'station') return false;
+  const after = phases[k + 1];
+  return after?.kind === 'docked' && after.target === phase.target;
+}
+
+/**
+ * The final approach to a docking at one of the flight's events, in mission
+ * seconds: the two craft closing in, or flying side by side, until they dock.
+ */
+export interface Approach {
+  /** When the final approach begins (see approachesAtEvents). */
+  readonly start: number;
+  /** The event's time, when the two dock. */
+  readonly end: number;
+}
+
+/**
+ * Every place where an event marks a docking and the ship's phases say how
+ * the two craft came together before it (see closesToDocked). The final
+ * approach begins when the craft came alongside: at the start of its station
+ * keeping, or at a rendezvous's published `alongside` time, or else at the
+ * start of the rendezvous (Apollo 11's begins as Eagle's braking burn,
+ * terminal phase finalize, ends). It begins no earlier than the event before
+ * the docking: when an event already marks that moment or a later one
+ * (Gemini 8's station keeping), the approach already plays as a stretch of
+ * its own. The story clock gives each its own stretch (see storyKeyTimes),
+ * so the two are seen closing in.
+ */
+export function approachesAtEvents(
+  path: { readonly ships: readonly ShipTrack[] },
+  eventTimes: readonly number[],
+): Approach[] {
+  const isEvent = (time: number): boolean =>
+    eventTimes.some((event) => Math.abs(event - time) < 1e-6);
+  const approaches: Approach[] = [];
+  for (const ship of path.ships) {
+    ship.phases.forEach((phase, k) => {
+      const end = elapsedToSeconds(phase.end.value);
+      if (!closesToDocked(ship.phases, k) || !isEvent(end)) return;
+      const alongside = phase.kind === 'rendezvous' ? phase.alongside : undefined;
+      const begins = elapsedToSeconds((alongside ?? phase.start).value);
+      const eventBefore = Math.max(...eventTimes.filter((event) => event < end - 1e-6));
+      approaches.push({ start: Math.max(begins, eventBefore), end });
+    });
+  }
+  return approaches;
+}
+
+/**
  * The mission times a flight's story clock is built from: the path's two
  * ends and every event, so each stretch between two events plays for a
  * watchable length. One more for each parting (see partingsAtEvents): the
  * end of its station keeping, so the two flying side by side play as their
  * own stretch rather than the first moments of a long one. (Other station
  * keeping adds no key: as keys, it would lengthen some flights by 10 to 34
- * seconds.)
+ * seconds.) And one for each docking at an event (see approachesAtEvents):
+ * the start of its final approach, so the two closing in play as their own
+ * stretch rather than the last moments of a long one. That adds 6 to 7.5
+ * seconds to each of seven flights.
  */
 export function storyKeyTimes(
   path: { readonly start: number; readonly end: number; readonly ships: readonly ShipTrack[] },
   eventTimes: readonly number[],
 ): number[] {
   const partingEnds = partingsAtEvents(path, eventTimes).map((parting) => parting.end);
-  return [path.start, path.end, ...eventTimes, ...partingEnds];
+  const approachStarts = approachesAtEvents(path, eventTimes).map((approach) => approach.start);
+  return [path.start, path.end, ...eventTimes, ...partingEnds, ...approachStarts];
 }
 
 /** Builds a story clock from any list of mission times (sorted or not). */

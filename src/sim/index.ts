@@ -11,12 +11,14 @@
  */
 export { buildFlightPath } from './build.ts';
 export {
+  approachesAtEvents,
+  closesToDocked,
   createStoryTime,
   partingsAtEvents,
   partsFromDocked,
   storyIntervalLength,
   storyKeyTimes,
 } from './story-time.ts';
-export type { Parting, StoryTime, StoryTimeOptions } from './story-time.ts';
+export type { Approach, Parting, StoryTime, StoryTimeOptions } from './story-time.ts';
 export { READABLE_MOON_DISTANCE, toReadable } from './warp.ts';
 export type * from './types.ts';
