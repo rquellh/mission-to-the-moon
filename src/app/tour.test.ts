@@ -23,7 +23,13 @@ import { story as gemini7 } from '../content/missions/gemini-7/story.ts';
 import { flight as gemini10Flight } from '../content/missions/gemini-10/flight.ts';
 import { story as gemini10 } from '../content/missions/gemini-10/story.ts';
 import { elapsedToSeconds, type EventView, type Mission } from '../content/types.ts';
-import { buildFlightPath, createStoryTime, partingsAtEvents, storyKeyTimes } from '../sim/index.ts';
+import {
+  buildFlightPath,
+  createStoryTime,
+  partingsAtEvents,
+  storyKeyTimes,
+  type StoryTimeOptions,
+} from '../sim/index.ts';
 import type { FlightPlan } from '../sim/types.ts';
 import type { Director, StoryMap } from './contract.ts';
 import { MissionPlayer, tripShape } from './player.ts';
@@ -80,6 +86,8 @@ function fakeScreen(frameMs: number) {
  * The player and tour, built the way main.ts builds them. `scene` says
  * whether the fake scene reports a moving camera (`Director.moving`): left
  * out, it does not say, as the real scene did when this was written.
+ * `clock` changes how the story clock is built, for a case no real flight's
+ * clock has.
  */
 function setUp(
   mission: Mission,
@@ -87,10 +95,11 @@ function setUp(
   screen: Screen,
   options: TourOptions = {},
   scene: { reportsMoving?: boolean } = {},
+  clock: StoryTimeOptions = {},
 ) {
   const path = buildFlightPath(plan);
   const eventTimes = mission.events.map((event) => elapsedToSeconds(event.elapsed));
-  const story = createStoryTime(storyKeyTimes(path, eventTimes));
+  const story = createStoryTime(storyKeyTimes(path, eventTimes), clock);
   const keys = story.keyTimes;
   const map: StoryMap = {
     duration: story.length,
@@ -899,35 +908,37 @@ describe('a stop where two craft part: Eagle undocks from Columbia', () => {
     assertAtStop(tour, player, 'The Eagle has landed');
   });
 
-  it('Back from the landing, and starting at the stop, cut to the event, hold, play on, and rest', () => {
+  it('Back from the landing, and starting at the stop, play the last 30 minutes up to the event, hold, play on, and rest', () => {
     const screen = fakeScreen(1000 / 60);
     const { player, tour, at, event, rest } = headingForEagleUndocks(screen);
     travel(tour, screen, 30);
     tour.next();
     travel(tour, screen);
     expect(tour.stop?.id).toBe('landing');
-    // The 30 minutes before the undocking are a quarter of a story second, too little for a run-up.
-    expect(event - player.story.toStory(undocking - RUN_UP_MAX_MISSION_SECONDS)).toBeLessThan(
-      RUN_UP_MIN_STORY_SECONDS,
-    );
-    const playOn = playSeconds(PARTING_REST_STORY_SECONDS);
+    // The day in lunar orbit slows into the undocking: its last 30 minutes are 2.7 story seconds.
+    const from = player.story.toStory(undocking - RUN_UP_MAX_MISSION_SECONDS);
+    expect(event - from).toBeGreaterThan(2);
+    expect(event - from).toBeLessThan(RUN_UP_STORY_SECONDS);
+    // The camera moved to the Ship view as the run-up began, so it has settled by the event: the short hold.
+    const takes =
+      playSeconds(event - from) + PARTING_HOLD_SECONDS + playSeconds(PARTING_REST_STORY_SECONDS);
 
-    // From the Moon view: the camera moves to the Ship view at once, and the hold lets it settle.
+    // From the Moon view.
     tour.back();
-    expect(player.storyTime).toBe(event);
+    expect(player.storyTime).toBeCloseTo(from, 9);
     expect(tour.phase).toBe('traveling');
     const backTook = travel(tour, screen);
     expectAtRest(tour, player, rest);
-    // Already in the Ship view: the short hold.
+    // Already in the Ship view.
     tour.start(at);
-    expect(player.storyTime).toBe(event);
+    expect(player.storyTime).toBeCloseTo(from, 9);
     const startTook = travel(tour, screen);
 
     expectAtRest(tour, player, rest);
-    expect(backTook).toBeGreaterThanOrEqual(PARTING_VIEW_SETTLE_SECONDS + playOn - 1e-6);
-    expect(backTook).toBeLessThanOrEqual(PARTING_VIEW_SETTLE_SECONDS + playOn + 3 / 60 + 1e-6);
-    expect(startTook).toBeGreaterThanOrEqual(PARTING_HOLD_SECONDS + playOn - 1e-6);
-    expect(startTook).toBeLessThanOrEqual(PARTING_HOLD_SECONDS + playOn + 3 / 60 + 1e-6);
+    expect(backTook).toBeGreaterThanOrEqual(takes - 1e-6);
+    expect(backTook).toBeLessThanOrEqual(takes + 3 / 60 + 1e-6);
+    expect(startTook).toBeGreaterThanOrEqual(takes - 1e-6);
+    expect(startTook).toBeLessThanOrEqual(takes + 3 / 60 + 1e-6);
   });
 
   it('with reduced motion, goes straight to the rest point', () => {
@@ -1112,13 +1123,13 @@ describe('stopping once the camera has settled', () => {
     );
     setMoving(true);
 
-    // "Into orbit around the Moon" has too little in its last 30 minutes for a run-up.
-    tour.start(3);
+    // Liftoff is at the very start of the clock, with nothing before it to run up from.
+    tour.start(0);
 
     expect(tour.phase).toBe('traveling');
-    expect(tour.shownStop?.id).toBe('lunar-orbit-insertion');
+    expect(tour.shownStop?.id).toBe('liftoff');
     setMoving(false);
-    assertAtStop(tour, player, 'Into orbit around the Moon');
+    assertAtStop(tour, player, 'Liftoff');
   });
 });
 
@@ -1192,7 +1203,7 @@ describe('the short run-up', () => {
         expect(took).toBeLessThanOrEqual(playSeconds(story) + frame);
         assertAtStop(tour, player, `run-up to stop ${tour.index + 1}`);
       };
-      // Landing at Hadley: the last 30 minutes, 1.6 story seconds.
+      // Landing at Hadley: the last 30 minutes, 2.7 story seconds.
       runUp(() => tour.start(3));
       runUp(() => tour.back());
       // Back partway through a trip returns to the stop just left.
@@ -1221,9 +1232,18 @@ describe('the short run-up', () => {
 
   it('cuts straight to a stop when 30 minutes before it is less than a story second', () => {
     const screen = fakeScreen(1000 / 60);
-    const { player, tour, views } = setUp(apollo11, apollo11Flight, screen);
+    // Every real flight's clock slows into its events, so its last 30 minutes before a stop are
+    // two story seconds or more. Played evenly, as it once was, Apollo 11's is not.
+    const { player, tour, views } = setUp(
+      apollo11,
+      apollo11Flight,
+      screen,
+      {},
+      {},
+      { ease: false },
+    );
     const orbit = tour.stops.findIndex((stop) => stop.id === 'lunar-orbit-insertion');
-    // The orbit insertion closes a three-day coast: its last 30 minutes are a seventh of a story second.
+    // Played evenly, the three-day coast the orbit insertion closes has its last 30 minutes in a seventh of a story second.
     expect(
       storyOf(player, tour, orbit) -
         player.story.toStory(elapsedToSeconds('075:49:50.37') - RUN_UP_MAX_MISSION_SECONDS),
