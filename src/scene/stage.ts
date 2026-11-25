@@ -47,13 +47,17 @@ import {
 } from './config';
 import { createEarth, type Earth } from './earth';
 import {
-  divesPast,
+  clockJumped,
+  fitAcross,
   fitDistance,
   interpolatePose,
   swingAngle,
   swingAround,
+  swingBodyOf,
+  swingKeeping,
   type CameraPose,
   type ClearArea,
+  type ClockReading,
   type OrientedPose,
   type SphereLike,
 } from './framing';
@@ -238,11 +242,36 @@ const ORBIT_VIEW_TILT_DEG = 70;
 /** A ship this many body radii up (or less) counts as near that body for the Earth and Moon views. */
 const NEAR_BODY_RADII = 4;
 /**
+ * A tall, narrow picture is narrower than the low orbits around Earth or the
+ * Moon, and a craft on one would spend seconds off its sides. There, the
+ * Earth and Moon views stand back far enough that the orbits fit across it
+ * (see orbitReach): those of every craft near the body, within
+ * LOW_ORBIT_RADII body radii of its center, over LOW_ORBIT_WINDOW_SECONDS of
+ * mission time either side of the moment framed (about an orbit), with
+ * LOW_ORBIT_EDGE_PX clear at each side: room for a craft at the edge of the
+ * orbit and another drawn beside it (two craft parting are drawn at least
+ * PAIR_GAP_MIN_PX apart). Only a picture whose clear area is taller than it
+ * is wide stands back so; a wide one (any desktop window) fits them anyway
+ * and keeps its framing.
+ */
+const LOW_ORBIT_RADII = 1.7;
+const LOW_ORBIT_WINDOW_SECONDS = 5400;
+const LOW_ORBIT_EDGE_PX = 80;
+/**
+ * A camera move whose ends are closer than this share of the distance it
+ * looks from (and whose ups turn less than as many radians) is no move: about
+ * a pixel at most, so it is made at once and `moving` never says otherwise.
+ */
+const SAME_POSE_SHARE = 1e-3;
+/**
  * A camera move swings around Earth or the Moon (see swingAround) when the
  * points it looks at, at both ends, are within this many of the body's
- * radii of its center. Otherwise (to or from the journey view, or in open
- * space) the camera flies straight across, unless that would take it past
- * a body closer than either end (see divesPast).
+ * radii of its center; or when flying straight would take it past a body
+ * closer than either end (see divesPast); or when only one end looks there
+ * and the other is a wider view from farther off with the body in sight
+ * (the journey view, to or from the Earth or Moon view or a craft near
+ * either). Otherwise (between Earth and the Moon, or in open space) the
+ * camera flies straight across. See swingBodyOf.
  */
 const SWING_REACH_RADII = 3;
 /** Room kept at the edges of the journey view for a spacecraft model, in CSS pixels. */
@@ -374,6 +403,13 @@ interface ShipState extends ShipPose {
   fastForward: number;
 }
 
+/** Where a ship is and which way it goes at a mission time a view is framed for (see Stage.posesAt). */
+interface FramePose {
+  exists: boolean;
+  readonly position: Vector3;
+  readonly forward: Vector3;
+}
+
 /**
  * Two ships keeping station without docking, from `from` to `to` (mission
  * time). `anchor` stays where it is; `mover` is drawn beside it.
@@ -473,8 +509,9 @@ export class Stage implements Director {
   private mixTween: Tween | null = null;
   private shownTime = Number.NaN;
   private shownMix = Number.NaN;
-  private lastStory = Number.NaN;
-  private wasPlaying = false;
+  /** The clock as last heard from (see noteClock), and whether it has jumped since the last frame. */
+  private clockSeen: ClockReading;
+  private clockJump = false;
   private readonly eventSeconds: number[];
   private currentEvent = -2;
 
@@ -511,7 +548,38 @@ export class Stage implements Director {
   private readonly orbitMission: boolean;
   /** Set by setView; the framing waits a frame so any seek made with it is in place. */
   private pendingView: 'tween' | 'instant' | null = 'instant';
+  /** The mission time setView asked the pending view to be framed for, if not now. */
+  private pendingAt: number | null = null;
+  /** The mission time the Earth or Moon view was last framed for, which a change of layout keeps (see refitOffset). */
+  private framedAt = 0;
+  /**
+   * A move into the ship view framed for a later moment (setView's `at`):
+   * that time while the clock is on its way there, and the ship followed
+   * then, when it is not the one followed now. The camera heads for that
+   * ship as it will be with the clock stopped there, so it chases it without
+   * the steady fast-forward view (see updateCamera) until the clock stops or
+   * gets there.
+   */
+  private chaseAt: number | null = null;
+  private chaseOverride: ShipState | null = null;
+  /** The chased ship as it will be at chaseAt (see chaseSubject). */
+  private readonly chaseAtPose: ShipPose = {
+    exists: true,
+    position: new Vector3(),
+    forward: new Vector3(1, 0, 0),
+    up: new Vector3(0, 1, 0),
+  };
+  /** Every ship at a mission time a view is framed for (see posesAt), and the Sun's direction then. */
+  private readonly framePoses: FramePose[];
+  private readonly frameSun = new Vector3(1, 0, 0);
+  private readonly frameDirection = new Vector3();
   private cameraTween: Tween | null = null;
+  /** True while cameraTween is a move the `moving` getter reports (not a refit after a change of layout). */
+  private cameraMove = false;
+  /** True while the ship view eases back from its steady fast-forward view to the chase. */
+  private fastReturning = false;
+  /** What `moving` said when subscribers last heard. */
+  private movingShown = false;
   private readonly tweenFrom = orientedPose();
   private readonly tweenTo = orientedPose();
   private readonly tweenPose = orientedPose();
@@ -670,6 +738,12 @@ export class Stage implements Director {
     if (!main) throw new Error('The flight path has no ships');
     this.main = main;
     this.followed = main;
+    this.framePoses = this.ships.map(() => ({
+      exists: false,
+      position: new Vector3(),
+      forward: new Vector3(1, 0, 0),
+    }));
+    this.clockSeen = this.readClock();
     this.viewNow = homeView(options.mission);
     this.orbitMission = options.mission.destination === 'earth-orbit';
     this.journeyPoints = this.sampleJourney();
@@ -723,6 +797,7 @@ export class Stage implements Director {
     this.cleanups.push(
       this.player.subscribe(() => {
         this.needsRender = true;
+        this.noteClock();
       }),
     );
 
@@ -799,7 +874,7 @@ export class Stage implements Director {
     });
     if (this.viewNow === 'journey' && this.earth) {
       // Frame for where everything will end up.
-      this.startTween(this.transitionMs, to);
+      this.startTween(this.transitionMs, to, { move: false });
     }
     this.needsRender = true;
     this.notify();
@@ -821,22 +896,61 @@ export class Stage implements Director {
   }
 
   /**
+   * True while the camera is on its way: a move to a view (asked for, or to
+   * a followed ship handed over far off), a swing that brings the followed
+   * ship back into view after a jump of the clock, or the ship view's return
+   * from its steady fast-forward view. Not while it refits to a change of
+   * layout or of scale. Subscribers hear when it changes.
+   */
+  get moving(): boolean {
+    const tweening = this.cameraMove && this.cameraTween !== null && !this.cameraTween.done;
+    return this.pendingView === 'tween' || tweening || this.fastReturning;
+  }
+
+  /**
    * Move the camera to a view. With `instant`, jump there (also the case
    * with reduced motion). A view the mission does not offer becomes the
-   * nearest one it does. `at` (see Director.setView) is not used yet: the
-   * view is framed for the spacecraft as it is now.
+   * nearest one it does. With `at`, the view is framed for the spacecraft as
+   * it will be at that mission time (a tour on its way to a stop asks for
+   * the stop's), so arriving there needs no second move: the Earth and Moon
+   * views look from where the ship followed then will be, and the ship view
+   * heads for the ship followed then.
    */
   setView(view: EventView, options: { at?: number; instant?: boolean } = {}): void {
+    const at = options.at;
     this.viewNow = nearestView(this.options.mission, view);
     this.userMovedCamera = false;
-    this.pendingView = options.instant || !this.running ? 'instant' : 'tween';
-    if (view === 'spacecraft') {
+    this.pendingView = options.instant || !this.running || this.reducedMotion ? 'instant' : 'tween';
+    this.pendingAt = at !== undefined && Number.isFinite(at) ? at : null;
+    this.endChaseAt(false);
+    if (this.viewNow === 'spacecraft') {
       this.chaseReady = false;
       this.chaseDirection.copy(CHASE_OFFSET);
       this.chaseZoom = 1;
+      if (this.pendingAt !== null && this.pendingAt > this.player.time) {
+        this.chaseAt = this.pendingAt;
+        const ship = this.followedAt(this.pendingAt);
+        if (ship !== this.followed && ship.exists) this.chaseOverride = ship;
+      }
+    }
+    // Say now, not from the next frame, whether this starts a move: none when the
+    // camera is already where the view puts it (the view asked for again, as framed).
+    if (this.pendingView === 'tween' && this.earth && this.alreadyFramed()) {
+      this.pendingView = 'instant';
     }
     this.needsRender = true;
+    this.movingShown = this.moving;
     this.notify();
+  }
+
+  /** True when the camera already rests where the pending view's framing puts it (see setView). */
+  private alreadyFramed(): boolean {
+    this.framingOffset(this.settledOffset, this.mix, this.pendingAt ?? this.player.time);
+    this.settledPose(this.tweenTo);
+    this.tweenFrom.position.copy(this.camera.position);
+    this.tweenFrom.target.copy(this.controls.target);
+    this.tweenFrom.up.copy(this.camera.up);
+    return this.samePose(this.tweenFrom, this.tweenTo);
   }
 
   setViewInsets(insets: ViewInsets): void {
@@ -1369,6 +1483,99 @@ export class Stage implements Director {
     return this.ships.find((ship) => ship.exists) ?? this.followed;
   }
 
+  /** The ship the ship view's camera follows: the followed ship, or while a move heads for a later moment, the one followed then (see chaseAt). */
+  private chased(): ShipState {
+    return this.chaseOverride ?? this.followed;
+  }
+
+  /**
+   * End a move's hold on a later moment (see chaseAt). If the camera was
+   * following a ship other than the followed one, and `handOver` is true, it
+   * moves to the followed one when that is far off, as at any handover.
+   */
+  private endChaseAt(handOver: boolean): void {
+    const before = this.chased();
+    this.chaseAt = null;
+    this.chaseOverride = null;
+    if (!handOver || this.viewNow !== 'spacecraft' || this.pendingView) return;
+    if (before.position.distanceTo(this.followed.position) > HANDOVER_DISTANCE) {
+      this.pendingView = this.running && !this.reducedMotion ? 'tween' : 'instant';
+    }
+  }
+
+  /**
+   * Every ship at mission time `at` (scale mix `mix`), into framePoses, and
+   * the Sun's direction then, into frameSun. Returns the one the Earth and
+   * Moon views frame then: the ship followed then, or before it flies, the
+   * first one that does (as subject() does for now); null when none does.
+   */
+  private posesAt(at: number, mix: number): FramePose | null {
+    this.ships.forEach((ship, i) => {
+      const pose = this.framePoses[i] as FramePose;
+      pose.exists = this.path.position(ship.id, at, mix, this.scratch);
+      if (!pose.exists) return;
+      pose.position.fromArray(this.scratch);
+      if (this.path.direction(ship.id, at, mix, this.scratch)) pose.forward.fromArray(this.scratch);
+    });
+    this.path.sunDirection(at, this.scratch);
+    this.frameSun.fromArray(this.scratch);
+    const followed = this.framePoses[this.ships.indexOf(this.followedAt(at))];
+    if (followed?.exists) return followed;
+    return this.framePoses.find((pose) => pose.exists) ?? null;
+  }
+
+  /**
+   * How far from a body's center the low orbits of the craft near it at
+   * mission time `at` reach (see LOW_ORBIT_RADII), in scene units at scale
+   * mix `mix`: the farthest any of them gets within LOW_ORBIT_WINDOW_SECONDS
+   * either side, counting only its path within LOW_ORBIT_RADII of the center,
+   * so a craft arriving from far off, or leaving, counts only once it is
+   * close. Reads framePoses, so call posesAt(at, mix) first.
+   */
+  private orbitReach(center: Vector3, radius: number, at: number, mix: number): number {
+    let reach = 0;
+    const limit = radius * LOW_ORBIT_RADII;
+    this.ships.forEach((ship, i) => {
+      const pose = this.framePoses[i];
+      if (!pose?.exists || pose.position.distanceTo(center) > radius * (1 + NEAR_BODY_RADII))
+        return;
+      const line = this.path.polyline(ship.id);
+      if (!line) return;
+      const { times, readablePositions: readable, truePositions: real } = line;
+      const from = Math.floor(indexAtValue(times, at - LOW_ORBIT_WINDOW_SECONDS));
+      for (let k = from; k < times.length; k += 1) {
+        if ((times[k] as number) > at + LOW_ORBIT_WINDOW_SECONDS) break;
+        const x = MathUtils.lerp(readable[3 * k] ?? 0, real[3 * k] ?? 0, mix) - center.x;
+        const y = MathUtils.lerp(readable[3 * k + 1] ?? 0, real[3 * k + 1] ?? 0, mix) - center.y;
+        const z = MathUtils.lerp(readable[3 * k + 2] ?? 0, real[3 * k + 2] ?? 0, mix) - center.z;
+        const distance = Math.hypot(x, y, z);
+        if (distance <= limit) reach = Math.max(reach, distance);
+      }
+    });
+    return reach;
+  }
+
+  /** The mission clock now, as clockJumped reads it. */
+  private readClock(): ClockReading {
+    return {
+      story: this.player.storyTime,
+      playing: this.player.playing,
+      speed: this.player.speed,
+    };
+  }
+
+  /**
+   * Hear the clock: it tells of each step it runs and of every seek alike.
+   * Note a jump (a seek, not a slow frame; see clockJumped) for the next
+   * frame, which is all that moves the camera in the Earth and Moon views
+   * besides the visitor and a change of view.
+   */
+  private noteClock(): void {
+    const now = this.readClock();
+    if (clockJumped(this.clockSeen, now)) this.clockJump = true;
+    this.clockSeen = now;
+  }
+
   /** A few hundred points along every path, for framing the journey view (and an Earth-orbit flight's Earth view). */
   private sampleJourney(): Record<ScaleMode, Float32Array> {
     const readable: number[] = [];
@@ -1510,9 +1717,12 @@ export class Stage implements Director {
     const followed = this.followedAt(t);
     if (followed !== this.followed) {
       // Handing the ship view to a ship somewhere else (the main ship at its liftoff): move the camera there.
-      const far = followed.position.distanceTo(this.followed.position) > HANDOVER_DISTANCE;
+      // (Not when the camera already follows it, on a move to the moment it is followed: see chaseAt.)
+      const chased = this.chased();
+      const far = followed.position.distanceTo(chased.position) > HANDOVER_DISTANCE;
       this.followed = followed;
-      if (far && this.viewNow === 'spacecraft' && !this.pendingView) {
+      if (this.chaseOverride === followed) this.chaseOverride = null;
+      if (far && followed !== chased && this.viewNow === 'spacecraft' && !this.pendingView) {
         this.pendingView = this.running && !this.reducedMotion ? 'tween' : 'instant';
       }
     }
@@ -1550,7 +1760,7 @@ export class Stage implements Director {
           0,
         );
       case 'spacecraft':
-        return out.copy(this.followed.position);
+        return out.copy(this.chased().position);
       case 'journey':
         return out.lerpVectors(this.journeyCenter.readable, this.journeyCenter.true, mix);
     }
@@ -1569,56 +1779,29 @@ export class Stage implements Director {
   }
 
   /**
-   * The settled camera offset (from the anchor) for the current view at the
-   * current time, written to `out`. For the ship view this also resets the
-   * chase so it starts behind and above the ship.
+   * The settled camera offset (from the anchor) for the current view, framed
+   * for mission time `at` (now unless a view was asked for a later moment),
+   * written to `out`. For the ship view this also resets the chase so it
+   * starts behind and above the ship.
    */
-  private framingOffset(out: Vector3, mix = this.mix): Vector3 {
+  private framingOffset(out: Vector3, mix = this.mix, at = this.player.time): Vector3 {
     switch (this.viewNow) {
       case 'journey':
         return this.journeyOffset(out, mix);
       case 'earth':
       case 'moon': {
-        const ship = this.subject();
         const isEarth = this.viewNow === 'earth';
         const center = isEarth ? this.origin : this.moonSphere(mix).center;
         const radius = isEarth ? EARTH_FRAME_RADIUS : MOON_RADIUS;
-        const direction = this.bodyDirection(center, radius, this.v3);
-        const spheres: SphereLike[] = [{ center, radius }];
-        if (isEarth && this.orbitMission) {
-          // A flight that stays in Earth orbit: Earth and every orbit, with room at the edges for a model.
-          spheres.push(...this.pathSpheres(mix));
-          const clear: ClearArea = {
-            width: Math.max(0.2, this.clear.width - (2 * SHIP_EDGE_PX) / this.cssWidth),
-            height: Math.max(0.2, this.clear.height - (2 * SHIP_EDGE_PX) / this.cssHeight),
-          };
-          const distance = fitDistance(
-            this.camera,
-            center,
-            direction,
-            spheres,
-            1.06,
-            clear,
-            this.worldUp,
-          );
-          return out.copy(direction).multiplyScalar(distance);
-        }
-        if (ship.exists && ship.position.distanceTo(center) < radius * (1 + NEAR_BODY_RADII)) {
-          spheres.push({ center: ship.position.clone(), radius: radius * 0.12 });
-        }
-        const distance = fitDistance(
-          this.camera,
-          center,
-          direction,
-          spheres,
-          1.2,
-          this.clear,
-          this.worldUp,
-        );
-        return out.copy(direction).multiplyScalar(distance);
+        const subject = this.posesAt(at, mix);
+        const direction = this.bodyDirection(center, radius, subject, this.frameDirection);
+        this.framedAt = at;
+        return out
+          .copy(direction)
+          .multiplyScalar(this.bodyDistance(center, radius, direction, subject, at, mix));
       }
       case 'spacecraft': {
-        const ship = this.followed;
+        const ship = this.chaseSubject();
         this.chaseFrameFor(ship, this.chaseFrame);
         this.chaseReady = true;
         this.chaseDistance = this.chaseAutoDistance(ship);
@@ -1681,16 +1864,73 @@ export class Stage implements Director {
   }
 
   /**
-   * The Earth and Moon views look at the body from the side the ship is on,
-   * turned away from straight overhead toward the Sun (and north), so the
-   * ship stands out against the lit side and its shape reads. Without a ship
-   * nearby, they show the body's day side.
+   * How far the Earth or Moon view stands from the body's center, looking
+   * along `direction`, for the clear area now: the body and the framed ship
+   * `subject` (at mission time `at`) in the clear area, and in a tall, narrow
+   * picture the low orbits around the body across it (see LOW_ORBIT_RADII).
+   * A flight that stays in Earth orbit has Earth and every orbit in its
+   * Earth view. Reads framePoses, so call posesAt(at, mix) first.
    */
-  private bodyDirection(center: Vector3, radius: number, out: Vector3): Vector3 {
-    const ship = this.subject();
-    if (center === this.origin && this.orbitMission && this.orbitDirection(ship, out)) return out;
-    const lean = this.v1.copy(this.sunDirection).addScaledVector(this.v2.set(0, 1, 0), 0.6);
-    if (ship.exists && ship.position.distanceTo(center) < radius * (1 + NEAR_BODY_RADII)) {
+  private bodyDistance(
+    center: Vector3,
+    radius: number,
+    direction: Vector3,
+    subject: FramePose | null,
+    at: number,
+    mix: number,
+  ): number {
+    const spheres: SphereLike[] = [{ center, radius }];
+    if (center === this.origin && this.orbitMission) {
+      // A flight that stays in Earth orbit: Earth and every orbit, with room at the edges for a model.
+      spheres.push(...this.pathSpheres(mix));
+      const clear: ClearArea = {
+        width: Math.max(0.2, this.clear.width - (2 * SHIP_EDGE_PX) / this.cssWidth),
+        height: Math.max(0.2, this.clear.height - (2 * SHIP_EDGE_PX) / this.cssHeight),
+      };
+      return fitDistance(this.camera, center, direction, spheres, 1.06, clear, this.worldUp);
+    }
+    if (subject && subject.position.distanceTo(center) < radius * (1 + NEAR_BODY_RADII)) {
+      spheres.push({ center: subject.position.clone(), radius: radius * 0.12 });
+    }
+    const distance = fitDistance(
+      this.camera,
+      center,
+      direction,
+      spheres,
+      1.2,
+      this.clear,
+      this.worldUp,
+    );
+    // Only a picture taller than it is wide; a wide one (any desktop window) keeps its framing.
+    const tall = this.cssWidth * this.clear.width < this.cssHeight * this.clear.height;
+    if (!tall) return distance;
+    const reach = this.orbitReach(center, radius, at, mix);
+    if (reach <= radius) return distance;
+    const across: ClearArea = {
+      width: Math.max(0.2, this.clear.width - (2 * LOW_ORBIT_EDGE_PX) / this.cssWidth),
+      height: this.clear.height,
+    };
+    return Math.max(distance, fitAcross(this.camera, reach, 1, across));
+  }
+
+  /**
+   * The Earth and Moon views look at the body from the side the ship
+   * (`subject`, where it is at the moment framed) is on, turned away from
+   * straight overhead toward the Sun (and north), so the ship stands out
+   * against the lit side and its shape reads. Without a ship nearby, they
+   * show the body's day side. Reads frameSun, so call posesAt first.
+   */
+  private bodyDirection(
+    center: Vector3,
+    radius: number,
+    subject: FramePose | null,
+    out: Vector3,
+  ): Vector3 {
+    const ship = subject;
+    if (center === this.origin && this.orbitMission && ship && this.orbitDirection(ship, out))
+      return out;
+    const lean = this.v1.copy(this.frameSun).addScaledVector(this.v2.set(0, 1, 0), 0.6);
+    if (ship && ship.position.distanceTo(center) < radius * (1 + NEAR_BODY_RADII)) {
       const toShip = out.subVectors(ship.position, center).normalize();
       lean.addScaledVector(toShip, -lean.dot(toShip));
       if (lean.lengthSq() < 1e-6) lean.set(0, 1, 0).addScaledVector(toShip, -toShip.y);
@@ -1702,22 +1942,23 @@ export class Stage implements Director {
     }
     if (center === this.origin) return out.copy(lean).normalize();
     // The Moon: from the Earth side (its near side), leaning sunward.
-    return out.set(-1, 0.3, 0).addScaledVector(this.sunDirection, 0.7).normalize();
+    return out.set(-1, 0.3, 0).addScaledVector(this.frameSun, 0.7).normalize();
   }
 
   /**
    * The Earth view of a flight that stays in Earth orbit: from above the
    * ship's orbit (its north or sunlit side), tilted ORBIT_VIEW_TILT_DEG
    * toward the ship, so the orbits show as rings around Earth rather than
-   * edge on. False when the ship's travel gives no orbit plane.
+   * edge on. False when the ship's travel gives no orbit plane. Reads
+   * framePoses and frameSun, so call posesAt first.
    */
-  private orbitDirection(ship: ShipState, out: Vector3): boolean {
+  private orbitDirection(ship: FramePose, out: Vector3): boolean {
     if (!ship.exists) return false;
     // The orbit plane: the ship's own, or while it has none (climbing, falling under a
     // parachute, or afloat), that of another ship still in orbit.
     const normal = this.v2;
     let found = false;
-    for (const candidate of [ship, ...this.ships]) {
+    for (const candidate of [ship, ...this.framePoses]) {
       if (!candidate.exists) continue;
       normal.crossVectors(this.v1.copy(candidate.position).normalize(), candidate.forward);
       if (normal.lengthSq() > 0.05) {
@@ -1728,7 +1969,7 @@ export class Stage implements Director {
     if (!found) return false;
     normal.normalize();
     const radial = this.v1.copy(ship.position).normalize();
-    const preferred = this.v3.copy(this.sunDirection).multiplyScalar(0.6).add(this.worldUp);
+    const preferred = this.v3.copy(this.frameSun).multiplyScalar(0.6).add(this.worldUp);
     if (normal.dot(preferred) < 0) normal.negate();
     const tilt = MathUtils.degToRad(ORBIT_VIEW_TILT_DEG);
     // (No turning away from the Moon here: that could turn the view edge on to the orbits.)
@@ -1765,7 +2006,7 @@ export class Stage implements Director {
    * The ship view's frame: x along the ship's horizontal travel, y up (away
    * from the nearby body, or ecliptic north far from both), z to the side.
    */
-  private chaseFrameFor(ship: ShipState, out: Quaternion): Quaternion {
+  private chaseFrameFor(ship: ShipPose, out: Quaternion): Quaternion {
     const up = this.v1;
     const toEarth = ship.position.length() - EARTH_RADIUS;
     const toMoon = ship.position.distanceTo(this.moonCenter) - MOON_RADIUS;
@@ -1791,8 +2032,27 @@ export class Stage implements Director {
     return out.setFromRotationMatrix(this.m1);
   }
 
+  /**
+   * What the ship view's chase turns with and stands off from (see
+   * chaseFrameFor): the chased ship as it is now, or while a move heads for a
+   * later moment (see chaseAt), as it will be then. Holding that frame on the
+   * way, the camera arrives exactly where the chase rests once the clock
+   * stops there, with nothing left to catch up.
+   */
+  private chaseSubject(): ShipPose {
+    const ship = this.chased();
+    if (this.chaseAt === null) return ship;
+    const pose = this.chaseAtPose;
+    if (!this.path.position(ship.id, this.chaseAt, this.mix, this.scratch)) return ship;
+    pose.position.fromArray(this.scratch);
+    if (this.path.direction(ship.id, this.chaseAt, this.mix, this.scratch))
+      pose.forward.fromArray(this.scratch);
+    this.radialUp(pose.position, pose.up);
+    return pose;
+  }
+
   /** How far the ship view stands off: enough to see the nearby body, farther out in open space. */
-  private chaseAutoDistance(ship: ShipState): number {
+  private chaseAutoDistance(ship: ShipPose): number {
     const toEarth = ship.position.length() - EARTH_RADIUS;
     const toMoon = ship.position.distanceTo(this.moonCenter) - MOON_RADIUS;
     const nearMoon = toMoon / MOON_RADIUS < toEarth / EARTH_RADIUS;
@@ -1803,23 +2063,40 @@ export class Stage implements Director {
 
   /**
    * Start a camera move from where the camera is to the current view's
-   * framing. A move between two views of one body, or one that flying
-   * straight would take close past a body, swings around that body (see
-   * swingBody and swingAround), and a long swing takes longer (see
-   * LONG_SWING_MS). Otherwise the camera flies straight across.
+   * framing (for mission time `how.at`, or now), or with `how.keepOffset`,
+   * to settledOffset as it is (a refit, see reframeAfterLayout). A move
+   * between two views of one body, one that flying straight would take close
+   * past a body, or one into or out of a close view of a body from a wide
+   * view, swings around that body (see swingBodyOf and swingAround), and a
+   * long swing takes longer (see LONG_SWING_MS). Otherwise the camera flies
+   * straight across. A move to where the camera already is is made at once.
+   * `how.move` (true unless given) says whether `moving` reports it.
    */
-  private startTween(durationMs: number, mix = this.mix): void {
+  private startTween(
+    durationMs: number,
+    mix = this.mix,
+    how: { at?: number; keepOffset?: boolean; move?: boolean } = {},
+  ): void {
     this.settleDamping();
     this.tweenFrom.position.copy(this.camera.position);
     this.tweenFrom.target.copy(this.controls.target);
     this.tweenFrom.up.copy(this.camera.up);
-    this.framingOffset(this.settledOffset, mix);
+    if (!how.keepOffset) this.framingOffset(this.settledOffset, mix, how.at);
     this.tweenMix = mix;
     const toMix = mix;
     // The destination moves with its anchor (a ship, or the Moon as the scale changes).
     const destination = (): OrientedPose =>
       this.settledPose(this.tweenTo, this.viewNow === 'journey' ? toMix : this.mix);
     destination();
+    this.cameraTween?.cancel();
+    this.cameraTween = null;
+    this.cameraMove = false;
+    if (this.samePose(this.tweenFrom, this.tweenTo)) {
+      this.setCameraUp(this.tweenTo.up);
+      this.applyPose(this.tweenTo);
+      this.applyLimits();
+      return;
+    }
     const body = this.swingBody(this.tweenFrom, this.tweenTo);
     let duration = durationMs;
     if (body) {
@@ -1830,14 +2107,17 @@ export class Stage implements Director {
       const share = MathUtils.clamp((degrees - short) / (long - short), 0, 1);
       duration *= MathUtils.lerp(1, LONG_SWING_MS / TRANSITION_MS, share);
     }
+    const keep = body ? this.keptCraft(this.tweenFrom, this.tweenTo, body) : null;
     this.controls.minDistance = 0;
     this.controls.maxDistance = Infinity;
-    this.cameraTween?.cancel();
+    this.cameraMove = how.move ?? true;
     this.cameraTween = new Tween(
       duration,
       (t) => {
         const to = destination();
-        if (body) {
+        if (body && keep) {
+          swingKeeping(this.tweenFrom, to, this.bodyCenter(body), keep, t, this.tweenPose);
+        } else if (body) {
           swingAround(this.tweenFrom, to, this.bodyCenter(body), t, this.tweenPose);
         } else {
           interpolatePose(this.tweenFrom, to, t, this.tweenPose);
@@ -1854,23 +2134,46 @@ export class Stage implements Director {
     this.needsRender = true;
   }
 
-  /**
-   * The body a camera move between two poses swings around, if any: the one
-   * both ends look at or near (see SWING_REACH_RADII), or else one that
-   * flying straight would dive past (see divesPast).
-   */
+  /** The body a camera move between two poses swings around, if any (see swingBodyOf and SWING_REACH_RADII). */
   private swingBody(from: CameraPose, to: CameraPose): 'earth' | 'moon' | null {
-    const bodies = ['moon', 'earth'] as const;
-    const sphere = (body: 'earth' | 'moon'): SphereLike => ({
-      center: this.bodyCenter(body),
-      radius: body === 'moon' ? MOON_RADIUS : EARTH_FRAME_RADIUS,
-    });
-    const shared = bodies.find((body) => {
-      const { center, radius } = sphere(body);
-      const reach = radius * SWING_REACH_RADII;
-      return from.target.distanceTo(center) < reach && to.target.distanceTo(center) < reach;
-    });
-    return shared ?? bodies.find((body) => divesPast(from, to, sphere(body))) ?? null;
+    const bodies = [
+      { name: 'moon', center: this.moonCenter, radius: MOON_RADIUS },
+      { name: 'earth', center: this.origin, radius: EARTH_FRAME_RADIUS },
+    ] as const;
+    return swingBodyOf(from, to, bodies, SWING_REACH_RADII)?.name ?? null;
+  }
+
+  /**
+   * For a swing around `body` between a wide view and a close view of a craft
+   * near the body (the ship view near Earth or the Moon, to or from the
+   * journey view), the end that looks at the craft, which swingKeeping keeps
+   * in the picture all the way. Null for any other swing (between two views
+   * of the body, or one that looks at its center): swingAround slides the
+   * body across the picture.
+   */
+  private keptCraft(
+    from: CameraPose,
+    to: CameraPose,
+    body: 'earth' | 'moon',
+  ): 'from' | 'to' | null {
+    const center = this.bodyCenter(body);
+    const radius = body === 'moon' ? MOON_RADIUS : EARTH_FRAME_RADIUS;
+    const near = (pose: CameraPose): boolean =>
+      pose.target.distanceTo(center) < radius * SWING_REACH_RADII;
+    const atCraft = (pose: CameraPose): boolean => pose.target.distanceTo(center) > radius * 0.5;
+    if (near(to) && atCraft(to) && !near(from)) return 'to';
+    if (near(from) && atCraft(from) && !near(to)) return 'from';
+    return null;
+  }
+
+  /** True when two camera poses are the same, near enough that a move between them would not show. */
+  private samePose(a: OrientedPose, b: OrientedPose): boolean {
+    const scale = Math.max(a.position.distanceTo(a.target), 1e-9) * SAME_POSE_SHARE;
+    return (
+      a.position.distanceTo(b.position) < scale &&
+      a.target.distanceTo(b.target) < scale &&
+      a.up.distanceToSquared(b.up) < SAME_POSE_SHARE * SAME_POSE_SHARE
+    );
   }
 
   /** Where Earth's or the Moon's center is now. */
@@ -1931,33 +2234,72 @@ export class Stage implements Director {
     return out.copy(this.settledOffset);
   }
 
-  /** Frame the current view now: instantly, or with a camera move. */
-  private applyFraming(instant: boolean): void {
+  /** Frame the current view for mission time `at` (now unless given): instantly, or with a camera move. */
+  private applyFraming(instant: boolean, at = this.player.time): void {
     if (instant) {
-      this.cameraTween?.cancel();
-      this.cameraTween = null;
-      this.framingOffset(this.settledOffset);
-      this.settledPose(this.tweenPose);
-      this.setCameraUp(this.tweenPose.up);
-      this.applyPose(this.tweenPose);
-      this.applyLimits();
+      this.framingOffset(this.settledOffset, this.mix, at);
+      this.jumpToSettled();
     } else {
-      this.startTween(this.transitionMs);
+      this.startTween(this.transitionMs, this.mix, { at });
     }
   }
 
-  /** After the interface or window changes size: refit unless the person has taken the camera. */
+  /** Put the camera where the current view rests now, with no move. */
+  private jumpToSettled(): void {
+    this.cameraTween?.cancel();
+    this.cameraTween = null;
+    this.cameraMove = false;
+    this.settledPose(this.tweenPose);
+    this.setCameraUp(this.tweenPose.up);
+    this.applyPose(this.tweenPose);
+    this.applyLimits();
+  }
+
+  /**
+   * After the interface or window changes size: refit unless the person has
+   * taken the camera. The camera keeps the direction it looks from (a card
+   * changing height never swings it around the body); only its distance
+   * changes, as the new clear area needs, and the picture slides so the
+   * subject sits in the middle of it (see updateClearArea). A move under way
+   * lands on the refitted framing instead.
+   */
   private reframeAfterLayout(): void {
     this.needsRender = true;
     if (!this.earth || this.userMovedCamera || this.pendingView) return;
     if (this.viewNow === 'spacecraft') return;
     if (this.cameraTween && !this.cameraTween.done) {
       // A move is under way (a tour starting as its card opens, say): have it land on the framing for the new clear area.
-      this.framingOffset(this.settledOffset, this.tweenMix);
+      this.refitOffset(this.settledOffset, this.tweenMix);
       return;
     }
-    if (this.reducedMotion) this.applyFraming(true);
-    else this.startTween(REFRAME_MS);
+    this.settleDamping();
+    this.settledOffset.subVectors(this.camera.position, this.controls.target);
+    this.refitOffset(this.settledOffset, this.mix);
+    if (this.reducedMotion) this.jumpToSettled();
+    else this.startTween(REFRAME_MS, this.mix, { keepOffset: true, move: false });
+  }
+
+  /**
+   * Fit `offset`, the camera's offset from the view's anchor, to the clear
+   * area now, keeping its direction: only its length changes. The Earth and
+   * Moon views fit what they were framed for (see framedAt); the journey
+   * view has one direction anyway.
+   */
+  private refitOffset(offset: Vector3, mix: number): void {
+    if (this.viewNow === 'journey') {
+      this.journeyOffset(offset, mix);
+      return;
+    }
+    if (this.viewNow !== 'earth' && this.viewNow !== 'moon') return;
+    if (offset.lengthSq() < 1e-18) return;
+    const isEarth = this.viewNow === 'earth';
+    const center = isEarth ? this.origin : this.moonSphere(mix).center;
+    const radius = isEarth ? EARTH_FRAME_RADIUS : MOON_RADIUS;
+    const direction = this.frameDirection.copy(offset).normalize();
+    const subject = this.posesAt(this.framedAt, mix);
+    offset
+      .copy(direction)
+      .multiplyScalar(this.bodyDistance(center, radius, direction, subject, this.framedAt, mix));
   }
 
   private applyPose(pose: CameraPose): void {
@@ -2008,6 +2350,7 @@ export class Stage implements Director {
     if (this.cameraTween && !this.cameraTween.done) {
       this.cameraTween.cancel();
       this.cameraTween = null;
+      this.cameraMove = false;
       if (this.viewNow === 'spacecraft') this.readChase();
       else this.settledOffset.subVectors(this.camera.position, this.controls.target);
       this.applyLimits();
@@ -2223,9 +2566,23 @@ export class Stage implements Director {
     return (t1 > 0 && t1 < 1) || (t2 > 0 && t2 < 1) || (t1 < 0 && t2 > 1);
   }
 
-  /** Per frame: keep the camera on its anchor, follow the ship, and run any move. */
-  private updateCamera(dt: number, jumped: boolean, paused: boolean): boolean {
+  /**
+   * Per frame: keep the camera on its anchor, follow the ship, and run any
+   * move. In the Earth and Moon views the camera holds still unless the
+   * visitor moves it, a view is asked for, the layout changes (a refit, see
+   * reframeAfterLayout), or the clock jumps (`jumped`: a seek, never a pause
+   * or a slow frame) and leaves the followed ship hidden.
+   */
+  private updateCamera(dt: number, jumped: boolean): boolean {
     let moved = false;
+
+    // A move into the ship view framed for a later moment holds until the clock gets there or stops.
+    if (
+      this.chaseAt !== null &&
+      (!this.player.playing || this.player.time >= this.chaseAt || this.viewNow !== 'spacecraft')
+    ) {
+      this.endChaseAt(true);
+    }
 
     // The ship view moves to its steady view as the fast-forward level rises. As
     // it falls, the view holds until the level drops below FAST_FORWARD_OFF, when
@@ -2234,17 +2591,24 @@ export class Stage implements Director {
     // that moment (see src/app/tour.ts), so the camera goes there from the steady view
     // instead of swooping back in to the ship and out again. A stopped clock shows
     // the ship at its true place, so there the steady view ends at once (below).
+    // A move to a stop in the ship view (see chaseAt) heads for the ship as it will
+    // be there, with the clock stopped: without the steady view.
     const shipView = this.viewNow === 'spacecraft';
-    const level = shipView && this.player.playing ? this.followed.fastForward : 0;
+    const level =
+      shipView && this.player.playing && this.chaseAt === null ? this.followed.fastForward : 0;
     const wasFast = shipView && this.fastView.level > 0.001;
     const fast = Math.min(level / FAST_FORWARD_OFF, Math.max(level, this.fastView.level));
+    const fastBefore = this.fastView.level;
     this.updateFastView(fast);
     this.controls.enabled = fast < 0.02;
+    this.fastReturning = shipView && fast > 0.001 && fast < fastBefore - 1e-6;
 
     if (this.pendingView) {
       const instant = this.pendingView === 'instant' || this.reducedMotion;
+      const at = this.pendingAt ?? this.player.time;
       this.pendingView = null;
-      this.applyFraming(instant);
+      this.pendingAt = null;
+      this.applyFraming(instant, at);
       moved = true;
     } else if (wasFast && !this.player.playing) {
       // The clock stopped while the ship view held its steady view: the camera
@@ -2252,12 +2616,13 @@ export class Stage implements Director {
       this.startTween(this.transitionMs);
       moved = true;
     } else if (
-      (jumped || paused) &&
+      jumped &&
       !this.userMovedCamera &&
       (this.viewNow === 'earth' || this.viewNow === 'moon')
     ) {
-      // After a seek or a pause, bring the ship back into view if it is hidden.
-      // (The journey view keeps its one orientation; the ship view follows anyway.)
+      // After a jump of the clock, bring the ship back into view if it is hidden, in
+      // one swing around the body. (The journey view keeps its one orientation; the
+      // ship view follows anyway.)
       const tweening = this.cameraTween !== null && !this.cameraTween.done;
       if (!tweening && this.shipHidden(this.subject())) {
         this.applyFraming(this.reducedMotion);
@@ -2267,7 +2632,7 @@ export class Stage implements Director {
 
     // The ship view turns with the ship and eases its distance.
     if (this.viewNow === 'spacecraft' && this.chaseReady) {
-      const ship = this.followed;
+      const ship = this.chaseSubject();
       this.chaseFrameFor(ship, this.q1);
       const auto = this.chaseAutoDistance(ship);
       if (jumped || this.reducedMotion) {
@@ -2285,6 +2650,7 @@ export class Stage implements Director {
       moved = true;
       if (this.cameraTween.done) {
         this.cameraTween = null;
+        this.cameraMove = false;
         this.applyLimits();
         this.updateControls();
       }
@@ -2469,17 +2835,12 @@ export class Stage implements Director {
     const dt = this.lastFrameMs === null ? 0 : Math.min((time - this.lastFrameMs) / 1000, 0.1);
     this.lastFrameMs = time;
 
-    // A seek (or the tour jumping ahead) moves story time more than playback would.
-    const story = this.player.storyTime;
-    const playing = this.player.playing;
-    const step = Number.isNaN(this.lastStory) ? 0 : Math.abs(story - this.lastStory);
-    // `speed` is the pace right now: the chosen rate, or a tour trip's own pace,
-    // which runs faster than the rate in the middle of a long trip.
-    const jumped =
-      step > (playing ? Math.max(0.3, this.player.speed * 0.25) : 1e-9) || (!playing && step > 0);
-    const paused = this.wasPlaying && !playing;
-    this.lastStory = story;
-    this.wasPlaying = playing;
+    // A jump of the clock since the last frame: a seek (the visitor scrubbing or
+    // stepping to an event, the tour setting off or skipping), as the clock
+    // reported it (see noteClock). A slow frame, or a trip landing on its stop,
+    // is not one.
+    const jumped = this.clockJump;
+    this.clockJump = false;
 
     let animating = false;
     if (this.mixTween) {
@@ -2500,7 +2861,11 @@ export class Stage implements Director {
       this.notify();
     }
     const offsetMoving = this.updateViewOffset(dt);
-    const cameraMoved = this.updateCamera(dt, jumped, paused);
+    const cameraMoved = this.updateCamera(dt, jumped);
+    if (this.moving !== this.movingShown) {
+      this.movingShown = this.moving;
+      this.notify();
+    }
 
     if (
       animating ||

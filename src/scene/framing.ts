@@ -72,6 +72,62 @@ export function fitDistance(
   return distance;
 }
 
+/**
+ * Distance from a sphere's center, looking straight at it, at which the
+ * sphere (its radius scaled by `margin`) just fits across the clear part of
+ * the camera's view. Only the width counts: the Earth and Moon views use it
+ * so the low orbits around the body fit across a tall, narrow picture,
+ * whose height has room to spare.
+ */
+export function fitAcross(
+  camera: PerspectiveCamera,
+  radius: number,
+  margin: number,
+  clear: ClearArea,
+): number {
+  const tanV = Math.tan(MathUtils.degToRad(camera.fov) / 2);
+  const halfH = Math.atan(tanV * camera.aspect * clear.width);
+  return (radius * margin) / Math.sin(halfH);
+}
+
+/** The mission clock as the camera sees it (see clockJumped). */
+export interface ClockReading {
+  /** Story seconds. */
+  readonly story: number;
+  readonly playing: boolean;
+  /** Story seconds per real second it moves at now (Player.speed). */
+  readonly speed: number;
+}
+
+/**
+ * The most real time the clock covers in one step by itself, in seconds: the
+ * player's own limit, which lets a playTo trip keep time on a device drawing
+ * one frame a second (TRIP_MAX_FRAME_SECONDS in src/app/player.ts). Its pace
+ * can change within a step, so a step may go a little farther than the pace
+ * at either end of it says: CLOCK_STEP_ALLOWANCE times.
+ */
+const CLOCK_STEP_SECONDS = 1;
+const CLOCK_STEP_ALLOWANCE = 1.5;
+/** A change of story time smaller than this, in story seconds, is a rounding error, not a move. */
+const CLOCK_ROUNDING = 1e-6;
+
+/**
+ * True when the mission clock went from `before` to `after` by a jump (a
+ * seek: the visitor scrubbing or stepping to an event, the tour setting off,
+ * skipping, or going back) rather than by running. The player tells its
+ * subscribers of both alike; what tells them apart is that a running clock
+ * moves at most its own pace for one step, however long the frame took. So
+ * any move of a stopped clock is a jump, and so is a move of a running one
+ * farther than its pace could carry it in a step. A slow frame is not.
+ */
+export function clockJumped(before: ClockReading, after: ClockReading): boolean {
+  const step = Math.abs(after.story - before.story);
+  if (step <= CLOCK_ROUNDING) return false;
+  if (!before.playing) return true;
+  const pace = Math.max(before.speed, after.speed);
+  return step > pace * CLOCK_STEP_SECONDS * CLOCK_STEP_ALLOWANCE;
+}
+
 const _dirA = new Vector3();
 const _dirB = new Vector3();
 const _q = new Quaternion();
@@ -192,6 +248,101 @@ export function swingAngle(from: CameraPose, to: CameraPose, center: Vector3): n
   _fromDir.subVectors(from.position, center);
   _toDir.subVectors(to.position, center);
   return _fromDir.angleTo(_toDir);
+}
+
+const _sight = new Vector3();
+const _toSubject = new Vector3();
+const _offSight = new Quaternion();
+const _offSightPart = new Quaternion();
+const _upTurn = new Quaternion();
+const _upPart = new Quaternion();
+
+/**
+ * A move between a wide view and a close view of a subject near a body (a
+ * craft: `subject` names the end that looks at it), swinging around the
+ * body as swingAround does, but keeping the subject in the picture all the
+ * way. The camera goes where swingAround takes it; the line of sight turns
+ * with it so the subject's angle off it shrinks evenly to nothing on the way
+ * in (or grows evenly from nothing on the way out), never more than at the
+ * wide end, where the subject is in the picture. A plain swing slides the
+ * body's center across the picture instead, and can leave the craft outside
+ * until the end. The picture rolls evenly from one end's up to the other's.
+ */
+export function swingKeeping(
+  from: OrientedPose,
+  to: OrientedPose,
+  center: Vector3,
+  subject: 'from' | 'to',
+  t: number,
+  out: OrientedPose,
+): void {
+  swingAround(from, to, center, t, out);
+  if (t <= 0 || t >= 1) return;
+  const inward = subject === 'to';
+  const target = inward ? to.target : from.target;
+  const wide = inward ? from : to;
+  // The turn from the subject to the line of sight, seen from the wide end, taken a share at a
+  // time, and carried around the body with the camera (swingAround leaves its turn so far,
+  // from the start, in _arcStep), so it stays the same turn as seen from the camera.
+  _toSubject.subVectors(target, wide.position).normalize();
+  _sight.subVectors(wide.target, wide.position).normalize();
+  arcTurn(_toSubject, _sight, wide.up, _offSight);
+  // Seen from the far end, it is taken back around the body to the start first.
+  if (!inward) _offSight.premultiply(_twist.copy(_arc).invert()).multiply(_arc);
+  _offSightPart.identity().slerp(_offSight, inward ? 1 - t : t);
+  _offSightPart.premultiply(_arcStep).multiply(_arcBack.copy(_arcStep).invert());
+  _sight.subVectors(target, out.position).normalize().applyQuaternion(_offSightPart);
+  const fromLook = Math.max(from.position.distanceTo(from.target), 1e-9);
+  const toLook = Math.max(to.position.distanceTo(to.target), 1e-9);
+  out.target.copy(out.position).addScaledVector(_sight, fromLook * (toLook / fromLook) ** t);
+  _upTurn.setFromUnitVectors(from.up, to.up);
+  _upPart.identity().slerp(_upTurn, t);
+  out.up.copy(from.up).applyQuaternion(_upPart);
+}
+
+/** How far off a body a wide view may look and still have it in sight (see swingBodyOf), in degrees. */
+const WIDE_VIEW_SIGHT_DEG = 45;
+const _lookAlong = new Vector3();
+const _toCenter = new Vector3();
+
+/**
+ * The body a camera move between two poses swings around (see swingAround),
+ * or null when there is none and the camera flies straight across
+ * (interpolatePose). In order: a body that both ends look at or near (their
+ * targets within `reach` of its radii of its center); one that flying
+ * straight would dive past (see divesPast); or one that only one end looks
+ * at or near, when the other end is a wider view from farther off with the
+ * body in sight (the journey view, say). Flown straight, that last move into
+ * or out of a close view of the body sends the body swelling into a corner
+ * and the craft out of the picture until the end; around the body, the body
+ * slides across the picture instead.
+ */
+export function swingBodyOf<T extends SphereLike>(
+  from: CameraPose,
+  to: CameraPose,
+  bodies: readonly T[],
+  reach: number,
+): T | null {
+  const near = (pose: CameraPose, body: SphereLike): boolean =>
+    pose.target.distanceTo(body.center) < body.radius * reach;
+  const shared = bodies.find((body) => near(from, body) && near(to, body));
+  if (shared) return shared;
+  const passed = bodies.find((body) => divesPast(from, to, body));
+  if (passed) return passed;
+  for (const [close, wide] of [
+    [from, to],
+    [to, from],
+  ] as const) {
+    const body = bodies.find((one) => near(close, one));
+    if (!body || bodies.some((one) => near(wide, one))) continue;
+    const fartherOff =
+      wide.position.distanceTo(body.center) > close.position.distanceTo(body.center);
+    _lookAlong.subVectors(wide.target, wide.position);
+    _toCenter.subVectors(body.center, wide.position);
+    const inSight = _lookAlong.angleTo(_toCenter) < MathUtils.degToRad(WIDE_VIEW_SIGHT_DEG);
+    if (fartherOff && inSight) return body;
+  }
+  return null;
 }
 
 /**
