@@ -11,6 +11,7 @@ import {
   mountMission,
   navigation,
   screen,
+  sound,
   within,
   type Frames,
   type User,
@@ -49,11 +50,11 @@ describe('the tour panel', () => {
     });
 
     it('keeps "Tell me more" open on the tour, following it from stop to stop', async () => {
-      const { user } = await mountMission('gemini-3', { start: 'tour' });
+      const { user, frames } = await mountMission('gemini-3', { start: 'tour' });
 
       await user.click(within(theCard()).getByRole('button', { name: 'Tell me more' }));
       expect(screen.getByRole('region', { name: 'Liftoff' })).toBeVisible();
-      await user.click(screen.getByRole('button', { name: 'Next' }));
+      await travelToNextStop(user, frames);
 
       expect(screen.getByRole('region', { name: 'The first orbit change' })).toBeVisible();
       expect(within(theCard()).getByRole('button', { name: 'Tell me more' })).toHaveAttribute(
@@ -74,8 +75,9 @@ describe('the tour panel', () => {
       expect(within(panel).getByRole('button', { name: 'Skip to this stop' })).toHaveTextContent(
         'Skip',
       );
+      // The card stays on the stop just left until the clock reaches the next one.
       expect(
-        within(theCard()).getByRole('heading', { level: 3, name: 'The first orbit change' }),
+        within(theCard()).getByRole('heading', { level: 3, name: 'Liftoff' }),
       ).toBeInTheDocument();
 
       frames.advance(A_WHOLE_TRIP);
@@ -83,6 +85,9 @@ describe('the tour panel', () => {
       expect(panel).toHaveTextContent('Stop 2 of 6');
       expect(panel).not.toHaveTextContent('On the way…');
       expect(within(panel).getByRole('button', { name: 'Next' })).toBeEnabled();
+      expect(
+        within(theCard()).getByRole('heading', { level: 3, name: 'The first orbit change' }),
+      ).toBeInTheDocument();
     });
 
     it('skips the rest of the trip and arrives at once', async () => {
@@ -111,9 +116,14 @@ describe('the tour panel', () => {
       ).toBeInTheDocument();
     });
 
-    it('holds back "Try it" while on the way to a stop, and offers it there', async () => {
+    it('offers "Try it" at a stop, and holds it back on the way, even on the stop just left', async () => {
       // Gemini 8's tour starts at the target's launch, before its own liftoff, which has "Try it".
       const { user, frames } = await mountMission('gemini-8', { start: 'tour' });
+      await travelToNextStop(user, frames);
+      expect(within(theCard()).getByRole('heading', { level: 3 })).toHaveTextContent('Liftoff');
+      expect(
+        within(theCard()).getByRole('button', { name: 'Try it: Drop the stages' }),
+      ).toBeVisible();
 
       await user.click(screen.getByRole('button', { name: 'Next' }));
 
@@ -122,12 +132,32 @@ describe('the tour panel', () => {
       expect(
         within(theCard()).queryByRole('button', { name: 'Try it: Drop the stages' }),
       ).not.toBeInTheDocument();
+    });
 
-      frames.advance(A_WHOLE_TRIP);
+    it('stops a recording playing on the card as the tour sets off for the next stop', async () => {
+      const { user, frames } = await mountMission('apollo-11', { start: 'tour' });
+      // Next and Skip to the landing, the sixth stop.
+      for (let stop = 2; stop <= 6; stop += 1) {
+        await user.click(screen.getByRole('button', { name: 'Next' }));
+        frames.advance(0.5);
+        await user.click(screen.getByRole('button', { name: 'Skip to this stop' }));
+      }
+      await user.click(
+        within(theCard()).getByRole('button', { name: 'Listen to the recording, 15 seconds' }),
+      );
+      sound.starts();
+      expect(
+        within(theCard()).getByRole('button', { name: 'Pause the recording' }),
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Next' }));
 
       expect(
-        within(theCard()).getByRole('button', { name: 'Try it: Drop the stages' }),
-      ).toBeVisible();
+        within(theCard()).getByRole('heading', { level: 3, name: 'The Eagle has landed' }),
+      ).toBeInTheDocument();
+      expect(
+        within(theCard()).getByRole('button', { name: 'Listen to the recording, 15 seconds' }),
+      ).toBeInTheDocument();
     });
   });
 

@@ -257,6 +257,9 @@ export const copy = {
     skip: 'Skip',
     skipLabel: 'Skip to this stop',
     exit: 'Exit tour',
+    /** Said as the tour sets off: the card stays on the stop just left until the clock reaches the next one. */
+    headingFor: (index: number, total: number, title: string) =>
+      `On the way to stop ${index} of ${total}: ${title}.`,
     arrived: (index: number, total: number, title: string) =>
       `Stop ${index} of ${total}: ${title}.`,
     ended: 'Tour ended. You are exploring on your own.',

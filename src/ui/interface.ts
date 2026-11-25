@@ -4,7 +4,7 @@ import { Tour } from '../app/tour';
 import { copy } from '../content/copy';
 import { credits } from '../content/credits';
 import type { MissionBundle } from '../content/missions/bundle';
-import type { Memorial, Mission, MissionSummary } from '../content/types';
+import type { Memorial, Mission, MissionEvent, MissionSummary } from '../content/types';
 import type { Extra, ExtraMeta } from '../extras/types';
 import type { Parting } from '../sim';
 import { renderAbout, renderHowDrawn } from './about-dialog';
@@ -361,6 +361,9 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   };
 
   let tourPhase = tour.phase;
+  let tourIndex = tour.index;
+  /** The stop whose card screen readers have heard appear on the way, so it is not said again on arrival. */
+  let heardStop: MissionEvent | null = null;
   tour.subscribe(() => {
     document.body.classList.toggle('is-touring', tour.active);
     timeline.setLocked(tour.active);
@@ -373,15 +376,28 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     // "Try it" waits for the stop. At a stop the clock is already still.
     card.setTryItAllowed(tour.phase !== 'traveling');
     const stop = tour.stop;
-    // On the way, the card already shows the stop it is heading for, so it
-    // turns once as the trip begins rather than flicking through every event
-    // passed, which go by too quickly to read. The scene shows the way.
-    if (stop) card.show(index.events.indexOf(stop));
-    if (tour.phase === 'stopped' && stop)
+    const setOff =
+      tour.phase === 'traveling' && (tourPhase !== 'traveling' || tour.index !== tourIndex);
+    if (setOff && stop) {
+      // The card stays on the stop just left for now, so say where the tour is going. A
+      // recording stops as the tour sets off, as it did when the card turned at once.
+      pauseAllAudio();
+      announce(copy.tour.headingFor(tour.index + 1, tour.total, stop.title));
+    }
+    // The card shows the stop the clock has reached (see Tour.shownStop): on the way, the
+    // stop just left until the clock reaches the next one, rather than flicking through
+    // every event passed, which go by too quickly to read. The scene shows the way.
+    const shown = tour.shownStop;
+    if (shown) card.show(index.events.indexOf(shown));
+    // Each stop is said once, as its card appears: on reaching its event (at a parting, as
+    // the clock holds there), or on arrival.
+    if (stop && shown === stop && heardStop !== stop)
       announce(copy.tour.arrived(tour.index + 1, tour.total, stop.title));
+    heardStop = tour.phase === 'traveling' && shown === stop ? stop : null;
     // Leaving the tour partway to a stop: the card catches up with the clock.
     if (tour.phase === 'off' && tourPhase === 'traveling') card.show(index.eventAt(player.time));
     tourPhase = tour.phase;
+    tourIndex = tour.index;
   });
   setUpTourPanel(tour, { onExplore: explore });
 

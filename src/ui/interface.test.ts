@@ -111,20 +111,28 @@ describe('the mission interface', () => {
       expect(screen.getByRole('button', { name: 'Tell me more' })).toBeEnabled();
     });
 
-    it('holds the card on the stop it is heading for, not each event it passes', async () => {
+    it('holds the card on the stop just left until the clock reaches the next, not each event it passes', async () => {
       const { user, frames } = await mountMission('apollo-11', { start: 'tour' });
+      const card = screen.getByRole('region', { name: 'What is happening' });
 
       await user.click(screen.getByRole('button', { name: 'Next' }));
       frames.advance(3);
 
-      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('On the way…');
-      expect(
-        screen.getByRole('heading', { level: 3, name: 'Burn toward the Moon' }),
-      ).toBeInTheDocument();
-      // The events passed on the way go by too quickly to read, so the card does not show them.
-      expect(screen.getByRole('region', { name: 'What is happening' })).not.toHaveTextContent(
-        '02:44:16',
+      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent(
+        'Stop 2 of 12 On the way…',
       );
+      // The card never names a moment the clock has not reached, and the events passed on
+      // the way go by too quickly to read, so it does not show them either.
+      expect(within(card).getByRole('heading', { level: 3, name: 'Liftoff' })).toBeInTheDocument();
+      expect(
+        within(card).queryByRole('heading', { name: 'First stage separates' }),
+      ).not.toBeInTheDocument();
+
+      frames.advance(16);
+
+      expect(
+        within(card).getByRole('heading', { level: 3, name: 'Burn toward the Moon' }),
+      ).toBeInTheDocument();
     });
 
     it('notes the visit on this device once, however often it starts', async () => {
@@ -218,6 +226,27 @@ describe('the mission interface', () => {
       settle(frames);
 
       expect(screen.getByText('Tour ended. You are exploring on your own.')).toBeInTheDocument();
+    });
+
+    it('says where the tour is going as it sets off, and the stop as its card appears', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      const { user, frames } = await mountMission('gemini-3', { start: 'tour' });
+      settle(frames);
+
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      settle(frames);
+
+      expect(
+        screen.getByText('On the way to stop 2 of 6: The first orbit change.'),
+      ).toHaveAttribute('aria-live', 'polite');
+
+      frames.advance(16);
+      settle(frames);
+
+      expect(screen.getByText('Stop 2 of 6: The first orbit change.')).toHaveAttribute(
+        'aria-live',
+        'polite',
+      );
     });
 
     it('explains fast forward once, not on every lap', async () => {

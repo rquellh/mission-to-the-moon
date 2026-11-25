@@ -72,8 +72,9 @@ export function setUpTourPanel(tour: Tour, { onExplore }: TourPanelOptions): voi
       back.disabled = tour.index === 0;
       if (backHadFocus && back.disabled) next.focus();
       // On the way, the same button skips ahead to the stop. Only its words
-      // change, so keyboard focus stays on it, and nothing new is announced:
-      // the tour announces the stop on arrival, as it always has.
+      // change, so keyboard focus stays on it. The panel announces nothing
+      // itself: the interface says where the tour is going as it sets off,
+      // and the stop as its card appears (see interface.ts).
       if (phase === 'traveling') {
         nextLabel.textContent = copy.tour.skip;
         next.setAttribute('aria-label', copy.tour.skipLabel);
