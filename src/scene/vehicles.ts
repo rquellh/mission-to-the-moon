@@ -67,17 +67,39 @@ import { SHIP_SIZE_PX } from './config';
 /* Tuning (presentation choices).                                      */
 /* ------------------------------------------------------------------ */
 
-/** Story seconds over which a dropped part falls away, and over which a turn or settle takes place. */
+/** Story seconds over which a dropped part falls away, and over which a settle takes place. */
 const DROP_STORY_SECONDS = 1.1;
 /**
  * Mission seconds over which a dropped part drifts away at most. When the
  * story clock runs many mission minutes a second, the drift is timed by
  * this instead, so a moment just after a separation, paused, shows a clear
- * gap (the drift distance is an illustration).
+ * gap (the drift distance is an illustration). Played on, though, a drop
+ * timed this way takes at least DROP_MIN_SECONDS of real time, so a stage
+ * let go at a fast pace drifts off rather than vanishing in one frame.
  */
 const DROP_MISSION_SECONDS = 80;
+const DROP_MIN_SECONDS = 0.5;
+/** Story seconds over which a craft turns end for end when its main body's nose changes ends (as after pulling Eagle free). */
+const TURN_AROUND_STORY_SECONDS = 2.2;
+/**
+ * A turn of the path of more than SUDDEN_TURN_DEG (or SUDDEN_TURN_DEG_PER_S)
+ * between two frames, where one phase of a climb meets the next, eases over
+ * TURN_EASE_SECONDS of real time instead of turning the model in one frame.
+ * A steady turn, however quick, is followed exactly.
+ */
+const SUDDEN_TURN_DEG = 12;
+const SUDDEN_TURN_DEG_PER_S = 240;
+const TURN_EASE_SECONDS = 0.15;
 /** How quickly the apparent size follows a change of shape, in seconds of real time. */
 const SIZE_SMOOTHING_SECONDS = 0.3;
+/**
+ * A parachute opens over this many seconds of real time, growing out from
+ * the capsule; a drogue let go when the mains open drifts off and shrinks
+ * away over as long. A jump in time shows them as they are at once.
+ */
+const CHUTE_OPEN_SECONDS = 0.5;
+/** How far (meters) a drogue let go drifts off as it goes. */
+const CHUTE_RELEASE_DRIFT = 8;
 /** Bigger stacks look bigger, but much less than in proportion. */
 const SIZE_EXPONENT = 0.35;
 /** Reference length (meters) that gets SHIP_SIZE_PX: the command and service module. */
@@ -811,7 +833,9 @@ function parachutes(kit: Kit, name: 'drogue-parachutes' | 'main-parachutes'): Gr
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(linePoints, 3));
   children.push(new LineSegments(geometry, kit.lines));
-  return part(name, ...children);
+  const group = part(name, ...children);
+  group.userData['apex'] = apex.y;
+  return group;
 }
 
 /* ---------------- A spacewalker, on a tether from a hatch ---------------- */
@@ -1192,7 +1216,9 @@ function geminiParachute(
   }
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(linePoints, 3));
-  return part(name, canopy, new LineSegments(geometry, kit.lines));
+  const group = part(name, canopy, new LineSegments(geometry, kit.lines));
+  group.userData['apex'] = apex.y;
+  return group;
 }
 
 /* ---------------- Titan II, in stack coordinates (y from the engine exits) ---------------- */
@@ -1865,6 +1891,8 @@ interface Shape {
   keptElsewhere: ReadonlySet<VehiclePart>;
   /** Which end its dropped parts drift away from, once known (see ShipModel.dropSide). */
   dropSide?: 1 | -1;
+  /** How far the drop at its change, timed by mission time, was last drawn (see DROP_MIN_SECONDS). */
+  missionDrop?: number;
 }
 
 /**
@@ -2084,6 +2112,7 @@ const _z = new Vector3();
 const _basis = new Matrix4();
 const _q = new Quaternion();
 const _qRoll = new Quaternion();
+const _qStep = new Quaternion();
 const _axisX = new Vector3(1, 0, 0);
 const _axisY = new Vector3(0, 1, 0);
 
@@ -2116,6 +2145,14 @@ const RIDES_WITH: ReadonlyMap<VehiclePart, VehiclePart> = new Map<VehiclePart, V
 /** Dropped parts that drift forward and aside (a tower or a nose shroud) rather than back. */
 const DROPS_FORWARD: ReadonlySet<string> = new Set(['escape-tower', 'agena-shroud', 'atda-shroud']);
 
+/** Parachutes, which open over CHUTE_OPEN_SECONDS (see ShipModel.openChutes). */
+const CHUTES: readonly VehiclePart[] = [
+  'drogue-parachutes',
+  'main-parachutes',
+  'gemini-drogue-parachute',
+  'gemini-main-parachute',
+];
+
 /** Turn rate drawn under reduced motion, degrees per story second, at most. */
 const REDUCED_MOTION_TURN_DEG = 8;
 /**
@@ -2136,6 +2173,11 @@ function wrapAngle(angle: number): number {
 function ease(t: number): number {
   const u = Math.min(1, Math.max(0, t));
   return u * u * (3 - 2 * u);
+}
+
+/** A dropped part shrinks away over the last quarter of its drop (`done`, 0 to 1), rather than vanishing at the end. */
+function dropShrink(done: number): number {
+  return 1 - ease((done - 0.75) / 0.25);
 }
 
 /** A change's parts that count toward the model's length. */
@@ -2207,6 +2249,18 @@ export class ShipModel {
   private walkerGun = false;
   /** How visible the whole model is now (see PoseContext.opacity). */
   private fade = 1;
+  /** The turn the model is drawn at, and the turn its path asked for last frame (see SUDDEN_TURN_DEG). */
+  private readonly drawnTurn = new Quaternion();
+  private readonly pathTurn = new Quaternion();
+  /** How many CSS pixels across its glow is drawn now (it follows a change of shape as the size does). */
+  private haloPixels = 0;
+  /** How far each parachute is open, 0 to 1 (see CHUTE_OPEN_SECONDS), and whether one is still opening or going. */
+  private readonly chuteLevels = new Map<string, number>();
+  private chutesMoving = false;
+  /** True while a dropped part is held to DROP_MIN_SECONDS with the clock stopped. */
+  private dropMoving = false;
+  /** True while the model eases to its size, its glow's size, or its path's turn. */
+  private settling = false;
 
   constructor(
     readonly shipId: string,
@@ -2730,9 +2784,11 @@ export class ShipModel {
   private turningNow = false;
   private walkerMoving = false;
 
-  /** True while the model turns or a spacewalker fades with the clock stopped, so the scene must keep drawing. */
+  /** True while the model turns, a spacewalker fades, a parachute opens, a dropped part drifts off, or the model eases to a new size or turn with the clock stopped, so the scene must keep drawing. */
   get idleTurning(): boolean {
-    return this.turningNow || this.walkerMoving;
+    return (
+      this.turningNow || this.walkerMoving || this.chutesMoving || this.dropMoving || this.settling
+    );
   }
 
   /**
@@ -2830,8 +2886,13 @@ export class ShipModel {
       this.lastShape = -1;
       this.turningNow = false;
       this.walkerMoving = false;
+      this.chutesMoving = false;
+      this.dropMoving = false;
+      this.settling = false;
       return false;
     }
+    // Not drawn last frame: everything is put where it is now rather than eased there.
+    const fresh = this.lastShape < 0;
     this.root.visible = true;
     this.halo.visible = true;
     this.fader.set(context.opacity);
@@ -2840,9 +2901,10 @@ export class ShipModel {
       this.haloOpacity * Math.min(1, context.opacity) * context.glow;
 
     const previous = index > 0 ? this.shapes[index - 1] : undefined;
-    const since = (context.storyTime - context.toStory(shape.time)) / DROP_STORY_SECONDS;
-    const settling = previous !== undefined && since >= 0 && since < 1;
+    const sinceStory = context.storyTime - context.toStory(shape.time);
+    const since = sinceStory / DROP_STORY_SECONDS;
     const u = ease(since);
+    const turnedFor = sinceStory / TURN_AROUND_STORY_SECONDS;
 
     // Show only the active group (and the previous one while its parts fall away).
     for (let i = 0; i < this.groups.length; i += 1) {
@@ -2855,13 +2917,19 @@ export class ShipModel {
     this.showParts(shape, context);
     this.updateWalker(shape, context);
     this.showSpecials(shape, shape.change.parts);
+    this.openChutes(shape, context, fresh);
 
     // Turning around (the main body's nose changes ends).
-    const turning = settling && previous !== undefined && previous.facingEnd !== shape.facingStart;
+    const turning =
+      previous !== undefined &&
+      turnedFor >= 0 &&
+      turnedFor < 1 &&
+      previous.facingEnd !== shape.facingStart;
     // Shapes built turned about Z (see endFor) turn around that way; the rest about X.
     if (turning) {
-      if (TURN_ABOUT_Z.has(shape.kind)) this.body.rotation.z = Math.PI * (1 - u);
-      else this.body.rotation.x = Math.PI * (1 - u);
+      const turned = Math.PI * (1 - ease(turnedFor));
+      if (TURN_ABOUT_Z.has(shape.kind)) this.body.rotation.z = turned;
+      else this.body.rotation.x = turned;
     }
 
     // Parts that came off fall away, and the pivot settles from where it
@@ -2869,12 +2937,18 @@ export class ShipModel {
     // interstage, and the tower come off within seconds of each other.
     let pivot = shape.pivot;
     this.trail.visible = false;
+    this.dropMoving = false;
+    // Changes the clock has just played past start their drops from the start (see DROP_MIN_SECONDS).
+    if (!fresh && !context.snap) {
+      for (let k = this.lastShape + 1; k <= index; k += 1)
+        (this.shapes[k] as Shape).missionDrop = 0;
+    }
     let droppedFrom: Shape | undefined;
     let dropped = this.dropProgress;
     for (let k = index; k > 0; k -= 1) {
       const later = this.shapes[k] as Shape;
       const earlier = this.shapes[k - 1] as Shape;
-      const progress = this.dropAt(later, context);
+      const progress = this.dropAt(later, context, fresh);
       if (progress.done < 0 || progress.done >= 1) break;
       if (earlier.group === shape.group && later.group === shape.group) {
         pivot -= (later.pivot - earlier.pivot) * (1 - ease(progress.done));
@@ -2918,7 +2992,8 @@ export class ShipModel {
     _x.crossVectors(_y, _z).normalize();
     _basis.makeBasis(_x, _y, _z);
     _q.setFromRotationMatrix(_basis);
-    this.root.quaternion.copy(_q);
+    this.turnTo(_q, context, fresh);
+    this.root.quaternion.copy(this.drawnTurn);
 
     // A cited roll (about the long axis) or tumble (end over end), plus any turn made while the clock was stopped.
     this.motionAt(index, context, this.turn);
@@ -2944,12 +3019,78 @@ export class ShipModel {
     const scale = context.unitsPerPixel / this.metersPerPixel;
     this.root.scale.setScalar(scale);
 
-    // The halo sits behind the middle of the model.
+    // The halo sits behind the middle of the model, and changes size with it as its shape changes.
     _y.multiplyScalar(shape.middle * scale);
     this.halo.position.copy(pose.position).add(_y);
     const haloPixels = Math.max(30, (shape.length / this.metersPerPixel) * 0.9 + 18);
-    this.halo.scale.setScalar(haloPixels * context.unitsPerPixel);
+    if (context.snap || fresh || this.haloPixels <= 0) this.haloPixels = haloPixels;
+    else
+      this.haloPixels +=
+        (haloPixels - this.haloPixels) * (1 - Math.exp(-context.dt / SIZE_SMOOTHING_SECONDS));
+    this.halo.scale.setScalar(this.haloPixels * context.unitsPerPixel);
+    // Still easing to its size, its glow's, or its path's turn: with the clock stopped (at a
+    // tour stop it has just settled onto) the scene keeps drawing until it gets there.
+    this.settling =
+      Math.abs(wanted - this.metersPerPixel) > 0.002 * wanted ||
+      Math.abs(haloPixels - this.haloPixels) > 0.25 ||
+      this.drawnTurn.angleTo(this.pathTurn) > 1e-3;
     return true;
+  }
+
+  /**
+   * Turn the model toward the turn its path asks for (`wanted`): a steady
+   * turn is followed exactly, a sudden one (see SUDDEN_TURN_DEG) eases over
+   * TURN_EASE_SECONDS. At once when the model was not drawn last frame, on a
+   * jump in time, and under reduced motion.
+   */
+  private turnTo(wanted: Quaternion, context: PoseContext, fresh: boolean): void {
+    if (fresh || context.snap || context.reducedMotion) {
+      this.drawnTurn.copy(wanted);
+    } else {
+      // How far the path turned since the last frame, in the world's frame.
+      _qStep.copy(this.pathTurn).invert().premultiply(wanted);
+      const step = 2 * Math.acos(Math.min(1, Math.abs(_qStep.w)));
+      const sudden = MathUtils.degToRad(
+        Math.max(SUDDEN_TURN_DEG, SUDDEN_TURN_DEG_PER_S * context.dt),
+      );
+      if (step <= sudden) this.drawnTurn.premultiply(_qStep);
+      this.drawnTurn.slerp(wanted, 1 - Math.exp(-context.dt / TURN_EASE_SECONDS));
+    }
+    this.pathTurn.copy(wanted);
+  }
+
+  /**
+   * Parachutes open over CHUTE_OPEN_SECONDS of real time, growing out from
+   * the capsule's apex; a drogue let go (the mains replace it) drifts off and
+   * shrinks away. At once when the model was not drawn last frame, on a jump
+   * in time, and under reduced motion.
+   */
+  private openChutes(shape: Shape, context: PoseContext, fresh: boolean): void {
+    this.chutesMoving = false;
+    const snap = fresh || context.snap || context.reducedMotion;
+    for (const name of CHUTES) {
+      const node = shape.parts.get(name);
+      if (!node) continue;
+      const wanted = node.visible ? 1 : 0;
+      let level = this.chuteLevels.get(name) ?? wanted;
+      const step = context.dt / CHUTE_OPEN_SECONDS;
+      if (snap) level = wanted;
+      else if (level < wanted) level = Math.min(wanted, level + step);
+      else level = Math.max(wanted, level - step);
+      this.chuteLevels.set(name, level);
+      if (level !== wanted) this.chutesMoving = true;
+      if (level >= 1 && wanted === 1) continue;
+      node.visible = level > 0.01;
+      if (!node.visible) continue;
+      const e = ease(level);
+      const opening = wanted === 1;
+      // Grown about the apex, where the lines meet, so it comes out of the capsule.
+      const size = opening ? 0.15 + 0.85 * e : 0.4 + 0.6 * e;
+      const apex = (node.userData['apex'] as number | undefined) ?? 0;
+      const rest = node.userData['restY'] as number;
+      node.scale.setScalar((node.userData['restScale'] as number) * size);
+      node.position.y = rest + apex * (1 - size) + (opening ? 0 : (1 - e) * CHUTE_RELEASE_DRIFT);
+    }
   }
 
   /** The meters per CSS pixel the model was last drawn at. */
@@ -3067,11 +3208,24 @@ export class ShipModel {
    * How far parts dropped at a shape's change have gone: `done` 0 to 1 (gone
    * at 1) and `drift`, the share of the drift distance, by story time
    * (speeding up, as before) or by mission time (steady), whichever is
-   * further along.
+   * further along. Played on, the drop by mission time goes no faster than
+   * over DROP_MIN_SECONDS of real time (at once when the model was not drawn
+   * last frame, or on a jump in time).
    */
-  private dropAt(shape: Shape, context: PoseContext): { done: number; drift: number } {
+  private dropAt(
+    shape: Shape,
+    context: PoseContext,
+    fresh: boolean,
+  ): { done: number; drift: number } {
     const story = (context.storyTime - context.toStory(shape.time)) / DROP_STORY_SECONDS;
-    const mission = (context.time - shape.time) / DROP_MISSION_SECONDS;
+    let mission = (context.time - shape.time) / DROP_MISSION_SECONDS;
+    const shown = shape.missionDrop;
+    if (!fresh && !context.snap && shown !== undefined && mission > shown && shown < 1) {
+      const most = shown + context.dt / DROP_MIN_SECONDS;
+      if (mission > most && most > story) this.dropMoving = true;
+      mission = Math.min(mission, most);
+    }
+    shape.missionDrop = mission;
     const out = this.dropProgress;
     out.done = Math.max(story, mission);
     out.drift = Math.max(story > 0 ? story * story : story, mission);
@@ -3116,7 +3270,7 @@ export class ShipModel {
       const forward = DROPS_FORWARD.has(name);
       node.position.y = rest + (forward ? distance * 0.8 : -distance);
       if (forward) node.position.x = since * 6;
-      node.scale.setScalar(1 - 0.35 * since);
+      node.scale.setScalar((1 - 0.35 * since) * dropShrink(since));
     }
   }
 
@@ -3163,7 +3317,7 @@ export class ShipModel {
     // Drift away from the spacecraft, on the side the dropped parts were on.
     const distance = (2 + 18 * progress.drift) * this.dropSide(previous, dropped);
     this.trail.position.set(0, distance, 0);
-    this.trail.scale.setScalar(1 - 0.3 * since);
+    this.trail.scale.setScalar((1 - 0.3 * since) * dropShrink(since));
   }
 
   /** Which end of the previous model (+1 the front, -1 the back) the dropped parts were on; worked out once per change. */
@@ -3277,7 +3431,8 @@ export class LeftBehindModel {
   /**
    * Place it at its site, `position`, upright along `up` and facing
    * `front`; hide it when `shown` is false. When `context.metersPerPixel`
-   * is above 0, draw at that scale (the lander standing at the site).
+   * is above 0, draw at that scale (the lander standing at the site, or
+   * just lifting off from it), and otherwise ease to its own.
    */
   update(
     shown: boolean,
@@ -3309,7 +3464,8 @@ export class LeftBehindModel {
       context.maxReachPixels / this.reach,
     );
     const wanted = context.metersPerPixel > 0 ? context.metersPerPixel : 1 / pixelsPerMeter;
-    if (context.snap || this.metersPerPixel <= 0) this.metersPerPixel = wanted;
+    if (context.snap || this.metersPerPixel <= 0 || context.metersPerPixel > 0)
+      this.metersPerPixel = wanted;
     else
       this.metersPerPixel +=
         (wanted - this.metersPerPixel) * (1 - Math.exp(-context.dt / SIZE_SMOOTHING_SECONDS));
