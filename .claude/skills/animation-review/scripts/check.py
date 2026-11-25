@@ -30,7 +30,7 @@ COVER_RISE = 0.3  # or its share rises this much within a second
 REST_TURN_DEG_S = 0.5  # with the clock stopped, a camera turning faster than this is moving
 REST_SHIFT_PX_S = 4  # or a body's centre sliding faster than this on screen
 STALL_S = 0.25  # a frame gap this long
-LAP_LIMIT = 1 / 8  # the owner's standard: about one lap in 8 seconds for a drawn craft
+LAP_LIMIT = 1 / 20  # standard 7: a drawn craft no faster than about one lap in 20 seconds (a working figure, not the owner's; see SKILL.md)
 DRAWN = 0.5  # a model at least this opaque counts as drawn
 STORY_TOLERANCE = 0.15  # story seconds the card may lead the clock (sampling)
 
@@ -652,7 +652,7 @@ def mark_lines(groups, signals, rows):
             signals.append((name, 'ok', 'no marks'))
 
     # Each signal carries the numbers of the standards in SKILL.md it bears on.
-    report('7 laps', ['laps'], 'a drawn craft laps faster than once in 8 s')
+    report('7 laps', ['laps'], f'a drawn craft laps faster than once in {1 / LAP_LIMIT:.0f} s')
     report('9-10 still', ['moving-at-rest', 're-aim'], 'the camera moves with the clock stopped, or re-aims itself')
     report('11 around', ['swell', 'turn'], 'a body swells or the camera turns fast')
     report('14 level', ['tilt', 'roll'], 'the horizon tilts or the camera rolls')
