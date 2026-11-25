@@ -380,6 +380,11 @@ export function easeMove(t: number): number {
   return (1 - Math.cos(Math.PI * t)) / 2;
 }
 
+/** How far through its time a move eased by easeMove is when it is `eased` of the way there: easeMove undone. */
+export function moveShare(eased: number): number {
+  return Math.acos(MathUtils.clamp(1 - 2 * eased, -1, 1)) / Math.PI;
+}
+
 /** Steps over which moveDuration measures a move. */
 const MOVE_SAMPLES = 48;
 const _sample: OrientedPose = { position: new Vector3(), target: new Vector3(), up: new Vector3() };
@@ -387,16 +392,24 @@ const _turnA = new Quaternion();
 const _turnB = new Quaternion();
 
 /**
+ * A camera move's pose at `t` (0, its start, to 1, its end, as easeMove
+ * eases it), written to `out`. `share` is how far through the move's time
+ * that is (0 to 1, not eased), for a move whose end moves on the way.
+ */
+export type MovePose = (t: number, out: OrientedPose, share: number) => void;
+
+/**
  * How long a camera move takes, in milliseconds: the least time in which,
  * eased by easeMove, the picture never turns faster than
  * `degreesPerSecond` (its turn and its roll together, as the camera's
  * orientation turns), but no less than `shortestMs` and no more than
  * `longestMs`. A move that turns the picture far takes longer, and one that
- * hardly turns it the shortest time. `poseAt(t, out)` writes the move's pose
- * at `t`, from 0 (its start) to 1 (its end).
+ * hardly turns it the shortest time. A move whose end moves on the way is
+ * measured as it will go only if `poseAt` moves the end over the time asked
+ * about (see MovePose).
  */
 export function moveDuration(
-  poseAt: (t: number, out: OrientedPose) => void,
+  poseAt: MovePose,
   degreesPerSecond: number,
   shortestMs: number,
   longestMs: number,
@@ -410,8 +423,57 @@ export function moveDuration(
  * together, as the camera's orientation turns), in radians. Of the ways a
  * move can go, the one that turns it least is the calmest.
  */
-export function moveTurn(poseAt: (t: number, out: OrientedPose) => void): number {
+export function moveTurn(poseAt: MovePose): number {
   return measureMove(poseAt).total;
+}
+
+/**
+ * Of the ways round a swing can go (see SwingWay), the one along which the
+ * move (`poseAt`, given the way) turns the picture least in all, roll
+ * included. Another way must be calmer than the first by `margin` radians to
+ * be taken over it, so the short way round wins a near tie. Measured with the
+ * move's end where `poseAt` puts it at each moment: for an end that moves on
+ * the way (the ship view's chase, carried round the body with its craft),
+ * where it will be, not where it is as the move sets off, so a roll that the
+ * end's own turn would lengthen gives way to one it shortens. Each way's
+ * `twist` is left unset, for the move to set as it goes.
+ */
+export function calmestWay(
+  ways: readonly SwingWay[],
+  poseAt: (way: SwingWay, t: number, out: OrientedPose, share: number) => void,
+  margin: number,
+): SwingWay {
+  let calmest = ways[0] as SwingWay;
+  let least = Number.POSITIVE_INFINITY;
+  for (const way of ways) {
+    way.twist = Number.NaN;
+    const turn = moveTurn((t, out, share) => poseAt(way, t, out, share));
+    way.twist = Number.NaN;
+    if (turn < least - margin) {
+      least = turn;
+      calmest = way;
+    }
+  }
+  return calmest;
+}
+
+/**
+ * Where a chase camera (`pose`, looking at its craft at `subject`) will be
+ * once the craft is at `subjectTo` and the chase has turned by `turn` with it
+ * (carried round the body as the craft goes round), written to `out`: as far
+ * from the craft, turned with it, still looking at it.
+ */
+export function carryPose(
+  pose: OrientedPose,
+  subject: Vector3,
+  subjectTo: Vector3,
+  turn: Quaternion,
+  out: OrientedPose,
+): OrientedPose {
+  out.position.subVectors(pose.position, subject).applyQuaternion(turn).add(subjectTo);
+  out.target.subVectors(pose.target, subject).applyQuaternion(turn).add(subjectTo);
+  out.up.copy(pose.up).applyQuaternion(turn);
+  return out;
 }
 
 /** A move's turn of the camera, eased by easeMove: in all, and at its fastest (radians per unit of the move's time). */
@@ -423,13 +485,13 @@ interface MoveTurn {
 const _measure: MoveTurn = { total: 0, peak: 0 };
 
 /** Measures a move's turn of the camera (see MoveTurn) at MOVE_SAMPLES eased steps. */
-function measureMove(poseAt: (t: number, out: OrientedPose) => void): MoveTurn {
+function measureMove(poseAt: MovePose): MoveTurn {
   _measure.total = 0;
   _measure.peak = 0;
-  poseAt(0, _sample);
+  poseAt(0, _sample, 0);
   orientationOf(_sample, _turnA);
   for (let i = 1; i <= MOVE_SAMPLES; i += 1) {
-    poseAt(easeMove(i / MOVE_SAMPLES), _sample);
+    poseAt(easeMove(i / MOVE_SAMPLES), _sample, i / MOVE_SAMPLES);
     orientationOf(_sample, _turnB);
     const step = _turnA.angleTo(_turnB);
     _measure.total += step;
