@@ -241,6 +241,16 @@ const CHASE_STOP_SECONDS = 3;
  * the chase there takes (NaN until worked out), and the chase's frame and
  * distance there, once worked out (see Stage.headForStop).
  */
+/** The ship view's chase as it will be at a later moment (see Stage.chaseAtTime). */
+interface ChaseLater {
+  /** The camera's pose then. */
+  pose: OrientedPose;
+  /** The chase's frame then (see Stage.chaseFrameFor). */
+  frame: Quaternion;
+  /** How far it stands off then, before the chase's zoom (see Stage.chaseAutoDistance). */
+  distance: number;
+}
+
 interface StopAhead {
   at: number;
   endMs: number;
@@ -927,7 +937,11 @@ export class Stage implements Director {
   private readonly calmLook = new Vector3();
   private readonly calmNext = new Vector3();
   /** The chase as it will be at a tour's stop (see expectStop and leavesForStop). */
-  private readonly stopPose = orientedPose();
+  private readonly stopLater: ChaseLater = {
+    pose: orientedPose(),
+    frame: new Quaternion(),
+    distance: 0,
+  };
   private readonly nowPose = orientedPose();
   /** The stop a tour's trip will bring the clock to, if the tour said (see expectStop). */
   private stopAhead: StopAhead | null = null;
@@ -1102,8 +1116,9 @@ export class Stage implements Director {
   private readonly q5 = new Quaternion();
   private readonly q6 = new Quaternion();
   private readonly q7 = new Quaternion();
-  private readonly q8 = new Quaternion();
   private readonly dryForward = new Vector3();
+  /** The chase's heading as it had it, across a new up (see chaseFrameFor). */
+  private readonly heldHeading = new Vector3();
   /** A ship as it will be at a later moment, for chaseAtTime. */
   private readonly dryPose: ShipPose = {
     exists: true,
@@ -2558,11 +2573,25 @@ export class Stage implements Director {
     const forward = this.v2.copy(ship.forward).addScaledVector(up, -ship.forward.dot(up));
     const across = forward.length() / Math.max(ship.forward.length(), 1e-9);
     if (across < CHASE_HEADING_SHARE) {
+      // Where it heads next, as far as that is across its up too; for the rest, the heading the
+      // chase had. A path ahead as near straight up or down as the craft (a capsule coming down
+      // under its parachutes onto the water) has a heading only in its slight drift sideways,
+      // which can point either way from one frame to the next: taken as it was, it turned the
+      // chase's heading round and back (and headForStop the camera a share of half a turn at
+      // once, for two frames, on the way into Splashdown).
+      const lead = this.heldHeading
+        .copy(this.chaseForward)
+        .addScaledVector(up, -this.chaseForward.dot(up));
+      if (lead.lengthSq() > 1e-12) lead.normalize();
       const ahead = this.headingAhead(up, this.v3);
-      if (ahead) {
+      if (ahead > 0) {
+        const sure = Math.min(1, ahead / CHASE_HEADING_SHARE);
+        lead.multiplyScalar(1 - sure).addScaledVector(this.v3, sure);
+      }
+      if (lead.lengthSq() > 1e-6) {
         const share = across / CHASE_HEADING_SHARE;
         if (forward.lengthSq() > 1e-12) forward.normalize().multiplyScalar(share);
-        forward.addScaledVector(ahead, 1 - share);
+        forward.addScaledVector(lead.normalize(), 1 - share);
       }
     }
     if (forward.lengthSq() < 1e-6) {
@@ -2635,9 +2664,10 @@ export class Stage implements Director {
   /**
    * Where the chased ship's path heads across `up` over the next
    * CHASE_AHEAD_SECONDS of mission time (from its liftoff, before it), as a
-   * unit vector into `out`; null when it hardly does.
+   * unit vector into `out`. Returns how much of that way is across `up`, 0
+   * to 1 (0, with `out` zero, when none is).
    */
-  private headingAhead(up: Vector3, out: Vector3): Vector3 | null {
+  private headingAhead(up: Vector3, out: Vector3): number {
     const track = this.chased();
     const from = Math.max(this.chaseTime(), track.track.start);
     out.set(0, 0, 0);
@@ -2646,9 +2676,15 @@ export class Stage implements Director {
       const direction = this.f2.fromArray(this.scratch);
       out.addScaledVector(direction, 1 / Math.max(direction.length(), 1e-9));
     }
+    const length = out.length();
     out.addScaledVector(up, -out.dot(up));
-    if (out.lengthSq() < 1e-6) return null;
-    return out.normalize();
+    const across = out.length();
+    if (across < 1e-6 || length < 1e-9) {
+      out.set(0, 0, 0);
+      return 0;
+    }
+    out.divideScalar(across);
+    return across / length;
   }
 
   /**
@@ -3123,11 +3159,11 @@ export class Stage implements Director {
 
   /**
    * The ship view's chase as it will be at mission time `at`, for the ship
-   * followed then, from the chase's direction and zoom now, into `out`;
-   * null when that ship does not fly then. It changes nothing the camera
-   * uses now.
+   * followed then, from the chase's direction and zoom now: its camera pose,
+   * frame and distance, into `out`; null when that ship does not fly then.
+   * It changes nothing the camera uses now.
    */
-  private chaseAtTime(at: number, out: OrientedPose): OrientedPose | null {
+  private chaseAtTime(at: number, out: ChaseLater): ChaseLater | null {
     const ship = this.followedAt(at);
     const pose = this.dryPose;
     if (!this.path.position(ship.id, at, this.mix, this.scratch)) return null;
@@ -3141,17 +3177,18 @@ export class Stage implements Director {
     const [savedAt, savedOverride] = [this.chaseAt, this.chaseOverride];
     this.chaseAt = at;
     this.chaseOverride = ship;
-    const frame = this.chaseFrameFor(pose, this.q8);
+    const frame = this.chaseFrameFor(pose, out.frame);
     this.chaseAt = savedAt;
     this.chaseOverride = savedOverride;
     this.chaseForward.copy(this.dryForward);
-    out.target.copy(pose.position);
-    out.position
+    out.distance = this.chaseAutoDistance(pose);
+    out.pose.target.copy(pose.position);
+    out.pose.position
       .copy(this.chaseDirection)
       .applyQuaternion(frame)
-      .multiplyScalar(this.chaseAutoDistance(pose) * this.chaseZoom)
+      .multiplyScalar(out.distance * this.chaseZoom)
       .add(pose.position);
-    out.up.set(0, 1, 0).applyQuaternion(frame);
+    out.pose.up.set(0, 1, 0).applyQuaternion(frame);
     return out;
   }
 
@@ -3823,7 +3860,7 @@ export class Stage implements Director {
     else if (this.chaseReady) this.snapChase();
     if (this.stopAhead) this.stopAhead.needMs = Number.NaN;
     const stop = !on && !jumped && !this.reducedMotion ? this.usableStop() : null;
-    const end = stop ? this.chaseAtTime(stop.at, this.stopPose) : null;
+    const end = stop ? this.chaseAtTime(stop.at, this.stopLater)?.pose : null;
     if (stop && end) {
       // A tour's stop ahead too soon for the move back to the chase as it follows its craft: to the
       // chase as it will be at the stop, in the time left (see leavesForStop).
@@ -3879,7 +3916,7 @@ export class Stage implements Director {
     const stop = this.usableStop();
     if (!stop) return false;
     if (Number.isNaN(stop.needMs)) {
-      const end = this.chaseAtTime(stop.at, this.stopPose);
+      const end = this.chaseAtTime(stop.at, this.stopLater)?.pose;
       if (!end) {
         this.stopAhead = null;
         return false;
@@ -3982,10 +4019,10 @@ export class Stage implements Director {
     if (left > CHASE_STOP_SECONDS) return;
     // Worked out each frame: a craft that comes to rest (a landing) keeps the heading the chase
     // had last, so its frame there is known only as the chase gets there.
-    const end = this.chaseAtTime(stop.at, this.stopPose);
+    const end = this.chaseAtTime(stop.at, this.stopLater);
     if (!end) return;
-    stop.frame = (stop.frame ?? new Quaternion()).copy(this.q8);
-    stop.distance = this.chaseAutoDistance(this.dryPose);
+    stop.frame = (stop.frame ?? new Quaternion()).copy(end.frame);
+    stop.distance = end.distance;
     stop.fromMs ??= this.nowMs;
     // From nothing when it begins to all of it when the clock is due at the stop, evenly in frame
     // time (the mission clock slows into the stop, so by it the turn would end early and quickly).
