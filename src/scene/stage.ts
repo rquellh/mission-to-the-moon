@@ -105,10 +105,9 @@ import { createMarkers, type MarkerPoint, type MarkerSet } from './markers';
 import { createMoon, type Moon } from './moon';
 import {
   orbitStays,
-  RETURN_EARTH_RADII,
-  RETURN_MOON_RADII,
   returnFade,
   returnStarts,
+  returnZone,
   sampleIndexAt,
   valueAtIndex,
 } from './path-fade';
@@ -1868,16 +1867,10 @@ export class Stage implements Director {
     const p = new Vector3();
     for (let i = 0; i < n; i += 1) {
       p.fromArray(polyline.truePositions, 3 * i);
-      const earth = p.length() / EARTH_RADIUS;
       const moon = p.distanceTo(moonTrue) / MOON_RADIUS;
-      // The Moon's zone first: Earth's reaches far out toward it (see RETURN_EARTH_RADII).
-      if (moon < RETURN_MOON_RADII[0]) {
-        bodies[i] = 2;
-        fades[i] = returnFade(moon, RETURN_MOON_RADII);
-      } else if (earth < RETURN_EARTH_RADII[0]) {
-        bodies[i] = 1;
-        fades[i] = returnFade(earth, RETURN_EARTH_RADII);
-      }
+      const zone = returnZone(moon);
+      bodies[i] = zone;
+      fades[i] = returnFade(zone, moon);
     }
     const starts = returnStarts(bodies);
     if (!starts.some((start) => start >= 0)) return null;

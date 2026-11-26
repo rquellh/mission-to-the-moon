@@ -6,16 +6,15 @@
  * each sample, a tenth of a lap apart, and which samples are low.
  */
 import { describe, expect, it } from 'vitest';
-import { EARTH_MEAN_RADIUS_KM, MOON_MEAN_RADIUS_KM } from '../content/physical-constants.ts';
 import {
   MAX_ORBIT_STAYS,
   ORBIT_STAY_REVOLUTIONS,
   orbitStays,
-  MOON_CLOSEST_KM,
-  RETURN_EARTH_RADII,
-  RETURN_MOON_RADII,
+  RETURN_AWAY_MOON_RADII,
+  RETURN_MOON_ZONE_RADII,
   returnFade,
   returnStarts,
+  returnZone,
   sampleIndexAt,
   stayAt,
   valueAtIndex,
@@ -177,24 +176,46 @@ describe('returnStarts', () => {
   });
 });
 
-describe('returnFade', () => {
-  it.each([
-    ['Earth', RETURN_EARTH_RADII],
-    ['the Moon', RETURN_MOON_RADII],
-  ])('comes in as the craft comes back to %s, none far out and all of it close in', (_, zone) => {
-    const [near, full] = zone;
-    expect(returnFade(near, zone)).toBe(0);
-    expect(returnFade(near + 5, zone)).toBe(0);
-    expect(returnFade(full, zone)).toBe(1);
-    expect(returnFade(1, zone)).toBe(1);
-    const middle = returnFade((near + full) / 2, zone);
-    expect(middle).toBeGreaterThan(0.3);
-    expect(middle).toBeLessThan(0.7);
+describe('returnZone', () => {
+  it("is the Moon's within its zone and Earth's anywhere else", () => {
+    expect(returnZone(1.06)).toBe(2);
+    expect(returnZone(1.18)).toBe(2);
+    expect(returnZone(RETURN_MOON_ZONE_RADII)).toBe(1);
+    expect(returnZone(60)).toBe(1);
   });
 
-  it("keeps Earth's zone apart from the Moon's however near the Moon comes", () => {
-    const earth = RETURN_EARTH_RADII[0] * EARTH_MEAN_RADIUS_KM;
-    const moon = RETURN_MOON_RADII[0] * MOON_MEAN_RADIUS_KM;
-    expect(earth + moon).toBeLessThan(MOON_CLOSEST_KM);
+  it('starts the return to Earth where a flight leaves lunar orbit, faded none there', () => {
+    // Out from Earth (far from the Moon), round the Moon in a low orbit, and home again.
+    const moonRadii = [220, 120, 30, 3, 1.25, 1.06, 1.18, 1.1, 1.5, 3, 9, 200];
+    const zones = moonRadii.map(returnZone);
+    expect(zones).toEqual([1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1]);
+    expect(Array.from(returnStarts(zones))).toEqual([-1, -1, -1, -1, -1, -1, -1, -1, 8, 8, 8, 8]);
+    expect(returnFade(1, RETURN_MOON_ZONE_RADII)).toBe(0);
+  });
+});
+
+describe('returnFade', () => {
+  it('fades the way out from Earth in as the craft climbs away from the Moon, and holds', () => {
+    expect(returnFade(1, RETURN_MOON_ZONE_RADII)).toBe(0);
+    const near = returnFade(1, 2);
+    expect(near).toBeGreaterThan(0.4);
+    expect(near).toBeLessThan(0.6);
+    expect(returnFade(1, 4)).toBeGreaterThan(returnFade(1, 3));
+    expect(returnFade(1, RETURN_AWAY_MOON_RADII)).toBe(1);
+    expect(returnFade(1, 220)).toBe(1);
+  });
+
+  it('changes little from one step to the next across the zone edge', () => {
+    let last = returnFade(1, RETURN_MOON_ZONE_RADII);
+    for (let r = RETURN_MOON_ZONE_RADII; r <= RETURN_AWAY_MOON_RADII; r += 0.01) {
+      const now = returnFade(1, r);
+      expect(Math.abs(now - last)).toBeLessThan(0.02);
+      last = now;
+    }
+  });
+
+  it('fades a return to the Moon in across its zone, none at its edge', () => {
+    expect(returnFade(2, RETURN_MOON_ZONE_RADII)).toBe(0);
+    expect(returnFade(2, 1.06)).toBe(1);
   });
 });
