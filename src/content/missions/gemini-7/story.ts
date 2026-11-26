@@ -372,7 +372,7 @@ export const story: Mission = {
         'The white-and-black Titan II rocket rises on a bright flame beside the red service tower at Pad 19, with orange-tinted smoke billowing at left and a low building in the foreground.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ------------------------- Life in orbit -------------------------- */
@@ -405,7 +405,7 @@ export const story: Mission = {
         chronology('December 4, 1965: "Some 20 hours later Lovell again removed his suit"'),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'missile',
@@ -480,7 +480,7 @@ export const story: Mission = {
       discrepancy:
         "NSSDCA gives the circular orbit as 299.7 by 303.7 km. We follow the mission report's Table 4.3-III, final values after the maneuver, 162.8 by 160.5 nautical miles.",
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ----------------------------- Company ---------------------------- */
@@ -570,7 +570,7 @@ export const story: Mission = {
         "Gemini 7 seen close up from Gemini 6A: the white spacecraft's narrow nose points left and its wide, dark end, trailing loose wires, faces right, with the blue Earth and white clouds curving behind it. Part of Gemini 6A's window frame shows at upper left.",
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'apart-for-the-night',
@@ -676,7 +676,7 @@ export const story: Mission = {
         ),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'splashdown',
@@ -714,7 +714,7 @@ export const story: Mission = {
         'Seen from above, two astronauts in white suits and helmets sit with Navy swimmers in an orange life raft beside the dark Gemini 7 spacecraft, in a patch of bright green dye on the blue sea.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

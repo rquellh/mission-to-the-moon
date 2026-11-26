@@ -355,7 +355,7 @@ export const story: Mission = {
         'Seen from far across flat scrubland, a thin white rocket rises from a red launch tower on Pad 19, with a big cloud of white smoke spreading beside it. Another red tower and low buildings stand along the horizon under a gray sky.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'in-orbit',
@@ -428,7 +428,7 @@ export const story: Mission = {
       discrepancy:
         'On the Shoulders of Titans (page 235) says the firing "lasted a carefully timed 75 seconds". We follow the transcript and NASA\'s article, 1 minute 14 seconds. NASA\'s article gives the new orbit as 97 miles by 105 miles and the ground radioed "85.6, 92.6" (nautical miles; transcript page 44, 01 50 32); we follow NSSDCA, 158 by 169 kilometers.',
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'orbit-tilt',
@@ -500,7 +500,7 @@ export const story: Mission = {
       discrepancy:
         "On the Shoulders of Titans gives this firing as two and a half minutes, and the perigee after it as 72 kilometers; NASA's article gives 45 miles. We follow the crew's timing in the transcript and NSSDCA's 84 kilometers.",
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'retrofire',
@@ -538,7 +538,7 @@ export const story: Mission = {
         ),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'splashdown',
@@ -583,7 +583,7 @@ export const story: Mission = {
         'Some time after splashdown, seen from above, Navy swimmers fasten a yellow flotation collar around the dark Gemini 3 spacecraft in a deep blue sea while Grissom and Young wait inside. A yellow raft floats beside it, bright green marker dye spreads across the water, and a Navy helicopter hovers near the horizon.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ------------------------------ Recovery ----------------------------- */
@@ -666,7 +666,7 @@ export const story: Mission = {
         "John Young, left, and Gus Grissom, smiling in light blue flight suits, stand on either side of the round end of their spacecraft in the carrier's dim hangar. Behind Grissom, a sign is painted with the words USS Intrepid.",
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

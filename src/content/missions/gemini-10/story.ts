@@ -411,7 +411,7 @@ export const story: Mission = {
       discrepancy:
         "NASA's Gemini X page says Gemini X was about 1,600 kilometers behind its Agena at insertion, and On the Shoulders of Titans (page 344) says 1,800 kilometers. We follow the mission report's summary, a slant range very close to the nominal 1,000 nautical miles.",
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ------------------------- Catching the Agena ------------------------ */
@@ -446,7 +446,7 @@ export const story: Mission = {
         "Before docking: the Agena, a silver cylinder with an American flag on its side and a coiled antenna on top, floats free in black space about 41 feet from Gemini 10. Earth's blue curve is at lower left, and the dark nose of Gemini 10 curves up at lower right.",
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* -------------------------- Riding the Agena ------------------------- */
@@ -497,7 +497,7 @@ export const story: Mission = {
         "Seen from the window of Gemini 10, docked to the Agena, the round, dark docking end of the Agena fills the lower half of the view, with its lit display panel and a tall coiled antenna. A white glow from one of the Agena's main-engine firings spreads out behind it, over Earth's dark blue edge.",
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'standup-eva',
@@ -610,7 +610,7 @@ export const story: Mission = {
       discrepancy:
         'Section 4.1 of the mission report puts the start of station keeping at 48 hours 3 minutes, and section 1.0 says the second rendezvous was completed at 48 hours. We follow section 4.3.1.2.2, 47:59:22.',
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'spacewalk',
@@ -652,7 +652,7 @@ export const story: Mission = {
       discrepancy:
         "NASA's Gemini X page, NASA's 55-years article, and the Gemini chronology give the spacewalk as 39 minutes; we follow the mission report's 48 hours 42 minutes to 49 hours 20 minutes (38 minutes). On the Shoulders of Titans gives the umbilical as 15 meters and NASA's 55-years article as 45 feet; we follow the mission report's 50 feet.",
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- Coming home --------------------------- */
@@ -746,7 +746,7 @@ export const story: Mission = {
         'A black-and-white photo looking down on a rippled sea: the small cone-shaped Gemini 10 hangs on long lines below a striped main parachute, just above the water.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

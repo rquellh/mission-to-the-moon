@@ -6,7 +6,7 @@ import { credits } from '../content/credits';
 import type { MissionBundle } from '../content/missions/bundle';
 import type { Memorial, Mission, MissionEvent, MissionSummary } from '../content/types';
 import type { Extra, ExtraMeta } from '../extras/types';
-import type { Parting } from '../sim';
+import type { Parting, Stay } from '../sim';
 import { renderAbout, renderHowDrawn } from './about-dialog';
 import { pauseAllAudio } from './audio-player';
 import { renderCredits } from './credits-dialog';
@@ -59,6 +59,10 @@ export interface InterfaceOptions {
   player: Player;
   /** Where a lander parts from its ship at an event, for the tour to show (see partingsAtEvents). */
   partings: readonly Parting[];
+  /** Where a craft lets go of a part at an event, for the tour to show (see dropsAtEvents). */
+  drops: readonly number[];
+  /** Where the craft the story follows rests on a surface, for the tour to turn straight past (see staysOnSurface). */
+  stays: readonly Stay[];
   director: Director;
   /** False when there is no 3D view (for example, without WebGL). */
   has3D: boolean;
@@ -238,6 +242,8 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   const tour = new Tour(mission, player, director, {
     jumpStraight: () => motion.matches,
     partings: options.partings,
+    drops: options.drops,
+    stays: options.stays,
   });
   // The doors change what covers the 3D view; a resize alone may not show it (the card only moves).
   const dock = setUpDock({ has3D, onLayout: () => remeasure() });

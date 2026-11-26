@@ -137,6 +137,36 @@ export type VehiclePart =
    */
   | 'atda-shroud';
 
+/**
+ * The parts that fall away from a ship when it lets go of them: spent
+ * stages, an escape tower, a service module, a lunar module's stages, the
+ * Gemini adapter's sections, an Atlas, a target's shroud. The scene draws
+ * them drifting off over the moments after (its DROPPABLE, in
+ * src/scene/vehicles.ts, lists the same parts), and an every-event tour
+ * rests just after such a moment so it is seen (see src/app/drops.ts).
+ * Parachutes, the crew outside and an open hatch come and go in their own
+ * ways.
+ */
+export const FALLING_PARTS: ReadonlySet<VehiclePart> = new Set<VehiclePart>([
+  'first-stage',
+  'aft-interstage',
+  'second-stage',
+  'saturn-ib-first-stage',
+  'third-stage',
+  'escape-tower',
+  'service-module',
+  'service-module-damaged',
+  'lm-descent-stage',
+  'lm-ascent-stage',
+  'titan-first-stage',
+  'titan-second-stage',
+  'gemini-equipment-section',
+  'gemini-retro-section',
+  'atlas',
+  'agena-shroud',
+  'atda-shroud',
+]);
+
 /** How the parts are put together. */
 export type VehicleLayout =
   /** Stacked as they flew on their launch vehicle (for Apollo, the lunar module inside the adapter). */

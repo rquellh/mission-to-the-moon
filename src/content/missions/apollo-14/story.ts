@@ -372,7 +372,7 @@ export const story: Mission = {
         'The white Saturn V rocket rises beside its orange launch tower in clouds of smoke and steam, under a dark blue sky, with black birds flying in the foreground.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'docking',
@@ -413,7 +413,7 @@ export const story: Mission = {
       discrepancy:
         "NSSDCA's Master Catalog page for the Apollo 14 command and service module gives the successful sixth attempt as 02:00:02 UT. Apollo by the Numbers gives docking at 004:56:56.7 (01:59:58 GMT), which the Mission Report's Table 6-I agrees with (04:56:56), and we follow it. The crew's account in the Mission Report (Section 9.5.1, page 9-3) describes a \"fifth and final attempt\"; its editor's note explains that six contacts were made, which the rest of the report calls six docking attempts, and that the pilots counted the first two as one. We follow the count of six, as Apollo by the Numbers and the rest of the report give it.",
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'lunar-orbit-insertion',
@@ -513,7 +513,7 @@ export const story: Mission = {
       discrepancy:
         "Apollo by the Numbers' LM Lunar Landing table gives 108:15:11.40 (09:18:13 GMT), when the other three footpads touched down. We follow the Mission Report, which times the landing from the first pad's contact (Table 6-II), 108:15:09, as the Apollo 14 Timeline does (108:15:09.30, 09:18:11 GMT). For the tilt, NSSDCA's lunar module page gives 8 degrees and Apollo by the Numbers' LM Lunar Landing table gives 1 degree pitch down, 6.9 degrees roll right, and 1.4 degrees yaw left; we follow the Mission Report's 7 degrees of roll.",
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- On the Moon --------------------------- */
@@ -552,7 +552,7 @@ export const story: Mission = {
         'The lunar module Antares, wrapped in gold and silver foil, stands on four legs on the gray, dusty surface of the Moon under a black sky. A United States flag stands at the left, and bootprints cover the ground in front.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'cone-crater',
@@ -606,7 +606,7 @@ export const story: Mission = {
         'Black-and-white photo of Edgar Mitchell in his white spacesuit and backpack, standing beside the two-wheeled equipment cart on a wide, gently rolling gray plain under a black sky. Small crosshair marks from the camera dot the picture.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- Coming home --------------------------- */
@@ -699,7 +699,7 @@ export const story: Mission = {
         'The cone-shaped command module hangs under three large orange-and-white striped parachutes just above the deep blue Pacific Ocean, with white clouds in the sky.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

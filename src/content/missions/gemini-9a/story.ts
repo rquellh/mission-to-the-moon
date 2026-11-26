@@ -368,7 +368,7 @@ export const story: Mission = {
         'The white-and-black Titan II rocket climbs from its pad on a bright flame beside an orange service tower, with clouds of white smoke spreading out on both sides under a blue sky.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'target-sighted',
@@ -494,7 +494,7 @@ export const story: Mission = {
         "Seen from Gemini 9A during one of its three meetings, the ATDA floats above Earth's blue curve and white clouds: a silver cylinder topped by a white cone whose two halves are spread apart like open jaws, with a thin rod sticking out from its side.",
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ------------------------- Two more meetings ----------------------- */
@@ -569,7 +569,7 @@ export const story: Mission = {
       discrepancy:
         'The 80 nautical miles is a figure from Gemini Control\'s commentary ("some 80"), in a report the commentator signed off "At 16 hours, 11 minutes and 10 seconds after lift-off" (PAO transcript, PDF page 164); two hours earlier the commentary gave "some 50" (PDF page 162). On the Shoulders of Titans (page 336) says that the next day the spacecraft led its target by 111 kilometers (60 nautical miles), without a time. We give the commentary\'s figure, as Gemini Control\'s, because it is the only one tied to a time.',
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- The spacewalk ------------------------- */
@@ -617,7 +617,7 @@ export const story: Mission = {
         'Gene Cernan in a white spacesuit and helmet floats in black space beside the edge of the spacecraft, light glinting off his visor, his long hose looping through the dark around him.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'back-inside',
@@ -660,7 +660,7 @@ export const story: Mission = {
       discrepancy:
         'The chronology\'s June 3 entry says the hatch was opened at 49 hours 23 minutes and closed at 51 hours 28 minutes, 2 hours 5 minutes apart. NASA\'s "Angry Alligator" article and NASA\'s Gemini IX page give the spacewalk as 2 hours 7 minutes. NSSDCA says Cernan reentered the spacecraft at 12:05 p.m. EST (51:25:27, our arithmetic) and the hatch was closed at 12:10, and the transcript has the command pilot saying "We got Gene back in the hatch" at 51:09:03 (page 237). We follow the transcript\'s calls, from "We\'re opening the hatch now" (49:22:01) to "We\'ve got the hatch closed" (51:30:23), which match NSSDCA\'s 12:10 p.m. and the 128 minutes in On the Shoulders of Titans.',
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- Coming home --------------------------- */
@@ -744,7 +744,7 @@ export const story: Mission = {
         'The small, dark Gemini 9A spacecraft hangs under its big red-and-white striped main parachute just above the rippled blue Atlantic Ocean.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

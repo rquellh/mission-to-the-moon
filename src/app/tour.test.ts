@@ -13,7 +13,8 @@ import { describe, expect, it } from 'vitest';
 import { flight as apollo8Flight } from '../content/missions/apollo-8/flight.ts';
 import { story as apollo8 } from '../content/missions/apollo-8/story.ts';
 import { flight as apollo11Flight } from '../content/missions/apollo-11/flight.ts';
-import { story as apollo11 } from '../content/missions/apollo-11/story.ts';
+import { bundle as apollo11Bundle } from '../content/missions/apollo-11/index.ts';
+import { story as apollo11Story } from '../content/missions/apollo-11/story.ts';
 import { flight as apollo12Flight } from '../content/missions/apollo-12/flight.ts';
 import { story as apollo12 } from '../content/missions/apollo-12/story.ts';
 import { flight as apollo15Flight } from '../content/missions/apollo-15/flight.ts';
@@ -27,11 +28,13 @@ import {
   buildFlightPath,
   createStoryTime,
   partingsAtEvents,
+  staysOnSurface,
   storyKeyTimes,
   type StoryTimeOptions,
 } from '../sim/index.ts';
 import type { FlightPlan } from '../sim/types.ts';
 import type { Director, StoryMap } from './contract.ts';
+import { dropsAtEvents } from './drops.ts';
 import {
   MissionPlayer,
   planTrip,
@@ -43,7 +46,9 @@ import {
 } from './player.ts';
 import {
   CAMERA_SETTLE_MAX_SECONDS,
+  DROP_REST_STORY_SECONDS,
   EARLY_VIEW_MISSION_SECONDS,
+  everyEventTripSeconds,
   HURRY_VIEW_MISSION_SECONDS,
   PARTING_HOLD_SECONDS,
   PARTING_REST_MAX_SHARE,
@@ -55,6 +60,7 @@ import {
   RUN_UP_STORY_SECONDS,
   SKIP_GUARD_MS,
   Tour,
+  tourStops,
   TRIP_MAX_SECONDS,
   TRIP_MIN_SECONDS,
   tripSeconds,
@@ -64,6 +70,14 @@ import {
 } from './tour.ts';
 
 type Screen = ReturnType<typeof fakeScreen>;
+
+/**
+ * Apollo 11 with the key-moments tour it took before it rode along through
+ * every event (see TourStyle): most of these tests are about that style,
+ * which the other flights still take, and Apollo 11's flight has the cases
+ * they need. Its every-event tour is tested at the end.
+ */
+const apollo11: Mission = { ...apollo11Story, tour: 'key-moments' };
 
 /** A screen that draws a frame every `frameMs` milliseconds, on demand. */
 function fakeScreen(frameMs: number) {
@@ -168,6 +182,7 @@ function setUp(
     tour: new Tour(mission, player, director, {
       now: screen.now,
       partings: partingsAtEvents(path, eventTimes),
+      stays: staysOnSurface(path),
       ...options,
     }),
     /** The scene starts or stops showing its fast-forward view, and says so. */
@@ -811,7 +826,7 @@ describe("a trip held back by the clock's craft", () => {
     'heading for a stop in %s, keeps the usual lead however long its final run',
     (_name, mission, plan, toId) => {
       const screen = fakeScreen(1000 / 60);
-      const stops = mission.events.filter((event) => event.inTour);
+      const stops = tourStops(mission);
       const fromId = stops[stops.findIndex((stop) => stop.id === toId) - 1]!.id;
       const set = leaving(mission, plan, fromId, screen);
       const { trip, views, startMs } = set;
@@ -1744,5 +1759,218 @@ describe("the mission clock's playTo", () => {
     wait(screen, 1);
     assert.ok(Math.abs(player.storyTime - from - 2) < 0.05, 'plays on at the chosen speed');
     player.pause();
+  });
+});
+
+describe("Apollo 11's tour of every event", () => {
+  /** Apollo 11's own tour, built as main.ts builds it, with the parts its craft let go of. */
+  function everyEvent(screen: Screen, options: TourOptions = {}) {
+    const times = apollo11Story.events.map((event) => elapsedToSeconds(event.elapsed));
+    return setUp(apollo11Story, apollo11Flight, screen, {
+      drops: dropsAtEvents(apollo11Bundle, times),
+      ...options,
+    });
+  }
+
+  /** Story seconds of a stop's event. */
+  const eventStory = (player: MissionPlayer, stop: { elapsed: string }): number =>
+    player.story.toStory(elapsedToSeconds(stop.elapsed as `${number}:${number}:${number}`));
+
+  /** Next, then frames until the tour stops; what it took, the fastest pace, and whether the page turned. */
+  function next(tour: Tour, player: MissionPlayer, screen: Screen) {
+    const startMs = screen.now();
+    const target = tour.stops[tour.index + 1]!;
+    tour.next();
+    const turned = tour.phase === 'stopped';
+    let fastest = 0;
+    let reachedAt: number | null = null;
+    while (tour.phase === 'traveling' && screen.now() - startMs < 40_000) {
+      screen.frame();
+      fastest = Math.max(fastest, player.speed);
+      // The card never names a moment the clock has not reached.
+      const shown = tour.shownStop!;
+      expect(eventStory(player, shown)).toBeLessThanOrEqual(player.storyTime + 1e-9);
+      // Exactly: a trip lands on its stop's event by itself (see Tour.watchTravel).
+      if (reachedAt === null && player.storyTime >= eventStory(player, target))
+        reachedAt = (screen.now() - startMs) / 1000;
+    }
+    return { turned, fastest, reachedAt, took: (screen.now() - startMs) / 1000 };
+  }
+
+  it('stops at every event, in order', () => {
+    const { tour } = everyEvent(fakeScreen(1000 / 60));
+
+    expect(tour.stops.map(({ id }) => id)).toEqual(apollo11Story.events.map(({ id }) => id));
+    expect(tour.total).toBe(25);
+  });
+
+  for (const [screenName, frameMs] of screens.slice(0, 2)) {
+    it(`plays each trip at Explore's pace, taking as long as its story with its eases, and lands on each stop, ${screenName}`, () => {
+      const screen = fakeScreen(frameMs);
+      const { player, tour } = everyEvent(screen);
+      tour.start(0);
+      travel(tour, screen);
+      const frame = frameMs / 1000 + 1e-6;
+
+      for (let stop = 1; stop < tour.total; stop += 1) {
+        const from = player.storyTime;
+        const to = eventStory(player, tour.stops[stop]!);
+        const trip = next(tour, player, screen);
+
+        expect(tour.index).toBe(stop);
+        expect(tour.phase).toBe('stopped');
+        expect(player.playing).toBe(false);
+        if (trip.turned) continue;
+        // Never faster than Explore at 1x, and as long as the story plus the eases out and in.
+        expect(trip.fastest).toBeLessThanOrEqual(1 + 1e-9);
+        expect(trip.reachedAt).toBeGreaterThanOrEqual(everyEventTripSeconds(to - from) - 1e-6);
+        expect(trip.reachedAt).toBeLessThanOrEqual(everyEventTripSeconds(to - from) + frame);
+      }
+    });
+  }
+
+  it('asks the scene for the Ship view only: as it starts, on Back, and starting over, never on a trip, a page turn, or Skip', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour, views } = everyEvent(screen);
+    tour.start(0);
+    travel(tour, screen);
+    expect(views.map(({ view }) => view)).toEqual(['spacecraft']);
+
+    for (let stop = 1; stop < tour.total; stop += 1) {
+      next(tour, player, screen);
+      // Skip on the way to every third stop.
+      if (stop % 3 === 0 && tour.phase === 'traveling') {
+        wait(screen, 0.5);
+        tour.next();
+      }
+      travel(tour, screen);
+    }
+    expect(views).toHaveLength(1);
+
+    tour.back();
+    travel(tour, screen);
+    tour.next();
+    travel(tour, screen);
+    tour.next();
+    expect(tour.phase).toBe('finished');
+    tour.start(0);
+    travel(tour, screen);
+
+    expect(views.map(({ view }) => view)).toEqual(['spacecraft', 'spacecraft', 'spacecraft']);
+  });
+
+  it('turns the page while Eagle rests on the Moon: from the landing to the liftoff, Next arrives at once', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour } = everyEvent(screen);
+    tour.start(0);
+    travel(tour, screen);
+
+    const turned: string[] = [];
+    for (let stop = 1; stop < tour.total; stop += 1) {
+      const trip = next(tour, player, screen);
+      if (trip.turned) turned.push(tour.stop!.id);
+    }
+
+    expect(turned).toEqual([
+      'first-step',
+      'aldrin-on-surface',
+      'flag',
+      'experiments',
+      'moonwalk-ends',
+      'lunar-liftoff',
+    ]);
+  });
+
+  it('a page turn puts the clock on the stop, still, with its card, and stays there', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour } = everyEvent(screen);
+    const told = heard(tour);
+    tour.start(tour.stops.findIndex(({ id }) => id === 'first-step'));
+    travel(tour, screen);
+    told.length = 0;
+
+    tour.next();
+
+    assertAtStop(tour, player, 'Aldrin joins Armstrong');
+    expect(tour.shownStop?.id).toBe('aldrin-on-surface');
+    expect(told).toEqual(['stopped: aldrin-on-surface']);
+    wait(screen, 2);
+    assertAtStop(tour, player, 'Aldrin joins Armstrong, 2 seconds later');
+  });
+
+  it('Back turns the page too, and plays the usual run-up off the surface', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour } = everyEvent(screen);
+    tour.start(tour.stops.findIndex(({ id }) => id === 'aldrin-on-surface'));
+    travel(tour, screen);
+
+    tour.back();
+    assertAtStop(tour, player, 'Back to the first step');
+    tour.back();
+    assertAtStop(tour, player, 'Back to the landing');
+
+    tour.back();
+    expect(tour.stop?.id).toBe('program-alarm');
+    expect(tour.phase).toBe('traveling');
+    travel(tour, screen);
+    assertAtStop(tour, player, 'Back to the program alarm');
+  });
+
+  it.each(['first-stage-separation', 'lm-extraction', 'ascent-stage-jettison', 'cm-sm-separation'])(
+    'at a part let go (%s), holds on the event, then plays on and rests just after it',
+    (id) => {
+      const screen = fakeScreen(1000 / 60);
+      const { player, tour } = everyEvent(screen);
+      const at = tour.stops.findIndex((stop) => stop.id === id);
+      tour.start(at - 1);
+      travel(tour, screen, 40);
+      const event = eventStory(player, tour.stops[at]!);
+      const after = eventStory(player, tour.stops[at + 1]!);
+      tour.next();
+
+      while (player.storyTime < event) screen.frame();
+      const reachedMs = screen.now();
+      while (!player.playing) screen.frame();
+      const held = (screen.now() - reachedMs) / 1000;
+      travel(tour, screen);
+
+      expect(held).toBeGreaterThanOrEqual(PARTING_HOLD_SECONDS - 1e-6);
+      expect(tour.phase).toBe('stopped');
+      expect(tour.stop?.id).toBe(id);
+      expect(player.storyTime).toBeCloseTo(
+        event + Math.min(DROP_REST_STORY_SECONDS, PARTING_REST_MAX_SHARE * (after - event)),
+        6,
+      );
+    },
+  );
+
+  it('still shows Eagle undocking as two craft parting, resting just after', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour } = everyEvent(screen);
+    const at = tour.stops.findIndex((stop) => stop.id === 'undocking');
+    tour.start(at - 1);
+    travel(tour, screen);
+
+    next(tour, player, screen);
+
+    expect(tour.stop?.id).toBe('undocking');
+    expect(player.storyTime).toBeCloseTo(
+      eventStory(player, tour.stops[at]!) + PARTING_REST_STORY_SECONDS,
+      9,
+    );
+  });
+
+  it('with reduced motion, every Next and Back jumps straight to the stop, in the Ship view', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour, views } = everyEvent(screen, { jumpStraight: () => true });
+    tour.start(tour.stops.findIndex(({ id }) => id === 'program-alarm'));
+    assertAtStop(tour, player, 'start');
+
+    tour.next();
+    assertAtStop(tour, player, 'the landing');
+    tour.back();
+    assertAtStop(tour, player, 'back to the program alarm');
+
+    expect(new Set(views.map(({ view }) => view))).toEqual(new Set(['spacecraft']));
   });
 });

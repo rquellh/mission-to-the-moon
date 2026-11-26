@@ -398,7 +398,7 @@ export const story: Mission = {
         'At night, the Saturn V rocket rises from its launch tower on a blinding white flame that lights up clouds of exhaust, above a dark line of trees.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'translunar-injection',
@@ -494,7 +494,7 @@ export const story: Mission = {
         'The whole Earth as a round, blue ball against black space. Brown and tan Africa and the Arabian Peninsula are at the top, swirls of white cloud cover the blue ocean, and the white ice of Antarctica is at the bottom.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- Lunar orbit -------------------------- */
@@ -519,7 +519,7 @@ export const story: Mission = {
         ),
       ],
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'undocking',
@@ -576,7 +576,7 @@ export const story: Mission = {
       discrepancy:
         "Apollo by the Numbers (Timeline and LM Lunar Landing table) and the Mission Report's own summary (section 1.0, printed page 1-1, PDF page 13) give the landing as 110:21:58, 19:54:58 GMT. We follow the Mission Report's sequence of events (Table 3-I), 110:21:57, which NSSDCA's 19:54:57 UT also matches.",
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'first-moonwalk',
@@ -610,7 +610,7 @@ export const story: Mission = {
         'Cernan, in a white spacesuit, sits in the rover on the dark gray ground, with the gold-wrapped lunar module Challenger behind him and a rounded gray mountain under the black sky.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'second-moonwalk',
@@ -651,7 +651,7 @@ export const story: Mission = {
         'A patch of rusty orange soil in the gray ground on the rim of Shorty Crater, with a small tripod-like measuring tool standing on it and gray boulders behind.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'third-moonwalk',
@@ -687,7 +687,7 @@ export const story: Mission = {
         'Schmitt, in a white spacesuit, stands beside a huge gray boulder much taller than he is. The front of the rover, with its dish antenna, is at left, on a gray slope under a black sky.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'last-steps',
@@ -718,7 +718,7 @@ export const story: Mission = {
         ARTEMIS_IV,
       ],
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- Back to orbit -------------------------- */
@@ -753,7 +753,7 @@ export const story: Mission = {
         'A blurry frame from a TV screen: the small, bright ascent stage of Challenger rising above the gray lunar ground and dark hills, with the descent stage left on the ground below.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'docking',
@@ -895,7 +895,7 @@ export const story: Mission = {
         'Seen from above, three red-and-white striped parachutes carry the small cone-shaped command module down to the deep blue Pacific Ocean, seconds before it hits the water.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

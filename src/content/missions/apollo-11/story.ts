@@ -143,6 +143,7 @@ export const story: Mission = {
   name: 'Apollo 11',
   kind: 'flight',
   destination: 'moon',
+  tour: 'every-event',
 
   summary: {
     text: {
@@ -353,7 +354,7 @@ export const story: Mission = {
         'View looking down from the launch tower as the white Saturn V rocket climbs past on a column of flame and smoke, with the Florida coast far below.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'first-stage-separation',
@@ -411,7 +412,7 @@ export const story: Mission = {
       ],
       discrepancy: `${NMC_DIFFERS} command and service module gives the burn as 5 minutes 48 seconds. Apollo by the Numbers gives 5 minutes 46.83 seconds, which we follow.`,
       view: 'journey',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- To the Moon -------------------------- */
@@ -433,7 +434,7 @@ export const story: Mission = {
         nmc('csm', 'Mission Profile'),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'lm-extraction',
@@ -511,7 +512,7 @@ export const story: Mission = {
         'Earth, half lit in blue and white, rising above the gray, cratered horizon of the Moon against black space.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'undocking',
@@ -537,7 +538,7 @@ export const story: Mission = {
         'The lunar module Eagle, a boxy gold-and-black craft with four spindly landing legs extended, floating against black space.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ----------------------------- Landing ---------------------------- */
@@ -641,7 +642,7 @@ export const story: Mission = {
         sourceUrl: 'https://www.nasa.gov/historical-sounds/',
       },
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- On the Moon --------------------------- */
@@ -694,7 +695,7 @@ export const story: Mission = {
         sourceUrl: 'https://www.nasa.gov/historical-sounds/',
       },
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'aldrin-on-surface',
@@ -725,7 +726,7 @@ export const story: Mission = {
         'Buzz Aldrin, in a white spacesuit and backpack, climbs down the ladder of the gold-wrapped lunar module toward the bright lunar surface, with black sky behind.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'flag',
@@ -825,7 +826,7 @@ export const story: Mission = {
       ],
       discrepancy: `${NMC_DIFFERS} lunar module gives liftoff as 17:54:01 UT. Apollo by the Numbers gives 17:54:00 GMT, which we follow.`,
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'docking',
@@ -847,7 +848,7 @@ export const story: Mission = {
         "Eagle's upper stage approaches the camera above the gray surface of the Moon, with a half-lit Earth rising above the lunar horizon.",
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'ascent-stage-jettison',
@@ -890,7 +891,7 @@ export const story: Mission = {
       ],
       discrepancy: `${NMC_DIFFERS} command and service module gives the start of the firing as 04:54:42 UT. Apollo by the Numbers gives 04:55:42 GMT, which we follow.`,
       view: 'journey',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'cm-sm-separation',
@@ -984,7 +985,7 @@ export const story: Mission = {
         'The cone-shaped command module Columbia floats in the blue Pacific inside an orange flotation collar, with white balloons on top. Beside it, the crew and a Navy swimmer sit in an orange raft.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

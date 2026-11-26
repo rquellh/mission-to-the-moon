@@ -52,10 +52,10 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
   play.append(playIcon, pauseIcon);
   play.addEventListener('click', () => (player.playing ? player.pause() : player.play()));
 
-  /* Scrubber: ticks for events, taller ones for chapter starts ----- */
+  /* Scrubber: ticks for events (taller for key moments), and for chapter starts */
   input.max = String(story.duration);
   const eventTicks = index.events.map((event, i) => {
-    const tick = el('span', event.inTour ? 'tick tick--tour' : 'tick');
+    const tick = el('span', event.keyMoment ? 'tick tick--key' : 'tick');
     tick.style.setProperty('--at', String(fraction(index.seconds[i] ?? 0)));
     return tick;
   });

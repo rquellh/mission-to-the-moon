@@ -1,6 +1,7 @@
 import './styles/main.css';
 import type { Director, StoryMap } from './app/contract';
 import { readDeepLink } from './app/deep-link';
+import { dropsAtEvents } from './app/drops';
 import { outlineOf, sourcesCitedBy } from './app/outline';
 import { MissionPlayer } from './app/player';
 import { homeView, nearestView } from './app/views';
@@ -17,7 +18,13 @@ import {
 import { elapsedToSeconds, type EventView, type MissionSummary } from './content/types';
 import { extraFor, extras, hasExtra, isExtraReady, loadExtra } from './extras';
 import type { Stage } from './scene/stage';
-import { buildFlightPath, createStoryTime, partingsAtEvents, storyKeyTimes } from './sim';
+import {
+  buildFlightPath,
+  createStoryTime,
+  partingsAtEvents,
+  staysOnSurface,
+  storyKeyTimes,
+} from './sim';
 import { byId, reducedMotionQuery } from './ui/dom';
 import { mountInterface, setUpMissionList, type MissionInterface } from './ui/interface';
 import { setUpStatus } from './ui/status';
@@ -46,14 +53,23 @@ function addressOf(id: string): string {
 /**
  * Load a flight and build its path and story time. Story time gives every
  * stretch between two events a watchable length (see storyKeyTimes). The
- * partings are where the tour stops to show a lander leave its ship.
+ * partings and drops are where the tour stops to show a lander leave its
+ * ship, or a craft let go of a part; the stays, where it turns straight to
+ * the next stop (see staysOnSurface).
  */
 async function prepareFlight(id: string) {
   const bundle = await loadBundle(id);
   const path = buildFlightPath(bundle.flight);
   const eventTimes = bundle.mission.events.map((event) => elapsedToSeconds(event.elapsed));
   const storyTime = createStoryTime(storyKeyTimes(path, eventTimes));
-  return { bundle, path, storyTime, partings: partingsAtEvents(path, eventTimes) };
+  return {
+    bundle,
+    path,
+    storyTime,
+    partings: partingsAtEvents(path, eventTimes),
+    drops: dropsAtEvents(bundle, eventTimes),
+    stays: staysOnSurface(path),
+  };
 }
 
 /**
@@ -122,7 +138,7 @@ async function main(): Promise<void> {
     );
     return;
   }
-  const { bundle, path, storyTime, partings } = flight;
+  const { bundle, path, storyTime, partings, drops, stays } = flight;
   const mission = bundle.mission;
   const story: StoryMap = {
     duration: storyTime.length,
@@ -153,6 +169,8 @@ async function main(): Promise<void> {
     loadExtra,
     player,
     partings,
+    drops,
+    stays,
   };
 
   /** Begin where the address asks: the welcome, a tour, exploring, a memorial page, or an extra. */

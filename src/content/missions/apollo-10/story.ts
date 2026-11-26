@@ -353,7 +353,7 @@ export const story: Mission = {
         'The white Saturn V rocket rises on a bright flame beside its red launch tower, under a gray, cloudy sky, with smoke spreading across the pad below.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- To the Moon -------------------------- */
@@ -446,7 +446,7 @@ export const story: Mission = {
         ),
       ],
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'undocking',
@@ -512,7 +512,7 @@ export const story: Mission = {
         ),
       ],
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'staging',
@@ -555,7 +555,7 @@ export const story: Mission = {
         nmc('"The LM descent stage was jettisoned into lunar orbit"'),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'redocking',
@@ -600,7 +600,7 @@ export const story: Mission = {
         "Snoopy's ascent stage, a small, angular craft of silver and black, approaches against the gray, cratered Moon, seen through Charlie Brown's window, whose frame shows as a blurred red and blue band.",
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- Coming home -------------------------- */
@@ -685,7 +685,7 @@ export const story: Mission = {
         'The three Apollo 10 astronauts in blue flight suits stand in the doorway of a Navy helicopter at the top of a red-carpeted stairway on the deck of the USS Princeton, one of them waving. A man in a white shirt stands at the foot of the stairs.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

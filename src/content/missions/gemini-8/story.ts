@@ -344,7 +344,7 @@ export const story: Mission = {
         "A white Atlas rocket with the Agena on top rises beside a red launch tower on a burst of orange flame and billowing white smoke, under a blue sky crossed by a jet's contrail.",
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ----------------------------- Launch ---------------------------- */
@@ -380,7 +380,7 @@ export const story: Mission = {
         'A white-and-black Titan II rocket climbs away from its red launch tower on a column of exhaust, with tan smoke spreading across the pad under a blue sky with white clouds.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'staging',
@@ -496,7 +496,7 @@ export const story: Mission = {
         wildRide('"OK we\'ve got a visual on the Agena at 76 miles"'),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'closing-in',
@@ -552,7 +552,7 @@ export const story: Mission = {
         "Close view of the silver Agena floating in black space, with its engine end at left and its docking collar and a coiled antenna at right. Earth's blue edge is at the bottom, and part of Gemini 8 is in the foreground.",
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'docking',
@@ -587,7 +587,7 @@ export const story: Mission = {
         'The round docking collar of the Agena fills the view just ahead of Gemini 8, with a coiled antenna rising above it. The dark nose of Gemini 8 is in the lower left corner.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- Emergency --------------------------- */
@@ -613,7 +613,7 @@ export const story: Mission = {
       ],
       discrepancy: `The mission report's summary gives about 7:00:30; ${NMC_HOUR_EARLY} gives 5:41 p.m. EST, an hour earlier than the mission report's time allows. We follow Table 4.2-I, 07:00:26.7.`,
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'undocking',
@@ -666,7 +666,7 @@ export const story: Mission = {
       discrepancy:
         "The mission report's summary gives about 300 degrees per second. NASA's Gemini VIII page and NSSDCA say the rate approached and possibly exceeded one revolution per second, and the Smithsonian's Gemini VIII page, On the Shoulders of Titans, and NASA's 55-years article give one revolution per second (360 degrees per second). We follow the mission report's control system analysis (section 5.1.5), 296 degrees per second. Scott's call is quoted as On the Shoulders of Titans prints it (page 314; its note cites the Gemini VIII voice transcript). NASA's 55-years article gives \"We have serious problems here. We're tumbling end over end.\", and NASA's \"Wild Ride\" article splits it into two quotes, \"We have serious problems here,\" and \"We're tumbling end over end. We're disengaged from the Agena.\"",
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'control-regained',
@@ -692,7 +692,7 @@ export const story: Mission = {
       ],
       discrepancy: `${NMC_HOUR_EARLY} gives 6:06:30 p.m. EST for the moment the spacecraft was stabilized, an hour earlier than the mission report's time allows. We follow Table 4.2-I, 07:25:30.`,
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- Coming home -------------------------- */
@@ -752,7 +752,7 @@ export const story: Mission = {
       discrepancy:
         'Section 5.1.8.3 of the mission report gives retrofire as 10:04:46.6. We follow Table 4.2-I, 10:04:47, which Appendix 1 of the Gemini chronology also gives.',
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- Splashdown --------------------------- */
@@ -817,7 +817,7 @@ export const story: Mission = {
         'Some time after splashdown, waiting for the recovery ship: seen from above, Gemini 8 floats in deep blue water inside a yellow flotation collar with both hatches open. Armstrong and Scott sit inside in white spacesuits while three rescue swimmers hold on to the spacecraft, and a yellow raft floats alongside.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'recovery',

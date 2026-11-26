@@ -125,6 +125,19 @@ export interface AudioClip {
  */
 export type EventView = 'earth' | 'moon' | 'spacecraft' | 'journey';
 
+/**
+ * How a flight's guided tour steps through it (see src/app/tour.ts):
+ * - "key-moments": it stops at the events marked `keyMoment`, shows each
+ *   stop in that event's own view, and fits each trip between 5 and 15
+ *   seconds.
+ * - "every-event": it stops at every event, rides along in the Ship view
+ *   from start to end, plays each trip at Explore's pace, and turns straight
+ *   to the next page where nothing moves (the hours on the Moon's surface).
+ * Flights move to "every-event" one at a time; "key-moments" goes once all
+ * of them have.
+ */
+export type TourStyle = 'key-moments' | 'every-event';
+
 /** A named stretch of a mission, used to group events and to jump around the timeline. */
 export interface Chapter {
   /** Unique within the mission, for example "landing". */
@@ -150,8 +163,11 @@ export interface MissionEvent {
   /** A real recording of this moment, when NASA publishes one. Its words must be cited like any other fact. */
   audio?: AudioClip;
   view: EventView;
-  /** True for the events the guided tour stops at. */
-  inTour?: boolean;
+  /**
+   * True for the flight's key moments. Explore's timeline marks them, and a
+   * key-moments tour stops at them (see TourStyle).
+   */
+  keyMoment?: boolean;
   /**
    * The id of a hands-on extra (a folder under src/extras) that lets the
    * visitor try this moment, for example "stages" on a liftoff.
@@ -181,6 +197,8 @@ export interface Mission {
    * a flight that stayed in Earth orbit has no Moon view (see src/app/views.ts).
    */
   destination: 'earth-orbit' | 'moon';
+  /** How the guided tour steps through the flight. Without it, "key-moments". */
+  tour?: TourStyle;
   summary: Fact;
   crew: Cited<CrewMember[]>;
   /**

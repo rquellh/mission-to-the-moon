@@ -5,6 +5,7 @@ import {
   type MissionEvent,
 } from '../content/types.ts';
 import type { Parting } from '../sim/story-time.ts';
+import { stillBetween, type Stay } from '../sim/surface.ts';
 import type { Director, Player } from './contract.ts';
 import {
   planTrip,
@@ -36,6 +37,19 @@ export interface TourOptions {
    * (see PARTING_REST_STORY_SECONDS).
    */
   partings?: readonly Parting[];
+  /**
+   * The mission seconds of each event at which a craft lets go of a part
+   * that falls away (see dropsAtEvents in drops.ts). An every-event tour's
+   * stop there rests just after it, once the part has fallen away (see
+   * DROP_REST_STORY_SECONDS).
+   */
+  drops?: readonly number[];
+  /**
+   * Where the craft the story follows rests on a surface (see staysOnSurface
+   * in src/sim/surface.ts). An every-event tour turns straight from one stop
+   * to the next within one of these (see StyleRules.pageTurns).
+   */
+  stays?: readonly Stay[];
   /** Real time in milliseconds; tests pass their own clock. */
   now?: () => number;
 }
@@ -67,7 +81,9 @@ export const RUN_UP_MAX_MISSION_SECONDS = 30 * 60;
 export const RUN_UP_MIN_STORY_SECONDS = 1;
 
 /**
- * The shortest and longest trip from one stop to the next, in real seconds.
+ * The shortest and longest trip from one stop to the next of a key-moments
+ * tour, in real seconds (an every-event tour's are in
+ * EVERY_EVENT_TRIP_MAX_SECONDS and everyEventTripSeconds).
  * A trip takes as long as the story between the two stops lasts at normal
  * speed, kept within these: a hop between two close stops still has time to
  * be seen, and a long quiet stretch speeds up rather than keep anyone waiting.
@@ -84,10 +100,12 @@ export const TRIP_MAX_SECONDS = 15;
 export const SKIP_GUARD_MS = 400;
 
 /**
- * On a trip, the camera keeps the view it is in and moves to the stop's view
- * this many real seconds before arriving. The view chosen for a stop frames
- * the stop itself, so from the start of a long trip the spacecraft would often
- * be out of it (the Moon view, while the ship is still days from the Moon).
+ * On a trip of a key-moments tour (an every-event tour keeps one view; see
+ * StyleRules.viewOnTrips), the camera keeps the view it is in and moves to
+ * the stop's view this many real seconds before arriving. The view chosen
+ * for a stop frames the stop itself, so from the start of a long trip the
+ * spacecraft would often be out of it (the Moon view, while the ship is
+ * still days from the Moon).
  * The camera's move takes up to 3 seconds, so the arrival is framed as the
  * stop intends. A trip this short or shorter moves the camera at the start.
  * It is as long as a squeezed trip's arrival at normal speed, so the camera
@@ -159,6 +177,17 @@ export const PARTING_REST_STORY_SECONDS = 3;
 export const PARTING_REST_MAX_SHARE = 0.6;
 
 /**
+ * An every-event tour's stop where a craft lets go of a part (see
+ * TourOptions.drops) rests this many story seconds after its event: the
+ * scene draws the part falling away over the first 1.1 story seconds or so
+ * (DROP_STORY_SECONDS in src/scene/vehicles.ts), and the stop shows it gone.
+ * Like a parting's, the rest point comes no later than PARTING_REST_MAX_SHARE
+ * of the way to the next stop, and the clock holds on the event first (see
+ * PARTING_HOLD_SECONDS), so the part is seen on the craft before it goes.
+ */
+export const DROP_REST_STORY_SECONDS = 1.5;
+
+/**
  * Arriving at a parting, the clock holds still on the event for this many
  * real seconds before playing on to the rest point, so the two are seen
  * docked before they part. The hold also lasts until the camera has settled
@@ -186,9 +215,9 @@ const TRAVEL_GRACE_SECONDS = 2;
 const SAME_STORY_SECONDS = 1e-6;
 
 /**
- * Real seconds for the trip between two stops this many story seconds apart,
- * as asked of the clock. A hurried trip held back by the clock's craft takes
- * longer (see planTrip in player.ts).
+ * Real seconds for the trip between two stops of a key-moments tour this
+ * many story seconds apart, as asked of the clock. A hurried trip held back
+ * by the clock's craft takes longer (see planTrip in player.ts).
  */
 export function tripSeconds(storySeconds: number): number {
   return Math.min(TRIP_MAX_SECONDS, Math.max(TRIP_MIN_SECONDS, Math.abs(storySeconds)));
@@ -251,15 +280,101 @@ export function playSeconds(storySeconds: number): number {
 }
 
 /**
- * The guided tour: steps through the mission's events marked `inTour`. For
- * each stop it moves the camera to the event's view (or the nearest view the
- * mission offers), plays the clock up to the event, pauses there, and waits
- * for Next. Next flies the whole stretch from one stop to the next, moving
- * the camera near the end; starting, going back, and starting over play a
- * short run-up to the stop instead, with the camera moved at once. At a
- * parting (see TourOptions.partings) the clock holds on the event for a
- * moment, then plays on to rest just after it, with the two craft apart.
- * The tour stops once the camera has settled (see CAMERA_SETTLE_MAX_SECONDS).
+ * The longest trip of an every-event tour, in real seconds. Its trips play
+ * at Explore's pace, so this reaches only a story longer than any between
+ * two of Apollo 11's events (17.4 story seconds at most): such a trip would
+ * play its first and last few seconds at Explore's pace and hurry through
+ * its middle (see tripShape and planTrip in player.ts), as a key-moments
+ * trip longer than TRIP_MAX_SECONDS does.
+ */
+export const EVERY_EVENT_TRIP_MAX_SECONDS = 30;
+
+/**
+ * Real seconds for a trip of an every-event tour over this many story
+ * seconds: the story at Explore's pace, 1 story second per real second,
+ * between the trip's eases out of one stop and into the next (see
+ * playSeconds), so nothing on the way plays faster than Explore shows it,
+ * up to EVERY_EVENT_TRIP_MAX_SECONDS. There is no shortest trip: two stops
+ * close together are a short trip.
+ */
+export function everyEventTripSeconds(storySeconds: number): number {
+  return Math.min(EVERY_EVENT_TRIP_MAX_SECONDS, playSeconds(Math.abs(storySeconds)));
+}
+
+/**
+ * What a tour style decides (see TourStyle in src/content/types.ts). Each
+ * flight's tour follows one. The key-moments style goes away once every
+ * flight has been converted to every-event, and with it the members here
+ * that only it uses.
+ */
+export interface StyleRules {
+  /** The events the tour stops at, in order. */
+  stops(mission: Mission): MissionEvent[];
+  /** The view the camera shows at a stop. */
+  view(mission: Mission, stop: MissionEvent): EventView;
+  /** Real seconds for the trip between two stops this many story seconds apart, as asked of the clock (a trip held back by the clock's craft takes longer; see planTrip in player.ts). */
+  tripSeconds(storySeconds: number): number;
+  /**
+   * True when a trip moves the camera to the stop's view on the way (see
+   * tripViewSeconds and watchScene). False when the tour keeps one view from
+   * start to end: it asks for it as it starts, on a run-up (Back, starting
+   * over), and whenever the camera is in another; a trip, and a page turn,
+   * leave the camera where it is, so a visitor's drag stays.
+   */
+  viewOnTrips: boolean;
+  /** True when a stop where a craft lets go of a part rests just after it (see DROP_REST_STORY_SECONDS). */
+  showsDrops: boolean;
+  /**
+   * True when Next and Back turn straight to the next page, with the clock
+   * jumped there, across a stretch in which the craft the story follows
+   * rests on a surface (see TourOptions.stays): there is nothing to watch.
+   */
+  pageTurns: boolean;
+}
+
+/** A key-moments tour: the flight's key moments, each in its own view, a trip of 5 to 15 seconds between them. */
+const KEY_MOMENTS: StyleRules = {
+  stops: (mission) => mission.events.filter((event) => event.keyMoment),
+  view: (mission, stop) => nearestView(mission, stop.view),
+  tripSeconds,
+  viewOnTrips: true,
+  showsDrops: false,
+  pageTurns: false,
+};
+
+/** An every-event tour: every event, riding along in the Ship view, each trip at Explore's pace. */
+const EVERY_EVENT: StyleRules = {
+  stops: (mission) => [...mission.events],
+  view: () => 'spacecraft',
+  tripSeconds: everyEventTripSeconds,
+  viewOnTrips: false,
+  showsDrops: true,
+  pageTurns: true,
+};
+
+/** The rules of a flight's tour style (see TourStyle). */
+export function tourRules(mission: Mission): StyleRules {
+  return mission.tour === 'every-event' ? EVERY_EVENT : KEY_MOMENTS;
+}
+
+/** The events a flight's tour stops at, in order. */
+export function tourStops(mission: Mission): MissionEvent[] {
+  return tourRules(mission).stops(mission);
+}
+
+/**
+ * The guided tour: steps through the mission's stops, as its style says
+ * (see StyleRules): its key moments, each in its event's view (or the
+ * nearest view the mission offers), or every event, in the Ship view
+ * throughout. For each stop it plays the clock up to the event, pauses
+ * there, and waits for Next. Next flies the whole stretch from one stop to
+ * the next, for a key-moments tour moving the camera near the end; starting,
+ * going back, and starting over play a short run-up to the stop instead,
+ * with the camera moved at once. An every-event tour turns straight to the
+ * next stop where nothing moves between the two. At a parting (see
+ * TourOptions.partings) the clock holds on the event for a moment, then
+ * plays on to rest just after it, with the two craft apart. The tour stops
+ * once the camera has settled (see CAMERA_SETTLE_MAX_SECONDS).
  */
 export class Tour {
   readonly stops: readonly MissionEvent[];
@@ -305,13 +420,15 @@ export class Tour {
   private readonly player: Player;
   private readonly director: Director;
   private readonly options: TourOptions;
+  private readonly rules: StyleRules;
 
   constructor(mission: Mission, player: Player, director: Director, options: TourOptions = {}) {
     this.mission = mission;
     this.player = player;
     this.director = director;
     this.options = options;
-    this.stops = mission.events.filter((event) => event.inTour);
+    this.rules = tourRules(mission);
+    this.stops = this.rules.stops(mission);
     this.stopStories = this.stops.map((stop) =>
       player.story.toStory(elapsedToSeconds(stop.elapsed)),
     );
@@ -384,7 +501,8 @@ export class Tour {
     } else {
       // Fly from this stop, unless something has moved the clock away from it.
       const atStop = Math.abs(this.player.storyTime - this.restStory) < SAME_STORY_SECONDS;
-      this.goTo(this.indexNow + 1, atStop ? 'trip' : 'run-up');
+      const to = this.indexNow + 1;
+      this.goTo(to, atStop ? (this.turnsPage(to) ? 'page' : 'trip') : 'run-up');
     }
   }
 
@@ -393,7 +511,8 @@ export class Tour {
     if (this.phaseNow === 'finished') {
       this.goTo(this.stops.length - 1, 'run-up');
     } else if (this.indexNow > 0) {
-      this.goTo(this.indexNow - 1, 'run-up');
+      const to = this.indexNow - 1;
+      this.goTo(to, this.turnsPage(to) ? 'page' : 'run-up');
     }
   }
 
@@ -418,11 +537,25 @@ export class Tour {
   }
 
   /**
+   * True when Next or Back to stop `index` turns the page (see
+   * StyleRules.pageTurns): the craft the story follows rests on a surface all
+   * the way from where the clock is to where the clock rests at that stop.
+   */
+  private turnsPage(index: number): boolean {
+    const stop = this.stops[index];
+    if (!stop || !this.rules.pageTurns) return false;
+    const seconds = elapsedToSeconds(stop.elapsed);
+    const rest = this.restFor(seconds, this.player.story.toStory(seconds));
+    return stillBetween(this.options.stays ?? [], this.player.time, rest);
+  }
+
+  /**
    * Head for a stop. A "trip" plays the clock on from where it is, with no
    * cut, for as long as the stretch deserves; a "run-up" cuts to shortly
-   * before the stop and plays the last few seconds (see RUN_UP_STORY_SECONDS).
+   * before the stop and plays the last few seconds (see RUN_UP_STORY_SECONDS);
+   * a "page" jumps the clock straight there (see StyleRules.pageTurns).
    */
-  private goTo(index: number, way: 'trip' | 'run-up'): void {
+  private goTo(index: number, way: 'trip' | 'run-up' | 'page'): void {
     const stop = this.stops[index];
     if (!stop) return;
     this.stopTravel();
@@ -433,18 +566,20 @@ export class Tour {
     // Through the same map as arrive's seek, so the two agree exactly.
     this.restStory = this.player.story.toStory(this.restSeconds);
     this.viewMovedMs = Number.NEGATIVE_INFINITY;
-    const view = nearestView(this.mission, stop.view);
-    const jump = this.options.jumpStraight?.() === true;
+    const view = this.rules.view(this.mission, stop);
+    const jump = way === 'page' || this.options.jumpStraight?.() === true;
     const trip = way === 'trip' && !jump;
     const from = trip ? this.player.storyTime : this.runUpFrom();
     const seconds = trip
-      ? tripSeconds(this.targetStory - from)
+      ? this.rules.tripSeconds(this.targetStory - from)
       : playSeconds(this.targetStory - from);
     // How long it really takes: a hurried trip held back by the clock's craft takes longer.
     const plan = planTrip(this.player.story, from, this.targetStory, seconds);
     const takes = trip ? plan.seconds : seconds;
     const now = this.now();
-    if (trip && takes > VIEW_LEAD_SECONDS) {
+    // A tour that keeps one view asks for it only on a run-up, or when the camera is in another.
+    const asksView = this.rules.viewOnTrips || way === 'run-up' || this.director.view !== view;
+    if (trip && this.rules.viewOnTrips && takes > VIEW_LEAD_SECONDS) {
       this.viewLater = view;
       const viewIn = tripViewSeconds({
         fromView: this.director.view,
@@ -455,7 +590,7 @@ export class Tour {
       this.viewAtMs = now + viewIn * 1000;
       this.sawFastForward = false;
       this.stopWatchingScene = this.director.subscribe(this.watchScene);
-    } else {
+    } else if (asksView) {
       this.moveCamera(view);
     }
     if (jump) {
@@ -572,17 +707,26 @@ export class Tour {
   /**
    * Mission seconds where the clock rests at a stop whose event is at
    * `eventSeconds` (`eventStory` in story seconds): the event itself, or for
-   * a parting a little after it (see PARTING_REST_STORY_SECONDS).
+   * a parting a little after it (see PARTING_REST_STORY_SECONDS), and on an
+   * every-event tour for a part let go too (see DROP_REST_STORY_SECONDS).
    */
   private restFor(eventSeconds: number, eventStory: number): number {
-    const parting = this.options.partings?.find(
-      ({ start }) => Math.abs(start - eventSeconds) < 1e-6,
-    );
-    if (!parting) return eventSeconds;
-    const besideStory = this.player.story.toStory(parting.end) - eventStory;
-    if (!(besideStory > 0)) return eventSeconds;
-    const after = Math.min(PARTING_REST_STORY_SECONDS, PARTING_REST_MAX_SHARE * besideStory);
-    return this.player.story.toElapsed(eventStory + after);
+    const at = (time: number): boolean => Math.abs(time - eventSeconds) < 1e-6;
+    const parting = this.options.partings?.find(({ start }) => at(start));
+    if (parting) {
+      const besideStory = this.player.story.toStory(parting.end) - eventStory;
+      if (!(besideStory > 0)) return eventSeconds;
+      const after = Math.min(PARTING_REST_STORY_SECONDS, PARTING_REST_MAX_SHARE * besideStory);
+      return this.player.story.toElapsed(eventStory + after);
+    }
+    if (this.rules.showsDrops && this.options.drops?.some(at)) {
+      const next =
+        this.stopStories.find((story) => story > eventStory + SAME_STORY_SECONDS) ??
+        this.player.story.duration;
+      const after = Math.min(DROP_REST_STORY_SECONDS, PARTING_REST_MAX_SHARE * (next - eventStory));
+      if (after > SAME_STORY_SECONDS) return this.player.story.toElapsed(eventStory + after);
+    }
+    return eventSeconds;
   }
 
   /**

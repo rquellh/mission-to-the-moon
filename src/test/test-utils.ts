@@ -18,6 +18,7 @@ import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import page from '../../index.html?raw';
 import type { StoryMap } from '../app/contract.ts';
+import { dropsAtEvents } from '../app/drops.ts';
 import { outlineOf, sourcesCitedBy } from '../app/outline.ts';
 import { MissionPlayer } from '../app/player.ts';
 import { homeView, nearestView } from '../app/views.ts';
@@ -42,8 +43,10 @@ import {
   buildFlightPath,
   createStoryTime,
   partingsAtEvents,
+  staysOnSurface,
   storyKeyTimes,
   type Parting,
+  type Stay,
 } from '../sim/index.ts';
 import { createAudioPlayer } from '../ui/audio-player.ts';
 import { mountInterface, type InterfaceOptions, type MissionInterface } from '../ui/interface.ts';
@@ -104,6 +107,8 @@ interface Prepared {
   start: number;
   end: number;
   partings: Parting[];
+  drops: number[];
+  stays: Stay[];
 }
 
 const prepared = new Map<string, Promise<Prepared>>();
@@ -128,6 +133,8 @@ function prepare(id: string): Promise<Prepared> {
         start: keys[0] ?? path.start,
         end: keys[keys.length - 1] ?? path.end,
         partings: partingsAtEvents(path, eventTimes),
+        drops: dropsAtEvents(bundle, eventTimes),
+        stays: staysOnSurface(path),
       };
     });
     prepared.set(id, ready);
@@ -182,7 +189,7 @@ export async function mountMission(
   id: string,
   options: MountOptions = {},
 ): Promise<MountedMission> {
-  const { bundle, story, start, end, partings } = await prepare(id);
+  const { bundle, story, start, end, partings, drops, stays } = await prepare(id);
   const mission = options.story ? options.story(bundle.mission) : bundle.mission;
   setScreen({ wide: options.wide ?? false });
   freshPage();
@@ -221,6 +228,8 @@ export async function mountMission(
       }),
     player,
     partings,
+    drops,
+    stays,
     director,
     has3D: !options.no3D,
   };

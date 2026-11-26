@@ -352,7 +352,7 @@ export const story: Mission = {
         'A white-and-black Titan II rocket marked United States climbs away from a red launch tower on a short flame, with orange-tinted smoke billowing across the pad under a blue sky.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'in-orbit',
@@ -411,7 +411,7 @@ export const story: Mission = {
       discrepancy:
         "On the Shoulders of Titans says the pod was ejected at 2 hours 13 minutes. We follow the mission report's Table 4.2-I, 02:07:15.",
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'pressure-holds',
@@ -470,7 +470,7 @@ export const story: Mission = {
       discrepancy:
         'Table 4.3-IV of the mission report gives the first firing as 50:49:57 in its ground-directed column and 50:49:58 in its actual column. We follow the sequence of events, Table 4.2-I, 50:49:57.',
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'record',
@@ -500,7 +500,7 @@ export const story: Mission = {
         'Pete Conrad, wearing his spacesuit helmet, looks into the camera from inside the cramped Gemini 5 cabin, with a bright window behind him. Gordon Cooper took the picture at some point during the flight.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- Coming home --------------------------- */
@@ -540,7 +540,7 @@ export const story: Mission = {
       discrepancy:
         "NASA's Gemini V page and NSSDCA say retrofire was made on revolution 120, and the Gemini chronology says the 121st revolution; the mission report says the landing was in the planned area for revolution 121. The text does not number the revolution.",
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'splashdown',
@@ -586,7 +586,7 @@ export const story: Mission = {
         'Seen from above, the dark Gemini 5 spacecraft floats in a sparkling blue sea inside a yellow flotation collar. An astronaut in a white suit steps from the spacecraft onto a yellow raft, while two other men stand at the open hatch.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'on-the-carrier',
