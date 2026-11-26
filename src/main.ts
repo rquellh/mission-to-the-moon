@@ -128,6 +128,7 @@ async function main(): Promise<void> {
     duration: storyTime.length,
     toStory: (seconds) => storyTime.toStory(seconds),
     toElapsed: (seconds) => storyTime.toMission(seconds),
+    hurryLimit: (seconds) => storyTime.hurryLimit(seconds),
   };
   const keys = storyTime.keyTimes;
   const player = new MissionPlayer(keys[0] ?? path.start, keys[keys.length - 1] ?? path.end, story);

@@ -57,6 +57,18 @@ export interface StoryTime {
   toStory(missionSeconds: number): number;
   /** Mission seconds for a story time (clamped to [0, length]). */
   toMission(storySeconds: number): number;
+  /**
+   * How much faster than its own pace the clock may be played at story
+   * second `storySeconds` (story seconds per real second, 1 being Explore's
+   * normal speed) before a craft on no closed lap there, which the scene
+   * draws at its true place however fast it goes, laps its body faster than
+   * once in SWING_LAP_STORY_SECONDS of real time. Infinity where no craft is
+   * on no closed lap (there the scene's ring and its stand-in cover any
+   * speed), or where nothing turns. On the eased clock it is never below 1:
+   * the clock itself keeps every swing to that pace (see easedPlan). The
+   * tour's hurry keeps to it (see planTrip in src/app/player.ts).
+   */
+  hurryLimit(storySeconds: number): number;
 }
 
 /** Story length of one mission interval, seconds. */
@@ -787,6 +799,12 @@ function easedPlan(from: number, to: number, length: number, turns: Turns): Plan
   return { times, paces, stories, length: played, play: 'eased' };
 }
 
+/** A moment on a clock: its mission time, and the mission seconds per story second there. */
+interface Place {
+  readonly t: number;
+  readonly pace: number;
+}
+
 /** Index j with values[j] <= x < values[j + 1], clamped to [0, values.length - 2]. */
 function locate(values: ArrayLike<number>, x: number): number {
   let lo = 0;
@@ -860,20 +878,37 @@ export function createStoryTime(
       return story[i]! + (plan.stories[j] as number) + storyInto(span, p0, p1, t - t0);
     },
     toMission(storySeconds) {
-      if (keys.length === 0) return 0;
-      if (keys.length === 1) return keys[0]!;
-      const s = Math.min(length, Math.max(0, storySeconds));
-      const i = locate(story, s);
-      const plan = plans[i]!;
-      if (s >= story[i + 1]!) return keys[i + 1]!;
-      const y = s - story[i]!;
-      const j = locate(plan.stories, y);
-      const t0 = plan.times[j] as number;
-      const span = (plan.times[j + 1] as number) - t0;
-      const p0 = plan.paces[j] as number;
-      const p1 = plan.paces[j + 1] as number;
-      const x = missionInto(span, p0, p1, y - (plan.stories[j] as number));
-      return Math.min(plan.times[j + 1] as number, t0 + x);
+      return placeAt(storySeconds).t;
+    },
+    hurryLimit(storySeconds) {
+      if (keys.length < 2) return Infinity;
+      const { t, pace } = placeAt(storySeconds);
+      const rate = turns.openRate(t);
+      if (!(rate > 0) || !(pace > 0)) return Infinity;
+      const limit = 1 / (SWING_LAP_STORY_SECONDS * rate * pace);
+      // The clock keeps every swing to that at its own pace (see easedPlan); only rounding says less.
+      return calm ? Math.max(1, limit) : limit;
     },
   };
+
+  /** The mission time at story second `storySeconds` (clamped), and the pace there, just ahead. */
+  function placeAt(storySeconds: number): Place {
+    if (keys.length === 0) return { t: 0, pace: 0 };
+    if (keys.length === 1) return { t: keys[0]!, pace: 0 };
+    const s = Math.min(length, Math.max(0, storySeconds));
+    const i = locate(story, s);
+    const plan = plans[i]!;
+    const last = plan.times.length - 1;
+    if (s >= story[i + 1]!) return { t: keys[i + 1]!, pace: plan.paces[last] as number };
+    const y = s - story[i]!;
+    const j = locate(plan.stories, y);
+    const t0 = plan.times[j] as number;
+    const span = (plan.times[j + 1] as number) - t0;
+    const p0 = plan.paces[j] as number;
+    const p1 = plan.paces[j + 1] as number;
+    const x = missionInto(span, p0, p1, y - (plan.stories[j] as number));
+    // Story seconds per mission second change evenly across the cell (see storyInto).
+    const perMission = 1 / p0 + ((1 / p1 - 1 / p0) * x) / span;
+    return { t: Math.min(plan.times[j + 1] as number, t0 + x), pace: 1 / perMission };
+  }
 }

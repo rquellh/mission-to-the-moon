@@ -7,10 +7,11 @@ import {
 import type { Parting } from '../sim/story-time.ts';
 import type { Director, Player } from './contract.ts';
 import {
+  planTrip,
   TRIP_ARRIVE_SECONDS,
   TRIP_DEPART_SECONDS,
   TRIP_EASE_SECONDS,
-  tripHurries,
+  type TripPlan,
 } from './player.ts';
 import { nearestView } from './views.ts';
 
@@ -93,9 +94,10 @@ export const SKIP_GUARD_MS = 400;
  * moves as the clock settles back to that speed, and the stop's view shows
  * the run-in to the stop at the pace exploring would. The camera moves
  * sooner on a short hurried trip out of the ship view (see
- * HURRY_VIEW_MISSION_SECONDS) and when the ship view's fast-forward view ends
- * on the way, and later when the scene is still fast-forwarding when it is
- * due (see watchScene).
+ * HURRY_VIEW_MISSION_SECONDS), on a trip whose final run into a body is
+ * longer than this (see tripViewSeconds), and when the ship view's
+ * fast-forward view ends on the way; and later when the scene is still
+ * fast-forwarding when it is due (see watchScene).
  */
 export const VIEW_LEAD_SECONDS = TRIP_ARRIVE_SECONDS;
 
@@ -183,9 +185,57 @@ const TRAVEL_GRACE_SECONDS = 2;
 /** Two places on the clock this close, in story seconds, are the same place. */
 const SAME_STORY_SECONDS = 1e-6;
 
-/** Real seconds for the trip between two stops this many story seconds apart. */
+/**
+ * Real seconds for the trip between two stops this many story seconds apart,
+ * as asked of the clock. A hurried trip held back by the clock's craft takes
+ * longer (see planTrip in player.ts).
+ */
 export function tripSeconds(storySeconds: number): number {
   return Math.min(TRIP_MAX_SECONDS, Math.max(TRIP_MIN_SECONDS, Math.abs(storySeconds)));
+}
+
+/**
+ * Real seconds into a trip at which the camera moves to the stop's view, for
+ * a trip planned as `plan` (see planTrip) over `storySeconds` of story, from
+ * `fromView` to a stop in `toView` that is `missionToStop` mission seconds
+ * off. One move, at the first of these that applies:
+ *
+ * - A hurried trip out of the ship view to a stop in the Earth or Moon view
+ *   no more than HURRY_VIEW_MISSION_SECONDS off moves as its hurry begins,
+ *   TRIP_DEPART_SECONDS in.
+ * - A trip to a stop in the Earth or Moon view whose final run (from the end
+ *   of its last hurry to the stop, see TripPlan.finalRun) is longer than
+ *   VIEW_LEAD_SECONDS moves as that final run begins, and no sooner than its
+ *   hurry would: the trip has been held to about normal speed for a swing in
+ *   to the body (a capsule arriving at Earth, a craft sweeping into lunar
+ *   orbit), and that body's view shows the whole of it, where a wide view
+ *   would show a speck and the ship view's chase would turn with the craft.
+ *   A trip with the usual shape has a final run of exactly
+ *   VIEW_LEAD_SECONDS, so this never moves its camera.
+ * - Otherwise, VIEW_LEAD_SECONDS before arriving.
+ *
+ * A trip no longer than VIEW_LEAD_SECONDS moves at once (see goTo). On the
+ * way, the scene may still move the camera sooner, or hold the move back
+ * (see watchScene).
+ */
+export function tripViewSeconds(trip: {
+  readonly fromView: EventView;
+  readonly toView: EventView;
+  readonly missionToStop: number;
+  readonly plan: TripPlan;
+}): number {
+  const { fromView, toView, missionToStop, plan } = trip;
+  const toBody = toView === 'earth' || toView === 'moon';
+  if (
+    fromView === 'spacecraft' &&
+    toBody &&
+    missionToStop <= HURRY_VIEW_MISSION_SECONDS &&
+    plan.hurries
+  )
+    return TRIP_DEPART_SECONDS;
+  if (toBody && plan.finalRun > VIEW_LEAD_SECONDS)
+    return Math.max(TRIP_DEPART_SECONDS, plan.seconds - plan.finalRun);
+  return plan.seconds - VIEW_LEAD_SECONDS;
 }
 
 /**
@@ -390,11 +440,19 @@ export class Tour {
     const seconds = trip
       ? tripSeconds(this.targetStory - from)
       : playSeconds(this.targetStory - from);
+    // How long it really takes: a hurried trip held back by the clock's craft takes longer.
+    const plan = planTrip(this.player.story, from, this.targetStory, seconds);
+    const takes = trip ? plan.seconds : seconds;
     const now = this.now();
-    if (trip && seconds > VIEW_LEAD_SECONDS) {
+    if (trip && takes > VIEW_LEAD_SECONDS) {
       this.viewLater = view;
-      const early = this.leavesShipViewEarly(view, seconds, this.targetStory - from);
-      this.viewAtMs = now + (early ? TRIP_DEPART_SECONDS : seconds - VIEW_LEAD_SECONDS) * 1000;
+      const viewIn = tripViewSeconds({
+        fromView: this.director.view,
+        toView: view,
+        missionToStop: this.stopSeconds - this.player.time,
+        plan,
+      });
+      this.viewAtMs = now + viewIn * 1000;
       this.sawFastForward = false;
       this.stopWatchingScene = this.director.subscribe(this.watchScene);
     } else {
@@ -411,7 +469,7 @@ export class Tour {
     }
     this.phaseNow = 'traveling';
     this.travelStartMs = now;
-    this.travelDeadlineMs = now + (seconds + TRAVEL_GRACE_SECONDS) * 1000;
+    this.travelDeadlineMs = now + (takes + TRAVEL_GRACE_SECONDS) * 1000;
     // Already there: a stop at the very start, two stops at one time, or a
     // run-up with too little to play. A parting still holds on its event and
     // plays the two apart.
@@ -428,18 +486,6 @@ export class Tour {
     this.notify();
     this.stopWatching = this.player.subscribe(this.watchTravel);
     this.player.playTo(this.targetStory, seconds);
-  }
-
-  /**
-   * True when a trip of `seconds` real seconds over `storySeconds` of story
-   * to a stop in `view` should move the camera there as its hurry begins (see
-   * HURRY_VIEW_MISSION_SECONDS).
-   */
-  private leavesShipViewEarly(view: EventView, seconds: number, storySeconds: number): boolean {
-    if (this.director.view !== 'spacecraft') return false;
-    if (view !== 'earth' && view !== 'moon') return false;
-    if (this.stopSeconds - this.player.time > HURRY_VIEW_MISSION_SECONDS) return false;
-    return tripHurries(seconds, storySeconds);
   }
 
   /**

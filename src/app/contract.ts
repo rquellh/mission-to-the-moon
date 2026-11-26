@@ -26,6 +26,14 @@ export interface StoryMap {
   toStory(elapsedSeconds: number): number;
   /** Story seconds to mission elapsed seconds. */
   toElapsed(storySeconds: number): number;
+  /**
+   * How much faster than normal speed the clock may play at a story second
+   * before a craft drawn at its true place laps its body faster than the
+   * scene allows (see StoryTime.hurryLimit in src/sim/story-time.ts); a
+   * tour's hurry keeps to it (see planTrip in player.ts). Without it, trips
+   * are not limited.
+   */
+  readonly hurryLimit?: (storySeconds: number) => number;
 }
 
 /** The mission clock: where we are in the mission and whether time is running. */
@@ -56,8 +64,10 @@ export interface Player {
   /**
    * Play to a story time in a set number of real seconds, whatever the
    * device's frame rate or the chosen rate, easing out of the start and into
-   * the end. `playing` is true on the way; the clock stops exactly on the
-   * target. pause, seek, seekStory, and play end the trip early.
+   * the end; a hurried trip that would carry a craft round its body too fast
+   * takes longer (see StoryMap.hurryLimit and planTrip in player.ts).
+   * `playing` is true on the way; the clock stops exactly on the target.
+   * pause, seek, seekStory, and play end the trip early.
    */
   playTo(storySeconds: number, seconds: number): void;
   /** Stop the clock, and any playTo trip. */
