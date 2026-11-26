@@ -2,22 +2,22 @@
 
 `scripts/record.mjs` writes one folder per recording (and one per trip or event with `all`). Every time in it is seconds after the mark, the moment just before the press; rows before the mark have negative times and show the place the recording leaves. Every position is in CSS pixels from the top left of the page, whatever `--dpr` is; `sheets.py` scales them to the frames.
 
-| File               | Written by | What it is                                                                                                                       |
-| ------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `meta.json`        | record.mjs | How it was recorded (mode, mission, stop or event, screen, steps, why it ended) and the build stamp (below).                     |
-| `events.json`      | record.mjs | The flight's events (id, title, mission second, story second, view, in the tour or not), the story clock's keys, its partings.   |
-| `timeline.tsv`     | record.mjs | The interface and the scene every 100 ms.                                                                                        |
-| `camera.tsv`       | record.mjs | The camera every frame the page runs (`requestAnimationFrame`), whether or not it draws.                                         |
-| `cast/pNNNNN.jpg`  | record.mjs | Every frame the page drew, in CSS pixels whatever `--dpr` is, named by milliseconds after the mark (`mNNNNN` before it).         |
-| `at-start.png`     | record.mjs | A screenshot just before recording (device pixels).                                                                              |
-| `end.png`          | record.mjs | A screenshot at the end.                                                                                                         |
-| `check.txt`        | check.py   | The report: build, frames, signals, the card against the clock, changes, pace, marks, a thinned camera table.                    |
-| `camera-table.tsv` | check.py   | `camera.tsv` turned into motion, one row a frame.                                                                                |
-| `marks.tsv`        | check.py   | The moments worth a closer look.                                                                                                 |
-| `signals.json`     | check.py   | The signals, for the summary of a sweep.                                                                                         |
-| `sheet-NN.jpg`     | sheets.py  | The whole recording at 0.5 s, 12 tiles to a sheet, whole frames.                                                                 |
-| `craft-NN.jpg`     | sheets.py  | The same times, each tile cropped around the followed craft (about eight times its size, so a 30 px craft is drawn about 80 px). |
-| `mark-NN-*.jpg`    | sheets.py  | Each marked moment at 0.1 s: whole frames for camera marks, cropped around the craft for craft marks.                            |
+| File               | Written by | What it is                                                                                                                                                                      |
+| ------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meta.json`        | record.mjs | How it was recorded (mode, mission, stop or event, screen, steps, why it ended) and the build stamp (below).                                                                    |
+| `events.json`      | record.mjs | The flight's events (id, title, mission second, story second, view, `keyMoment`, and `tourStop`: whether this flight's tour stops at it), the story clock's keys, its partings. |
+| `timeline.tsv`     | record.mjs | The interface and the scene every 100 ms.                                                                                                                                       |
+| `camera.tsv`       | record.mjs | The camera every frame the page runs (`requestAnimationFrame`), whether or not it draws.                                                                                        |
+| `cast/pNNNNN.jpg`  | record.mjs | Every frame the page drew, in CSS pixels whatever `--dpr` is, named by milliseconds after the mark (`mNNNNN` before it).                                                        |
+| `at-start.png`     | record.mjs | A screenshot just before recording (device pixels).                                                                                                                             |
+| `end.png`          | record.mjs | A screenshot at the end.                                                                                                                                                        |
+| `check.txt`        | check.py   | The report: build, frames, signals, the card against the clock, changes, pace, marks, a thinned camera table.                                                                   |
+| `camera-table.tsv` | check.py   | `camera.tsv` turned into motion, one row a frame.                                                                                                                               |
+| `marks.tsv`        | check.py   | The moments worth a closer look.                                                                                                                                                |
+| `signals.json`     | check.py   | The signals, for the summary of a sweep.                                                                                                                                        |
+| `sheet-NN.jpg`     | sheets.py  | The whole recording at 0.5 s, 12 tiles to a sheet, whole frames.                                                                                                                |
+| `craft-NN.jpg`     | sheets.py  | The same times, each tile cropped around the followed craft (about eight times its size, so a 30 px craft is drawn about 80 px).                                                |
+| `mark-NN-*.jpg`    | sheets.py  | Each marked moment at 0.1 s: whole frames for camera marks, cropped around the craft for craft marks.                                                                           |
 
 Sheets are at most 1980 px a side, so the image reader shows them at full size. Each tile's label gives its time, the mission clock, the view, `ff` while fast forward shows, `stand-in` while the followed craft is drawn as a stand-in gliding round its ring (not at its true place, which races round the body), and `stopped` while the clock is still. A tile shows the frame on screen at its time, which is the last one drawn: a still page draws nothing, so a label that says `frame from 3.21 s` means nothing was drawn since then. While the clock runs that is a stall; while it is stopped it is rest.
 

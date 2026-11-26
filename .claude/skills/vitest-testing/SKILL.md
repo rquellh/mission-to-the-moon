@@ -349,7 +349,9 @@ it('sets off for the next stop, and arrives when the trip is over', async () => 
 });
 ```
 
-Draw "enough" frames (`A_WHOLE_TRIP` is 16 seconds, longer than any trip) and check where things ended up. A stop where two craft part (Apollo 11's "Eagle undocks") takes longer: after its trip the clock holds on the event and plays on to rest just after it, up to 22 seconds in all. How long a trip takes, its easing, and when the camera moves are the tour's own tests (`src/app/tour.test.ts`); an interface test never measures them.
+Draw "enough" frames (`A_WHOLE_TRIP` is 16 seconds, longer than any trip of a key-moments tour) and check where things ended up. A stop where two craft part (Apollo 11's "Eagle undocks") takes longer: after its trip the clock holds on the event and plays on to rest just after it, up to 22 seconds in all.
+
+A flight's tour has one of two styles (the mission's `tour` field; see `TourStyle` in `src/content/types.ts`). Apollo 11's is every-event: 25 stops, the Ship view throughout, trips of up to about 23 seconds, and page turns on the surface. Every other flight's is key-moments. To test key-moments behaviour on Apollo 11's content, mount it with that style: `mountMission('apollo-11', { start: 'tour', story: (mission) => ({ ...mission, tour: 'key-moments' }) })`. How long a trip takes, its easing, and when the camera moves are the tour's own tests (`src/app/tour.test.ts`); an interface test never measures them.
 
 ### Sound: `sound`
 
@@ -767,7 +769,7 @@ The interface answers a click, a key, a frame, or a fake's call at once. Assert 
 await user.click(screen.getByRole('button', { name: 'Take the tour of Apollo 11' }));
 
 expect(screen.queryByRole('dialog', { name: 'All missions' })).not.toBeInTheDocument();
-expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 1 of 12');
+expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 1 of 25');
 expect(navigation.address).toBeNull();
 ```
 
