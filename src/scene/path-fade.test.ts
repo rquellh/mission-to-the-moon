@@ -13,6 +13,9 @@ import {
   sampleIndexAt,
   stayAt,
   valueAtIndex,
+  WAY_BACK_REVOLUTIONS,
+  WAY_DIM_REVOLUTIONS,
+  wayDimming,
 } from './path-fade.ts';
 
 /** A path of `stretches`, each `laps` long, low over a body or not. */
@@ -90,6 +93,39 @@ describe('stayAt', () => {
     ['after the last stay', 320, -1],
   ])('finds the stay a craft is in %s', (_name, index, stay) => {
     expect(stayAt(stays, index)).toBe(stay);
+  });
+});
+
+describe('wayDimming', () => {
+  // A parking orbit round Earth (samples 0 to 14), the coast, and a stay at the Moon (19 to 318).
+  const flight = path([1.5, true], [0.4, false], [30, true], [0.4, false]);
+  const stays = orbitStays(flight.revolutions, flight.low);
+
+  it('dims nothing while the craft is in the stay its path begins with', () => {
+    expect(wayDimming(stays, flight.revolutions, 7).before).toBe(0);
+  });
+
+  it('leaves the way in bright as the craft arrives in orbit', () => {
+    expect(wayDimming(stays, flight.revolutions, 20)).toEqual({ before: 19, dim: 0 });
+  });
+
+  it(`dims all of the way in once the craft is ${WAY_DIM_REVOLUTIONS[1]} of a lap into the stay`, () => {
+    const index = 19 + WAY_DIM_REVOLUTIONS[1] * 10;
+
+    expect(wayDimming(stays, flight.revolutions, index)).toEqual({
+      before: 19,
+      dim: expect.closeTo(1, 6),
+    });
+    expect(wayDimming(stays, flight.revolutions, 200)).toEqual({ before: 19, dim: 1 });
+  });
+
+  it('brings it back as the craft leaves, a little at a time', () => {
+    const leaving = wayDimming(stays, flight.revolutions, 320);
+    const gone = wayDimming(stays, flight.revolutions, 318 + WAY_BACK_REVOLUTIONS * 10);
+
+    expect(leaving.dim).toBeGreaterThan(0.1);
+    expect(leaving.dim).toBeLessThan(0.9);
+    expect(gone.dim).toBe(0);
   });
 });
 

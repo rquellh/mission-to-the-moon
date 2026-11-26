@@ -13,8 +13,8 @@ import {
   Vector3,
 } from 'three';
 import type { Polyline } from '../sim';
-import { PATH_FUTURE_OPACITY, PATH_WIDTH_PX } from './config';
-import { MAX_ORBIT_STAYS, sampleIndexAt, stayAt, valueAtIndex } from './path-fade';
+import { PATH_FUTURE_OPACITY, PATH_WAY_OPACITY, PATH_WIDTH_PX } from './config';
+import { MAX_ORBIT_STAYS, sampleIndexAt, stayAt, valueAtIndex, wayDimming } from './path-fade';
 
 /**
  * A ship's path as a line of steady on-screen width. The vertex shader
@@ -123,6 +123,8 @@ const fragmentShader = /* glsl */ `
   uniform vec2 uGoneFade;
   uniform float uRunNow;
   uniform float uLapShown;
+  uniform vec2 uWay;
+  uniform float uWayOpacity;
 
   varying vec2 vUv;
   varying float vSample;
@@ -145,6 +147,8 @@ const fragmentShader = /* glsl */ `
     }
 
     float alpha = (vSample <= uNow ? 1.0 : uFutureOpacity) * uOpacity;
+    // The way in to the stay in orbit now is in, dim while the craft goes round (see wayDimming).
+    if (vSample < uWay.x) alpha *= mix(1.0, uWayOpacity, uWay.y);
     // In a stretch that goes around and around, loops still to come fade
     // out, and older ones dim and then go (see PathFade). Counted in
     // revolutions from now, held to the stretch's ends.
@@ -322,6 +326,8 @@ export function createPathLine(
       uGoneFade: { value: new Vector2(fade?.gone[0] ?? 1e6, fade?.gone[1] ?? 2e6) },
       uRunNow: { value: -1 },
       uLapShown: { value: 1 },
+      uWay: { value: new Vector2(0, 0) },
+      uWayOpacity: { value: PATH_WAY_OPACITY },
     },
     defines: { MAX_HIDDEN, MAX_RUNS },
     vertexShader,
@@ -345,6 +351,7 @@ export function createPathLine(
     uOpacity: { value: number };
     uRunNow: { value: number };
     uLapShown: { value: number };
+    uWay: { value: Vector2 };
     resolution: { value: Vector2 };
   };
 
@@ -352,6 +359,8 @@ export function createPathLine(
     uniforms.uNow.value = index;
     uniforms.uRevNow.value = valueAtIndex(revolutions, index);
     uniforms.uRunNow.value = stayAt(runs, index);
+    const way = wayDimming(runs, revolutions, index);
+    uniforms.uWay.value.set(way.before, way.dim);
   };
 
   return {
