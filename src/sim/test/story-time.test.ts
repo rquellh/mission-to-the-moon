@@ -684,3 +684,49 @@ describe('the even clock', () => {
     },
   );
 });
+
+describe('how much faster the clock may be played', () => {
+  const { keys } = keysOf(apollo11Flight, apollo11);
+  const story = createStoryTime(keys);
+  const turns = keys.turns!;
+  /** The pace there, mission seconds per story second, just ahead. */
+  const paceAhead = (s: number): number => (story.toMission(s + 1e-4) - story.toMission(s)) / 1e-4;
+
+  it('is normal speed on a swing the clock already plays at its own limit (Apollo 11 arriving at the Moon)', () => {
+    const at = story.toStory(apollo11Event('lunar-orbit-insertion')) - 4;
+    const rate = turns.openRate(story.toMission(at));
+
+    expect(rate).toBeGreaterThan(0);
+    expect(story.hurryLimit(at)).toBeCloseTo(1, 3);
+    // At that limit, the craft there laps once in SWING_LAP_STORY_SECONDS of real time.
+    expect(1 / (rate * paceAhead(at) * story.hurryLimit(at))).toBeCloseTo(
+      SWING_LAP_STORY_SECONDS,
+      1,
+    );
+  });
+
+  it('is more where the craft turn slowly, and no limit where none is on no closed lap', () => {
+    const coasting = story.toStory(apollo11Event('transearth-injection') + 30 * 3600);
+    const inOrbit = story.toStory(apollo11Event('undocking') - 3600);
+    const onTheSurface = story.toStory(apollo11Event('first-step'));
+
+    // Thirty hours out, the clock's hurried middle is already within three times of the coast's calm pace.
+    expect(story.hurryLimit(coasting)).toBeGreaterThan(2);
+    expect(story.hurryLimit(coasting)).toBeLessThan(Infinity);
+    expect(story.hurryLimit(inOrbit)).toBe(Infinity);
+    expect(story.hurryLimit(onTheSurface)).toBe(Infinity);
+  });
+
+  it('is never under normal speed on the eased clock, and can be on the even clock', () => {
+    const even = createStoryTime(keys, { ease: false });
+    const all = (clock: StoryTime) =>
+      Array.from({ length: 4001 }, (_, k) => clock.hurryLimit((clock.length * k) / 4000));
+
+    expect(Math.min(...all(story))).toBeGreaterThanOrEqual(1);
+    expect(Math.min(...all(even))).toBeLessThan(0.1);
+  });
+
+  it('has no limit on a clock with no flight to read', () => {
+    expect(createStoryTime([0, 86_400]).hurryLimit(3)).toBe(Infinity);
+  });
+});

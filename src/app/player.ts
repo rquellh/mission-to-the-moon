@@ -41,7 +41,7 @@ const TRIP_HURRY_EASE_SECONDS = 1;
 interface Trip {
   from: number;
   to: number;
-  seconds: number;
+  plan: TripPlan;
   elapsed: number;
 }
 
@@ -98,27 +98,62 @@ function squeezedShape(
   seconds: number,
   storySeconds: number,
 ): TripProgress | null {
+  const hurry = hurryOf(seconds, storySeconds);
+  if (hurry === null) return null;
+  const hurryEase = TRIP_HURRY_EASE_SECONDS;
+  const hurrying = seconds - TRIP_DEPART_SECONDS - TRIP_ARRIVE_SECONDS - hurryEase;
+  const { covered, pace } = walk(
+    [
+      ...DEPARTURE,
+      { seconds: hurryEase, from: 1, to: hurry },
+      { seconds: hurrying - hurryEase, from: hurry, to: hurry },
+      { seconds: hurryEase, from: hurry, to: 1 },
+      ...ARRIVAL,
+    ],
+    Math.min(seconds, Math.max(0, elapsed)),
+  );
+  return { share: Math.min(1, covered / storySeconds), pace: pace / storySeconds };
+}
+
+/**
+ * The hurried pace of a squeezed trip of `seconds` real seconds over
+ * `storySeconds` of story (story seconds per real second), or null when it
+ * is not squeezed (see squeezedShape).
+ */
+function hurryOf(seconds: number, storySeconds: number): number | null {
   if (!(storySeconds > seconds)) return null;
-  const ease = TRIP_EASE_SECONDS;
   const hurryEase = TRIP_HURRY_EASE_SECONDS;
   // Real seconds of the hurried pace, counting half of each ease into and out of it.
   const hurrying = seconds - TRIP_DEPART_SECONDS - TRIP_ARRIVE_SECONDS - hurryEase;
   // Its two eases must not overlap.
   if (hurrying < hurryEase) return null;
   // The story covered at normal speed and in the eases, so the hurry covers the rest.
-  const unhurried = TRIP_DEPART_SECONDS + TRIP_ARRIVE_SECONDS - ease + hurryEase;
+  const unhurried = TRIP_DEPART_SECONDS + TRIP_ARRIVE_SECONDS - TRIP_EASE_SECONDS + hurryEase;
   const hurry = (storySeconds - unhurried) / hurrying;
-  if (hurry < 1) return null;
-  const stretches: readonly PaceStretch[] = [
-    { seconds: ease, from: 0, to: 1 },
-    { seconds: TRIP_DEPART_SECONDS - ease, from: 1, to: 1 },
-    { seconds: hurryEase, from: 1, to: hurry },
-    { seconds: hurrying - hurryEase, from: hurry, to: hurry },
-    { seconds: hurryEase, from: hurry, to: 1 },
-    { seconds: TRIP_ARRIVE_SECONDS - ease, from: 1, to: 1 },
-    { seconds: ease, from: 1, to: 0 },
-  ];
-  let left = Math.min(seconds, Math.max(0, elapsed));
+  return hurry < 1 ? null : hurry;
+}
+
+/** A squeezed trip's start, at normal speed: the ease out of where it was, then normal speed. */
+const DEPARTURE: readonly PaceStretch[] = [
+  { seconds: TRIP_EASE_SECONDS, from: 0, to: 1 },
+  { seconds: TRIP_DEPART_SECONDS - TRIP_EASE_SECONDS, from: 1, to: 1 },
+];
+
+/** A squeezed trip's end, at normal speed: normal speed, then the ease into where it stops. */
+const ARRIVAL: readonly PaceStretch[] = [
+  { seconds: TRIP_ARRIVE_SECONDS - TRIP_EASE_SECONDS, from: 1, to: 1 },
+  { seconds: TRIP_EASE_SECONDS, from: 1, to: 0 },
+];
+
+/** How far along a run of pace stretches is: the story seconds it has covered, and its pace then. */
+interface Walked {
+  readonly covered: number;
+  readonly pace: number;
+}
+
+/** Story seconds a run of pace stretches covers in its first `elapsed` real seconds, and its pace then. */
+function walk(stretches: readonly PaceStretch[], elapsed: number): Walked {
+  let left = Math.max(0, elapsed);
   let covered = 0;
   for (const { seconds: length, from, to } of stretches) {
     if (!(length > 0)) continue;
@@ -127,12 +162,273 @@ function squeezedShape(
       const pace = from + ((to - from) * (1 - Math.cos(angle))) / 2;
       covered +=
         from * left + (to - from) * (left / 2 - (length / (2 * Math.PI)) * Math.sin(angle));
-      return { share: Math.min(1, covered / storySeconds), pace: pace / storySeconds };
+      return { covered, pace };
     }
     covered += ((from + to) / 2) * length;
     left -= length;
   }
-  return { share: 1, pace: 0 };
+  return { covered, pace: 0 };
+}
+
+/** Story seconds covered by a squeezed trip's start and by its end at normal speed, eases included. */
+const DEPARTURE_STORY_SECONDS = walk(DEPARTURE, TRIP_DEPART_SECONDS).covered;
+const ARRIVAL_STORY_SECONDS = walk(ARRIVAL, TRIP_ARRIVE_SECONDS).covered;
+
+/*
+ * A trip's hurry and the craft. The hurry multiplies the story clock's pace,
+ * and on a closed lap the scene covers any speed: a craft going round too
+ * fast is drawn as a stand-in gliding round its ring. On no closed lap
+ * (arriving at a body, leaving one) nothing can stand in, and the craft is
+ * drawn at its true place, so the hurry keeps to the story's hurryLimit
+ * there (see StoryMap.hurryLimit): about normal speed on a swing the clock
+ * already plays at its own limit, faster where craft turn slowly, as fast as
+ * it likes where none is on no closed lap. A squeezed trip whose usual shape
+ * (see tripShape) keeps to it is played that way, unchanged. One that does
+ * not keeps its start and its end at normal speed, and in between goes as
+ * fast as the usual shape's hurry but no faster than the limit allows, its
+ * speed changing no more abruptly than the usual ease into the hurry does;
+ * it takes longer, by what the slower parts cost, up to
+ * TRIP_LIMITED_MAX_SECONDS. A trip that would need longer still takes that
+ * long and goes over the limit by one even factor where the limit holds it
+ * back (see TripPlan.over).
+ */
+export const TRIP_LIMITED_MAX_SECONDS = 28;
+
+/**
+ * A trip held back by the limit is hurrying where it goes at least this
+ * many times normal speed (or, for a trip whose hurry is slower than five
+ * times, half way from normal speed to its hurry) more than
+ * TRIP_RUN_IN_MISSION_SECONDS from the stop; its final run (see
+ * TripPlan.finalRun) begins where the limit next holds it under that, after
+ * its last hurry. Under it, a trip whose limit rises and falls between two
+ * and three times normal speed is still on its way in.
+ */
+export const TRIP_HURRY_SPEED = 3;
+
+/**
+ * Within this much mission time of the stop, a trip going fast is not a
+ * hurry but part of its run in: the craft is at the body it is arriving at
+ * already (nothing crosses between Earth and the Moon in three hours; see
+ * HURRY_VIEW_MISSION_SECONDS in tour.ts). Apollo 11 coming home goes
+ * through its entry and its parachutes, minutes before splashdown, at up to
+ * six times normal speed after the swing round Earth the limit held it to.
+ */
+export const TRIP_RUN_IN_MISSION_SECONDS = 3 * 3600;
+
+/**
+ * A trip's final run begins no farther from the stop than this, in mission
+ * seconds: farther out, a stretch the limit holds is a swing away from the
+ * body the trip left (Apollo 12 leaving the Moon, 72 hours before its
+ * splashdown), not the swing in. The clock first holds a craft arriving at
+ * Earth about six hours out, at the Moon two or three.
+ */
+export const TRIP_FINAL_RUN_MISSION_SECONDS = 8 * 3600;
+
+/** Story seconds between the points at which a limited trip's speed is set. */
+const PLAN_STEP_STORY_SECONDS = 0.02;
+
+/** Real seconds between the moments at which a trip's usual shape is checked against the limit. */
+const CHECK_STEP_SECONDS = 0.02;
+
+/** A trip planned (see planTrip): how long it takes, and where it is at each moment. */
+export interface TripPlan {
+  /** Real seconds it takes. */
+  readonly seconds: number;
+  /** Whether it hurries between normal speed at its two ends (see TRIP_DEPART_SECONDS). */
+  readonly hurries: boolean;
+  /** Whether the story's hurryLimit shaped it, rather than the usual shape (see tripShape). */
+  readonly limited: boolean;
+  /** The factor by which it goes over the limit where it had to (see TRIP_LIMITED_MAX_SECONDS); 1 when it keeps to it. */
+  readonly over: number;
+  /**
+   * Real seconds of its final run, from the end of its last hurry to its
+   * end. The usual shape's hurry ends as it settles back to normal speed,
+   * TRIP_ARRIVE_SECONDS before the end, and so does that of a trip held back
+   * only on its way out; a trip that does not hurry has the same. A trip the
+   * limit holds back on its way in (a swing round the body it is arriving
+   * at) runs in from where the limit takes hold after its last hurry (see
+   * TRIP_HURRY_SPEED), so its final run is the whole of that swing, and
+   * whatever follows it to the stop.
+   */
+  readonly finalRun: number;
+  /** How far along it is, and how fast it is going, `elapsed` real seconds in (as tripShape). */
+  at(elapsed: number): TripProgress;
+}
+
+/** The last trip planned, so the tour's plan and the player's are one (see planTrip). */
+let lastPlanned: {
+  story: StoryMap;
+  from: number;
+  to: number;
+  seconds: number;
+  plan: TripPlan;
+} | null = null;
+
+/**
+ * The trip from story second `from` to `to` that a playTo of `seconds` real
+ * seconds plays on `story`: the usual shape (see tripShape), or, for a
+ * squeezed trip whose usual hurry would carry a craft drawn at its true place
+ * round its body faster than the story allows, one held to that (see
+ * TRIP_LIMITED_MAX_SECONDS), which takes longer.
+ */
+export function planTrip(story: StoryMap, from: number, to: number, seconds: number): TripPlan {
+  const last = lastPlanned;
+  if (
+    last &&
+    last.story === story &&
+    last.from === from &&
+    last.to === to &&
+    last.seconds === seconds
+  )
+    return last.plan;
+  const plan = makePlan(story, from, to, seconds);
+  lastPlanned = { story, from, to, seconds, plan };
+  return plan;
+}
+
+function makePlan(story: StoryMap, from: number, to: number, seconds: number): TripPlan {
+  const span = Math.abs(to - from);
+  const usual: TripPlan = {
+    seconds,
+    hurries: tripHurries(seconds, span),
+    limited: false,
+    over: 1,
+    finalRun: Math.min(seconds, TRIP_ARRIVE_SECONDS),
+    at: (elapsed) => tripShape(elapsed, seconds, span),
+  };
+  const limit = story.hurryLimit;
+  const hurry = hurryOf(seconds, span);
+  if (!limit || hurry === null) return usual;
+  const direction = to >= from ? 1 : -1;
+  const limitAt = (covered: number): number => limit(from + direction * covered);
+  if (keepsTo(usual, span, limitAt)) return usual;
+  const toStop = (covered: number): number =>
+    story.toElapsed(to) - story.toElapsed(from + direction * covered);
+  return limitedPlan(span, hurry, limitAt, toStop);
+}
+
+/** True when a trip's usual shape never goes faster than the limit allows. */
+function keepsTo(plan: TripPlan, span: number, limitAt: (covered: number) => number): boolean {
+  for (let elapsed = 0; elapsed <= plan.seconds; elapsed += CHECK_STEP_SECONDS) {
+    const { share, pace } = plan.at(elapsed);
+    const speed = span * pace;
+    if (speed > 1 && speed > limitAt(span * share) * (1 + 1e-9)) return false;
+  }
+  return true;
+}
+
+/**
+ * A squeezed trip over `span` story seconds held to the limit (see
+ * TRIP_LIMITED_MAX_SECONDS): its start and end as usual, and between them a
+ * speed that is the least of the usual hurry, the limit (times `over`, 1
+ * unless the trip would take too long), and what the speed can reach from
+ * either end changing no faster than the usual ease into the hurry does at
+ * its steepest. Within each step of PLAN_STEP_STORY_SECONDS the speed changes
+ * at one rate.
+ */
+function limitedPlan(
+  span: number,
+  hurry: number,
+  limitAt: (covered: number) => number,
+  toStop: (covered: number) => number,
+): TripPlan {
+  const start = DEPARTURE_STORY_SECONDS;
+  const middle = Math.max(0, span - DEPARTURE_STORY_SECONDS - ARRIVAL_STORY_SECONDS);
+  const steps = Math.max(1, Math.ceil(middle / PLAN_STEP_STORY_SECONDS));
+  const step = middle / steps;
+  // Each point takes the least limit of its own and its two neighbours', so a sharp change of the
+  // limit between two points (a transfer beginning) is met at the point before it.
+  const read = Float64Array.from({ length: steps + 1 }, (_, i) => limitAt(start + i * step));
+  const limits = read.map((value, i) =>
+    Math.min(value, read[i - 1] ?? Infinity, read[i + 1] ?? Infinity),
+  );
+  // The usual ease into the hurry, half a cosine over TRIP_HURRY_EASE_SECONDS, at its steepest.
+  const steepest = (Math.PI / 2) * ((hurry - 1) / TRIP_HURRY_EASE_SECONDS);
+  const speeds = new Float64Array(steps + 1);
+  const times = new Float64Array(steps + 1);
+  /** Lays the middle out with the limit stretched by `over`, and returns its real seconds. */
+  const lay = (over: number): number => {
+    for (let i = 0; i <= steps; i += 1) speeds[i] = Math.min(hurry, over * (limits[i] as number));
+    // Normal speed where the middle meets the start and the end; no faster to reach than allowed.
+    speeds[0] = 1;
+    speeds[steps] = 1;
+    for (let i = 1; i <= steps; i += 1)
+      speeds[i] = Math.min(
+        speeds[i] as number,
+        Math.sqrt((speeds[i - 1] as number) ** 2 + 2 * steepest * step),
+      );
+    for (let i = steps - 1; i >= 0; i -= 1)
+      speeds[i] = Math.min(
+        speeds[i] as number,
+        Math.sqrt((speeds[i + 1] as number) ** 2 + 2 * steepest * step),
+      );
+    for (let i = 1; i <= steps; i += 1)
+      times[i] =
+        (times[i - 1] as number) + (2 * step) / ((speeds[i - 1] as number) + (speeds[i] as number));
+    return times[steps] as number;
+  };
+  const ends = TRIP_DEPART_SECONDS + TRIP_ARRIVE_SECONDS;
+  let over = 1;
+  if (ends + lay(1) > TRIP_LIMITED_MAX_SECONDS) {
+    // Over the limit by the least even factor that fits: with it stretched far enough, only the hurry holds the trip back.
+    let lo = 1;
+    let hi = hurry / Math.max(1e-9, Math.min(...limits));
+    for (let k = 0; k < 60 && hi - lo > 1e-9 * hi; k += 1) {
+      const mid = (lo + hi) / 2;
+      if (ends + lay(mid) > TRIP_LIMITED_MAX_SECONDS) lo = mid;
+      else hi = mid;
+    }
+    over = hi;
+  }
+  const hurrying = lay(over);
+  const seconds = ends + hurrying;
+  // The final run: from where the limit last holds the trip under its hurrying speed after a
+  // hurry; with none, from where the trip is back at normal speed, as the usual shape's is.
+  const fast = Math.min(TRIP_HURRY_SPEED, (1 + hurry) / 2);
+  let runFrom = -1;
+  let hurried = false;
+  for (let i = 0; i <= steps; i += 1) {
+    const allowed = over * (limits[i] as number);
+    const speed = speeds[i] as number;
+    const away = toStop(start + i * step);
+    if (away > TRIP_FINAL_RUN_MISSION_SECONDS) hurried = true;
+    else if (speed >= fast && away > TRIP_RUN_IN_MISSION_SECONDS) hurried = true;
+    else if (allowed < fast && speed >= allowed * (1 - 1e-9)) {
+      if (hurried) runFrom = i;
+      hurried = false;
+    }
+  }
+  const finalRun =
+    runFrom < 0 ? TRIP_ARRIVE_SECONDS : seconds - TRIP_DEPART_SECONDS - (times[runFrom] as number);
+  const at = (elapsed: number): TripProgress => {
+    const e = Math.min(seconds, Math.max(0, elapsed));
+    let covered: number;
+    let speed: number;
+    if (e < TRIP_DEPART_SECONDS) ({ covered, pace: speed } = walk(DEPARTURE, e));
+    else if (e < TRIP_DEPART_SECONDS + hurrying) {
+      const into = e - TRIP_DEPART_SECONDS;
+      let lo = 0;
+      let hi = steps - 1;
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if ((times[mid] as number) <= into) lo = mid;
+        else hi = mid - 1;
+      }
+      const v0 = speeds[lo] as number;
+      const v1 = speeds[lo + 1] as number;
+      // One rate of change of speed across the step: its speed squared changes evenly with the story.
+      const rate = (v1 * v1 - v0 * v0) / (2 * step);
+      const tau = into - (times[lo] as number);
+      covered = start + lo * step + Math.min(step, v0 * tau + (rate * tau * tau) / 2);
+      speed = v0 + rate * tau;
+    } else {
+      const done = walk(ARRIVAL, e - TRIP_DEPART_SECONDS - hurrying);
+      covered = start + middle + done.covered;
+      speed = done.pace;
+    }
+    return { share: Math.min(1, covered / span), pace: speed / span };
+  };
+  return { seconds, hurries: true, limited: true, over, finalRun, at };
 }
 
 /**
@@ -189,7 +485,7 @@ export class MissionPlayer implements Player {
     const trip = this.trip;
     if (!trip) return this.playRate;
     const span = Math.abs(trip.to - trip.from);
-    return span * tripShape(trip.elapsed, trip.seconds, span).pace;
+    return span * trip.plan.at(trip.elapsed).pace;
   }
 
   seek(elapsedSeconds: number): void {
@@ -227,7 +523,12 @@ export class MissionPlayer implements Player {
       this.notify();
       return;
     }
-    this.trip = { from: this.storyNow, to, seconds, elapsed: 0 };
+    this.trip = {
+      from: this.storyNow,
+      to,
+      plan: planTrip(this.story, this.storyNow, to, seconds),
+      elapsed: 0,
+    };
     this.isPlaying = true;
     // Count from now, not from the first frame, so a slow device does not lose a frame's time.
     this.lastFrameMs = this.now();
@@ -270,14 +571,14 @@ export class MissionPlayer implements Player {
     const trip = this.trip;
     if (trip) {
       trip.elapsed += Math.min(TRIP_MAX_FRAME_SECONDS, elapsed);
-      if (trip.elapsed >= trip.seconds) {
+      if (trip.elapsed >= trip.plan.seconds) {
         // Land exactly on the place asked for, then stand still there.
         this.storyNow = trip.to;
         this.trip = null;
         this.isPlaying = false;
         this.frame = null;
       } else {
-        const { share } = tripShape(trip.elapsed, trip.seconds, Math.abs(trip.to - trip.from));
+        const { share } = trip.plan.at(trip.elapsed);
         this.storyNow = trip.from + (trip.to - trip.from) * share;
         this.frame = requestAnimationFrame(this.step);
       }
