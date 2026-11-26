@@ -541,19 +541,19 @@ const FAR_TRAVEL = 4;
 /**
  * Leaving the ship view's steady view for a tour's stop ahead, the calm move
  * sets off while the craft still races round its ring, and so cannot keep it
- * in sight (see setOffForStop). On the way into "In orbit around Earth" and
- * "Heading home" it lost the craft for about three seconds: its model came
- * back at its true place behind Earth, then off the bottom of the screen, then
- * under the card, while the picture rolled 21 to 25 degrees a second. So the
- * move is planned and tried first: with the clock taken to run evenly to the
- * stop, the craft's place at each of CUT_SAMPLES moments of the move, from
- * when its model would be drawn there again (no longer in fast forward), is
- * seen from the move's camera there. Off the screen, under the card or behind
- * a body (see seenFrom) for more than CUT_LOST_MS in all, the move is not
- * flown: the steady view
- * holds, and as the craft stops racing (its stand-in fading out, see the
- * hand-back), the picture dissolves to the chase of the craft at its true
- * place, which then travels with it to the stop (see headForStop).
+ * in sight (see setOffForStop). On Apollo 11's way into "Burn toward the
+ * Moon" and "Heading home" it lost the craft for about three seconds: its
+ * model came back at its true place behind the body, then off the bottom of
+ * the screen, then under the card, while the picture rolled 21 to 25 degrees
+ * a second. So the move is planned and tried first: with the clock taken to
+ * run evenly to the stop, the craft's place at each of CUT_SAMPLES moments of
+ * the move, from when its model would be drawn there again (no longer in fast
+ * forward), is seen from the move's camera there. Off the screen, under the
+ * card or behind a body (see seenFrom) for more than CUT_LOST_MS in all, the
+ * move is not flown: the steady view holds, and as the craft stops racing
+ * (its stand-in fading out, see the hand-back), the picture dissolves to the
+ * chase of the craft at its true place, which then travels with it to the
+ * stop (see headForStop).
  */
 const CUT_SAMPLES = 40;
 const CUT_LOST_MS = 500;
