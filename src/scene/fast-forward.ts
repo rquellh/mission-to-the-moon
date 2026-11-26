@@ -147,6 +147,38 @@ export function closedLapStart(path: LapPath, now: number, center: ArrayLike<num
   return Number.NaN;
 }
 
+/**
+ * The latest time, at or before `now` (in revolutions), that a craft passed
+ * the place round its body it was at when its fast forward began
+ * (`anchor`). A time-lapse ring is held to the lap through this passage (see
+ * heldLap), so the lap it is drawn through changes once a lap at most,
+ * however fast the clock carries the craft round.
+ */
+export function lastPassage(anchor: number, now: number): number {
+  return anchor + Math.floor(now - anchor);
+}
+
+/**
+ * The start (in revolutions) of the lap a time-lapse ring is held to: a
+ * closed lap through the craft's latest passage of where its fast forward
+ * began (see lastPassage and closedLapStart), or NaN when none closes. A
+ * ring drawn through the closed lap around the craft's true place instead
+ * followed it as it raced round: each time the lap chosen around it moved
+ * on, and at every burn, the ring slid across the picture in a frame or two,
+ * several times a second (the owner: the ring "moves back and forth and
+ * kind of shakes"). Held to one place round the body, one lap is chosen
+ * there for as long as the orbit holds, and the next lap there differs from
+ * it only as an orbit drifts from one lap to the next.
+ */
+export function heldLap(
+  path: LapPath,
+  anchor: number,
+  now: number,
+  center: ArrayLike<number>,
+): number {
+  return closedLapStart(path, lastPassage(anchor, now), center);
+}
+
 const _end = [0, 0, 0];
 
 /**

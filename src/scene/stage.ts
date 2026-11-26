@@ -62,8 +62,10 @@ import {
   handBackEases,
   handBackOpacity,
   HANDBACK_SWITCH,
+  heldLap,
   indexAtValue,
   inFastForward,
+  lastPassage,
   ringHeadingAt,
   ringPointAt,
   seedShare,
@@ -364,8 +366,13 @@ const RING_OPACITY = 0.9;
 const RING_LIGHTEN = 0.35;
 /** Points along a ring. */
 const RING_POINTS = 192;
-/** How quickly a ring eases to its craft's new orbit after a burn, in seconds of real time. */
-const RING_SETTLE_SECONDS = 0.15;
+/**
+ * How quickly a ring eases to its craft's new orbit, in seconds of real time:
+ * after a burn, and as the lap it is held to drifts from one lap to the next
+ * (see heldLap). The owner asked for a ring that holds still; one that must
+ * change takes a second or two to, never a frame or two.
+ */
+const RING_SETTLE_SECONDS = 0.6;
 /**
  * A craft that goes behind Earth or the Moon fades out over this many
  * seconds of real time, and fades in as it comes out, rather than vanishing
@@ -582,6 +589,8 @@ interface ShipState extends ShipPose {
   readonly ringNow: Float32Array;
   readonly ringWanted: Float32Array;
   readonly ringCenter: Vector3;
+  /** Where round its body (in revolutions flown) the craft was as its ring came in, which the ring is held to (see heldLap); NaN before. */
+  ringAnchor: number;
   /** How far it is in sight, 0 (behind Earth or the Moon) to 1 (see HIDDEN_FADE_SECONDS); NaN while it does not exist. */
   seen: number;
 }
@@ -1028,6 +1037,7 @@ export class Stage implements Director {
         ringNow: new Float32Array(RING_POINTS * 3),
         ringWanted: new Float32Array(RING_POINTS * 3),
         ringCenter: new Vector3(),
+        ringAnchor: Number.NaN,
         seen: Number.NaN,
         exists: false,
         position: new Vector3(),
@@ -4377,8 +4387,9 @@ export class Stage implements Director {
   /**
    * Put each ship in fast forward or take it out (see
    * FAST_FORWARD_CROSSFADE_SECONDS), fade its ring in or out, draw the ring
-   * through the closed lap of its path around now, easing to a new lap
-   * after a burn, and glide its stand-in round it (see updateStandIn). The
+   * through a closed lap held to where the craft was as the ring came in
+   * (see heldLap), easing to a new lap after a burn or as the orbit drifts
+   * (see RING_SETTLE_SECONDS), and glide its stand-in round it (see updateStandIn). The
    * ring keeps its last lap while it fades out. The followed ship's
    * fast-forward level, for the camera and the interface, eases over
    * FAST_FORWARD_SECONDS. `jumped` is any seek, `leapt` one of more than a
@@ -4398,12 +4409,22 @@ export class Stage implements Director {
       const target = fast ? 1 : 0;
       const at = leapt || this.reducedMotion;
       if (fast && ship.lap) {
-        // Through the true place itself, where the craft's own line meets it (see writeLap).
+        // Held to where the craft was as fast forward began (see heldLap), and through it, where
+        // the craft's own line meets it then (see writeLap); a new fast forward holds it afresh.
         const now = this.revolutionsAt(ship, t);
-        writeLap(ship.lap, start, this.mix, ship.ringWanted, RING_POINTS, now);
+        const fresh = ship.crossFade <= 0 || leapt || !(now >= ship.ringAnchor);
+        if (fresh) ship.ringAnchor = now;
+        const center = this.nearMoon(ship.position) ? this.moonAtTrueScale : this.atOrigin;
+        const held = heldLap(ship.lap, ship.ringAnchor, now, center);
+        if (Number.isNaN(held))
+          writeLap(ship.lap, start, this.mix, ship.ringWanted, RING_POINTS, now);
+        else {
+          const through = lastPassage(ship.ringAnchor, now);
+          writeLap(ship.lap, held, this.mix, ship.ringWanted, RING_POINTS, through);
+        }
         ship.ringCenter.copy(this.nearMoon(ship.position) ? this.moonCenter : this.origin);
         // A ring that is not showing yet takes its lap as it is; one showing eases to a new one.
-        if (ship.crossFade <= 0 || at || rescaled) ship.ringNow.set(ship.ringWanted);
+        if (fresh || rescaled) ship.ringNow.set(ship.ringWanted);
         else {
           const now = ship.ringNow;
           const wanted = ship.ringWanted;
