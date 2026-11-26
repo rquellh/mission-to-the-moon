@@ -28,11 +28,12 @@ import {
   type Material,
   type Object3D,
 } from 'three';
-import type {
-  LeftBehind,
-  VehicleChange,
-  VehicleLayout,
-  VehiclePart,
+import {
+  FALLING_PARTS,
+  type LeftBehind,
+  type VehicleChange,
+  type VehicleLayout,
+  type VehiclePart,
 } from '../content/vehicle-types';
 import {
   buildWalker,
@@ -2116,27 +2117,6 @@ const _qStep = new Quaternion();
 const _axisX = new Vector3(1, 0, 0);
 const _axisY = new Vector3(0, 1, 0);
 
-/** Parts that visibly fall away when they come off. */
-const DROPPABLE: ReadonlySet<string> = new Set([
-  'first-stage',
-  'aft-interstage',
-  'second-stage',
-  'saturn-ib-first-stage',
-  'third-stage',
-  'escape-tower',
-  'service-module',
-  'service-module-damaged',
-  'lm-descent-stage',
-  'lm-ascent-stage',
-  'titan-first-stage',
-  'titan-second-stage',
-  'gemini-equipment-section',
-  'gemini-retro-section',
-  'atlas',
-  'agena-shroud',
-  'atda-shroud',
-]);
-
 /** Parts that fall away only together with the part they sit on (the empty adapter with the S-IVB). */
 const RIDES_WITH: ReadonlyMap<VehiclePart, VehiclePart> = new Map<VehiclePart, VehiclePart>([
   ['adapter', 'third-stage'],
@@ -3243,8 +3223,8 @@ export class ShipModel {
       if (!gone(name)) continue;
       const base = RIDES_WITH.get(name);
       if (
-        DROPPABLE.has(name) ||
-        (base !== undefined && parts.includes(base) && gone(base) && DROPPABLE.has(base))
+        FALLING_PARTS.has(name) ||
+        (base !== undefined && parts.includes(base) && gone(base) && FALLING_PARTS.has(base))
       )
         out.push(name);
     }
