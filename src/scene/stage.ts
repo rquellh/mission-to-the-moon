@@ -229,10 +229,11 @@ const CHASE_DISTANCE_SECONDS = 0.8;
 const CHASE_SAME_SPOT_RAD = 1e-5;
 /**
  * With a tour's stop ahead (see expectStop), over the trip's last
- * CHASE_STOP_SECONDS the chase heads evenly for its frame and distance at the
- * stop, so it is there as the clock stops: trailing its craft's heading, it
- * went on turning after the clock had stopped (up to 2.8 s at 25 degrees a
- * second on the way into "Parachutes open").
+ * CHASE_STOP_SECONDS the chase heads for its frame and distance at the stop,
+ * easing in and out over that time, so it is there as the clock stops:
+ * trailing its craft's heading, it went on turning after the clock had
+ * stopped (up to 2.8 s at 25 degrees a second on the way into "Parachutes
+ * open").
  */
 const CHASE_STOP_SECONDS = 3;
 
@@ -3896,14 +3897,19 @@ export class Stage implements Director {
 
   /**
    * Move the ship view into its steady view (`on`) or back out to the chase:
-   * one move, as long as its turn of the picture needs (see CAMERA_MOVE_MS),
-   * which `moving` reports. Going in, it sets off from where the camera is,
-   * not from the chase, which then follows a craft lapping its body too fast
-   * to watch; coming out it keeps the craft, drawn again, in sight. Either
-   * way the body's top edge never sinks lower in the picture than it is at
-   * either end (see keepBodyUp), so the body does not drop out of the bottom
-   * of the picture, behind the card, as the camera backs away from it. After
-   * a jump of the clock, or under reduced motion, it is there at once.
+   * one calm move round the body (see planCalm and calmMs), as long as its
+   * turn, roll and change of the body's share need (see CALM_ROLL_DEG_PER_S
+   * and the limits beside it), up to CALM_MOVE_MAX_MS, which `moving`
+   * reports. With a tour's stop ahead too soon for that move back to the
+   * chase as it follows its craft, it heads for the chase as it will be at
+   * the stop, in the time left (see setOffForStop). Going in, it sets off
+   * from where the camera is, not from the chase, which then follows a craft
+   * lapping its body too fast to watch; coming out it keeps the craft, drawn
+   * again, in sight. Either way the body's top edge never sinks lower in the
+   * picture than it is at either end (see keepBodyUp), so the body does not
+   * drop out of the bottom of the picture, behind the card, as the camera
+   * backs away from it. After a jump of the clock, or under reduced motion,
+   * it is there at once.
    */
   private setFastView(on: boolean, jumped: boolean): void {
     if (on) this.updateFastView();
@@ -4145,9 +4151,10 @@ export class Stage implements Director {
 
   /**
    * Over a tour trip's last CHASE_STOP_SECONDS, turn the chase from its own
-   * frame toward its frame at the stop, by a share that grows evenly to all of
-   * it as the clock stops, and its distance likewise (its own frame is kept, so
-   * the share is of the way from it each frame, not compounded).
+   * frame toward its frame at the stop, by a share that eases in and out (a
+   * smoothstep in frame time) from none where it begins to all of it when the
+   * clock is due at the stop, and its distance likewise (its own frame is
+   * kept, so the share is of the way from it each frame, not compounded).
    */
   private headForStop(): void {
     const stop = this.usableStop();
