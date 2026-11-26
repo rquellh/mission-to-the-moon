@@ -17,6 +17,7 @@ import { byId, el, hiddenText, reducedMotionQuery } from './dom';
 import { setUpEnding, type EndingAfter } from './ending';
 import { setUpEventCard } from './event-card';
 import { setUpExtraSheet } from './extra-sheet';
+import { fillFastForwardMark, orbitsInFastForward } from './fast-forward-mark';
 import { missionDates, speakMissionTime } from './format';
 import { setUpHub, type HubOptions } from './hub';
 import { icon } from './icons';
@@ -209,27 +210,20 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
 
   // Fast forward: the scene says when the ship circles too fast to follow.
   // A quiet mark shows by the clock, counting the orbits the ship really
-  // flies once it has flown one. Screen readers hear why once, not on every
-  // lap: the mark is not a live region, so the count is only read when a
+  // flies once it has flown one (the tour's panel has its own, on a trip).
+  // Screen readers hear why once, here for both marks, not on every lap:
+  // neither mark is a live region, so the count is only read when a
   // visitor goes to it.
   const fastMark = byId('clock-fast', HTMLSpanElement);
   const fastOrbits = el('span', 'clock__orbits');
   fastOrbits.setAttribute('data-testid', 'clock-fast-forward-orbits');
-  fastOrbits.hidden = true;
-  fastMark.replaceChildren(`${copy.timeline.fastForward} `, fastOrbits);
-  fastMark.title = copy.timeline.fastForwardHint;
+  const showFastOrbits = fillFastForwardMark(fastMark, fastOrbits);
   let fastShown = false;
-  let orbitsShown = 0;
   let fastSpokenAt = -Infinity;
   director.subscribe(() => {
-    const fast = director.fastForward === true;
-    const laps = fast ? (director.fastForwardLaps ?? 0) : 0;
-    const orbits = Number.isFinite(laps) && laps >= 1 ? Math.floor(laps) : 0;
-    if (orbits !== orbitsShown) {
-      orbitsShown = orbits;
-      fastOrbits.hidden = orbits === 0;
-      fastOrbits.textContent = orbits === 0 ? '' : copy.timeline.fastForwardOrbits(orbits);
-    }
+    const orbits = orbitsInFastForward(director);
+    const fast = orbits !== null;
+    showFastOrbits(orbits ?? 0);
     if (fast === fastShown) return;
     fastShown = fast;
     fastMark.hidden = !fast;
@@ -413,7 +407,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     tourPhase = tour.phase;
     tourIndex = tour.index;
   });
-  setUpTourPanel(tour, { onExplore: explore });
+  setUpTourPanel(tour, { director, onExplore: explore });
 
   /* The welcome ------------------------------------------------------- */
   const welcomeOptions: WelcomeOptions = {

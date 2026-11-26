@@ -7,6 +7,7 @@
  * carry each trip to its end.
  */
 import { describe, expect, it } from 'vitest';
+import { copy } from '../content/copy.ts';
 import {
   mountMission,
   navigation,
@@ -160,6 +161,69 @@ describe('the tour panel', () => {
       expect(
         within(theCard()).getByRole('button', { name: 'Listen to the recording, 15 seconds' }),
       ).toBeInTheDocument();
+    });
+  });
+
+  // The mark by the clock is out of sight on the tour, so the panel says it on a trip.
+  // On the screen a dot stands between "Fast forward" and the count; screen readers skip it.
+  describe('fast forward', () => {
+    const thePanel = (): HTMLElement => screen.getByRole('region', { name: 'Guided tour' });
+
+    it('says "Fast forward" on a trip while the clock runs fast, then counts the orbits', async () => {
+      const { user, director } = await mountMission('gemini-3', { start: 'tour' });
+      await user.click(within(thePanel()).getByRole('button', { name: 'Next' }));
+
+      director.setFastForward(true);
+
+      const mark = within(thePanel()).getByText('Fast forward');
+      expect(mark).toBeVisible();
+      expect(mark).toHaveTextContent(/^Fast forward$/);
+      expect(mark).toHaveAttribute('title', copy.timeline.fastForwardHint);
+      expect(thePanel()).toHaveTextContent('On the way to Stop 2 of 6');
+
+      director.setFastForwardLaps(1.5);
+      expect(mark).toHaveTextContent(/^Fast forward 1 orbit$/);
+
+      director.setFastForwardLaps(12.2);
+      expect(mark).toHaveTextContent(/^Fast forward 12 orbits$/);
+      expect(within(thePanel()).getByText('12 orbits')).toBeVisible();
+    });
+
+    it('says nothing of it at a stop', async () => {
+      const { director } = await mountMission('gemini-3', { start: 'tour' });
+
+      director.setFastForward(true);
+      director.setFastForwardLaps(3.5);
+
+      expect(thePanel()).toHaveTextContent('Stop 1 of 6');
+      expect(within(thePanel()).queryByText('Fast forward')).not.toBeInTheDocument();
+    });
+
+    it('goes when the clock slows down again, on the same trip', async () => {
+      const { user, director } = await mountMission('gemini-3', { start: 'tour' });
+      await user.click(within(thePanel()).getByRole('button', { name: 'Next' }));
+      director.setFastForward(true);
+      director.setFastForwardLaps(4.1);
+      expect(within(thePanel()).getByText('4 orbits')).toBeVisible();
+
+      director.setFastForward(false);
+
+      expect(within(thePanel()).queryByText('Fast forward')).not.toBeInTheDocument();
+      expect(thePanel()).toHaveTextContent('On the way to Stop 2 of 6');
+    });
+
+    it('goes when the trip arrives', async () => {
+      const { user, director, frames } = await mountMission('gemini-3', { start: 'tour' });
+      await user.click(within(thePanel()).getByRole('button', { name: 'Next' }));
+      director.setFastForward(true);
+      director.setFastForwardLaps(2.3);
+      expect(within(thePanel()).getByText('2 orbits')).toBeVisible();
+
+      frames.advance(A_WHOLE_TRIP);
+
+      expect(thePanel()).toHaveTextContent('Stop 2 of 6');
+      expect(thePanel()).not.toHaveTextContent('On the way to');
+      expect(within(thePanel()).queryByText('Fast forward')).not.toBeInTheDocument();
     });
   });
 

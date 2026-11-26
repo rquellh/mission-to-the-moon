@@ -350,5 +350,37 @@ describe('the mission interface', () => {
       );
       expect(screen.getByText('2 orbits').closest('[aria-live], [role="status"]')).toBeNull();
     });
+
+    it('on a tour trip too, says why once and never reads out the count', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      const { user, director, frames } = await mountMission('gemini-3', { start: 'tour' });
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      settle(frames);
+      expect(
+        screen.getByText('On the way to stop 2 of 6: The first orbit change.'),
+      ).toHaveAttribute('aria-live', 'polite');
+
+      director.setFastForward(true);
+      settle(frames);
+      expect(screen.getByText(copy.timeline.fastForwardSpoken)).toHaveAttribute(
+        'aria-live',
+        'polite',
+      );
+
+      director.setFastForwardLaps(1);
+      settle(frames);
+      director.setFastForwardLaps(2);
+      settle(frames);
+
+      // The announcer still holds the explanation; the panel's count is in no live region.
+      expect(screen.getByText(copy.timeline.fastForwardSpoken)).toHaveAttribute(
+        'aria-live',
+        'polite',
+      );
+      const panel = screen.getByRole('region', { name: 'Guided tour' });
+      expect(
+        within(panel).getByText('2 orbits').closest('[aria-live], [role="status"]'),
+      ).toBeNull();
+    });
   });
 });

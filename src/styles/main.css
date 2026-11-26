@@ -884,6 +884,34 @@ body.is-welcome .hud {
   list-style: none;
 }
 
+/* Fast forward on a trip, in the progress row's place: as quiet as "On the
+   way to", and no taller than the row (its words spill evenly above and
+   below), so the card keeps its size as it comes and goes. */
+.tour__fast {
+  grid-area: progress;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 3px;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  /* Every figure the same width, so the count does not shift as it goes up. */
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.tour__fast-orbits::before {
+  content: '· ';
+  content: '· ' / '';
+}
+
+.tour__steps--fast .tour__progress {
+  visibility: hidden;
+}
+
 .tour__dot {
   flex: 1 1 0;
   height: 3px;
@@ -3942,6 +3970,11 @@ body.is-welcome .hud {
     flex-direction: row;
     align-items: baseline;
     gap: 8px;
+  }
+
+  /* Fast forward follows the stop it is on the way to. */
+  .tour__fast {
+    justify-content: flex-start;
   }
 
   /* The end of the flight fills the card on its own, under the full progress strip. */
