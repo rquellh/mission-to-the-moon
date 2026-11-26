@@ -199,10 +199,13 @@ const CHASE_TURN_SECONDS = 0.7;
 const CHASE_TURN_MAX_DEG_PER_S = 30;
 /**
  * The fastest the chase is carried around a body with its ship, in degrees a
- * second: a lap in eight seconds, the fastest the owner lets a drawn ship go
- * round (see FAST_FORWARD_CROSSFADE_SECONDS). A ship that briefly laps
- * faster while still drawn (racing round the Moon as it arrives, or round
- * Earth before entry) the chase lets fall behind rather than whirling with it.
+ * second: a lap in eight seconds. At normal speed a ship drawn at its true
+ * place now goes round no faster than once in 20 seconds (18 degrees a
+ * second; see FAST_FORWARD_ON_LAP_SECONDS in fast-forward.ts), so this only
+ * binds when something plays an open swing faster than the story clock does
+ * (the tour's hurry as a ship arrives at the Moon, or at Earth before
+ * entry): the chase then lets the ship fall behind rather than whirling
+ * with it.
  */
 const CHASE_CARRY_MAX_DEG_PER_S = 45;
 const CHASE_DISTANCE_SECONDS = 0.8;
