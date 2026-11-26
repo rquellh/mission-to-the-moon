@@ -14,6 +14,7 @@ import {
 } from 'three';
 import type { Polyline } from '../sim';
 import { PATH_FUTURE_OPACITY, PATH_WIDTH_PX } from './config';
+import { MAX_ORBIT_STAYS, sampleIndexAt, valueAtIndex } from './path-fade';
 
 /**
  * A ship's path as a line of steady on-screen width. The vertex shader
@@ -187,7 +188,7 @@ const ringFragmentShader = /* glsl */ `
 
 /** Most stretches one line can leave out, and most stretches that fade loop by loop. */
 const MAX_HIDDEN = 4;
-const MAX_RUNS = 4;
+const MAX_RUNS = MAX_ORBIT_STAYS;
 
 /** Corner layout of one segment: a quad with a cap at each end (as in three's LineSegmentsGeometry). */
 const QUAD_POSITIONS = [
@@ -197,8 +198,8 @@ const QUAD_UVS = [-1, 2, 1, 2, -1, 1, 1, 1, -1, -1, 1, -1, -1, -2, 1, -2];
 const QUAD_INDEX = [0, 2, 1, 2, 3, 1, 2, 4, 3, 4, 5, 3, 4, 6, 5, 6, 7, 5];
 
 /**
- * How a long path is kept readable where it goes around and around (an
- * Earth orbit, or days in lunar orbit). Distances are in revolutions of the
+ * How a path is kept readable where it goes around and around (each stay
+ * in orbit, see orbitStays in path-fade.ts). Distances are in revolutions of the
  * orbit being flown, counted from now: in each faded stretch the part still
  * to come fades out between `future[0]` and `future[1]` revolutions ahead,
  * the flown part dims from full brightness to `past[2]` between `past[0]`
@@ -213,7 +214,7 @@ export interface PathFade {
   gone: readonly [number, number];
   /** Revolutions flown at each sample, from the path's start (never decreasing). */
   revolutions: Float64Array;
-  /** The faded stretches, as sample index ranges [first, last] (at most four). */
+  /** The faded stretches, as sample index ranges [first, last] (at most MAX_ORBIT_STAYS). */
   runs: readonly (readonly [number, number])[];
 }
 
@@ -230,38 +231,6 @@ export interface PathLine {
   setOpacity(opacity: number): void;
   setResolution(width: number, height: number): void;
   dispose(): void;
-}
-
-/**
- * Index position of mission time t along the samples: i + fraction when t
- * lies between sample i and i + 1; -1 before the first; the last index after.
- */
-export function sampleIndexAt(times: Float64Array, t: number): number {
-  const n = times.length;
-  if (n === 0 || t < (times[0] as number)) return -1;
-  if (t >= (times[n - 1] as number)) return n - 1;
-  let lo = 0;
-  let hi = n - 1;
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >> 1;
-    if ((times[mid] as number) <= t) lo = mid;
-    else hi = mid;
-  }
-  const a = times[lo] as number;
-  const b = times[hi] as number;
-  return lo + (b > a ? (t - a) / (b - a) : 0);
-}
-
-/** The value of a per-sample array at a fractional sample index (clamped to the ends). */
-export function valueAtIndex(values: ArrayLike<number>, index: number): number {
-  const n = values.length;
-  if (n === 0) return 0;
-  if (index <= 0) return values[0] as number;
-  if (index >= n - 1) return values[n - 1] as number;
-  const i = Math.floor(index);
-  const a = values[i] as number;
-  const b = values[i + 1] as number;
-  return a + (b - a) * (index - i);
 }
 
 /**
