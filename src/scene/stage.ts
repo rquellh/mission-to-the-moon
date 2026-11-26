@@ -4423,8 +4423,6 @@ export class Stage implements Director {
         changed = true;
       ship.fast = fast;
       if (this.updateStandIn(ship, t, dt, leapt)) changed = true;
-      // The ring and the craft's own lap are not quite one curve (see updateTrail), so one gives way to the other.
-      this.lineOf.get(ship)?.setLapShown(1 - smoothstep(0, 1, ship.crossFade));
       const ring = ship.ring;
       if (!ring) return;
       if (ship.crossFade > 0) {
@@ -4436,6 +4434,19 @@ export class Stage implements Director {
         changed = true;
       }
     });
+    // The ring and a craft's own lap are not quite one curve (see updateTrail), so the lap gives
+    // way to the ring. A craft docked to another is drawn as part of it, with no ring of its own,
+    // and its line is lit up to its true place, which races round with the other's: its lap gives
+    // way to the other's ring too, rather than racing round under it.
+    for (const ship of this.ships) {
+      const phase = ship.exists ? this.path.phaseAt(ship.id, t) : undefined;
+      const host =
+        phase?.kind === 'docked'
+          ? this.ships.find((other) => other.id === phase.target)
+          : undefined;
+      const covered = Math.max(ship.crossFade, host?.crossFade ?? 0);
+      this.lineOf.get(ship)?.setLapShown(1 - smoothstep(0, 1, covered));
+    }
     // The steady view frames the followed ship's ring (see updateFastView).
     const followed = this.followed;
     if (followed.crossFade > 0) {
