@@ -330,6 +330,8 @@ const LABEL_NEAR_MOON_RADII = [1.4, 2.2] as const;
 /** The room between the parts at a site and the first label under them, in CSS pixels, and how long a label takes to fade in or out, in seconds. */
 const LABEL_GAP_PX = 8;
 const LABEL_FADE_SECONDS = 0.5;
+/** How near its opacity a label's fade ends (see updateLabels). */
+const LABEL_FADE_DONE = 0.004;
 /** For this many story seconds after liftoff, a part left behind is drawn at the size its lander is drawn (see updateFleet). */
 const LIFTOFF_SIZE_STORY_SECONDS = 1.5;
 const COMPANION_MARKER_M = 1500;
@@ -988,6 +990,8 @@ export class Stage implements Director {
    * frame it had, so the picture stays as it was (see followChase).
    */
   private chaseHeld = false;
+  /** True while a label fades in or out, which takes frames of its own (see updateLabels). */
+  private labelsFading = false;
   /** How much of the return fade the lines show, 0 to 1 (see showReturns). */
   private returnShown = 1;
   /** Where the chased ship was around its body last frame, to carry the chase around with it (see followChase). */
@@ -4215,6 +4219,7 @@ export class Stage implements Director {
       fastForward ||
       offsetMoving ||
       returnsMoving ||
+      this.labelsFading ||
       cameraMoved ||
       this.needsRender ||
       this.shipsTurning()
@@ -4931,7 +4936,11 @@ export class Stage implements Director {
       .setFromMatrixColumn(this.camera.matrixWorld, 1)
       .normalize()
       .negate();
-    const ease = snap ? 1 : 1 - Math.exp(-dt / LABEL_FADE_SECONDS);
+    // A leap of the clock (a page turn) fades a label in or out as playing does, so it does not
+    // pop in under a picture that stays put; only the fresh frame drawn on resuming (no time
+    // between frames) puts it straight where it belongs.
+    const ease = snap && dt <= 0 ? 1 : 1 - Math.exp(-dt / LABEL_FADE_SECONDS);
+    this.labelsFading = false;
     for (let i = 0; i < parts.length; i += 1) {
       const part = parts[i] as LeftBehindModel;
       const label = this.labels[i];
@@ -4952,7 +4961,10 @@ export class Stage implements Director {
           LABEL_NEAR_MOON_RADII[1],
           this.camera.position.distanceTo(site) / MOON_RADIUS,
         );
-      material.opacity += ((this.labelWanted[i] ? near : 0) - material.opacity) * ease;
+      const wanted = this.labelWanted[i] ? near : 0;
+      material.opacity += (wanted - material.opacity) * ease;
+      if (Math.abs(wanted - material.opacity) < LABEL_FADE_DONE) material.opacity = wanted;
+      else this.labelsFading = true;
       label.visible = material.opacity > 0.01;
       if (!label.visible) continue;
       // How far the site's parts reach down the screen, and the labels already hanging there, in CSS pixels.
