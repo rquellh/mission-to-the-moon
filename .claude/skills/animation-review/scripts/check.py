@@ -248,11 +248,11 @@ class Recording:
         return min(matches, key=lambda event: abs(event['seconds'] - mission))
 
     def tour_at(self, t):
-        """'way' while the tour is on its way to a stop, 'stop' at one, None off the tour."""
+        """'way' while the tour is on its way to a stop or plays the stop's own action (the button reads Skip), 'stop' at rest at one, None off the tour."""
         row = self.timeline_at(t)
-        if not row or not row['counter'].startswith('Stop'):
+        if not row or 'Stop' not in row['counter']:
             return None
-        return 'way' if 'On the way' in row['counter'] else 'stop'
+        return 'way' if 'On the way' in row['counter'] or 'Skip' in (row.get('button') or '') else 'stop'
 
     def timeline_at(self, t):
         best = None

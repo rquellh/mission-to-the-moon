@@ -505,13 +505,16 @@ function pageProbe() {
     const player = s ? s.player : null;
     const counter = textOf('[data-testid=tour-count]');
     const stop = /Stop (\d+) of (\d+)/.exec(counter);
+    const button = textOf('[data-testid=tour-next]');
     const c = s ? s.camera : null;
     return {
       ready: Boolean(document.body?.classList.contains('is-ready') && window.__missionScene),
       stop: stop ? Number(stop[1]) : null,
       stops: stop ? Number(stop[2]) : null,
-      onTheWay: /On the way/.test(counter),
-      button: textOf('[data-testid=tour-next]'),
+      // Not yet at rest at its stop: on a trip, or holding on and then playing the stop's own
+      // action, when the counter already names the stop and only the button (Skip) says so.
+      onTheWay: /On the way/.test(counter) || /Skip/.test(button),
+      button,
       ending: shown(document.querySelector('[data-testid=ending]')),
       card: textOf('#card-title'),
       view: s ? s.viewNow : null,
