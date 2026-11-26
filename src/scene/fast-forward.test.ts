@@ -1,13 +1,26 @@
 /**
  * Fast forward's two rules: a craft is replaced by its ring when it laps
- * its body faster than once in about 7 seconds, and drawn again below once
- * in about 8 (with nothing in between); and the ring is drawn only through
- * a lap of the path that closes on itself, with no chord where its ends
- * meet. The paths here are drawn around a body at the origin, in the plane
- * y = 0, starting along +x.
+ * its body faster than once in 20 seconds, and drawn again below once in 24
+ * (with nothing in between); and the ring is drawn only through a lap of
+ * the path that closes on itself, with no chord where its ends meet. The
+ * paths here are drawn around a body at the origin, in the plane y = 0,
+ * starting along +x.
  */
 import { describe, expect, it } from 'vitest';
-import { closedLapStart, inFastForward, writeLap, type LapPath } from './fast-forward.ts';
+import {
+  CALM_LAP_STORY_SECONDS,
+  EASE_GENTLE_PACE,
+  PLAIN_ORBIT_SECONDS,
+  SWING_LAP_STORY_SECONDS,
+} from '../sim/story-time.ts';
+import {
+  closedLapStart,
+  FAST_FORWARD_OFF_LAP_SECONDS,
+  FAST_FORWARD_ON_LAP_SECONDS,
+  inFastForward,
+  writeLap,
+  type LapPath,
+} from './fast-forward.ts';
 
 const ORIGIN = [0, 0, 0];
 const SAMPLES_PER_LAP = 200;
@@ -48,19 +61,19 @@ const lapIn = (seconds: number): number => 1 / seconds;
 
 describe('inFastForward', () => {
   it.each([
-    ['a lap in 8.8 seconds (Eagle before its descent, at normal speed)', 8.8, false],
-    ['a lap in 7.5 seconds', 7.5, false],
-    ['a lap in 6.5 seconds', 6.5, true],
-    ['a lap in 5.2 seconds (Eagle and Columbia before docking)', 5.2, true],
+    ['a lap in 30 seconds (low Earth orbit either side of an event, at normal speed)', 30, false],
+    ['a lap in 21 seconds', 21, false],
+    ['a lap in 19 seconds', 19, true],
+    ['a lap in 8.8 seconds (once called "better" than 4.4, since still too fast)', 8.8, true],
     ['a lap in 4.4 seconds', 4.4, true],
   ])('draws the craft or its ring for %s, starting from the craft', (_name, seconds, ring) => {
     expect(inFastForward(lapIn(seconds), false)).toBe(ring);
   });
 
   it.each([
-    ['a lap in 7.5 seconds', 7.5, true],
-    ['a lap in 7.9 seconds', 7.9, true],
-    ['a lap in 8.2 seconds', 8.2, false],
+    ['a lap in 19 seconds', 19, true],
+    ['a lap in 23.5 seconds', 23.5, true],
+    ['a lap in 24.5 seconds', 24.5, false],
     ['a stopped clock', Infinity, false],
   ])(
     'keeps the ring or goes back to the craft for %s, starting from the ring',
@@ -68,6 +81,18 @@ describe('inFastForward', () => {
       expect(inFastForward(lapIn(seconds), true)).toBe(ring);
     },
   );
+
+  it("matches the story clock's own figures for a calm craft", () => {
+    // The clock plays a stretch evenly, and a parting or docking approach at no more than a pace,
+    // at which a craft laps once in the scene's slower threshold: drawn, and never between the two.
+    expect(CALM_LAP_STORY_SECONDS).toBe(FAST_FORWARD_OFF_LAP_SECONDS);
+    // On no closed lap, where no ring can stand in, it keeps a craft slower than the faster one.
+    expect(SWING_LAP_STORY_SECONDS).toBeGreaterThan(FAST_FORWARD_ON_LAP_SECONDS);
+    // Either side of an event, a low Earth orbit is drawn, slower than either threshold.
+    const lapAtTheEvents = PLAIN_ORBIT_SECONDS / EASE_GENTLE_PACE;
+    expect(inFastForward(lapIn(lapAtTheEvents), true)).toBe(false);
+    expect(lapAtTheEvents).toBeGreaterThan(FAST_FORWARD_OFF_LAP_SECONDS);
+  });
 });
 
 describe('closedLapStart', () => {
