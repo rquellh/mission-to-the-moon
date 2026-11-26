@@ -4472,13 +4472,20 @@ export class Stage implements Director {
   private updateStandIn(ship: ShipState, t: number, dt: number, leapt: boolean): boolean {
     const wanted = ship.fast && !this.reducedMotion && ship.exists;
     const was = ship.standIn || !Number.isNaN(ship.handBack);
+    let began = false;
     if (leapt || this.reducedMotion || !ship.exists) {
       ship.handBack = Number.NaN;
       if (ship.standIn) this.endStandIn(ship, false);
-      if (wanted) this.seedStandIn(ship, t, 1 / FAST_FORWARD_GLIDE_LAP_SECONDS);
+      if (wanted) {
+        this.seedStandIn(ship, t, 1 / FAST_FORWARD_GLIDE_LAP_SECONDS);
+        began = true;
+      }
     } else {
       // Going in, from where the craft is; a dip fading in there carries on.
-      if (wanted && !ship.standIn) this.seedStandIn(ship, t, 1 / FAST_FORWARD_ON_LAP_SECONDS);
+      if (wanted && !ship.standIn) {
+        this.seedStandIn(ship, t, 1 / FAST_FORWARD_ON_LAP_SECONDS);
+        began = true;
+      }
       if (!wanted && ship.standIn) {
         if (Number.isNaN(ship.handBack)) {
           ship.handBack = 0;
@@ -4505,7 +4512,9 @@ export class Stage implements Director {
         if (back ? ship.handBack <= 0 : ship.handBack >= 1) ship.handBack = Number.NaN;
       }
     }
-    if (ship.standIn) this.glideStandIn(ship, dt);
+    // The frame it begins on, the craft's true place has already moved on by this frame's
+    // time: gliding on as well would step it twice (seen as a twitch close up, in the ship view).
+    if (ship.standIn) this.glideStandIn(ship, began ? 0 : dt);
     this.updateTrail(ship, t);
     return was || ship.standIn || !Number.isNaN(ship.handBack);
   }
