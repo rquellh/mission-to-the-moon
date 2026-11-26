@@ -159,6 +159,24 @@ describe('the mission interface', () => {
       ).toBeInTheDocument();
     });
 
+    it('on a tour of every event, rides along in the Ship view, whatever view each moment has when explored', async () => {
+      const { user, frames, director } = await mountMission('apollo-11', { start: 'tour' });
+      expect(director.view).toBe('spacecraft');
+
+      // On to "Burn toward the Moon", explored in the Both view, and "Into orbit around the Moon", in the Moon view.
+      for (let stop = 2; stop <= 8; stop += 1) {
+        await user.click(screen.getByRole('button', { name: 'Next' }));
+        frames.advance(0.5);
+        await user.click(screen.getByRole('button', { name: 'Skip to this stop' }));
+        expect(director.view).toBe('spacecraft');
+      }
+      await user.click(screen.getByRole('button', { name: 'Back' }));
+      frames.advance(8);
+
+      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 7 of 25');
+      expect(director.view).toBe('spacecraft');
+    });
+
     it('notes the visit on this device once, however often it starts', async () => {
       const { user } = await mountMission('apollo-11', { start: 'tour' });
       await user.click(screen.getByRole('button', { name: /all missions$/ }));
