@@ -214,6 +214,11 @@ const CHASE_TURN_MAX_DEG_PER_S = 30;
 const CHASE_CARRY_MAX_DEG_PER_S = 45;
 const CHASE_DISTANCE_SECONDS = 0.8;
 /**
+ * A craft whose direction from its body's center turns less than this, in
+ * radians, across a jump of the clock rests where it was (see followChase).
+ */
+const CHASE_SAME_SPOT_RAD = 1e-5;
+/**
  * The ship view's up is a body's vertical within the first of these heights
  * above it (in its radii) and ecliptic north beyond the second, so the
  * horizon is level near a body (see chaseUpWeights). The change between the
@@ -936,6 +941,12 @@ export class Stage implements Director {
   private readonly upWeights = { earth: 0, moon: 0 };
   private readonly upEarth = new Float64Array(4 * CHASE_UP_SAMPLES + 1);
   private readonly upMoon = new Float64Array(4 * CHASE_UP_SAMPLES + 1);
+  /**
+   * True from a jump of the clock that left the chased craft resting where it
+   * was (a tour's page turn on the Moon) until it moves: the chase holds the
+   * frame it had, so the picture stays as it was (see followChase).
+   */
+  private chaseHeld = false;
   /** Where the chased ship was around its body last frame, to carry the chase around with it (see followChase). */
   private readonly chaseRadial = {
     ship: null as ShipState | null,
@@ -3859,6 +3870,7 @@ export class Stage implements Director {
     const last = this.chaseRadial;
     const carried =
       last.ship === this.chased() && last.body === body && last.direction.dot(radial) > 0;
+    const stayed = carried && last.direction.angleTo(radial) < CHASE_SAME_SPOT_RAD;
     if (carried) {
       // Weighted by how far the up is that body's vertical: far off, the frame holds to ecliptic north.
       const weight = body === 'moon' ? this.upWeights.moon : this.upWeights.earth;
@@ -3871,6 +3883,11 @@ export class Stage implements Director {
     last.ship = this.chased();
     last.body = body;
     last.direction.copy(radial);
+    // A jump of the clock between two moments the craft rests on one spot leaves the picture
+    // where it was, until the craft moves: the frame its heading would want then may differ.
+    if (jumped && stayed) this.chaseHeld = true;
+    else if (!stayed) this.chaseHeld = false;
+    if (this.chaseHeld && !this.fastView.on) return;
     if (jumped || this.reducedMotion || this.fastView.on) {
       this.chaseFrame.copy(target);
       this.chaseDistance = auto;
