@@ -2,7 +2,8 @@
  * Keeping a craft's path readable where it goes round and round a body,
  * apart from the scene so the rules can be tested: which stretches of a path
  * are stays in orbit, faded lap by lap (orbitStays; the fading itself is
- * PathFade in path-lines.ts, its distances ORBIT_FADE in stage.ts), and how
+ * PathFade in path-lines.ts, its distances ORBIT_FADE in stage.ts), which
+ * one the craft is in (stayAt), and how
  * to read a value of the path at a point between two samples
  * (sampleIndexAt, valueAtIndex).
  *
@@ -53,6 +54,11 @@ export function orbitStays(
     }
   }
   return stays;
+}
+
+/** Which of `stays` (sample index ranges, as orbitStays gives them) a fractional sample index is in, or -1 for none. */
+export function stayAt(stays: ReadonlyArray<readonly [number, number]>, index: number): number {
+  return stays.findIndex(([first, last]) => index >= first && index <= last);
 }
 
 /**

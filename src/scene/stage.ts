@@ -304,7 +304,10 @@ const PATH_END_FADE_STORY_SECONDS = 1.5;
  * - Never while it is docked to another craft (drawn as part of it) or
  *   standing on a surface, and never with the clock stopped: then the model
  *   is at its true place.
- * - The ring fades in and out over FAST_FORWARD_CROSSFADE_SECONDS.
+ * - The ring fades in and out over FAST_FORWARD_CROSSFADE_SECONDS, and the
+ *   craft's own line gives way to it in the stay in orbit it is in, so the
+ *   ring is the one curve drawn round the body for that craft (see
+ *   updateTrail).
  *
  * The stand-in. The owner found craft going round the Moon or Earth "still
  * too fast", and proposed "cheating a bit ... similar to how we do when the
@@ -319,9 +322,9 @@ const PATH_END_FADE_STORY_SECONDS = 1.5;
  * jumps; it sits on the ring as drawn, at either scale, heading the way the
  * craft flies and upright over the body, as a craft in orbit is drawn.
  * Everything that places or shows the model (hidden behind a body or not,
- * its glow, its dot, a pair drawn round it, the pointer to it, the end of
- * its lit line) goes by where it is drawn (see drawnOf); the camera and the
- * framing go by the true place.
+ * its glow, its dot, a pair drawn round it, the pointer to it, how far its
+ * line is lit) goes by where it is drawn (see drawnOf and updateTrail); the
+ * camera and the framing go by the true place.
  *
  * The hand-back. When fast forward ends, the ring fades out and the model
  * goes back to its true place with a short dissolve (see
@@ -4418,6 +4421,8 @@ export class Stage implements Director {
         changed = true;
       ship.fast = fast;
       if (this.updateStandIn(ship, t, dt, leapt)) changed = true;
+      // The ring and the craft's own lap are not quite one curve (see updateTrail), so one gives way to the other.
+      this.lineOf.get(ship)?.setLapShown(1 - smoothstep(0, 1, ship.crossFade));
       const ring = ship.ring;
       if (!ring) return;
       if (ship.crossFade > 0) {
@@ -4508,19 +4513,23 @@ export class Stage implements Director {
   }
 
   /**
-   * A ship's line is lit up to now and dimmer ahead (see updateWorld), so
-   * where the two meet marks the craft's true place, which in fast forward
-   * races round the ring (seen on a lap not flown before, and in the loops
-   * that fade by revolutions). While the ship stands in, its line is lit up
-   * to the stand-in instead, on the last lap the craft has flown past it, so
-   * that mark goes round with the model; as the model goes back to its true
-   * place, so does the line.
+   * A ship's line is lit up to now and dimmer ahead (see updateWorld), and
+   * in a stay in orbit only the lap around that point is drawn (see
+   * ORBIT_FADE), so that point is the craft's true place, which in fast
+   * forward races round the body. While its ring is wanted, the line is lit
+   * up to the stand-in instead, on the last lap the craft has flown past it,
+   * so what the line shows of the stay goes round with the model, not the
+   * race. The lap itself gives way to the ring meanwhile (see
+   * updateFastForward): the ring is the lap through the true place, and in
+   * a frame that turns with the Moon (see path-fade.ts) a lap flown before
+   * it runs a little beside it. As fast forward ends the line goes back to
+   * now at once, while the ring still covers the lap, so that is not seen.
    */
   private updateTrail(ship: ShipState, t: number): void {
     const line = this.lineOf.get(ship);
     if (!line) return;
     const revolutions = this.revolutionsAt(ship, t);
-    if (!ship.standIn || !ship.revolutions || !Number.isFinite(revolutions)) {
+    if (!ship.standIn || !ship.fast || !ship.revolutions || !Number.isFinite(revolutions)) {
       if (ship.trailLagged) line.setTime(t);
       ship.trailLagged = false;
       return;

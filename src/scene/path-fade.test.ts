@@ -11,6 +11,7 @@ import {
   ORBIT_STAY_REVOLUTIONS,
   orbitStays,
   sampleIndexAt,
+  stayAt,
   valueAtIndex,
 } from './path-fade.ts';
 
@@ -72,6 +73,23 @@ describe('orbitStays', () => {
 
     expect(stays).toHaveLength(MAX_ORBIT_STAYS);
     expect(stays[0]).toEqual([0, 19]);
+  });
+});
+
+describe('stayAt', () => {
+  const stays = [
+    [0, 14],
+    [19, 318],
+  ] as const;
+
+  it.each([
+    ['in the parking orbit', 7.5, 0],
+    ['on the last sample of a stay', 14, 0],
+    ['between two stays', 16.5, -1],
+    ['at the Moon', 200, 1],
+    ['after the last stay', 320, -1],
+  ])('finds the stay a craft is in %s', (_name, index, stay) => {
+    expect(stayAt(stays, index)).toBe(stay);
   });
 });
 

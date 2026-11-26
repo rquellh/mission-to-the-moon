@@ -14,7 +14,7 @@ import {
 } from 'three';
 import type { Polyline } from '../sim';
 import { PATH_FUTURE_OPACITY, PATH_WIDTH_PX } from './config';
-import { MAX_ORBIT_STAYS, sampleIndexAt, valueAtIndex } from './path-fade';
+import { MAX_ORBIT_STAYS, sampleIndexAt, stayAt, valueAtIndex } from './path-fade';
 
 /**
  * A ship's path as a line of steady on-screen width. The vertex shader
@@ -121,6 +121,8 @@ const fragmentShader = /* glsl */ `
   uniform vec2 uFutureFade;
   uniform vec3 uPastFade;
   uniform vec2 uGoneFade;
+  uniform float uRunNow;
+  uniform float uLapShown;
 
   varying vec2 vUv;
   varying float vSample;
@@ -155,6 +157,8 @@ const fragmentShader = /* glsl */ `
         alpha *= mix(1.0, uPastFade.z, smoothstep(uPastFade.x, uPastFade.y, -ahead));
         alpha *= 1.0 - smoothstep(uGoneFade.x, uGoneFade.y, -ahead);
       }
+      // The stretch now is in gives way to its fast-forward ring (see setLapShown).
+      if (abs(vRun - uRunNow) < 0.5) alpha *= uLapShown;
     }
     if (alpha < 0.01) discard;
     gl_FragColor = vec4(diffuse, alpha);
@@ -229,6 +233,12 @@ export interface PathLine {
   setIndex(index: number): void;
   /** Fade the whole line (0 hidden, 1 shown): a ship's line goes once its path has ended. */
   setOpacity(opacity: number): void;
+  /**
+   * Fade the stay in orbit the line is lit up to (0 hidden, 1 shown): while
+   * a fast-forward ring stands for the orbit, it is the one ring drawn there
+   * (see the fast-forward block in stage.ts).
+   */
+  setLapShown(shown: number): void;
   setResolution(width: number, height: number): void;
   dispose(): void;
 }
@@ -267,7 +277,8 @@ export function createPathLine(
   const revolutions = fade?.revolutions ?? new Float64Array(n);
   const runOf = new Float32Array(n).fill(-1);
   const bounds: Vector2[] = [];
-  for (const [first, last] of (fade?.runs ?? []).slice(0, MAX_RUNS)) {
+  const runs = (fade?.runs ?? []).slice(0, MAX_RUNS);
+  for (const [first, last] of runs) {
     for (let i = Math.max(0, first); i <= Math.min(n - 1, last); i += 1) runOf[i] = bounds.length;
     bounds.push(new Vector2(valueAtIndex(revolutions, first), valueAtIndex(revolutions, last)));
   }
@@ -309,6 +320,8 @@ export function createPathLine(
       uFutureFade: { value: new Vector2(fade?.future[0] ?? 0, fade?.future[1] ?? 1) },
       uPastFade: { value: new Vector3(fade?.past[0] ?? 0, fade?.past[1] ?? 1, fade?.past[2] ?? 1) },
       uGoneFade: { value: new Vector2(fade?.gone[0] ?? 1e6, fade?.gone[1] ?? 2e6) },
+      uRunNow: { value: -1 },
+      uLapShown: { value: 1 },
     },
     defines: { MAX_HIDDEN, MAX_RUNS },
     vertexShader,
@@ -330,12 +343,15 @@ export function createPathLine(
     uNow: { value: number };
     uRevNow: { value: number };
     uOpacity: { value: number };
+    uRunNow: { value: number };
+    uLapShown: { value: number };
     resolution: { value: Vector2 };
   };
 
   const lightTo = (index: number): void => {
     uniforms.uNow.value = index;
     uniforms.uRevNow.value = valueAtIndex(revolutions, index);
+    uniforms.uRunNow.value = stayAt(runs, index);
   };
 
   return {
@@ -344,6 +360,9 @@ export function createPathLine(
     setOpacity(opacity) {
       uniforms.uOpacity.value = opacity;
       mesh.visible = opacity > 0.005;
+    },
+    setLapShown(shown) {
+      uniforms.uLapShown.value = shown;
     },
     setMix(mix) {
       uniforms.uMix.value = mix;
