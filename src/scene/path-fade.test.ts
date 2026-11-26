@@ -6,12 +6,14 @@
  * each sample, a tenth of a lap apart, and which samples are low.
  */
 import { describe, expect, it } from 'vitest';
+import { EARTH_MEAN_RADIUS_KM, MOON_MEAN_RADIUS_KM } from '../content/physical-constants.ts';
 import {
   MAX_ORBIT_STAYS,
   ORBIT_STAY_REVOLUTIONS,
   orbitStays,
-  RETURN_FULL_RADII,
-  RETURN_NEAR_RADII,
+  MOON_CLOSEST_KM,
+  RETURN_EARTH_RADII,
+  RETURN_MOON_RADII,
   returnFade,
   returnStarts,
   sampleIndexAt,
@@ -176,13 +178,23 @@ describe('returnStarts', () => {
 });
 
 describe('returnFade', () => {
-  it('comes in as the craft comes back, none far out and all of it close in', () => {
-    expect(returnFade(RETURN_NEAR_RADII)).toBe(0);
-    expect(returnFade(RETURN_NEAR_RADII + 5)).toBe(0);
-    expect(returnFade(RETURN_FULL_RADII)).toBe(1);
-    expect(returnFade(1)).toBe(1);
-    const middle = returnFade((RETURN_NEAR_RADII + RETURN_FULL_RADII) / 2);
+  it.each([
+    ['Earth', RETURN_EARTH_RADII],
+    ['the Moon', RETURN_MOON_RADII],
+  ])('comes in as the craft comes back to %s, none far out and all of it close in', (_, zone) => {
+    const [near, full] = zone;
+    expect(returnFade(near, zone)).toBe(0);
+    expect(returnFade(near + 5, zone)).toBe(0);
+    expect(returnFade(full, zone)).toBe(1);
+    expect(returnFade(1, zone)).toBe(1);
+    const middle = returnFade((near + full) / 2, zone);
     expect(middle).toBeGreaterThan(0.3);
     expect(middle).toBeLessThan(0.7);
+  });
+
+  it("keeps Earth's zone apart from the Moon's however near the Moon comes", () => {
+    const earth = RETURN_EARTH_RADII[0] * EARTH_MEAN_RADIUS_KM;
+    const moon = RETURN_MOON_RADII[0] * MOON_MEAN_RADIUS_KM;
+    expect(earth + moon).toBeLessThan(MOON_CLOSEST_KM);
   });
 });

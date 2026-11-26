@@ -117,12 +117,19 @@ export function wayDimming(
  * craft is back, the lines of its earlier time near that body are not drawn
  * near it (see returnFade and PathLine's return fade).
  *
- * A sample is near a body within RETURN_NEAR_RADII of its radii of its center
- * at true scale. The craft's return is felt as it comes in from there to
- * RETURN_FULL_RADII, so the old lines fade out as it comes back.
+ * A sample is near Earth within RETURN_EARTH_RADII[0] of Earth's radii of its
+ * center at true scale, and near the Moon within RETURN_MOON_RADII[0] of the
+ * Moon's. The craft's return is felt as it comes in from there to the second
+ * of the pair, so the old lines fade out as it comes back. Earth's reaches far
+ * out: on the way home Earth comes into the Ship view's picture with the craft
+ * some 43 of its radii out, and the lines of the way out should be gone by
+ * then. It still ends short of the Moon's however near the Moon comes (see
+ * MOON_CLOSEST_KM).
  */
-export const RETURN_NEAR_RADII = 20;
-export const RETURN_FULL_RADII = 8;
+export const RETURN_EARTH_RADII = [50, 40] as const;
+export const RETURN_MOON_RADII = [20, 8] as const;
+/** The Moon's nearest to Earth (its perigee at its closest, center to center), in km. */
+export const MOON_CLOSEST_KM = 356_400;
 
 /**
  * For each sample, the first sample of the stretch near one body that it is
@@ -150,10 +157,11 @@ export function returnStarts(near: ArrayLike<number>): Int32Array {
 
 /**
  * How far the return fade is in, 0 to 1, for a craft `radii` of its body's
- * radii from its center on a return (see RETURN_NEAR_RADII).
+ * radii from its center on a return to that body, whose `zone` is
+ * RETURN_EARTH_RADII or RETURN_MOON_RADII.
  */
-export function returnFade(radii: number): number {
-  return 1 - smoothstep(RETURN_FULL_RADII, RETURN_NEAR_RADII, radii);
+export function returnFade(radii: number, zone: readonly [number, number]): number {
+  return 1 - smoothstep(zone[1], zone[0], radii);
 }
 
 /** Which of `stays` (sample index ranges, as orbitStays gives them) a fractional sample index is in, or -1 for none. */

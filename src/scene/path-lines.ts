@@ -14,14 +14,7 @@ import {
 } from 'three';
 import type { Polyline } from '../sim';
 import { PATH_FUTURE_OPACITY, PATH_WAY_OPACITY, PATH_WIDTH_PX } from './config';
-import {
-  MAX_ORBIT_STAYS,
-  returnFade,
-  sampleIndexAt,
-  stayAt,
-  valueAtIndex,
-  wayDimming,
-} from './path-fade';
+import { MAX_ORBIT_STAYS, sampleIndexAt, stayAt, valueAtIndex, wayDimming } from './path-fade';
 
 /**
  * A ship's path as a line of steady on-screen width. The vertex shader
@@ -253,15 +246,15 @@ export interface PathFade {
 /**
  * Where a path comes back near a body it left earlier (see returnStarts in
  * path-fade.ts): for each sample, the first sample of the return it is in
- * (-1 for none), which body that is, and how far the sample is from that
- * body's center in its radii at true scale. Each body's center at readable
+ * (-1 for none), which body that is, and how far in the return fade is with
+ * the craft there, 0 to 1 (see returnFade). Each body's center at readable
  * and at true scale, and its radius. The lines drawn before the return fade
  * out between `fade[0]` and `fade[1]` of the body's radii from its center.
  */
 export interface PathReturns {
   starts: Int32Array;
   bodies: Uint8Array;
-  radii: Float32Array;
+  fades: Float32Array;
   centers: readonly { readable: Vector3; true: Vector3; radius: number }[];
   fade: readonly [number, number];
 }
@@ -417,7 +410,7 @@ export function createPathLine(
       uniforms.uReturn.value.set(-1, 0);
       return;
     }
-    const weight = returnFade(valueAtIndex(returns.radii, index)) * returnShown;
+    const weight = valueAtIndex(returns.fades, index) * returnShown;
     uniforms.uReturn.value.set(start, weight);
     uniforms.uReturnReadable.value.copy(center.readable);
     uniforms.uReturnTrue.value.copy(center.true);

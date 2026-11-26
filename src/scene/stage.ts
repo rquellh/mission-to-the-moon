@@ -104,7 +104,9 @@ import { createMarkers, type MarkerPoint, type MarkerSet } from './markers';
 import { createMoon, type Moon } from './moon';
 import {
   orbitStays,
-  RETURN_NEAR_RADII,
+  RETURN_EARTH_RADII,
+  RETURN_MOON_RADII,
+  returnFade,
   returnStarts,
   sampleIndexAt,
   valueAtIndex,
@@ -1825,27 +1827,26 @@ export class Stage implements Director {
     this.path.moonPosition(0, at);
     const moonReadable = new Vector3().fromArray(at);
     const bodies = new Uint8Array(n);
-    const radii = new Float32Array(n);
+    const fades = new Float32Array(n);
     const p = new Vector3();
     for (let i = 0; i < n; i += 1) {
       p.fromArray(polyline.truePositions, 3 * i);
       const earth = p.length() / EARTH_RADIUS;
       const moon = p.distanceTo(moonTrue) / MOON_RADIUS;
-      if (earth < RETURN_NEAR_RADII) {
-        bodies[i] = 1;
-        radii[i] = earth;
-      } else if (moon < RETURN_NEAR_RADII) {
+      // The Moon's zone first: Earth's reaches far out toward it (see RETURN_EARTH_RADII).
+      if (moon < RETURN_MOON_RADII[0]) {
         bodies[i] = 2;
-        radii[i] = moon;
-      } else {
-        radii[i] = Math.min(earth, moon);
+        fades[i] = returnFade(moon, RETURN_MOON_RADII);
+      } else if (earth < RETURN_EARTH_RADII[0]) {
+        bodies[i] = 1;
+        fades[i] = returnFade(earth, RETURN_EARTH_RADII);
       }
     }
     const starts = returnStarts(bodies);
     if (!starts.some((start) => start >= 0)) return null;
     const earth = { readable: new Vector3(), true: new Vector3(), radius: EARTH_RADIUS };
     const moon = { readable: moonReadable, true: moonTrue, radius: MOON_RADIUS };
-    return { starts, bodies, radii, centers: [earth, earth, moon], fade: RETURN_GONE_RADII };
+    return { starts, bodies, fades, centers: [earth, earth, moon], fade: RETURN_GONE_RADII };
   }
 
   /**
