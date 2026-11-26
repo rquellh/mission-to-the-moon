@@ -65,6 +65,9 @@ export const TIMELINE_COLUMNS = [
   'left',
   'labels',
   'classes',
+  'glide',
+  'laps',
+  'fflaps',
 ];
 
 /** Columns of camera.tsv: one row every frame the page runs (see references/recording-files.md). */
@@ -104,6 +107,15 @@ export const CAMERA_COLUMNS = [
   'uz',
   'w',
   'h',
+  'standin',
+  'glide',
+  'dx',
+  'dy',
+  'doccluded',
+  'dux',
+  'duy',
+  'duz',
+  'ring',
 ];
 
 /**
@@ -170,16 +182,61 @@ function pageProbe() {
     return s && s.camera && s.player && s.fastView ? s : null;
   };
 
+  // Laps the craft has flown around the body below it by mission time t, as the scene counts them (see Stage.revolutionsOf).
+  const lapsAt = (ship, t) => {
+    const times = ship.times;
+    const laps = ship.revolutions;
+    if (!times || !laps || times.length === 0) return NaN;
+    if (t <= times[0]) return laps[0];
+    const last = times.length - 1;
+    if (t >= times[last]) return laps[last];
+    let lo = 0;
+    let hi = last;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (times[mid] <= t) lo = mid;
+      else hi = mid;
+    }
+    const u = times[hi] > times[lo] ? (t - times[lo]) / (times[hi] - times[lo]) : 0;
+    return laps[lo] + (laps[hi] - laps[lo]) * u;
+  };
+  // In fast forward a craft's model is a stand-in gliding round its ring, not at its true place (see Stage.updateStandIn).
+  // Builds from before the stand-in have no such field: '-' there, read as "no stand-in".
+  const standInOf = (ship) => (ship && typeof ship.standIn === 'boolean' ? ship.standIn : null);
+  // How opaque a model is drawn: 0 while it is not drawn at all. A ShipModel keeps the fade it last
+  // drew with while it is hidden (ShipModel.update returns before setting it), which would read as
+  // drawn: under reduced motion in fast forward, and on the frame a hand-back hides it to move it.
+  const fadeOf = (model) => {
+    if (!model || typeof model.fade !== 'number') return null;
+    return model.root && model.root.visible === false ? 0 : model.fade;
+  };
+
   const sample = () => {
     const s = stageOf();
     const report = attempt(() => (window.__missionScene ? window.__missionScene() : null), null);
     const player = s ? s.player : null;
+    const states = s && Array.isArray(s.ships) ? s.ships : null;
+    // Each craft: the laps its stand-in has glided while it is one, '-' while its model is at its true place.
+    const glides = states
+      ? states
+          .map((ship) => {
+            if (!ship.exists) return `${ship.id}:gone`;
+            const standIn = standInOf(ship);
+            return `${ship.id}:${standIn ? fixed(ship.glide, 5) : '-'}`;
+          })
+          .join(' ')
+      : '-';
+    // Each craft: the laps it has really flown (its true place), whatever its model shows.
+    const laps = states
+      ? states.map((ship) => `${ship.id}:${fixed(lapsAt(ship, player.time), 4)}`).join(' ')
+      : '-';
     const ships = report
       ? report.ships
           .map((ship, i) => {
             const state = s?.ships?.[i];
             if (state && !state.exists) return `${ship.id}:gone`;
             const model = s?.fleet?.ships?.[i];
+            // Its last fade even while not drawn (`id:-@fade`): check.py's vanish mark reads it.
             const fade = model && typeof model.fade === 'number' ? model.fade : 1;
             const dot = s?.companionMarkers?.[i]?.visible ? '+dot' : '';
             return `${ship.id}:${centred(ship.box)}@${fixed(fade, 2)}${dot}`;
@@ -217,26 +274,56 @@ function pageProbe() {
         ? report.labels.map((label) => `${label.text}@${fixed(label.opacity, 2)}`).join('; ') || '-'
         : '-',
       (document.body?.className ?? '').replace(/\s+/g, ' ').trim() || '-',
+      glides,
+      laps,
+      s && typeof s.fastForwardLaps === 'number' ? fixed(s.fastForwardLaps, 2) : '-',
     ]);
   };
 
-  // Laps the craft has flown around the body below it by mission time t, as the scene counts them (see Stage.revolutionsOf).
-  const lapsAt = (ship, t) => {
-    const times = ship.times;
-    const laps = ship.revolutions;
-    if (!times || !laps || times.length === 0) return NaN;
-    if (t <= times[0]) return laps[0];
-    const last = times.length - 1;
-    if (t >= times[last]) return laps[last];
-    let lo = 0;
-    let hi = last;
-    while (hi - lo > 1) {
-      const mid = (lo + hi) >> 1;
-      if (times[mid] <= t) lo = mid;
-      else hi = mid;
+  /**
+   * How far a craft's stand-in is from its ring as drawn (Stage's ship.ringNow, a closed loop of
+   * points): the nearest point of the loop in space, then the two points' distance on screen in CSS
+   * pixels. NaN when it is no stand-in, has no ring, or either point is behind the camera.
+   */
+  const offRing = (ship, onScreen, spare) => {
+    const ring = ship.ringNow;
+    const at = ship.standInPose ? ship.standInPose.position : null;
+    if (!standInOf(ship) || !ring || !at || ring.length < 6) return NaN;
+    const count = Math.floor(ring.length / 3);
+    let best = Infinity;
+    let nx = 0;
+    let ny = 0;
+    let nz = 0;
+    for (let k = 0; k < count; k += 1) {
+      const j = (k + 1) % count;
+      const ax = ring[3 * k];
+      const ay = ring[3 * k + 1];
+      const az = ring[3 * k + 2];
+      const ex = ring[3 * j] - ax;
+      const ey = ring[3 * j + 1] - ay;
+      const ez = ring[3 * j + 2] - az;
+      const length = ex * ex + ey * ey + ez * ez;
+      const u =
+        length > 0
+          ? Math.max(
+              0,
+              Math.min(1, ((at.x - ax) * ex + (at.y - ay) * ey + (at.z - az) * ez) / length),
+            )
+          : 0;
+      const px = ax + ex * u;
+      const py = ay + ey * u;
+      const pz = az + ez * u;
+      const d = (at.x - px) ** 2 + (at.y - py) ** 2 + (at.z - pz) ** 2;
+      if (d < best) {
+        best = d;
+        nx = px;
+        ny = py;
+        nz = pz;
+      }
     }
-    const u = times[hi] > times[lo] ? (t - times[lo]) / (times[hi] - times[lo]) : 0;
-    return laps[lo] + (laps[hi] - laps[lo]) * u;
+    const from = onScreen(at);
+    const to = onScreen(spare.set(nx, ny, nz));
+    return from && to ? Math.hypot(from[0] - to[0], from[1] - to[1]) : NaN;
   };
 
   let scratch = null;
@@ -248,9 +335,17 @@ function pageProbe() {
     c.updateMatrixWorld();
     if (!scratch) {
       const V = c.position.constructor;
-      scratch = { f: new V(), u: new V(), r: new V(), p: new V(), a: new V() };
+      scratch = {
+        f: new V(),
+        u: new V(),
+        r: new V(),
+        p: new V(),
+        a: new V(),
+        d: new V(),
+        q: new V(),
+      };
     }
-    const { f, u, r, p, a } = scratch;
+    const { f, u, r, p, a, d, q } = scratch;
     c.getWorldDirection(f);
     u.set(0, 1, 0).applyQuaternion(c.quaternion);
     r.set(1, 0, 0).applyQuaternion(c.quaternion);
@@ -279,6 +374,7 @@ function pageProbe() {
     const ship = s.followed;
     const index = s.ships ? s.ships.indexOf(ship) : -1;
     const model = index >= 0 ? s.fleet?.ships?.[index] : null;
+    // Its true place (sx, sy, occluded), which in fast forward races round the body while its model glides.
     const shipAt = ship && ship.exists ? onScreen(ship.position) : null;
     const earthHeight = ship ? ship.position.length() - 1 : Infinity;
     const moonHeight = ship
@@ -295,6 +391,20 @@ function pageProbe() {
       tilt = (Math.atan2(a.dot(r), a.dot(u)) * 180) / Math.PI;
       weight = Math.hypot(a.dot(r), a.dot(u));
     }
+    // Where its model is drawn this frame: the stand-in's place in fast forward, or beside its partner
+    // in a pair (Stage.modelPlaces, as last drawn); its true place in a build without either.
+    const standIn = standInOf(ship);
+    const drawnAt =
+      ship && ship.exists
+        ? (index >= 0 && s.modelPlaces?.[index]) ||
+          (standIn && ship.standInPose ? ship.standInPose.position : ship.position)
+        : null;
+    const drawnOn = drawnAt ? onScreen(drawnAt) : null;
+    // Which way from the body's center it is drawn, so degrees round the body can be taken between frames.
+    if (drawnAt)
+      d.copy(drawnAt)
+        .sub(nearMoon ? s.moonCenter : s.origin)
+        .normalize();
     const player = s.player;
     probe.camera.push([
       performance.timeOrigin + frameMs,
@@ -307,7 +417,7 @@ function pageProbe() {
       tweening(s) ? 1 : 0,
       s.userMovedCamera ? 1 : 0,
       fixed(s.fastView.level, 3),
-      model && typeof model.fade === 'number' ? fixed(model.fade, 3) : '-',
+      fadeOf(model) !== null ? fixed(fadeOf(model), 3) : '-',
       ship ? fixed(ship.fastForward, 3) : '-',
       ship ? fixed(lapsAt(ship, player.time), 5) : '-',
       nearMoon ? 'M' : 'E',
@@ -326,6 +436,15 @@ function pageProbe() {
       fixed(u.z, 6),
       W,
       H,
+      standIn === null ? '-' : standIn ? 1 : 0,
+      standIn ? fixed(ship.glide, 6) : '-',
+      drawnOn ? fixed(drawnOn[0], 1) : '-',
+      drawnOn ? fixed(drawnOn[1], 1) : '-',
+      drawnAt ? attempt(() => (s.occluded(drawnAt) ? 1 : 0), '-') : '-',
+      drawnAt ? fixed(d.x, 6) : '-',
+      drawnAt ? fixed(d.y, 6) : '-',
+      drawnAt ? fixed(d.z, 6) : '-',
+      standIn ? fixed(offRing(ship, onScreen, q), 1) : '-',
     ]);
   };
   const loop = (frameMs) => {
