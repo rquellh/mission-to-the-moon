@@ -44,6 +44,9 @@ NO_DIP_DEG = 3  # between two frames, drawn, the model moves this many degrees r
 NO_DIP_PX = 30  # or this many pixels for each 0.1 s between the two frames
 OFF_RING_PX = 6  # after its first second, the stand-in is this far from its ring on screen
 HANDBACK_LOOK_S = 0.75  # how far either side of a hand-back's move to look for its dip
+# The 3D view faded below this (the page fading it in as it loads, or a change of view dissolving through
+# it) counts as hidden: a cut made under it is no move, so marks measured across it are left out.
+HIDDEN = 0.25
 
 
 def number(text):
@@ -145,6 +148,17 @@ def roll_between(f0, u0, f1, u1):
     sin = sum(c * f for c, f in zip(cross, f1))
     cos = sum(x * y for x, y in zip(p, u1))
     return math.degrees(math.atan2(sin, cos))
+
+
+def shown_of(raw):
+    """How much of the 3D view showed in a camera or timeline row: 1 in a recording made before it was logged."""
+    value = number(raw.get('shown', '-'))
+    return 1.0 if value is None else value
+
+
+def hidden_between(rows, t0, t1):
+    """True when the picture was hidden (see HIDDEN) in any camera row from t0 to t1."""
+    return any(t0 <= r['t'] <= t1 and r['shown'] < HIDDEN for r in rows)
 
 
 def disc_cover(cx, cy, r, w, h):
@@ -380,6 +394,8 @@ def change_lines(rec):
             'dock': row['dock'],
             'left': ' '.join(item.split(':')[0] for item in row['left'].split(' ')
                              if item.split(':', 1)[-1] not in ('-', '')) or 'none',
+            # The 3D view fading out and in (loading, or a change of view dissolving through it).
+            'picture': 'shown' if shown_of(row) >= 0.99 else 'hidden' if shown_of(row) < HIDDEN else 'fading',
         }
         for key, value in values.items():
             if last.get(key) != value:
@@ -558,7 +574,10 @@ def camera_table(rec):
             'standin': standin, 'glide': number(raw.get('glide')) if standin else None,
             'dir': direction if None not in direction else None, 'arc': None,
             'ring': number(raw.get('ring')) if standin else None, 'episode': None, 'craft': raw['followed'],
+            'shown': shown_of(raw), 'dissolve': raw.get('dissolve', '-'),
         }
+        # The least the picture showed from the frame each rate is taken from to this one (see HIDDEN).
+        row['veil'] = min([row['shown']] + [old['shown'] for old in previous if base and old['t'] >= base['t']])
         if base:
             dt = max(1e-3, t - base['t'])
             row['turn'] = angle_between(base['f'], f) / dt
@@ -650,6 +669,9 @@ def find_marks(rec, rows):
     for i, r in enumerate(rows):
         if r['t'] < rec.ready_from:
             continue
+        # Measured across a hidden picture (see HIDDEN): a cut under a fade, nothing anyone saw move.
+        if r['veil'] < HIDDEN:
+            continue
         drawn = r['fade'] is not None and r['fade'] >= DRAWN
         prev = rows[i - 1] if i else None
         if prev and r['jump'] > r['jump_limit'] and drawn and (prev['fade'] or 0) >= DRAWN:
@@ -663,7 +685,9 @@ def find_marks(rec, rows):
             marks.append(('turn', r['t'], r['turn'], 'during a camera move' if r['tween'] else 'with no camera move under way' + (' (visitor)' if r['usermoved'] else '')))
         if abs(r['roll']) > ROLL_DEG_S:
             marks.append(('roll', r['t'], r['roll'], f"{r['view']} view"))
+        # Not while a change of view dissolves: the picture fading out is still the last view's.
         if (r['view'] == 'spacecraft' and drawn and not r['tween'] and r['fastview'] < 0.05 and r['tilt'] is not None
+                and r['shown'] >= 0.99 and r['dissolve'] == '-'
                 and r['tiltw'] > 0.5 and abs(r['tilt']) > TILT_DEG):
             marks.append(('tilt', r['t'], r['tilt'], 'horizon off level in the ship view'))
         if drawn and r['where'] in ('off', 'behind', 'hidden', 'under'):
@@ -672,7 +696,7 @@ def find_marks(rec, rows):
             marks.append(('swell', r['t'], r['cover'], f"{'Earth' if r['cover_body'] == 'E' else 'the Moon'} covers {r['cover'] * 100:.0f}% of the screen"))
         else:
             for old in rows[max(0, i - 30):i]:
-                if r['t'] - old['t'] <= 1.0 and r['cover'] - old['cover'] > COVER_RISE:
+                if r['t'] - old['t'] <= 1.0 and r['cover'] - old['cover'] > COVER_RISE and not hidden_between(rows, old['t'], r['t']):
                     marks.append(('swell', r['t'], r['cover'], f"a body grows from {old['cover'] * 100:.0f}% to {r['cover'] * 100:.0f}% of the screen within a second"))
                     break
         if prev and not r['playing'] and not prev['playing'] and not r['usermoved']:
@@ -696,6 +720,8 @@ def find_marks(rec, rows):
     # From the timeline: a craft that vanishes without fading, or jumps in size.
     for prev, row in zip(rec.timeline, rec.timeline[1:]):
         if row['_t'] is None or row['_t'] < rec.ready_from:
+            continue
+        if prev['_t'] is not None and hidden_between(rows, prev['_t'], row['_t']):
             continue
         for name, ship in row['_ships'].items():
             before = prev['_ships'].get(name)
