@@ -32,6 +32,7 @@ import {
   moveDuration,
   moveShare,
   moveTurn,
+  partTurn,
   seenAt,
   swingAngle,
   swingAround,
@@ -788,5 +789,33 @@ describe('carryUp', () => {
       out.up.set(0, 1, 0);
     };
     expect(Math.abs(carryUp(away, new Vector3(0, 1, 0), carriedUp()).left)).toBeLessThan(1e-6);
+  });
+});
+
+describe('partTurn', () => {
+  const axis = new Vector3(0, 0, 1);
+  const angleOf = (q: Quaternion): number => {
+    const v = new Vector3(1, 0, 0).applyQuaternion(q);
+    return Math.atan2(v.y, v.x);
+  };
+
+  it('makes none of the turn at 0 and all of it at 1', () => {
+    const turn = new Quaternion().setFromAxisAngle(axis, 2);
+    expect(partTurn(turn, 0, false, new Quaternion()).angleTo(new Quaternion())).toBeLessThan(1e-9);
+    expect(partTurn(turn, 1, false, new Quaternion()).angleTo(turn)).toBeLessThan(1e-9);
+    expect(angleOf(partTurn(turn, 0.5, false, new Quaternion()))).toBeCloseTo(1, 9);
+  });
+
+  it('goes the long way round when asked, to the same end', () => {
+    const turn = new Quaternion().setFromAxisAngle(axis, (170 * Math.PI) / 180);
+    expect(angleOf(partTurn(turn, 0.5, false, new Quaternion()))).toBeCloseTo(
+      (85 * Math.PI) / 180,
+      9,
+    );
+    expect(angleOf(partTurn(turn, 0.5, true, new Quaternion()))).toBeCloseTo(
+      (-95 * Math.PI) / 180,
+      9,
+    );
+    expect(partTurn(turn, 1, true, new Quaternion()).angleTo(turn)).toBeLessThan(1e-9);
   });
 });

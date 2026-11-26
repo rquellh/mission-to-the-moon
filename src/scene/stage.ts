@@ -89,6 +89,7 @@ import {
   keepBodyUp,
   moveDuration,
   moveShare,
+  partTurn,
   seenAt,
   swingAround,
   swingBodyOf,
@@ -236,6 +237,20 @@ const CHASE_SAME_SPOT_RAD = 1e-5;
  * open").
  */
 const CHASE_STOP_SECONDS = 3;
+/**
+ * A turn the chase still has to make to its frame at the stop that would
+ * take longer than CHASE_STOP_SECONDS at this many degrees a second, on
+ * average, starts that much sooner (at the trip's start at the soonest): on
+ * the way home into "Letting go of the service module" the frame had to turn
+ * 171 degrees after 10 s, 164 of them in 7 s as the craft came in to Earth
+ * (its up from ecliptic north to Earth's vertical, its heading from toward
+ * Earth to along its orbit), and the picture rolled at up to 30 degrees a
+ * second. Such a long turn is planned one way round from the frame the chase
+ * had as it began (see headForStop): eased in and out, its peak is about half
+ * as fast again as this. Not while the craft circles its body, where it may
+ * go into fast forward and the steady view comes first.
+ */
+const CHASE_STOP_DEG_PER_S = 12;
 
 /** The ship view's chase as it will be at a later moment (see Stage.chaseAtTime). */
 interface ChaseLater {
@@ -262,6 +277,13 @@ interface StopAhead {
   distance?: number;
   /** When the chase began to head for the stop, in frame time (see Stage.headForStop). */
   fromMs?: number;
+  /**
+   * For a long turn to the stop (see CHASE_STOP_DEG_PER_S), the chase's frame
+   * as it began, and the turn from it to the frame at the stop, kept one way
+   * round from frame to frame.
+   */
+  startFrame?: Quaternion;
+  turn?: Quaternion;
 }
 /**
  * The ship view's up is a body's vertical within the first of these heights
@@ -4160,36 +4182,81 @@ export class Stage implements Director {
       }
     }
     this.followChaseOwn(dt, jumped);
-    if (!jumped && !this.reducedMotion && !this.fastView.on && !this.chaseHeld) this.headForStop();
+    if (!jumped && !this.reducedMotion && !this.chaseHeld) {
+      // Under the steady view nothing heads for the stop; out of it, heading begins afresh from there.
+      if (this.fastView.on) this.forgetHeading();
+      else this.headForStop();
+    }
   }
 
   /**
-   * Over a tour trip's last CHASE_STOP_SECONDS, turn the chase from its own
-   * frame toward its frame at the stop, by a share that eases in and out (a
-   * smoothstep in frame time) from none where it begins to all of it when the
-   * clock is due at the stop, and its distance likewise (its own frame is
-   * kept, so the share is of the way from it each frame, not compounded).
+   * On a tour trip, turn the chase toward its frame at the stop, by a share
+   * that eases in and out (a smoothstep in frame time) from none where it
+   * begins to all of it when the clock is due at the stop, and its distance
+   * likewise. It begins CHASE_STOP_SECONDS before the stop, or sooner for a
+   * turn still to make that a calm rate needs longer for (see
+   * CHASE_STOP_DEG_PER_S). A turn begun in time is made from the chase's own
+   * frame as it follows its craft (kept, so the share is of the way from it
+   * each frame, not compounded); a longer one from the frame the chase had as
+   * it began, one way round: from a frame that keeps moving, the turn near
+   * half a turn it can be would go one way round on one frame and the other
+   * on the next, and the craft's own turning would show through it.
    */
   private headForStop(): void {
     const stop = this.usableStop();
     if (!stop) return;
     const left = (stop.endMs - this.nowMs) / 1000;
-    if (left > CHASE_STOP_SECONDS) return;
     // Worked out each frame: a craft that comes to rest (a landing) keeps the heading the chase
     // had last, so its frame there is known only as the chase gets there.
     const end = this.chaseAtTime(stop.at, this.stopLater);
     if (!end) return;
+    if (stop.fromMs === undefined) {
+      const toGo = MathUtils.radToDeg(this.chaseFrame.angleTo(end.frame));
+      // Not sooner while the craft circles its body: it may yet go into fast forward, and the
+      // steady view then comes first (the turn begins afresh after it, see forgetHeading).
+      const circling = !Number.isNaN(this.closedLap(this.chased(), this.player.time));
+      const need = circling
+        ? CHASE_STOP_SECONDS
+        : Math.max(CHASE_STOP_SECONDS, toGo / CHASE_STOP_DEG_PER_S);
+      if (left > need) return;
+      stop.fromMs = this.nowMs;
+      if (left > CHASE_STOP_SECONDS) {
+        // The way round it takes from here: the shorter, as it begins.
+        stop.startFrame = this.chaseFrame.clone();
+        stop.turn = new Quaternion()
+          .copy(end.frame)
+          .multiply(this.q2.copy(this.chaseFrame).invert());
+        if (stop.turn.w < 0) stop.turn.set(-stop.turn.x, -stop.turn.y, -stop.turn.z, -stop.turn.w);
+      }
+    }
     stop.frame = (stop.frame ?? new Quaternion()).copy(end.frame);
     stop.distance = end.distance;
-    stop.fromMs ??= this.nowMs;
-    // From nothing when it begins to all of it when the clock is due at the stop, evenly in frame
+    // From nothing when it begins to all of it when the clock is due at the stop, eased in frame
     // time (the mission clock slows into the stop, so by it the turn would end early and quickly).
     const share = stop.endMs > stop.fromMs ? smoothstep(stop.fromMs, stop.endMs, this.nowMs) : 0;
     this.chaseOwnFrame.copy(this.chaseFrame);
     this.chaseOwnDistance = this.chaseDistance;
     this.chaseHeading = true;
-    this.chaseFrame.slerp(stop.frame, share);
+    if (stop.startFrame && stop.turn) {
+      // The turn from where it began to the stop's frame now, the same way round as last frame.
+      const turn = this.q3.copy(end.frame).multiply(this.q2.copy(stop.startFrame).invert());
+      if (turn.dot(stop.turn) < 0) turn.set(-turn.x, -turn.y, -turn.z, -turn.w);
+      stop.turn.copy(turn);
+      partTurn(turn, share, turn.w < 0, this.q2);
+      this.chaseFrame.copy(this.q2).multiply(stop.startFrame);
+    } else {
+      this.chaseFrame.slerp(stop.frame, share);
+    }
     this.chaseDistance += ((stop.distance ?? this.chaseDistance) - this.chaseDistance) * share;
+  }
+
+  /** Forget any turn toward the stop ahead begun before the steady view came on (see headForStop). */
+  private forgetHeading(): void {
+    const stop = this.stopAhead;
+    if (!stop) return;
+    delete stop.fromMs;
+    delete stop.startFrame;
+    delete stop.turn;
   }
 
   /** The chase as it follows its craft (see followChase). */
