@@ -870,6 +870,8 @@ export class Stage implements Director {
   /** True while the move under way is a calm one (see calmMs), its up carried along as calmUp has it. */
   private calmMove = false;
   private readonly calmUp = carriedUp();
+  /** True once the calm move under way has carried its up (see carryCalmUp). */
+  private calmCarried = false;
   /** True while movePose is asked for a calm move's pose with the swing's own up, to carry the up along it. */
   private rawPose = false;
   private readonly calmPose = orientedPose();
@@ -2656,6 +2658,7 @@ export class Stage implements Director {
       this.chased().exists;
     this.swingWay = this.swingWays[0] as SwingWay;
     this.calmMove = how.calm === true && body !== null;
+    this.calmCarried = false;
     let duration = how.ms ?? (this.reducedMotion ? 0 : this.planMove(body, move));
     if (this.calmMove && body) {
       const planned = this.planCalm(body);
@@ -2755,7 +2758,15 @@ export class Stage implements Director {
   private carryCalmUp(body: 'earth' | 'moon', to: OrientedPose): void {
     this.rawPose = true;
     this.swingWay.twist = Number.NaN;
+    const before = this.calmUp.left;
     carryUp((t, out) => this.movePose(body, t, to, out), to.up, this.calmUp);
+    // Planned anew each frame for an end carried along, it keeps rolling the way it set off: a roll
+    // near half a turn would otherwise flip from one way round to the other.
+    if (this.calmCarried) {
+      while (this.calmUp.left - before > Math.PI) this.calmUp.left -= 2 * Math.PI;
+      while (this.calmUp.left - before < -Math.PI) this.calmUp.left += 2 * Math.PI;
+    }
+    this.calmCarried = true;
     this.swingWay.twist = Number.NaN;
     this.rawPose = false;
   }
