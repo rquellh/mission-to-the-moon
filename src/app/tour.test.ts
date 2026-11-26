@@ -958,17 +958,17 @@ describe('a stop where two craft part: Eagle undocks from Columbia', () => {
     assertAtStop(tour, player, 'The Eagle has landed');
   });
 
-  it('Back from the landing, and starting at the stop, play the last 30 minutes up to the event, hold, play on, and rest', () => {
+  it('Back from the landing, and starting at the stop, play the last 3 story seconds up to the event, hold, play on, and rest', () => {
     const screen = fakeScreen(1000 / 60);
     const { player, tour, at, event, rest } = headingForEagleUndocks(screen);
     travel(tour, screen, 30);
     tour.next();
     travel(tour, screen);
     expect(tour.stop?.id).toBe('landing');
-    // The day in lunar orbit slows into the undocking: its last 30 minutes are 2.7 story seconds.
-    const from = player.story.toStory(undocking - RUN_UP_MAX_MISSION_SECONDS);
-    expect(event - from).toBeGreaterThan(2);
-    expect(event - from).toBeLessThan(RUN_UP_STORY_SECONDS);
+    // The day in lunar orbit slows into the undocking: its last 3 story seconds are about 9 minutes.
+    const from = event - RUN_UP_STORY_SECONDS;
+    expect(undocking - player.story.toElapsed(from)).toBeGreaterThan(5 * 60);
+    expect(undocking - player.story.toElapsed(from)).toBeLessThan(RUN_UP_MAX_MISSION_SECONDS);
     // The camera moved to the Ship view as the run-up began, so it has settled by the event: the short hold.
     const takes =
       playSeconds(event - from) + PARTING_HOLD_SECONDS + playSeconds(PARTING_REST_STORY_SECONDS);
@@ -1253,7 +1253,7 @@ describe('the short run-up', () => {
         expect(took).toBeLessThanOrEqual(playSeconds(story) + frame);
         assertAtStop(tour, player, `run-up to stop ${tour.index + 1}`);
       };
-      // Landing at Hadley: the last 30 minutes, 2.7 story seconds.
+      // Landing at Hadley: the last 3 story seconds, under 30 minutes.
       runUp(() => tour.start(3));
       runUp(() => tour.back());
       // Back partway through a trip returns to the stop just left.
@@ -1332,10 +1332,11 @@ describe('the short run-up', () => {
     travel(tour, screen);
     player.seekStory(player.storyTime + 1);
     tour.next();
-    // A run-up, not a trip from wherever the clock is: the last 30 minutes before leaving Earth.
-    expect(elapsedToSeconds(tour.stops[1]!.elapsed) - RUN_UP_MAX_MISSION_SECONDS).toBeCloseTo(
-      player.time,
-      6,
+    // A run-up, not a trip from wherever the clock is: the last 3 story seconds before leaving
+    // Earth, which the clock slowing into the burn makes under 30 minutes.
+    expect(player.storyTime).toBeCloseTo(storyOf(player, tour, 1) - RUN_UP_STORY_SECONDS, 6);
+    expect(elapsedToSeconds(tour.stops[1]!.elapsed) - player.time).toBeLessThan(
+      RUN_UP_MAX_MISSION_SECONDS,
     );
     travel(tour, screen);
     assertAtStop(tour, player, 'stop 2');

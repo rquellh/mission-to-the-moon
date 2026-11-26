@@ -285,11 +285,11 @@ const LONG_LUNAR_STAY_REVOLUTIONS = 40;
  * for it on the ring (below), never left half faded:
  *
  * - It is replaced once it goes around its body (on screen, at the pace the
- *   clock runs now) faster than once in FAST_FORWARD_ON_LAP_SECONDS (7), and
+ *   clock runs now) faster than once in FAST_FORWARD_ON_LAP_SECONDS (20), and
  *   drawn again once it slows to less than once in
- *   FAST_FORWARD_OFF_LAP_SECONDS (8); see fast-forward.ts. A slower lap stays
- *   a model the camera follows: a lander's last lap before its descent, at
- *   normal speed, takes about 8.8 seconds.
+ *   FAST_FORWARD_OFF_LAP_SECONDS (24); see fast-forward.ts. A slower lap
+ *   stays a model the camera follows: either side of an event the story
+ *   clock plays a low orbit at about one lap in 30 to 40 seconds.
  * - Only while its path around now is a closed lap of its body (see
  *   closedLapStart): a craft leaving orbit, arriving, or climbing from the
  *   surface is drawn however fast it goes, so a ring never has a chord or a

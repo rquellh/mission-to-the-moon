@@ -15,8 +15,13 @@
  * drawn again once it slows to less than once in FAST_FORWARD_OFF_LAP_SECONDS.
  * Two levels, so a pace near one of them does not flutter between the two.
  * The owner called a lap of the Moon in 4.4 seconds "way too fast" and one in
- * 8.8 seconds "better": Eagle's last lap before its descent, in Explore at
- * normal speed, takes about that long and stays a drawn model.
+ * 8.8 seconds "better", and with the ring coming on at once in 7 seconds
+ * said the orbit animations were still too fast. One lap in 20 seconds is a
+ * working figure chosen since, not one the owner gave: a drawn craft goes
+ * round no faster, and anything faster on a closed lap is the ring. The
+ * story clock keeps the moments either side of an event slower still (about
+ * once in 30 seconds in low Earth orbit; see EASE_GENTLE_PACE in
+ * src/sim/story-time.ts), so a craft is drawn again a little before them.
  */
 export const FAST_FORWARD_ON_LAP_SECONDS = 20;
 export const FAST_FORWARD_OFF_LAP_SECONDS = 24;
