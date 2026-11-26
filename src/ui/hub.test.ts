@@ -110,6 +110,8 @@ describe('the mission list', () => {
       expect(namesIn(within(list).getByRole('region', { name: 'Try it yourself' }))).toEqual([
         'Drop the stages',
         'Dock two spacecraft',
+        // Still a draft, so it is listed here (the tests run as the dev server does) but not on the published site.
+        'Land on the Moon Draft',
       ]);
       expect(namesIn(within(list).getByRole('region', { name: 'More to explore' }))).toEqual([
         'Mission patches',
