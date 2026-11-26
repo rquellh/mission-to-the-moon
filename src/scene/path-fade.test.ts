@@ -10,6 +10,10 @@ import {
   MAX_ORBIT_STAYS,
   ORBIT_STAY_REVOLUTIONS,
   orbitStays,
+  RETURN_FULL_RADII,
+  RETURN_NEAR_RADII,
+  returnFade,
+  returnStarts,
   sampleIndexAt,
   stayAt,
   valueAtIndex,
@@ -147,5 +151,38 @@ describe('reading a path between its samples', () => {
     ['after the last', 5, 3],
   ])('reads a value %s, held to the ends', (_name, index, value) => {
     expect(valueAtIndex([0, 1, 2, 3], index)).toBe(value);
+  });
+});
+
+describe('returnStarts', () => {
+  // 0 near neither body, 1 Earth, 2 the Moon.
+  it('marks a return to Earth from the first sample back near it', () => {
+    expect(Array.from(returnStarts([1, 1, 0, 2, 2, 0, 1, 1]))).toEqual([
+      -1, -1, -1, -1, -1, -1, 6, 6,
+    ]);
+  });
+
+  it('leaves a flight that never leaves Earth alone', () => {
+    expect(Array.from(returnStarts([1, 1, 1, 1]))).toEqual([-1, -1, -1, -1]);
+  });
+
+  it('leaves a single swing round the Moon alone', () => {
+    expect(Array.from(returnStarts([1, 0, 2, 2, 0, 1]))).toEqual([-1, -1, -1, -1, -1, 5]);
+  });
+
+  it('counts a body left for the other and come straight back to', () => {
+    expect(Array.from(returnStarts([1, 2, 1]))).toEqual([-1, -1, 2]);
+  });
+});
+
+describe('returnFade', () => {
+  it('comes in as the craft comes back, none far out and all of it close in', () => {
+    expect(returnFade(RETURN_NEAR_RADII)).toBe(0);
+    expect(returnFade(RETURN_NEAR_RADII + 5)).toBe(0);
+    expect(returnFade(RETURN_FULL_RADII)).toBe(1);
+    expect(returnFade(1)).toBe(1);
+    const middle = returnFade((RETURN_NEAR_RADII + RETURN_FULL_RADII) / 2);
+    expect(middle).toBeGreaterThan(0.3);
+    expect(middle).toBeLessThan(0.7);
   });
 });

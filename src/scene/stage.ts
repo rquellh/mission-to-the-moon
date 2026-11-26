@@ -102,10 +102,17 @@ import {
 } from './framing';
 import { createMarkers, type MarkerPoint, type MarkerSet } from './markers';
 import { createMoon, type Moon } from './moon';
-import { orbitStays, sampleIndexAt, valueAtIndex } from './path-fade';
+import {
+  orbitStays,
+  RETURN_NEAR_RADII,
+  returnStarts,
+  sampleIndexAt,
+  valueAtIndex,
+} from './path-fade';
 import {
   createOrbitRing,
   createPathLine,
+  type PathReturns,
   type OrbitRing,
   type PathFade,
   type PathLine,
@@ -264,6 +271,16 @@ const ORBIT_SUBJECT_SCALE = 5;
  * moves with it: nothing appears or goes at once. Before a stay its first
  * lap shows; after it, its last.
  */
+/**
+ * Back near a body it left earlier, what a craft drew near it before goes
+ * from the picture within RETURN_GONE_RADII[0] of the body's radii of its
+ * center and shows whole beyond RETURN_GONE_RADII[1] (see returnStarts in
+ * path-fade.ts), so the way out does not cross the way in up close, and no
+ * line stops with a hard end. Not in the journey view, whose whole-flight
+ * figure keeps every line; the change between views takes RETURN_VIEW_SECONDS.
+ */
+const RETURN_GONE_RADII = [3, 8] as const;
+const RETURN_VIEW_SECONDS = 0.6;
 const ORBIT_FADE = {
   future: [0.35, 0.6],
   past: [0.4, 0.65, 0],
@@ -947,6 +964,8 @@ export class Stage implements Director {
    * frame it had, so the picture stays as it was (see followChase).
    */
   private chaseHeld = false;
+  /** How much of the return fade the lines show, 0 to 1 (see showReturns). */
+  private returnShown = 1;
   /** Where the chased ship was around its body last frame, to carry the chase around with it (see followChase). */
   private readonly chaseRadial = {
     ship: null as ShipState | null,
@@ -1580,7 +1599,14 @@ export class Stage implements Director {
         readablePositions: polyline.readablePositions,
       };
       const fade: PathFade | null = runs.length > 0 ? { ...ORBIT_FADE, revolutions, runs } : null;
-      const line = createPathLine(polyline, ship.color, i + 1, hidden, fade);
+      const line = createPathLine(
+        polyline,
+        ship.color,
+        i + 1,
+        hidden,
+        fade,
+        this.returnsOf(polyline),
+      );
       this.lineOf.set(ship, line);
       line.mesh.renderOrder = 1 + i;
       line.setResolution(this.cssWidth, this.cssHeight);
@@ -1721,6 +1747,41 @@ export class Stage implements Director {
    * of a flight that stays in Earth orbit; for a Moon flight, each stay in
    * orbit, low over Earth or the Moon (see orbitStays).
    */
+  /** Where a path comes back near a body it left earlier, and what fades then (see PathReturns); null when it never does. */
+  private returnsOf(polyline: {
+    readonly times: Float64Array;
+    readonly truePositions: Float32Array;
+  }): PathReturns | null {
+    const n = polyline.times.length;
+    const at = [0, 0, 0];
+    this.path.moonPosition(1, at);
+    const moonTrue = new Vector3().fromArray(at);
+    this.path.moonPosition(0, at);
+    const moonReadable = new Vector3().fromArray(at);
+    const bodies = new Uint8Array(n);
+    const radii = new Float32Array(n);
+    const p = new Vector3();
+    for (let i = 0; i < n; i += 1) {
+      p.fromArray(polyline.truePositions, 3 * i);
+      const earth = p.length() / EARTH_RADIUS;
+      const moon = p.distanceTo(moonTrue) / MOON_RADIUS;
+      if (earth < RETURN_NEAR_RADII) {
+        bodies[i] = 1;
+        radii[i] = earth;
+      } else if (moon < RETURN_NEAR_RADII) {
+        bodies[i] = 2;
+        radii[i] = moon;
+      } else {
+        radii[i] = Math.min(earth, moon);
+      }
+    }
+    const starts = returnStarts(bodies);
+    if (!starts.some((start) => start >= 0)) return null;
+    const earth = { readable: new Vector3(), true: new Vector3(), radius: EARTH_RADIUS };
+    const moon = { readable: moonReadable, true: moonTrue, radius: MOON_RADIUS };
+    return { starts, bodies, radii, centers: [earth, earth, moon], fade: RETURN_GONE_RADII };
+  }
+
   private revolutionsOf(polyline: {
     readonly times: Float64Array;
     readonly truePositions: Float32Array;
@@ -4016,6 +4077,24 @@ export class Stage implements Director {
     }
   }
 
+  /**
+   * Ease how much of the return fade the lines show toward the view's (none
+   * in the journey view, see RETURN_GONE_RADII). Returns true while it moves.
+   */
+  private showReturns(dt: number): boolean {
+    const wanted = this.viewNow === 'journey' ? 0 : 1;
+    if (this.returnShown === wanted) return false;
+    const step = this.reducedMotion || dt <= 0 ? 1 : dt / RETURN_VIEW_SECONDS;
+    this.returnShown =
+      wanted > this.returnShown
+        ? Math.min(wanted, this.returnShown + step)
+        : Math.max(wanted, this.returnShown - step);
+    const shown = smoothstep(0, 1, this.returnShown);
+    for (let i = 0; i < this.lines.length; i += 1)
+      (this.lines[i] as PathLine).setReturnShown(shown);
+    return true;
+  }
+
   private readonly tick = (time: number): void => {
     this.nowMs = time;
     const dt = this.lastFrameMs === null ? 0 : Math.min((time - this.lastFrameMs) / 1000, 0.1);
@@ -4051,6 +4130,7 @@ export class Stage implements Director {
       this.notify();
     }
     const offsetMoving = this.updateViewOffset(dt);
+    const returnsMoving = this.showReturns(dt);
     const cameraMoved = this.updateCamera(dt, jumped);
     if (this.moving !== this.movingShown) {
       this.movingShown = this.moving;
@@ -4062,6 +4142,7 @@ export class Stage implements Director {
       worldChanged ||
       fastForward ||
       offsetMoving ||
+      returnsMoving ||
       cameraMoved ||
       this.needsRender ||
       this.shipsTurning()

@@ -14,7 +14,14 @@ import {
 } from 'three';
 import type { Polyline } from '../sim';
 import { PATH_FUTURE_OPACITY, PATH_WAY_OPACITY, PATH_WIDTH_PX } from './config';
-import { MAX_ORBIT_STAYS, sampleIndexAt, stayAt, valueAtIndex, wayDimming } from './path-fade';
+import {
+  MAX_ORBIT_STAYS,
+  returnFade,
+  sampleIndexAt,
+  stayAt,
+  valueAtIndex,
+  wayDimming,
+} from './path-fade';
 
 /**
  * A ship's path as a line of steady on-screen width. The vertex shader
@@ -48,6 +55,7 @@ const vertexShader = /* glsl */ `
   varying float vSample;
   varying float vRev;
   varying float vRun;
+  varying vec3 vPlace;
 
   float trimSegmentAlpha(const in vec4 start, const in vec4 end) {
     float a = projectionMatrix[2][2];
@@ -58,8 +66,11 @@ const vertexShader = /* glsl */ `
 
   void main() {
     float aspect = resolution.x / resolution.y;
-    vec4 start = modelViewMatrix * vec4(mix(instanceStart, trueStart, uMix), 1.0);
-    vec4 end = modelViewMatrix * vec4(mix(instanceEnd, trueEnd, uMix), 1.0);
+    vec3 placeStart = mix(instanceStart, trueStart, uMix);
+    vec3 placeEnd = mix(instanceEnd, trueEnd, uMix);
+    vPlace = position.y < 0.5 ? placeStart : placeEnd;
+    vec4 start = modelViewMatrix * vec4(placeStart, 1.0);
+    vec4 end = modelViewMatrix * vec4(placeEnd, 1.0);
 
     // Sample index along the path: this segment runs from sample i to i + 1.
     vSample = float(gl_InstanceID) + (position.y < 0.5 ? 0.0 : 1.0);
@@ -125,11 +136,18 @@ const fragmentShader = /* glsl */ `
   uniform float uLapShown;
   uniform vec2 uWay;
   uniform float uWayOpacity;
+  uniform float uMix;
+  uniform vec2 uReturn;
+  uniform vec3 uReturnReadable;
+  uniform vec3 uReturnTrue;
+  uniform float uReturnRadius;
+  uniform vec2 uReturnFade;
 
   varying vec2 vUv;
   varying float vSample;
   varying float vRev;
   varying float vRun;
+  varying vec3 vPlace;
 
   void main() {
     #include <logdepthbuf_fragment>
@@ -149,6 +167,12 @@ const fragmentShader = /* glsl */ `
     float alpha = (vSample <= uNow ? 1.0 : uFutureOpacity) * uOpacity;
     // The way in to the stay in orbit now is in, dim while the craft goes round (see wayDimming).
     if (vSample < uWay.x) alpha *= mix(1.0, uWayOpacity, uWay.y);
+    // Back near a body it left earlier, what the craft drew near it before goes, by its distance
+    // from the body, so no line ends with a hard end (see returnStarts in path-fade.ts).
+    if (vSample < uReturn.x) {
+      float radii = length(vPlace - mix(uReturnReadable, uReturnTrue, uMix)) / uReturnRadius;
+      alpha *= mix(1.0, smoothstep(uReturnFade.x, uReturnFade.y, radii), uReturn.y);
+    }
     // In a stretch that goes around and around, loops still to come fade
     // out, and older ones dim and then go (see PathFade). Counted in
     // revolutions from now, held to the stretch's ends.
@@ -226,6 +250,22 @@ export interface PathFade {
   runs: readonly (readonly [number, number])[];
 }
 
+/**
+ * Where a path comes back near a body it left earlier (see returnStarts in
+ * path-fade.ts): for each sample, the first sample of the return it is in
+ * (-1 for none), which body that is, and how far the sample is from that
+ * body's center in its radii at true scale. Each body's center at readable
+ * and at true scale, and its radius. The lines drawn before the return fade
+ * out between `fade[0]` and `fade[1]` of the body's radii from its center.
+ */
+export interface PathReturns {
+  starts: Int32Array;
+  bodies: Uint8Array;
+  radii: Float32Array;
+  centers: readonly { readable: Vector3; true: Vector3; radius: number }[];
+  fade: readonly [number, number];
+}
+
 export interface PathLine {
   readonly mesh: Mesh;
   /** Mission time at each sample. */
@@ -243,6 +283,8 @@ export interface PathLine {
    * (see the fast-forward block in stage.ts).
    */
   setLapShown(shown: number): void;
+  /** How much the return fade shows (0 none, 1 all; see PathReturns): none in a view of the whole flight. */
+  setReturnShown(shown: number): void;
   setResolution(width: number, height: number): void;
   dispose(): void;
 }
@@ -260,6 +302,7 @@ export function createPathLine(
   stencilRef: number,
   hidden: readonly (readonly [number, number])[] = [],
   fade: PathFade | null = null,
+  returns: PathReturns | null = null,
 ): PathLine {
   const geometry = new InstancedBufferGeometry();
   geometry.setIndex(QUAD_INDEX);
@@ -328,6 +371,11 @@ export function createPathLine(
       uLapShown: { value: 1 },
       uWay: { value: new Vector2(0, 0) },
       uWayOpacity: { value: PATH_WAY_OPACITY },
+      uReturn: { value: new Vector2(-1, 0) },
+      uReturnReadable: { value: new Vector3() },
+      uReturnTrue: { value: new Vector3() },
+      uReturnRadius: { value: 1 },
+      uReturnFade: { value: new Vector2(returns?.fade[0] ?? 0, returns?.fade[1] ?? 1) },
     },
     defines: { MAX_HIDDEN, MAX_RUNS },
     vertexShader,
@@ -352,15 +400,38 @@ export function createPathLine(
     uRunNow: { value: number };
     uLapShown: { value: number };
     uWay: { value: Vector2 };
+    uReturn: { value: Vector2 };
+    uReturnReadable: { value: Vector3 };
+    uReturnTrue: { value: Vector3 };
+    uReturnRadius: { value: number };
     resolution: { value: Vector2 };
   };
 
+  let returnShown = 1;
+  let lastIndex = -1;
+  const returnTo = (index: number): void => {
+    const i = Math.min(Math.max(0, Math.floor(index)), n - 1);
+    const start = returns ? (returns.starts[i] ?? -1) : -1;
+    const center = returns?.centers[returns.bodies[i] ?? 0];
+    if (!returns || start < 0 || !center) {
+      uniforms.uReturn.value.set(-1, 0);
+      return;
+    }
+    const weight = returnFade(valueAtIndex(returns.radii, index)) * returnShown;
+    uniforms.uReturn.value.set(start, weight);
+    uniforms.uReturnReadable.value.copy(center.readable);
+    uniforms.uReturnTrue.value.copy(center.true);
+    uniforms.uReturnRadius.value = center.radius;
+  };
+
   const lightTo = (index: number): void => {
+    lastIndex = index;
     uniforms.uNow.value = index;
     uniforms.uRevNow.value = valueAtIndex(revolutions, index);
     uniforms.uRunNow.value = stayAt(runs, index);
     const way = wayDimming(runs, revolutions, index);
     uniforms.uWay.value.set(way.before, way.dim);
+    returnTo(index);
   };
 
   return {
@@ -372,6 +443,11 @@ export function createPathLine(
     },
     setLapShown(shown) {
       uniforms.uLapShown.value = shown;
+    },
+    setReturnShown(shown) {
+      if (shown === returnShown) return;
+      returnShown = shown;
+      returnTo(lastIndex);
     },
     setMix(mix) {
       uniforms.uMix.value = mix;
