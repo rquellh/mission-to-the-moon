@@ -67,7 +67,7 @@ export function setUpTourPanel(tour: Tour, { director, onExplore }: TourPanelOpt
   exit.addEventListener('click', onExplore);
 
   const renderFast = (): void => {
-    const orbits = tour.phase === 'traveling' ? orbitsInFastForward(director) : null;
+    const orbits = tour.onTheWay ? orbitsInFastForward(director) : null;
     const shown = orbits !== null;
     if (shown !== (fastWords.parentNode === fast)) {
       fast.replaceChildren(...(shown ? [fastWords] : []));
@@ -88,8 +88,10 @@ export function setUpTourPanel(tour: Tour, { director, onExplore }: TourPanelOpt
       const position = tour.index + 1;
       const number = el('strong', 'tour__count-number', copy.tour.stopOf(position, tour.total));
       // On the way, the card still tells the stop just left, so the counter
-      // says the number is where the tour is going, not where it is.
-      if (phase === 'traveling')
+      // says the number is where the tour is going, not where it is. Once the
+      // stop's own action plays under its card (a parting, a part let go), the
+      // tour is at the stop, though Skip still goes on to where it rests.
+      if (tour.onTheWay)
         count.replaceChildren(el('span', 'tour__count-note', copy.tour.onTheWayTo), ' ', number);
       else count.replaceChildren(number);
       dots.forEach((dot, i) => {

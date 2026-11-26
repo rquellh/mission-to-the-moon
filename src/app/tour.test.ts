@@ -1094,6 +1094,26 @@ describe('a stop where two craft part: Eagle undocks from Columbia', () => {
     expect(playsOn.at - movedAt).toBeLessThanOrEqual(PARTING_VIEW_SETTLE_SECONDS + 1 / 60 + 1e-6);
   });
 
+  it('is on its way until the clock reaches the undocking, and at the stop from the hold on, while it still travels to where it rests', () => {
+    const screen = fakeScreen(1000 / 60);
+    const { player, tour, event, startMs } = headingForEagleUndocks(screen);
+    const seen: Array<{ story: number; phase: string; onTheWay: boolean }> = [];
+
+    while (tour.phase === 'traveling' && screen.now() - startMs < 40_000) {
+      screen.frame();
+      seen.push({ story: player.storyTime, phase: tour.phase, onTheWay: tour.onTheWay });
+    }
+
+    const reached = seen.findIndex(({ story }) => story === event);
+    expect(new Set(seen.slice(0, reached).map(({ onTheWay }) => onTheWay))).toEqual(
+      new Set([true]),
+    );
+    const atTheStop = seen.slice(reached);
+    expect(new Set(atTheStop.map(({ onTheWay }) => onTheWay))).toEqual(new Set([false]));
+    // Still traveling (Next skips to the rest point) through the hold and the play on.
+    expect(atTheStop.filter(({ phase }) => phase === 'traveling').length).toBeGreaterThan(60);
+  });
+
   it('shows the stop just left until the clock reaches the undocking, then "Eagle undocks" as the hold begins, not at rest', () => {
     const screen = fakeScreen(1000 / 60);
     const { player, tour, event, startMs } = headingForEagleUndocks(screen);
@@ -1928,12 +1948,24 @@ describe("Apollo 11's tour of every event", () => {
       const after = eventStory(player, tour.stops[at + 1]!);
       tour.next();
 
-      while (player.storyTime < event) screen.frame();
+      // On its way until the clock reaches the event; at the stop, with its card, from then on.
+      const onTheWay: boolean[] = [];
+      const atTheStop: string[] = [];
+      while (player.storyTime < event) {
+        onTheWay.push(tour.onTheWay);
+        screen.frame();
+      }
       const reachedMs = screen.now();
-      while (!player.playing) screen.frame();
+      const note = (): void => {
+        atTheStop.push(`${String(tour.onTheWay)} ${tour.shownStop?.id ?? 'none'}`);
+        screen.frame();
+      };
+      while (!player.playing) note();
       const held = (screen.now() - reachedMs) / 1000;
-      travel(tour, screen);
+      while (tour.phase === 'traveling') note();
 
+      expect(new Set(onTheWay)).toEqual(new Set([true]));
+      expect(new Set(atTheStop)).toEqual(new Set([`false ${id}`]));
       expect(held).toBeGreaterThanOrEqual(PARTING_HOLD_SECONDS - 1e-6);
       expect(tour.phase).toBe('stopped');
       expect(tour.stop?.id).toBe(id);

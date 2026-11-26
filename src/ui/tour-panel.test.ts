@@ -170,6 +170,63 @@ describe('the tour panel', () => {
 
   // Apollo 11 rides along through every event. On the Moon's surface nothing moves between
   // two stops, so Next and Back turn straight to the next page.
+  // At a stop that rests after its event, the clock reaches the event, holds there, and plays on
+  // to where it rests, with the stop's card showing: the panel says the tour is at the stop.
+  describe("a stop's own action", () => {
+    const thePanel = (): HTMLElement => screen.getByRole('region', { name: 'Guided tour' });
+
+    /** The panel and card while the stop's own action plays: at the stop, with Skip still on to where it rests. */
+    function expectAtTheStop(stop: string, title: string): void {
+      expect(within(theCard()).getByRole('heading', { level: 3, name: title })).toBeInTheDocument();
+      expect(thePanel()).toHaveTextContent(stop);
+      expect(thePanel()).not.toHaveTextContent('On the way');
+      expect(screen.getByRole('button', { name: 'Skip to this stop' })).toBeInTheDocument();
+    }
+
+    it('reads the stop on show while a part falls away under its card (Apollo 11, a tour of every event)', async () => {
+      const { user, frames } = await mountMission('apollo-11', { start: 'tour' });
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      frames.advance(3);
+      expect(thePanel()).toHaveTextContent('On the way to Stop 2 of 25');
+
+      // The clock holds on the first stage separating, then plays on as it falls away.
+      frames.advance(3);
+      expectAtTheStop('Stop 2 of 25', 'First stage separates');
+      frames.advance(2);
+      expectAtTheStop('Stop 2 of 25', 'First stage separates');
+
+      frames.advance(A_WHOLE_TRIP);
+      expect(thePanel()).toHaveTextContent('Stop 2 of 25');
+      expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
+    });
+
+    it('reads the stop on show while two craft part under its card (Apollo 11, a tour of key moments)', async () => {
+      const { user, frames } = await mountMission('apollo-11', {
+        start: 'tour',
+        story: (mission) => ({ ...mission, tour: 'key-moments' }),
+      });
+      // Next and Skip to "Into orbit around the Moon", the fourth stop.
+      for (let stop = 2; stop <= 4; stop += 1) {
+        await user.click(screen.getByRole('button', { name: 'Next' }));
+        frames.advance(0.5);
+        await user.click(screen.getByRole('button', { name: 'Skip to this stop' }));
+      }
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      frames.advance(6);
+      expect(thePanel()).toHaveTextContent('On the way to Stop 5 of 12');
+
+      // The clock holds on Eagle undocking, then plays on as the two part.
+      frames.advance(7);
+      expectAtTheStop('Stop 5 of 12', 'Eagle undocks');
+      frames.advance(3);
+      expectAtTheStop('Stop 5 of 12', 'Eagle undocks');
+
+      frames.advance(A_WHOLE_TRIP);
+      expect(thePanel()).toHaveTextContent('Stop 5 of 12');
+      expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
+    });
+  });
+
   describe('turning the page', () => {
     const thePanel = (): HTMLElement => screen.getByRole('region', { name: 'Guided tour' });
 
