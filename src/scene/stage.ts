@@ -4398,7 +4398,9 @@ export class Stage implements Director {
       const target = fast ? 1 : 0;
       const at = leapt || this.reducedMotion;
       if (fast && ship.lap) {
-        writeLap(ship.lap, start, this.mix, ship.ringWanted, RING_POINTS);
+        // Through the true place itself, where the craft's own line meets it (see writeLap).
+        const now = this.revolutionsAt(ship, t);
+        writeLap(ship.lap, start, this.mix, ship.ringWanted, RING_POINTS, now);
         ship.ringCenter.copy(this.nearMoon(ship.position) ? this.moonCenter : this.origin);
         // A ring that is not showing yet takes its lap as it is; one showing eases to a new one.
         if (ship.crossFade <= 0 || at || rescaled) ship.ringNow.set(ship.ringWanted);
