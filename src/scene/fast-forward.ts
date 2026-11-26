@@ -156,7 +156,13 @@ const _end = [0, 0, 0];
  * about its place around the body from one lap to the next and a ring can
  * ease from one lap to another point by point. What the lap misses closing
  * by is spread along it, so the last point leads back to the first without
- * a chord.
+ * a chord: none of it at `anchor` (revolutions, within the lap; its start
+ * unless given), where the ring runs through the path itself, and more of
+ * it the farther round the lap from there. The scene anchors a ring at the
+ * craft's true place, so the ring and the line the craft has flown meet
+ * where the craft is as fast forward begins and ends (see updateTrail in
+ * stage.ts); a lap that misses by a few hundredths of its size would
+ * otherwise run that far beside the craft's own line there.
  */
 export function writeLap(
   path: LapPath,
@@ -164,17 +170,19 @@ export function writeLap(
   mix: number,
   out: Float32Array,
   count: number,
+  anchor = start,
 ): void {
   const revolutions = path.revolutions;
   pointAt(path, indexAtValue(revolutions, start), mix, _a);
   pointAt(path, indexAtValue(revolutions, start + 1), mix, _end);
+  const from = Math.max(0, Math.min(1, anchor - start));
   for (let j = 0; j < count; j += 1) {
     const phase = j / count - start;
     const along = phase - Math.floor(phase);
     pointAt(path, indexAtValue(revolutions, start + along), mix, out, 3 * j);
     for (let c = 0; c < 3; c += 1) {
       out[3 * j + c] =
-        (out[3 * j + c] as number) + along * ((_a[c] as number) - (_end[c] as number));
+        (out[3 * j + c] as number) + (along - from) * ((_a[c] as number) - (_end[c] as number));
     }
   }
 }

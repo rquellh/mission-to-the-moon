@@ -99,6 +99,12 @@ export const SHIP_COLORS = {
 export const PATH_WIDTH_PX = 2.5;
 /** Opacity of the part of a path still to come. */
 export const PATH_FUTURE_OPACITY = 0.32;
+/**
+ * Opacity of the way in to a stay in orbit while the craft goes round (see
+ * wayDimming in path-fade.ts): a little above the part still to come, so the
+ * way it came and the way it will go stay told apart.
+ */
+export const PATH_WAY_OPACITY = 0.4;
 
 /** Marker sizes in CSS pixels. */
 export const MARKER_SIZE_PX = 7;
