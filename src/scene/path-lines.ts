@@ -224,6 +224,8 @@ export interface PathLine {
   setMix(mix: number): void;
   /** Light the line up to mission time t. */
   setTime(t: number): void;
+  /** Light the line up to a fractional sample index instead (a fast-forward stand-in's place, see stage.ts). */
+  setIndex(index: number): void;
   /** Fade the whole line (0 hidden, 1 shown): a ship's line goes once its path has ended. */
   setOpacity(opacity: number): void;
   setResolution(width: number, height: number): void;
@@ -362,6 +364,11 @@ export function createPathLine(
     resolution: { value: Vector2 };
   };
 
+  const lightTo = (index: number): void => {
+    uniforms.uNow.value = index;
+    uniforms.uRevNow.value = valueAtIndex(revolutions, index);
+  };
+
   return {
     mesh,
     times,
@@ -373,10 +380,9 @@ export function createPathLine(
       uniforms.uMix.value = mix;
     },
     setTime(t) {
-      const index = sampleIndexAt(times, t);
-      uniforms.uNow.value = index;
-      uniforms.uRevNow.value = valueAtIndex(revolutions, index);
+      lightTo(sampleIndexAt(times, t));
     },
+    setIndex: lightTo,
     setResolution(width, height) {
       uniforms.resolution.value.set(width, height);
     },

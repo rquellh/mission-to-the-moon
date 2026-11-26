@@ -29,12 +29,20 @@ export interface SceneShip {
   id: string;
   /**
    * True while the craft is in fast forward: it goes around its body too
-   * fast to draw, so its model gives way to a ring in its color. (A craft
-   * not drawn for another reason, such as being behind the Moon, is not.)
-   * The report's own `fastForward` is about the craft the story follows.
+   * fast to draw at its true place, so a ring in its color shows its orbit.
+   * (A craft not drawn for another reason, such as being behind the Moon, is
+   * not.) The report's own `fastForward` is about the craft the story follows.
    */
   fastForward: boolean;
-  /** Around everything of the craft that is drawn, or null when the craft is not drawn. Its soft glow is not counted. */
+  /**
+   * True while the craft's model is a stand-in: drawn on its fast-forward
+   * ring, gliding round it at a calm pace of its own, not at the craft's true
+   * place, from the moment fast forward begins until the model is handed back
+   * to its true place as it ends. Always false with reduced motion, where the
+   * ring is drawn alone.
+   */
+  standIn: boolean;
+  /** Around everything of the craft that is drawn (as a stand-in, where the stand-in is), or null when the craft is not drawn. Its soft glow is not counted. */
   box: SceneBox | null;
   /** The parts its shape has at this moment of the mission, whether or not they are on screen. */
   parts: ScenePart[];

@@ -55,8 +55,19 @@ import {
 import { createEarth, type Earth } from './earth';
 import {
   closedLapStart,
+  FAST_FORWARD_GLIDE_LAP_SECONDS,
+  FAST_FORWARD_HANDBACK_SECONDS,
+  FAST_FORWARD_ON_LAP_SECONDS,
+  glideRevolutions,
+  handBackEases,
+  handBackOpacity,
+  HANDBACK_SWITCH,
   indexAtValue,
   inFastForward,
+  ringHeadingAt,
+  ringPointAt,
+  seedShare,
+  stepHandBack,
   writeLap,
   type LapPath,
 } from './fast-forward';
@@ -153,6 +164,14 @@ function roleOf(track: ShipTrack, index: number): ShipRole {
 const orientedPose = (): OrientedPose => ({
   position: new Vector3(),
   target: new Vector3(),
+  up: new Vector3(0, 1, 0),
+});
+
+/** A ship pose to fill in, heading along +X with up along +Y. */
+const shipPose = (): ShipPose => ({
+  exists: false,
+  position: new Vector3(),
+  forward: new Vector3(1, 0, 0),
   up: new Vector3(0, 1, 0),
 });
 
@@ -260,9 +279,10 @@ const PATH_END_FADE_STORY_SECONDS = 1.5;
 const LONG_LUNAR_STAY_REVOLUTIONS = 40;
 /*
  * Fast forward: on a long flight the story clock can carry a craft around
- * its body several times a second. Drawn, the model would whirl around the
- * orbit, and the ship view with it. So each craft is either drawn or
- * replaced by a bright ring in its color, never left half faded:
+ * its body several times a second. Drawn at its true place, the model would
+ * whirl around the orbit, and the ship view with it. So such a craft is
+ * shown by a bright ring in its color, its orbit, with its model standing in
+ * for it on the ring (below), never left half faded:
  *
  * - It is replaced once it goes around its body (on screen, at the pace the
  *   clock runs now) faster than once in FAST_FORWARD_ON_LAP_SECONDS (7), and
@@ -277,11 +297,40 @@ const LONG_LUNAR_STAY_REVOLUTIONS = 40;
  * - Never while it is docked to another craft (drawn as part of it) or
  *   standing on a surface, and never with the clock stopped: then the model
  *   is at its true place.
- * - The model and the ring cross-fade over FAST_FORWARD_CROSSFADE_SECONDS.
+ * - The ring fades in and out over FAST_FORWARD_CROSSFADE_SECONDS.
  *
- * Each craft in fast forward has its own ring. The followed craft's turns on
- * the "Fast forward" mark and the ship view's steady view of the body with
- * the orbit in frame, which come and go more slowly (FAST_FORWARD_SECONDS).
+ * The stand-in. The owner found craft going round the Moon or Earth "still
+ * too fast", and proposed "cheating a bit ... similar to how we do when the
+ * spacecraft travels to the moon". The scene already cheats on size and
+ * distance so things can be seen (craft are drawn far larger than life; see
+ * the True scale switch); this cheats on pace the same way. While a craft is
+ * in fast forward its model stays drawn, but not at its true place, which
+ * races round the body: it glides round the ring at one steady, calm pace in
+ * real time (see FAST_FORWARD_GLIDE_LAP_SECONDS in fast-forward.ts) while the
+ * clock races. It sets off from the craft's true place as fast forward
+ * begins, at about the pace the craft was going round then, so nothing
+ * jumps; it sits on the ring as drawn, at either scale, heading the way the
+ * craft flies and upright over the body, as a craft in orbit is drawn.
+ * Everything that places or shows the model (hidden behind a body or not,
+ * its glow, its dot, a pair drawn round it, the pointer to it, the end of
+ * its lit line) goes by where it is drawn (see drawnOf); the camera and the
+ * framing go by the true place.
+ *
+ * The hand-back. When fast forward ends, the ring fades out and the model
+ * goes back to its true place with a short dissolve (see
+ * FAST_FORWARD_HANDBACK_SECONDS): it fades out where it stood in and fades
+ * in at its true place, moving while nothing is drawn, so it is never seen
+ * to jump; one already close to its true place eases across instead. After
+ * a seek of more than a moment the stand-in begins again at once at the true
+ * place for the new time; a smaller one (a tour settling onto its stop)
+ * leaves it gliding. Under reduced motion there is no stand-in: the model
+ * gives way to the ring, which stands alone, and nothing glides.
+ *
+ * Each craft in fast forward has its own ring and its own stand-in. The
+ * followed craft's turns on the "Fast forward" mark (with the laps it has
+ * really flown, see Stage.fastForwardLaps) and the ship view's steady view
+ * of the body with the orbit in frame, which come and go more slowly
+ * (FAST_FORWARD_SECONDS).
  */
 const FAST_FORWARD_CROSSFADE_SECONDS = 0.3;
 /**
@@ -295,6 +344,8 @@ const FAST_FORWARD_CROSSFADE_SECONDS = 0.3;
 const FAST_FORWARD_ON = 0.6;
 const FAST_FORWARD_OFF = 0.3;
 const FAST_FORWARD_SECONDS = 0.45;
+/** Subscribers hear of the followed craft's laps in fast forward at most this often, in milliseconds (see Stage.fastForwardLaps). */
+const LAPS_NOTIFY_MS = 250;
 /** The steady view: this many degrees off the orbit's axis, toward the ship (see updateFastView). */
 const FAST_FORWARD_TILT_DEG = 52;
 /** A ring's width in CSS pixels, its opacity, and how far its craft's color is lightened toward white. */
@@ -489,10 +540,31 @@ interface ShipState extends ShipPose {
   lap: LapPath | null;
   /** For a lander: the times it docks with another ship; it is followed only while apart on its way to one. */
   dockings: readonly number[];
-  /** True while it is in fast forward: its model replaced by its ring (see FAST_FORWARD_CROSSFADE_SECONDS). */
+  /** True while it is in fast forward: its ring drawn, its model a stand-in on it (see FAST_FORWARD_CROSSFADE_SECONDS). */
   fast: boolean;
-  /** How far its model has given way to its ring, 0 (the model) to 1 (the ring). */
+  /** How far its ring has come in, 0 (none) to 1 (the ring); under reduced motion, how far its model has given way to it. */
   crossFade: number;
+  /**
+   * True while its model is a stand-in on its ring, not at its true place
+   * (see the fast-forward block): from the moment it goes into fast forward
+   * until the hand-back moves the model to its true place.
+   */
+  standIn: boolean;
+  /** Laps the stand-in has glided since it began (never decreasing while it stands in); NaN while there is none. */
+  glide: number;
+  /** Where the stand-in is drawn this frame. */
+  readonly standInPose: ShipPose;
+  /** Where on its ring the stand-in began (a share of a lap), its pace then (laps a second), and the real seconds since. */
+  glideFrom: number;
+  glideStartRate: number;
+  glideSeconds: number;
+  /** From the ring's point where the stand-in began to the craft's true place then (see seedShare). */
+  readonly glideSeed: Vector3;
+  /** The hand-back under way, 0 to 1 (NaN when none is), and whether it eases across rather than dipping (see HANDBACK_EASE_DEG). */
+  handBack: number;
+  handBackEases: boolean;
+  /** True while its line is lit up to its stand-in rather than to now (see updateTrail). */
+  trailLagged: boolean;
   /** Its fast-forward level for the camera and the interface, 0 to 1 (see FAST_FORWARD_ON). */
   fastForward: number;
   /** Its ring, the points it is drawn through now and those it eases toward, and its body's center. */
@@ -660,6 +732,10 @@ export class Stage implements Director {
     forward: new Vector3(1, 0, 0),
     up: new Vector3(0, 1, 0),
   };
+  /** Where each ship's model was drawn this frame, for its dot (see updateFleet). */
+  private readonly modelPlaces: Vector3[];
+  /** A pair's anchor and mover riding along with the other's stand-in (see pairPose). */
+  private readonly pairPoses: readonly [ShipPose, ShipPose] = [shipPose(), shipPose()];
 
   /* Views and camera. */
   private viewNow: EventView;
@@ -792,6 +868,17 @@ export class Stage implements Director {
   private running = false;
   /** What the fastForward getter says now. */
   private fastForwardShown = false;
+  /**
+   * The laps the followed craft has flown in the fast forward showing now
+   * (see fastForwardLaps): its revolutions as that fast forward began (NaN
+   * while there is none) and the craft then, the count now, and the whole
+   * laps subscribers last heard of, and when (performance time, ms).
+   */
+  private lapsFrom = Number.NaN;
+  private lapsShip: ShipState | null = null;
+  private lapsNow = 0;
+  private lapsAnnounced = 0;
+  private lapsAnnouncedMs = -Infinity;
   /** The pointer toward the followed ship when it is out of the Earth or Moon view (see updatePointer), and each part left behind's label. */
   private pointer: Sprite | null = null;
   private labels: Sprite[] = [];
@@ -810,6 +897,8 @@ export class Stage implements Director {
 
   /* Scratch, so the frame loop allocates nothing. */
   private readonly scratch = [0, 0, 0];
+  private readonly handBackTrue = [0, 0, 0];
+  private readonly handBackCenter = [0, 0, 0];
   private readonly sunDirection = new Vector3(1, 0, 0);
   private readonly moonCenter = new Vector3(MOON_DISTANCE.readable, 0, 0);
   private readonly anchor = new Vector3();
@@ -914,6 +1003,16 @@ export class Stage implements Director {
         dockings: track.phases.filter((phase) => phase.kind === 'docked').map(phaseStart),
         fast: false,
         crossFade: 0,
+        standIn: false,
+        glide: Number.NaN,
+        standInPose: shipPose(),
+        glideFrom: 0,
+        glideStartRate: 0,
+        glideSeconds: 0,
+        glideSeed: new Vector3(),
+        handBack: Number.NaN,
+        handBackEases: false,
+        trailLagged: false,
         fastForward: 0,
         ring: null,
         ringNow: new Float32Array(RING_POINTS * 3),
@@ -930,6 +1029,7 @@ export class Stage implements Director {
     if (!main) throw new Error('The flight path has no ships');
     this.main = main;
     this.followed = main;
+    this.modelPlaces = this.ships.map(() => new Vector3());
     this.framePoses = this.ships.map(() => ({
       exists: false,
       position: new Vector3(),
@@ -1074,13 +1174,26 @@ export class Stage implements Director {
 
   /**
    * True while the followed ship circles too fast to follow and the scene
-   * shows its calm fast-forward view (the model faded, its orbit a ring).
-   * It turns on once that look is mostly in, and off once the model is
-   * mostly back (a little apart, so it does not flicker), and is always
-   * false with the clock stopped. Subscribers hear when it changes.
+   * shows its calm fast-forward view (its orbit a ring, its model a stand-in
+   * gliding round it, or under reduced motion faded). It turns on once that
+   * look is mostly in, and off once the model is mostly back (a little
+   * apart, so it does not flicker), and is always false with the clock
+   * stopped. Subscribers hear when it changes.
    */
   get fastForward(): boolean {
     return this.fastForwardShown;
+  }
+
+  /**
+   * The laps, whole and part, the followed craft has really flown (by its
+   * path, not as its stand-in shows) since the fast forward now showing
+   * began, as it went into fast forward; 0 while `fastForward` is false.
+   * Counted afresh after a seek of more than a moment. Subscribers hear when
+   * fast forward begins or ends, and when the whole laps change, at most
+   * every LAPS_NOTIFY_MS.
+   */
+  get fastForwardLaps(): number {
+    return this.fastForwardShown ? this.lapsNow : 0;
   }
 
   get view(): EventView {
@@ -1202,6 +1315,7 @@ export class Stage implements Director {
         return {
           id: ship.id,
           fastForward: ship.fast,
+          standIn: ship.standIn,
           box: model ? this.boxOnCanvas(model.root) : null,
           parts: names.map((name) => ({
             name,
@@ -2954,14 +3068,12 @@ export class Stage implements Director {
     if (!pointer) return;
     pointer.visible = false;
     const ship = this.subject();
-    if (
-      (this.viewNow !== 'earth' && this.viewNow !== 'moon') ||
-      !ship.exists ||
-      this.occluded(ship.position)
-    )
+    // Toward where its model is drawn (a stand-in's, in fast forward).
+    const at = this.drawnOf(ship).position;
+    if ((this.viewNow !== 'earth' && this.viewNow !== 'moon') || !ship.exists || this.occluded(at))
       return;
-    if (this.inClearArea(ship.position, SHIP_EDGE_PX)) return;
-    const p = this.v1.copy(ship.position).project(this.camera);
+    if (this.inClearArea(at, SHIP_EDGE_PX)) return;
+    const p = this.v1.copy(at).project(this.camera);
     // Behind the camera, the projection is mirrored.
     if (p.z > 1) p.multiplyScalar(-1);
     const i = this.clearInsets;
@@ -3443,7 +3555,8 @@ export class Stage implements Director {
     const shown =
       this.player.playing &&
       (this.fastForwardShown ? level > FAST_FORWARD_OFF : level > FAST_FORWARD_ON);
-    if (shown !== this.fastForwardShown) {
+    const newLap = this.countLaps(shown, leapt);
+    if (shown !== this.fastForwardShown || newLap) {
       this.fastForwardShown = shown;
       this.notify();
     }
@@ -3688,8 +3801,8 @@ export class Stage implements Director {
    * unit direction `dock` as `arranged` goes to 1.
    */
   private besideAnchor(
-    anchor: ShipState,
-    mover: ShipState,
+    anchor: ShipPose,
+    mover: ShipPose,
     dock: Vector3,
     minPixels: number,
     arranged: number,
@@ -3715,7 +3828,7 @@ export class Stage implements Director {
   }
 
   /** The world direction a ship's face looks (see ShipFace), into `out`. */
-  private faceDirection(ship: ShipState, face: ShipFace, out: Vector3): Vector3 {
+  private faceDirection(ship: ShipPose, face: ShipFace, out: Vector3): Vector3 {
     return out
       .copy(face.axis === 'up' ? ship.up : ship.forward)
       .multiplyScalar(face.sign)
@@ -3740,8 +3853,8 @@ export class Stage implements Director {
    * face direction), with its top on the anchor's side.
    */
   private facingPose(
-    anchor: ShipState,
-    mover: ShipState,
+    anchor: ShipPose,
+    mover: ShipPose,
     toMover: Vector3,
     face: ShipFace,
     arranged: number,
@@ -3792,10 +3905,53 @@ export class Stage implements Director {
     return this.dotMap;
   }
 
-  /** How visible a ship's model is now: it gives way to its ring in fast forward, and fades out behind Earth or the Moon. */
-  private opacityOf(ship: ShipState): number {
+  /**
+   * How visible a ship's model is now: it dips out and back in as a stand-in
+   * hands back to its true place (see handBackOpacity), under reduced motion
+   * it gives way to its ring in fast forward, and it fades out behind Earth
+   * or the Moon wherever it is drawn (see drawnOf).
+   */
+  private opacityOf(ship: ShipState, partner?: ShipState): number {
     const seen = Number.isNaN(ship.seen) ? 0 : ship.seen;
-    return (1 - smoothstep(0, 1, ship.crossFade)) * smoothstep(0, 1, seen);
+    const shown = this.reducedMotion
+      ? 1 - smoothstep(0, 1, ship.crossFade)
+      : Math.min(this.dipOf(ship), partner ? this.dipOf(partner) : 1);
+    return shown * smoothstep(0, 1, seen);
+  }
+
+  /** How far a ship's model is in sight through its hand-back's dip: 1 when none is under way (see handBackOpacity). */
+  private dipOf(ship: ShipState): number {
+    return Number.isNaN(ship.handBack) || ship.handBackEases ? 1 : handBackOpacity(ship.handBack);
+  }
+
+  /**
+   * Where one of a pair (see pairNow) is drawn from, into `out` if it is
+   * not simply drawnOf: one without a stand-in whose partner has one rides
+   * along with it, at its real offset from it and turned as it is. The two
+   * are in one orbit, and one without a ring of its own (one docked into
+   * the other's model) would otherwise be drawn from its true place, which
+   * races round the body with its partner's. Each of the two dips with the
+   * other as it hands back (see opacityOf's `partner`), since each is drawn
+   * from where the other is.
+   */
+  private pairPose(ship: ShipState, partner: ShipState, out: ShipPose): ShipPose {
+    if (ship.standIn || !partner.standIn) return this.drawnOf(ship);
+    const lead = partner.standInPose;
+    out.exists = ship.exists;
+    out.position.subVectors(ship.position, partner.position).add(lead.position);
+    out.forward.copy(lead.forward);
+    out.up.copy(lead.up);
+    return out;
+  }
+
+  /**
+   * Where a ship's model is drawn from: its stand-in on its ring while it
+   * has one (see updateStandIn), otherwise its true place. Everything that
+   * places or shows the model, its glow, its dot, or a pair it is in reads
+   * this, not the true place, which races round the body in fast forward.
+   */
+  private drawnOf(ship: ShipState): ShipPose {
+    return ship.standIn ? ship.standInPose : ship;
   }
 
   /** Size, place, and show or hide each spacecraft for this frame. */
@@ -3920,19 +4076,8 @@ export class Stage implements Director {
         ? (1 - paired) * smoothstep(COMPANION_MODEL_M, COMPANION_MARKER_M, meters)
         : 0;
     };
-    const dotScale = (2 * COMPANION_MARKER_PX * tanHalf) / this.cssHeight;
-    this.ships.forEach((ship, i) => {
-      const marker = this.companionMarkers[i];
-      if (!marker) return;
-      // It fades behind a body with its model (see shipUnitsPerPixel).
-      const level = companion(ship) * this.opacityOf(ship);
-      const units = level > 0.01 ? this.depthUnitsPerPixel(ship.position, tanHalf) : 0;
-      marker.visible = units > 0;
-      if (!marker.visible) return;
-      marker.position.copy(ship.position);
-      marker.scale.setScalar(dotScale);
-      (marker.material as SpriteMaterial).opacity = level;
-    });
+    // Where each model is drawn this frame (its stand-in's place, or beside its partner), for its dot.
+    this.ships.forEach((ship, i) => this.modelPlaces[i]?.copy(this.drawnOf(ship).position));
     // The ship that stays put (the main ship, or one of a pair) first, so the one drawn beside it can share its scale.
     const anchorIndex = this.ships.indexOf(pair ? pair.anchor : this.main);
     const moverIndex = pair ? this.ships.indexOf(pair.mover) : -1;
@@ -3958,21 +4103,28 @@ export class Stage implements Director {
     let anchorSizeScale = 1;
     /** The scale the pair shares, meters per CSS pixel (0 when there is no pair). */
     let pairScale = 0;
+    // A pair is drawn round whichever of the two stands in, and dips with it as it hands back (see pairPose).
+    const anchorShip = this.ships[anchorIndex] as ShipState;
+    const anchorPose = pair
+      ? this.pairPose(pair.anchor, pair.mover, this.pairPoses[0])
+      : this.drawnOf(anchorShip);
+    const moverPose = pair ? this.pairPose(pair.mover, pair.anchor, this.pairPoses[1]) : null;
     if (anchorModel) {
-      const ship = this.ships[anchorIndex] as ShipState;
+      const ship = anchorShip;
+      const pose = anchorPose;
       // A pair is drawn at the size of the ship the story follows, whichever of the two that is.
       context.sizeScale = anchorSizeScale = pair
         ? Math.max(sizeScaleOf(pair.anchor), sizeScaleOf(pair.mover))
         : sizeScaleOf(ship);
       context.unitsPerPixel = anchorUnits = this.shipUnitsPerPixel(
         ship,
-        ship.position,
+        pose.position,
         tanHalf,
         dt,
         snap,
       );
       context.metersPerPixel = 0;
-      context.opacity = this.opacityOf(ship) * (1 - companion(ship));
+      context.opacity = this.opacityOf(ship, pair?.mover) * (1 - companion(ship));
       if (pair && moverModel) {
         // Grow or shrink toward the size the two share: the docked pair's, or the larger of their
         // own, but large enough to show the smaller one (see PAIR_SMALL_SHARE).
@@ -3992,14 +4144,16 @@ export class Stage implements Director {
         if (own > 0 && pairScale > 0)
           context.metersPerPixel = MathUtils.lerp(own, pairScale, pair.arranged);
       }
-      anchorModel.update(closeUp(ship, anchorModel, ship), context);
+      anchorModel.update(closeUp(ship, anchorModel, pose), context);
+      this.modelPlaces[anchorIndex]?.copy(pose.position);
     }
 
     for (let i = 0; i < models.length; i += 1) {
       if (i === anchorIndex) continue;
       const model = models[i] as ShipModel;
       const ship = this.ships[i] as ShipState;
-      let pose: ShipPose = ship;
+      const itself = i === moverIndex && moverPose ? moverPose : this.drawnOf(ship);
+      let pose: ShipPose = itself;
       context.sizeScale = sizeScaleOf(ship);
       context.metersPerPixel = 0;
       // An anchor merged into this ship's model is not drawn: the pair's scale stands in for its own.
@@ -4007,8 +4161,9 @@ export class Stage implements Director {
       const spread = pair !== null && (pair.arranged > 0 || this.viewNow === 'spacecraft');
       if (pair && spread && anchorModel && i === moverIndex && anchorUnits > 0 && anchorScale > 0) {
         // Never on top of the other ship in the ship view; in its place beside it from station keeping on (an illustration).
+        // Both as drawn: a stand-in's pair is drawn round its stand-in.
         const w = pair.arranged;
-        const anchor = pair.anchor;
+        const anchor = anchorPose;
         const drawn = this.drawnPose;
         if (pair.moment) {
           // Where it will be docked, plus a little room.
@@ -4016,15 +4171,15 @@ export class Stage implements Director {
           this.dockDirection.copy(anchor.forward).multiplyScalar(pair.moment.contact >= 0 ? 1 : -1);
           this.besideAnchor(
             anchor,
-            ship,
+            itself,
             this.dockDirection,
             minPixels,
             w,
             anchorUnits,
             this.sitePosition,
           );
-          drawn.forward.lerpVectors(ship.forward, anchor.forward, w).normalize();
-          drawn.up.lerpVectors(ship.up, anchor.up, w).normalize();
+          drawn.forward.lerpVectors(itself.forward, anchor.forward, w).normalize();
+          drawn.up.lerpVectors(itself.up, anchor.up, w).normalize();
         } else {
           // Off the anchor's nose, face to face.
           const anchorFace = anchorModel.faceOf(anchorModel.shapeAt(pair.shapesAt));
@@ -4038,14 +4193,14 @@ export class Stage implements Director {
               Math.max(pair.gapPixels, stationGap / anchorScale) * pair.opening;
           this.besideAnchor(
             anchor,
-            ship,
+            itself,
             this.dockDirection,
             minPixels,
             w,
             anchorUnits,
             this.sitePosition,
           );
-          this.facingPose(anchor, ship, this.dockDirection, moverFace, w, drawn);
+          this.facingPose(anchor, itself, this.dockDirection, moverFace, w, drawn);
         }
         drawn.exists = true;
         drawn.position.copy(this.sitePosition);
@@ -4056,13 +4211,31 @@ export class Stage implements Director {
         const own = model.metersPerPixelOf(model.shapeAt(t), context);
         if (own > 0) context.metersPerPixel = MathUtils.lerp(own, anchorScale, w);
       } else {
-        context.unitsPerPixel = this.shipUnitsPerPixel(ship, ship.position, tanHalf, dt, snap);
+        context.unitsPerPixel = this.shipUnitsPerPixel(ship, itself.position, tanHalf, dt, snap);
       }
-      context.opacity = this.opacityOf(ship) * (1 - companion(ship));
+      context.opacity =
+        this.opacityOf(ship, i === moverIndex ? pair?.anchor : undefined) * (1 - companion(ship));
       model.update(closeUp(ship, model, pose), context);
+      this.modelPlaces[i]?.copy(pose.position);
     }
     context.glow = 1;
     context.focus = 0;
+    const dotScale = (2 * COMPANION_MARKER_PX * tanHalf) / this.cssHeight;
+    this.ships.forEach((ship, i) => {
+      const marker = this.companionMarkers[i];
+      const at = this.modelPlaces[i];
+      if (!marker || !at) return;
+      // Where its model is drawn, fading behind a body and dipping as it hands back with it (see opacityOf).
+      const partner =
+        pair?.anchor === ship ? pair.mover : pair?.mover === ship ? pair.anchor : undefined;
+      const level = companion(ship) * this.opacityOf(ship, partner);
+      const units = level > 0.01 ? this.depthUnitsPerPixel(at, tanHalf) : 0;
+      marker.visible = units > 0;
+      if (!marker.visible) return;
+      marker.position.copy(at);
+      marker.scale.setScalar(dotScale);
+      (marker.material as SpriteMaterial).opacity = level;
+    });
 
     // Parts left behind stand at their ship's landing site from their cited moment on.
     context.opacity = 1;
@@ -4209,12 +4382,13 @@ export class Stage implements Director {
 
   /**
    * Put each ship in fast forward or take it out (see
-   * FAST_FORWARD_CROSSFADE_SECONDS), cross-fade its model and its ring, and
-   * draw its ring through the closed lap of its path around now, easing to
-   * a new lap after a burn. The ring keeps its last lap while it fades out.
-   * The followed ship's fast-forward level, for the camera and the interface,
-   * eases over FAST_FORWARD_SECONDS. `jumped` is any seek, `leapt` one of more
-   * than a moment (see LEAP_STORY_SECONDS). Returns true when anything changed.
+   * FAST_FORWARD_CROSSFADE_SECONDS), fade its ring in or out, draw the ring
+   * through the closed lap of its path around now, easing to a new lap
+   * after a burn, and glide its stand-in round it (see updateStandIn). The
+   * ring keeps its last lap while it fades out. The followed ship's
+   * fast-forward level, for the camera and the interface, eases over
+   * FAST_FORWARD_SECONDS. `jumped` is any seek, `leapt` one of more than a
+   * moment (see LEAP_STORY_SECONDS). Returns true when anything changed.
    */
   private updateFastForward(dt: number, jumped: boolean, leapt: boolean): boolean {
     const pace = this.missionPace();
@@ -4252,6 +4426,7 @@ export class Stage implements Director {
       if (fast !== ship.fast || ship.crossFade !== crossFade || ship.fastForward !== level)
         changed = true;
       ship.fast = fast;
+      if (this.updateStandIn(ship, t, dt, leapt)) changed = true;
       const ring = ship.ring;
       if (!ring) return;
       if (ship.crossFade > 0) {
@@ -4274,9 +4449,193 @@ export class Stage implements Director {
         );
       this.ringRadius = radius;
     }
-    // The event markers would stand still on the ring while the ship goes around many times: they fade with the model.
+    // The event markers would stand still on the ring while the ship goes around many times: they fade as it comes in.
     if (changed) this.eventMarkers?.setOpacity(1 - smoothstep(0, 1, followed.crossFade));
     return changed;
+  }
+
+  /**
+   * A ship's stand-in, each frame (see the fast-forward block): it begins
+   * at the craft's true place as the craft goes into fast forward, glides
+   * round the ring in real time (see glideRevolutions), and hands back to
+   * the true place when fast forward ends: it dips out and in, moving unseen
+   * at the bottom of the dip (see stepHandBack), or, when it is close,
+   * eases across (see handBackEases). Fast forward back before the model
+   * has moved brings it back in where it is. After a leap of the clock it
+   * begins again at once at the true place for the new time, or is gone;
+   * under reduced motion there is none (the ring stands alone). Returns true
+   * while it moves or dips.
+   */
+  private updateStandIn(ship: ShipState, t: number, dt: number, leapt: boolean): boolean {
+    const wanted = ship.fast && !this.reducedMotion && ship.exists;
+    const was = ship.standIn || !Number.isNaN(ship.handBack);
+    if (leapt || this.reducedMotion || !ship.exists) {
+      ship.handBack = Number.NaN;
+      if (ship.standIn) this.endStandIn(ship, false);
+      if (wanted) this.seedStandIn(ship, t, 1 / FAST_FORWARD_GLIDE_LAP_SECONDS);
+    } else {
+      // Going in, from where the craft is; a dip fading in there carries on.
+      if (wanted && !ship.standIn) this.seedStandIn(ship, t, 1 / FAST_FORWARD_ON_LAP_SECONDS);
+      if (!wanted && ship.standIn) {
+        if (Number.isNaN(ship.handBack)) {
+          ship.handBack = 0;
+          ship.handBackEases = handBackEases(
+            ship.standInPose.position.toArray(this.scratch),
+            ship.position.toArray(this.handBackTrue),
+            ship.ringCenter.toArray(this.handBackCenter),
+          );
+        } else if (ship.handBack > HANDBACK_SWITCH) {
+          // Fading in as a stand-in begun a moment ago, and ending again: out again from where it is.
+          ship.handBack = 1 - ship.handBack;
+          ship.handBackEases = false;
+        }
+      }
+      if (!Number.isNaN(ship.handBack)) {
+        // Back before the model has moved, it comes back in where it is.
+        const back = wanted && ship.handBack < HANDBACK_SWITCH;
+        const step = back ? -dt : dt;
+        ship.handBack = ship.handBackEases
+          ? MathUtils.clamp(ship.handBack + step / FAST_FORWARD_HANDBACK_SECONDS, 0, 1)
+          : stepHandBack(ship.handBack, step);
+        const moved = ship.handBackEases ? ship.handBack >= 1 : ship.handBack >= HANDBACK_SWITCH;
+        if (!wanted && ship.standIn && moved) this.endStandIn(ship, !ship.handBackEases);
+        if (back ? ship.handBack <= 0 : ship.handBack >= 1) ship.handBack = Number.NaN;
+      }
+    }
+    if (ship.standIn) this.glideStandIn(ship, dt);
+    this.updateTrail(ship, t);
+    return was || ship.standIn || !Number.isNaN(ship.handBack);
+  }
+
+  /**
+   * A ship's line is lit up to now and dimmer ahead (see updateWorld), so
+   * where the two meet marks the craft's true place, which in fast forward
+   * races round the ring (seen on a lap not flown before, and in the loops
+   * that fade by revolutions). While the ship stands in, its line is lit up
+   * to the stand-in instead, on the last lap the craft has flown past it, so
+   * that mark goes round with the model; as the model goes back to its true
+   * place, so does the line.
+   */
+  private updateTrail(ship: ShipState, t: number): void {
+    const line = this.lineOf.get(ship);
+    if (!line) return;
+    const revolutions = this.revolutionsAt(ship, t);
+    if (!ship.standIn || !ship.revolutions || !Number.isFinite(revolutions)) {
+      if (ship.trailLagged) line.setTime(t);
+      ship.trailLagged = false;
+      return;
+    }
+    const ahead = revolutions - (ship.glideFrom + ship.glide);
+    line.setIndex(indexAtValue(ship.revolutions, revolutions - (ahead - Math.floor(ahead))));
+    ship.trailLagged = true;
+  }
+
+  /**
+   * Count the laps the followed craft flies in the fast forward showing
+   * (see fastForwardLaps), given whether it shows from this frame on. The
+   * count begins as the craft goes into fast forward, a moment before that
+   * shows, and goes on while it shows; it begins afresh after a leap of the
+   * clock, or when another craft is followed. Returns true when subscribers
+   * should hear of a new whole lap, at most every LAPS_NOTIFY_MS (they hear
+   * of the beginning and the end anyway, as fastForward changes).
+   */
+  private countLaps(shown: boolean, leapt: boolean): boolean {
+    const ship = this.followed;
+    if (!ship.fast && !shown) {
+      this.lapsFrom = Number.NaN;
+      this.lapsNow = 0;
+      return false;
+    }
+    const now = this.revolutionsAt(ship, this.player.time);
+    if (Number.isNaN(this.lapsFrom) || leapt || this.lapsShip !== ship) {
+      this.lapsFrom = now;
+      this.lapsShip = ship;
+    }
+    const laps = now - this.lapsFrom;
+    this.lapsNow = Number.isFinite(laps) ? Math.max(0, laps) : 0;
+    const whole = Math.floor(this.lapsNow);
+    if (!shown) return false;
+    if (!this.fastForwardShown) {
+      this.lapsAnnounced = whole;
+      this.lapsAnnouncedMs = this.nowMs;
+      return false;
+    }
+    if (whole === this.lapsAnnounced || this.nowMs - this.lapsAnnouncedMs < LAPS_NOTIFY_MS)
+      return false;
+    this.lapsAnnounced = whole;
+    this.lapsAnnouncedMs = this.nowMs;
+    return true;
+  }
+
+  /** The revolutions a ship has flown at mission time t, by its path (see revolutionsOf). */
+  private revolutionsAt(ship: ShipState, t: number): number {
+    const revolutions = ship.revolutions;
+    const times = ship.times;
+    if (!revolutions || !times) return Number.NaN;
+    return valueAtIndex(revolutions, sampleIndexAt(times, t));
+  }
+
+  /**
+   * Begin a ship's stand-in at its true place at mission time t, setting
+   * off at `rate` laps a second: on its ring where it has flown to (see
+   * writeLap), plus what lies between that point and the true place, which
+   * fades over the glide's ease (see seedShare).
+   */
+  private seedStandIn(ship: ShipState, t: number, rate: number): void {
+    const revolutions = this.revolutionsAt(ship, t);
+    ship.standIn = true;
+    ship.glide = 0;
+    ship.glideSeconds = 0;
+    ship.glideStartRate = rate;
+    ship.glideFrom = Number.isFinite(revolutions) ? revolutions - Math.floor(revolutions) : 0;
+    ringPointAt(ship.ringNow, RING_POINTS, ship.glideFrom, this.scratch);
+    ship.glideSeed.copy(ship.position).sub(this.v1.fromArray(this.scratch));
+    const pose = ship.standInPose;
+    pose.exists = ship.exists;
+    pose.position.copy(ship.position);
+    pose.forward.copy(ship.forward);
+    pose.up.copy(ship.up);
+  }
+
+  /**
+   * Move a ship's stand-in on by `dt` seconds of real time: on its ring as
+   * drawn this frame, heading the way it flies, its up away from the body,
+   * as a craft in orbit is drawn. Easing across to the true place as it
+   * hands back, part way there.
+   */
+  private glideStandIn(ship: ShipState, dt: number): void {
+    ship.glideSeconds += dt;
+    ship.glide = glideRevolutions(ship.glideSeconds, ship.glideStartRate);
+    const phase = ship.glideFrom + ship.glide;
+    const pose = ship.standInPose;
+    pose.exists = ship.exists;
+    ringPointAt(ship.ringNow, RING_POINTS, phase, this.scratch);
+    pose.position
+      .fromArray(this.scratch)
+      .addScaledVector(ship.glideSeed, seedShare(ship.glideSeconds));
+    ringHeadingAt(ship.ringNow, RING_POINTS, phase, this.scratch);
+    pose.forward.fromArray(this.scratch);
+    pose.up.subVectors(pose.position, ship.ringCenter);
+    if (pose.up.lengthSq() < 1e-12) pose.up.copy(ship.up);
+    pose.up.normalize();
+    if (!Number.isNaN(ship.handBack) && ship.handBackEases) {
+      const w = smoothstep(0, 1, ship.handBack);
+      pose.position.lerp(ship.position, w);
+      pose.forward.lerp(ship.forward, w).normalize();
+      pose.up.lerp(ship.up, w).normalize();
+    }
+  }
+
+  /**
+   * End a ship's stand-in: its model is drawn at its true place from now
+   * on. `unseen` when it moves there hidden at the bottom of a dip: it is
+   * then in sight there or not at once (see shipUnitsPerPixel), rather than
+   * fading in or out from where it stood in.
+   */
+  private endStandIn(ship: ShipState, unseen: boolean): void {
+    ship.standIn = false;
+    ship.glide = Number.NaN;
+    if (unseen) ship.seen = Number.NaN;
   }
 
   /** True when a point is nearer the Moon than Earth (by height in body radii). */
