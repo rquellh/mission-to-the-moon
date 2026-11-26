@@ -27,7 +27,9 @@ import {
   handBackEases,
   handBackOpacity,
   HANDBACK_SWITCH,
+  heldLap,
   inFastForward,
+  lastPassage,
   ringHeadingAt,
   ringPointAt,
   seedShare,
@@ -160,6 +162,32 @@ describe('closedLapStart', () => {
     const short = pathAround(0.8, () => 1.1);
 
     expect(closedLapStart(short, 0.4, ORIGIN)).toBeNaN();
+  });
+});
+
+describe('heldLap', () => {
+  it.each([
+    ['as fast forward begins', 2.3, 2.3],
+    ['most of a lap on', 3.29, 2.3],
+    ['three laps on', 5.4, 5.3],
+  ])('finds the latest passage of where fast forward began, %s', (_name, now, passage) => {
+    expect(lastPassage(2.3, now)).toBeCloseTo(passage, 9);
+  });
+
+  it('holds one lap while the craft races round it, and moves on a whole lap at a time', () => {
+    const orbit = pathAround(8, () => 1.1);
+    const heldAt = (now: number): number => heldLap(orbit, 2.3, now, ORIGIN);
+
+    expect(heldAt(2.3)).toBeCloseTo(1.8, 9);
+    expect(heldAt(2.9)).toBeCloseTo(1.8, 9);
+    expect(heldAt(3.29)).toBeCloseTo(1.8, 9);
+    expect(heldAt(3.31)).toBeCloseTo(2.8, 9);
+  });
+
+  it('holds no lap once the craft has left orbit', () => {
+    const leaving = pathAround(5, (r) => (r < 3 ? 1.1 : 1.1 + 6 * (r - 3) ** 2));
+
+    expect(heldLap(leaving, 1.2, 3.7, ORIGIN)).toBeNaN();
   });
 });
 
