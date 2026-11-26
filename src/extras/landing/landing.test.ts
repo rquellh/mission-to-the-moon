@@ -1,16 +1,17 @@
 /**
- * "Land on the Moon" ends each landing with "Up next": back to the flight it
- * was opened over, or, opened from the list, the flight of the first
- * landing. Running out of fuel ends a run with "Try again" and no "Up next",
- * a bump on the boulders says why and lets the run carry on, and sliding on
- * past the clear patch says to slide back. The real extra runs in the real
- * sheet and is flown with its buttons as the frames pass. jsdom draws no 3D
- * view, so it flies by its read-outs (and says so in the console, which
- * these tests keep quiet). No moment points at it yet, so it is opened from
- * the list (drafts are listed under test, as on the dev server) or by its
- * address over a flight. The rules of a run are tested in game.test.ts, and
- * what the sheet adds around the extra's own next step in
- * src/ui/extra-sheet.test.ts.
+ * "Land on the Moon" ends each landing with the real landing and "Up next":
+ * back to the flight it was opened over, or, opened from the list, the
+ * flight of the first landing. Running out of fuel ends a run with "Try
+ * again" and no "Up next", a bump on the boulders says why and lets the run
+ * carry on, and sliding on past the clear patch says to slide back. The real
+ * extra runs in the real sheet and is flown with its buttons as the frames
+ * pass. jsdom draws no 3D view, so it flies by its read-outs (and says so in
+ * the console, which these tests keep quiet). It is opened from the list
+ * (drafts are listed under test, as on the dev server), by its address over
+ * a flight, or with "Try it" on Apollo 11's powered descent, the moment that
+ * offers it, where the end still shows the landing itself. The rules of a
+ * run are tested in game.test.ts, and what the sheet adds around the extra's
+ * own next step in src/ui/extra-sheet.test.ts.
  */
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -132,6 +133,34 @@ describe('land on the moon', () => {
       await user.click(within(next).getByRole('button', { name: 'Back to Apollo 17' }));
 
       expect(screen.queryByRole('dialog', { name: 'Land on the Moon' })).not.toBeInTheDocument();
+    });
+
+    it("opened from Apollo 11's powered descent, shows the landing itself and offers the way back to the flight", async () => {
+      withoutItsView();
+      const { user, frames } = await mountMission('apollo-11', {
+        event: 'powered-descent',
+        loadExtra,
+      });
+      await user.click(
+        within(screen.getByRole('region', { name: 'What is happening' })).getByRole('button', {
+          name: 'Try it: Land on the Moon',
+        }),
+      );
+
+      const next = await land(user, frames);
+
+      expect(
+        within(theSheet()).getByRole('heading', { level: 3, name: 'The Eagle has landed' }),
+      ).toBeVisible();
+      expect(
+        within(theSheet()).queryByRole('heading', { name: 'Powered descent begins' }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(next).getByRole('heading', { level: 3, name: 'Pick up Apollo 11' }),
+      ).toBeVisible();
+      expect(next).not.toHaveTextContent('after the landing');
+      expect(next).toHaveTextContent('Your flight is waiting where you left it.');
+      expect(within(next).getByRole('button', { name: 'Back to Apollo 11' })).toBeVisible();
     });
 
     it('comes down again from the start with Try again, with Slower to hand', async () => {

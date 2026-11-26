@@ -285,10 +285,13 @@ describe('the end of a flight', () => {
         within(next).getByText(/^Apollo 12 was the second mission to land people on the Moon\./),
       ).toBeVisible();
       expect(within(next).getByRole('button', { name: 'Fly Apollo 12' })).toBeVisible();
-      expect(within(toTry).getByRole('heading', { level: 4 })).toHaveTextContent('Drop the stages');
+      // Still a draft, so it is picked here (the tests run as the dev server does) but not on the published site.
+      expect(within(toTry).getByRole('heading', { level: 4 })).toHaveTextContent(
+        'Land on the Moon',
+      );
       expect(
         within(toTry).getByText(
-          'Help a rocket climb to orbit by dropping each part at the right moment.',
+          "Bring a lunar module down past the boulders to clear ground before the fuel runs out, the way Apollo 11's crew did first.",
         ),
       ).toBeVisible();
       expect(within(toExplore).getByRole('heading', { level: 4 })).toHaveTextContent(

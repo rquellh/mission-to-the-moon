@@ -48,17 +48,17 @@ const LANDING_WORD = /\bland(s|ed|ing)?\b/i;
 
 /**
  * A story's landing event: the one the visitor came from when it is a
- * landing, else one that points at this extra, else the one called
- * "landing", else the first in the landing chapter whose title says landing.
+ * landing, else the one called "landing", else the first in the landing
+ * chapter whose title says landing. The moment that offers this game need
+ * not be the landing (Apollo 11 offers it as the powered descent begins),
+ * so offering it does not make a moment the landing.
  */
 function landingEvent(mission: Mission, from: string | null): MissionEvent | undefined {
   const byTitle = (event: MissionEvent): boolean =>
     event.chapter === 'landing' && LANDING_WORD.test(event.title);
-  const isLanding = (event: MissionEvent): boolean =>
-    event.handsOn === meta.id || event.id === 'landing' || byTitle(event);
+  const isLanding = (event: MissionEvent): boolean => event.id === 'landing' || byTitle(event);
   return (
     mission.events.find((event) => event.id === from && isLanding(event)) ??
-    mission.events.find((event) => event.handsOn === meta.id) ??
     mission.events.find((event) => event.id === 'landing') ??
     mission.events.find(byTitle)
   );
