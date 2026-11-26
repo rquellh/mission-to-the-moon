@@ -425,6 +425,25 @@ const LOW_ORBIT_EDGE_PX = 80;
  */
 const SAME_POSE_SHARE = 1e-3;
 /**
+ * A change of view that would fly a long way is made as a dissolve instead:
+ * the picture fades out over DISSOLVE_OUT_MS, the camera is put in the new
+ * view, and the picture fades back in over DISSOLVE_IN_MS, starting from the
+ * first frame drawn there (so a slow first frame of a new close view does not
+ * eat the fade). Flown, the tour's opening from the welcome's overview down to
+ * the rocket on its pad swept the picture round at 200 degrees a second, and
+ * Earth swelled from a few hundredths of the screen to most of it within a
+ * second. A move is that long when the camera's distance to what it looks at
+ * changes by more than FAR_ZOOM times (the journey view's diagram to a craft
+ * close up, or back), or what it looks at moves more than FAR_TRAVEL times the
+ * farther of the two distances (to a craft on the far side of a body). Moves
+ * between the Earth, Moon and ship views, which change distance less, still
+ * fly.
+ */
+const DISSOLVE_OUT_MS = 350;
+const DISSOLVE_IN_MS = 650;
+const FAR_ZOOM = 20;
+const FAR_TRAVEL = 4;
+/**
  * A camera move swings around Earth or the Moon (see swingAround) when the
  * points it looks at, at both ends, are within this many of the body's
  * radii of its center; or when flying straight would take it past a body
@@ -885,6 +904,14 @@ export class Stage implements Director {
   /* Loop. */
   private reducedMotion = false;
   private running = false;
+  /** Frames drawn since start(): a view asked for before the first is put there at once, unseen, as the canvas fades in. */
+  private framesSinceStart = 0;
+  /**
+   * A dissolve to a new view (see DISSOLVE_OUT_MS): fading out to the cut, or
+   * in after it; when its phase began, in frame time (NaN until the first
+   * frame of the new view is drawn); and the mission time the view is framed for.
+   */
+  private dissolve: { phase: 'out' | 'in'; fromMs: number; at: number } | null = null;
   /** What the fastForward getter says now. */
   private fastForwardShown = false;
   /**
@@ -1159,6 +1186,7 @@ export class Stage implements Director {
 
   start(): void {
     this.running = true;
+    this.framesSinceStart = 0;
     this.syncLoop();
   }
 
@@ -1229,7 +1257,7 @@ export class Stage implements Director {
    */
   get moving(): boolean {
     const tweening = this.cameraMove && this.cameraTween !== null && !this.cameraTween.done;
-    return this.pendingView === 'tween' || tweening;
+    return this.pendingView === 'tween' || tweening || this.dissolve !== null;
   }
 
   /**
@@ -1245,7 +1273,9 @@ export class Stage implements Director {
     const at = options.at;
     this.viewNow = nearestView(this.options.mission, view);
     this.userMovedCamera = false;
-    this.pendingView = options.instant || !this.running || this.reducedMotion ? 'instant' : 'tween';
+    // Before the first frame is drawn nothing has been seen yet (the canvas fades in as the scene starts).
+    const unseen = !this.running || this.framesSinceStart === 0;
+    this.pendingView = options.instant || unseen || this.reducedMotion ? 'instant' : 'tween';
     this.pendingAt = at !== undefined && Number.isFinite(at) ? at : null;
     this.endChaseAt(false);
     if (this.viewNow === 'spacecraft') {
@@ -2861,11 +2891,98 @@ export class Stage implements Director {
   /** Frame the current view for mission time `at` (now unless given): instantly, or with a camera move. */
   private applyFraming(instant: boolean, at = this.player.time): void {
     if (instant) {
+      this.endDissolve();
       this.framingOffset(this.settledOffset, this.mix, at);
       this.jumpToSettled();
+    } else if (this.dissolve?.phase === 'out' || this.farMove(at)) {
+      this.startDissolve(at);
     } else {
+      this.endDissolve();
       this.startTween(this.mix, { at });
     }
+  }
+
+  /** True when a move from where the camera is to the view framed for `at` would fly a long way (see DISSOLVE_OUT_MS). */
+  private farMove(at: number): boolean {
+    this.framingOffset(this.settledOffset, this.mix, at);
+    const to = this.settledPose(this.tweenTo);
+    const fromLook = this.camera.position.distanceTo(this.controls.target);
+    const toLook = to.position.distanceTo(to.target);
+    const near = Math.max(Math.min(fromLook, toLook), 1e-9);
+    const far = Math.max(fromLook, toLook);
+    return far / near > FAR_ZOOM || this.controls.target.distanceTo(to.target) > FAR_TRAVEL * far;
+  }
+
+  /**
+   * Fade the picture out to a cut to the view framed for `at` (see
+   * DISSOLVE_OUT_MS), or carry on with one fading out already. One fading in
+   * fades out again from where it is.
+   */
+  private startDissolve(at: number): void {
+    this.cameraTween?.cancel();
+    this.cameraTween = null;
+    this.cameraMove = false;
+    const shown = this.dissolveLevel();
+    if (this.dissolve?.phase === 'out') {
+      this.dissolve.at = at;
+    } else {
+      // From the picture as faded as it is now, so it never brightens on the way out.
+      this.dissolve = { phase: 'out', fromMs: this.nowMs - (1 - shown) * DISSOLVE_OUT_MS, at };
+    }
+    this.needsRender = true;
+  }
+
+  /** How much of the picture shows through a dissolve now, 0 to 1 (1 with none under way). */
+  private dissolveLevel(): number {
+    const d = this.dissolve;
+    if (!d) return 1;
+    if (Number.isNaN(d.fromMs)) return 0;
+    const ms = d.phase === 'out' ? DISSOLVE_OUT_MS : DISSOLVE_IN_MS;
+    const p = MathUtils.clamp((this.nowMs - d.fromMs) / ms, 0, 1);
+    return d.phase === 'out' ? 1 - p : p;
+  }
+
+  /**
+   * Each frame of a dissolve: at the bottom of the fade, cut to the new view;
+   * once it has faded in again, end it. Returns true while it holds the
+   * camera where it is (fading out), when nothing else should move it.
+   */
+  private stepDissolve(): boolean {
+    const d = this.dissolve;
+    if (!d) return false;
+    if (d.phase === 'out') {
+      if (this.nowMs - d.fromMs < DISSOLVE_OUT_MS) {
+        this.showDissolve();
+        return true;
+      }
+      d.phase = 'in';
+      d.fromMs = Number.NaN;
+      this.offsetNow = { ...this.offsetTarget };
+      this.applyViewOffset();
+      this.framingOffset(this.settledOffset, this.mix, d.at);
+      this.jumpToSettled();
+      this.showDissolve();
+      return false;
+    }
+    if (Number.isNaN(d.fromMs)) d.fromMs = this.nowMs;
+    if (this.nowMs - d.fromMs >= DISSOLVE_IN_MS) this.endDissolve();
+    else this.showDissolve();
+    return false;
+  }
+
+  /** Show the picture as far as the dissolve under way has it (see dissolveLevel). */
+  private showDissolve(): void {
+    this.canvas.style.transition = 'none';
+    this.canvas.style.opacity = String(this.dissolveLevel());
+    this.needsRender = true;
+  }
+
+  /** End any dissolve: the picture shows in full again. */
+  private endDissolve(): void {
+    if (!this.dissolve) return;
+    this.dissolve = null;
+    this.canvas.style.removeProperty('opacity');
+    this.canvas.style.removeProperty('transition');
   }
 
   /** Put the camera where the current view rests now, with no move. */
@@ -3228,6 +3345,11 @@ export class Stage implements Director {
       this.pendingAt = null;
       this.applyFraming(instant, at);
       moved = true;
+    }
+    // A dissolve fading out holds the picture where it is until the cut (see DISSOLVE_OUT_MS).
+    if (this.stepDissolve()) return true;
+    if (moved) {
+      // The view asked for is framed: nothing below starts another move this frame.
     } else if (shipView && this.chaseReady && this.wantsFastView() !== this.fastView.on) {
       // The followed craft went into fast forward, or came out of it (or the clock
       // stopped, which shows it at its true place): the ship view moves to its
@@ -3456,6 +3578,8 @@ export class Stage implements Director {
 
   /** Ease the picture's shift toward its target. Returns true while it moves. */
   private updateViewOffset(dt: number): boolean {
+    // A dissolve fading out holds the picture as it is; the cut puts the shift where it belongs.
+    if (this.dissolve?.phase === 'out') return false;
     const dx = this.offsetTarget.x - this.offsetNow.x;
     const dy = this.offsetTarget.y - this.offsetNow.y;
     if (Math.abs(dx) < 0.25 && Math.abs(dy) < 0.25) {
@@ -3582,6 +3706,7 @@ export class Stage implements Director {
     ) {
       this.renderFrame(dt, leapt);
     }
+    this.framesSinceStart += 1;
   };
 
   /** True while a spacecraft keeps turning or fading with the clock stopped (see ShipModel.idleTurning). */
