@@ -234,13 +234,6 @@ const CHASE_SAME_SPOT_RAD = 1e-5;
  */
 const CHASE_STOP_SECONDS = 3;
 
-/**
- * A stop a tour's trip will bring the clock to, told by the tour (see
- * Stage.expectStop): its mission time, when it will be there (in frame time,
- * performance.now's clock), how long the calm move from the steady view to
- * the chase there takes (NaN until worked out), and the chase's frame and
- * distance there, once worked out (see Stage.headForStop).
- */
 /** The ship view's chase as it will be at a later moment (see Stage.chaseAtTime). */
 interface ChaseLater {
   /** The camera's pose then. */
@@ -251,6 +244,13 @@ interface ChaseLater {
   distance: number;
 }
 
+/**
+ * A stop a tour's trip will bring the clock to, told by the tour (see
+ * Stage.expectStop): its mission time, when it will be there (in frame time,
+ * performance.now's clock), how long the calm move from the steady view to
+ * the chase there takes (NaN until worked out), and the chase's frame and
+ * distance there, once worked out (see Stage.headForStop).
+ */
 interface StopAhead {
   at: number;
   endMs: number;
@@ -292,6 +292,16 @@ const CHASE_OFFSET = new Vector3(-0.72, 0.34, 0.6).normalize();
 const SUBJECT_SCALE = 1.35;
 const ORBIT_SUBJECT_SCALE = 5;
 /**
+ * Back near a body it left earlier, what a craft drew near it before goes
+ * from the picture within RETURN_GONE_RADII[0] of the body's radii of its
+ * center and shows whole beyond RETURN_GONE_RADII[1] (see returnStarts in
+ * path-fade.ts), so the way out does not cross the way in up close, and no
+ * line stops with a hard end. Not in the journey view, whose whole-flight
+ * figure keeps every line; the change between views takes RETURN_VIEW_SECONDS.
+ */
+const RETURN_GONE_RADII = [3, 8] as const;
+const RETURN_VIEW_SECONDS = 0.6;
+/**
  * A path that goes around a body many times would pile its laps up into a
  * band, each a little turned from the one before (see path-fade.ts), and up
  * close they run beside the craft as near-copies of the lap it is on. So
@@ -306,16 +316,6 @@ const ORBIT_SUBJECT_SCALE = 5;
  * moves with it: nothing appears or goes at once. Before a stay its first
  * lap shows; after it, its last.
  */
-/**
- * Back near a body it left earlier, what a craft drew near it before goes
- * from the picture within RETURN_GONE_RADII[0] of the body's radii of its
- * center and shows whole beyond RETURN_GONE_RADII[1] (see returnStarts in
- * path-fade.ts), so the way out does not cross the way in up close, and no
- * line stops with a hard end. Not in the journey view, whose whole-flight
- * figure keeps every line; the change between views takes RETURN_VIEW_SECONDS.
- */
-const RETURN_GONE_RADII = [3, 8] as const;
-const RETURN_VIEW_SECONDS = 0.6;
 const ORBIT_FADE = {
   future: [0.35, 0.6],
   past: [0.4, 0.65, 0],
@@ -536,6 +536,25 @@ const DISSOLVE_OUT_MS = 350;
 const DISSOLVE_IN_MS = 650;
 const FAR_ZOOM = 20;
 const FAR_TRAVEL = 4;
+/**
+ * Leaving the ship view's steady view for a tour's stop ahead, the calm move
+ * sets off while the craft still races round its ring, and so cannot keep it
+ * in sight (see setOffForStop). On the way into "In orbit around Earth" and
+ * "Heading home" it lost the craft for about three seconds: its model came
+ * back at its true place behind Earth, then off the bottom of the screen, then
+ * under the card, while the picture rolled 21 to 25 degrees a second. So the
+ * move is planned and tried first: with the clock taken to run evenly to the
+ * stop, the craft's place at each of CUT_SAMPLES moments of the move, from
+ * when its model would be drawn there again (no longer in fast forward), is
+ * seen from the move's camera there. Off the screen, under the card or behind
+ * a body (see seenFrom) for more than CUT_LOST_MS in all, the move is not
+ * flown: the steady view
+ * holds, and as the craft stops racing (its stand-in fading out, see the
+ * hand-back), the picture dissolves to the chase of the craft at its true
+ * place, which then travels with it to the stop (see headForStop).
+ */
+const CUT_SAMPLES = 40;
+const CUT_LOST_MS = 500;
 /**
  * A camera move swings around Earth or the Moon (see swingAround) when the
  * points it looks at, at both ends, are within this many of the body's
@@ -1041,7 +1060,18 @@ export class Stage implements Director {
    * in after it; when its phase began, in frame time (NaN until the first
    * frame of the new view is drawn); and the mission time the view is framed for.
    */
-  private dissolve: { phase: 'out' | 'in'; fromMs: number; at: number } | null = null;
+  private dissolve: { phase: 'out' | 'in'; fromMs: number; at: number; chase: boolean } | null =
+    null;
+  /** True while the steady view holds for a dissolve to the chase as its craft stops racing (see CUT_LOST_MS). */
+  private cutPending = false;
+  /** True from that dissolve's cut until the clock stops: the ship view travels with its craft, not in the steady view. */
+  private cutToChase = false;
+  /** Where the camera was, kept while it is put somewhere else for a moment (see seenFrom). */
+  private readonly keptPosition = new Vector3();
+  private readonly keptQuaternion = new Quaternion();
+  private readonly keptUp = new Vector3();
+  private readonly cutPose = orientedPose();
+  private readonly cutShip = new Vector3();
   /** What the fastForward getter says now. */
   private fastForwardShown = false;
   /**
@@ -1783,13 +1813,6 @@ export class Stage implements Director {
       set?.setPixelRatio(ratio);
   }
 
-  /**
-   * Revolutions flown around the nearer body at each sample of a path (the
-   * angle swept about Earth's or the Moon's center, at true scale), and the
-   * stretches of it that fade loop by loop (see ORBIT_FADE): the whole path
-   * of a flight that stays in Earth orbit; for a Moon flight, each stay in
-   * orbit, low over Earth or the Moon (see orbitStays).
-   */
   /** Where a path comes back near a body it left earlier, and what fades then (see PathReturns); null when it never does. */
   private returnsOf(polyline: {
     readonly times: Float64Array;
@@ -1825,6 +1848,13 @@ export class Stage implements Director {
     return { starts, bodies, radii, centers: [earth, earth, moon], fade: RETURN_GONE_RADII };
   }
 
+  /**
+   * Revolutions flown around the nearer body at each sample of a path (the
+   * angle swept about Earth's or the Moon's center, at true scale), and the
+   * stretches of it that fade loop by loop (see ORBIT_FADE): the whole path
+   * of a flight that stays in Earth orbit; for a Moon flight, each stay in
+   * orbit, low over Earth or the Moon (see orbitStays).
+   */
   private revolutionsOf(polyline: {
     readonly times: Float64Array;
     readonly truePositions: Float32Array;
@@ -3301,16 +3331,18 @@ export class Stage implements Director {
    * DISSOLVE_OUT_MS), or carry on with one fading out already. One fading in
    * fades out again from where it is.
    */
-  private startDissolve(at: number): void {
+  private startDissolve(at: number, chase = false): void {
     this.cameraTween?.cancel();
     this.cameraTween = null;
     this.cameraMove = false;
     const shown = this.dissolveLevel();
     if (this.dissolve?.phase === 'out') {
       this.dissolve.at = at;
+      this.dissolve.chase = chase;
     } else {
       // From the picture as faded as it is now, so it never brightens on the way out.
-      this.dissolve = { phase: 'out', fromMs: this.nowMs - (1 - shown) * DISSOLVE_OUT_MS, at };
+      const fromMs = this.nowMs - (1 - shown) * DISSOLVE_OUT_MS;
+      this.dissolve = { phase: 'out', fromMs, at, chase };
     }
     this.needsRender = true;
   }
@@ -3340,6 +3372,13 @@ export class Stage implements Director {
       }
       d.phase = 'in';
       d.fromMs = Number.NaN;
+      if (d.chase) {
+        // Out of the steady view, onto the chase of the craft where it is now (see CUT_LOST_MS).
+        this.fastView.on = false;
+        this.fastMove = false;
+        this.snapChase();
+        this.cutToChase = true;
+      }
       this.offsetNow = { ...this.offsetTarget };
       this.applyViewOffset();
       this.framingOffset(this.settledOffset, this.mix, d.at);
@@ -3731,10 +3770,19 @@ export class Stage implements Director {
       this.applyFraming(instant, at);
       moved = true;
     }
+    // A jump of the clock, a stopped clock or another view ends the trip to the stop that a cut
+    // to the chase was for: the picture shows again at once, and the camera goes as a jump puts it.
+    if (jumped || !this.player.playing || !shipView) {
+      this.cutPending = false;
+      this.cutToChase = false;
+      if (jumped && this.dissolve?.chase) this.endDissolve();
+    }
     // A dissolve fading out holds the picture where it is until the cut (see DISSOLVE_OUT_MS).
     if (this.stepDissolve()) return true;
     if (moved) {
       // The view asked for is framed: nothing below starts another move this frame.
+    } else if (shipView && this.chaseReady && this.fastView.on && this.cutsForStop()) {
+      // The craft stops racing: the picture dissolves from the steady view to its chase (see CUT_LOST_MS).
     } else if (shipView && this.chaseReady && this.fastView.on && this.leavesForStop()) {
       // Off for the tour's stop ahead in time to rest there as the clock stops (see leavesForStop).
     } else if (shipView && this.chaseReady && this.wantsFastView() !== this.fastView.on) {
@@ -3841,7 +3889,8 @@ export class Stage implements Director {
   private wantsFastView(): boolean {
     if (this.viewNow !== 'spacecraft' || this.chaseAt !== null || !this.player.playing)
       return false;
-    return this.fastForwardShown || this.followed.fast;
+    // Cut to the chase as its craft stopped racing, it stays there while the mark fades.
+    return this.followed.fast || (this.fastForwardShown && !this.cutToChase);
   }
 
   /**
@@ -3912,7 +3961,7 @@ export class Stage implements Director {
    * where it races round now. Returns true when it sets off.
    */
   private leavesForStop(): boolean {
-    if (this.cameraTween || this.reducedMotion) return false;
+    if (this.cameraTween || this.reducedMotion || this.cutPending) return false;
     const stop = this.usableStop();
     if (!stop) return false;
     if (Number.isNaN(stop.needMs)) {
@@ -3925,8 +3974,95 @@ export class Stage implements Director {
     }
     const left = stop.endMs - this.nowMs;
     if (left > stop.needMs) return false;
-    this.setOffForStop(stop, Math.max(left, CAMERA_MOVE_MS[0]));
+    const [chaseAt, chaseOverride, holdRest] = [this.chaseAt, this.chaseOverride, this.holdRest];
+    const ms = Math.max(left, CAMERA_MOVE_MS[0]);
+    this.setOffForStop(stop, ms);
+    if (!this.losesCraft(stop, ms)) return true;
+    // Not flown: the steady view holds for a dissolve to the chase (see CUT_LOST_MS).
+    (this.cameraTween as Tween | null)?.cancel();
+    this.cameraTween = null;
+    this.cameraMove = false;
+    this.fastMove = false;
+    this.keepSight = false;
+    this.calmMove = false;
+    this.fixedEnd = false;
+    this.chaseAt = chaseAt;
+    this.chaseOverride = chaseOverride;
+    this.holdRest = holdRest;
+    this.fastView.on = true;
+    this.stopAhead = stop;
+    this.cutPending = true;
+    return false;
+  }
+
+  /**
+   * The steady view holding for a dissolve to the chase (see CUT_LOST_MS):
+   * start it as the followed craft stops racing, its stand-in fading out.
+   * Returns true when it starts.
+   */
+  private cutsForStop(): boolean {
+    if (!this.cutPending || this.followed.fast) return false;
+    this.cutPending = false;
+    this.startDissolve(this.player.time, true);
     return true;
+  }
+
+  /**
+   * True when the calm move just set off for `stop` (see setOffForStop), `ms`
+   * long, would lose its craft for more than CUT_LOST_MS: with the clock taken
+   * to run evenly to the stop, from when the craft would no longer be in fast
+   * forward (its model drawn at its true place again), its place out of the
+   * clear area or behind a body, seen from the move's camera then.
+   */
+  private losesCraft(stop: { at: number }, ms: number): boolean {
+    const body = this.swingBody(this.tweenFrom, this.tweenTo);
+    const ship = this.chased();
+    const index = this.ships.indexOf(ship);
+    if (!body || index < 0 || !this.cameraTween) return false;
+    const story = this.player.story;
+    const from = this.player.storyTime;
+    const to = story.toStory(stop.at);
+    const storyPerSecond = (to - from) / Math.max(ms / 1000, 1e-3);
+    let fast = ship.fast;
+    let lost = 0;
+    for (let i = 1; i <= CUT_SAMPLES; i += 1) {
+      const u = i / CUT_SAMPLES;
+      const s = from + (to - from) * u;
+      const t = story.toElapsed(s);
+      const a = Math.max(0, s - 0.02);
+      const b = Math.min(story.duration, s + 0.02);
+      const pace =
+        b > a ? ((story.toElapsed(b) - story.toElapsed(a)) / (b - a)) * storyPerSecond : 0;
+      fast = inFastForward(this.turnRate(ship, index, t) * pace, fast);
+      if (fast) continue;
+      if (!this.path.position(ship.id, t, this.mix, this.scratch)) continue;
+      const place = this.cutShip.fromArray(this.scratch);
+      this.movePose(body, easeMove(u), this.tweenTo, this.cutPose, place, this.swingWay, place);
+      if (!this.seenFrom(this.cutPose, place)) lost += ms / CUT_SAMPLES;
+    }
+    return lost > CUT_LOST_MS;
+  }
+
+  /**
+   * True when `point`, seen from `pose`, is not behind Earth or the Moon,
+   * nor farther out of the clear area than a craft drawn there reaches
+   * (SHIP_EDGE_PX): a craft passing close by the card's edge is still seen.
+   */
+  private seenFrom(pose: OrientedPose, point: Vector3): boolean {
+    const camera = this.camera;
+    this.keptPosition.copy(camera.position);
+    this.keptQuaternion.copy(camera.quaternion);
+    this.keptUp.copy(camera.up);
+    camera.position.copy(pose.position);
+    camera.up.copy(pose.up);
+    camera.lookAt(pose.target);
+    camera.updateMatrixWorld();
+    const seen = !this.occluded(point) && this.inClearArea(point, -SHIP_EDGE_PX);
+    camera.position.copy(this.keptPosition);
+    camera.quaternion.copy(this.keptQuaternion);
+    camera.up.copy(this.keptUp);
+    camera.updateMatrixWorld();
+    return seen;
   }
 
   /** Leave the steady view for the chase as it will be at `stop`, in a calm move of `ms` milliseconds. */
