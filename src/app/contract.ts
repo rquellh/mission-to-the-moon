@@ -103,6 +103,14 @@ export interface Director {
    * should look when it arrives.
    */
   setView(view: EventView, options?: { at?: number }): void;
+  /**
+   * A tour's trip that leaves the camera in its view will stop the clock at
+   * mission time `at`, `inSeconds` real seconds from now, so a camera move the
+   * scene makes on its own (out of its fast-forward view, say) can set off in
+   * time to come to rest as the clock stops. Optional; a scene without it
+   * moves its camera when the clock asks it to.
+   */
+  expectStop?(at: number, inSeconds: number): void;
   /** Keep the framed subject clear of the parts of the canvas the interface covers. */
   setViewInsets(insets: ViewInsets): void;
   /**

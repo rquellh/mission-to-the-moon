@@ -592,6 +592,9 @@ export class Tour {
       this.stopWatchingScene = this.director.subscribe(this.watchScene);
     } else if (asksView) {
       this.moveCamera(view);
+    } else if (trip) {
+      // The camera stays in its view: say where the clock will stop, so the scene can bring it to rest by then.
+      this.director.expectStop?.(this.stopSeconds, takes);
     }
     if (jump) {
       this.arrive();
