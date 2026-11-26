@@ -10,7 +10,8 @@
  * view stands to fit a craft's orbit across a narrow picture (fitAcross),
  * and what counts as a jump of the clock, which is the only thing besides
  * the visitor that moves the camera in the Earth and Moon views
- * (clockJumped).
+ * (clockJumped). And how a move's up can be carried along its line of sight
+ * so the picture rolls only as one even roll (carryUp).
  */
 import { PerspectiveCamera, Matrix4, Quaternion, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
@@ -18,7 +19,10 @@ import {
   aimAt,
   bodyTop,
   calmestWay,
+  carriedUp,
+  carriedUpAt,
   carryPose,
+  carryUp,
   clockJumped,
   divesPast,
   easeMove,
@@ -722,5 +726,67 @@ describe('clockJumped', () => {
     ['starts over from the end when played', stopped(500), playing(0)],
   ])('counts a clock that %s', (_name, before, after) => {
     expect(clockJumped(before, after)).toBe(true);
+  });
+});
+
+describe('carryUp', () => {
+  const blank = (): OrientedPose => pose(new Vector3(), new Vector3(), new Vector3());
+  // The roll from one up to the next about the second's line of sight, in radians (as check.py measures it).
+  const rollBetween = (a: OrientedPose, b: OrientedPose): number => {
+    const look = b.target.clone().sub(b.position).normalize();
+    const from = a.up.clone().addScaledVector(look, -a.up.dot(look)).normalize();
+    const to = b.up.clone().addScaledVector(look, -b.up.dot(look)).normalize();
+    return Math.atan2(new Vector3().crossVectors(from, to).dot(look), from.dot(to));
+  };
+  // A camera that goes a quarter of the way round a body's axis from above its equator, looking at
+  // its center, the axis up: a turn of the picture that is partly a roll.
+  const around = (t: number, out: OrientedPose): void => {
+    const angle = (Math.PI / 2) * t;
+    out.position.set(Math.cos(angle), 0.8, Math.sin(angle)).normalize().multiplyScalar(4);
+    out.target.set(0, 0, 0);
+    out.up.set(0, 1, 0);
+  };
+  const height = Math.atan2(0.8, 1);
+
+  it("is short of the end's up by the roll the way needs", () => {
+    const plan = carryUp(around, new Vector3(0, 1, 0), carriedUp());
+    // Round the axis from above the equator, the up rolls by the turn times the sine of the height.
+    expect(Math.abs(plan.left)).toBeCloseTo((Math.PI / 2) * Math.sin(height), 1);
+  });
+
+  it("starts on the first pose's up and ends on the end's", () => {
+    const plan = carryUp(around, new Vector3(0, 1, 0), carriedUp());
+    for (const t of [0, 1]) {
+      const at = blank();
+      around(t, at);
+      const look = at.target.clone().sub(at.position).normalize();
+      const wanted = at.up.clone().addScaledVector(look, -at.up.dot(look)).normalize();
+      carriedUpAt(plan, t, at);
+      expect(at.up.distanceTo(wanted)).toBeLessThan(1e-3);
+    }
+  });
+
+  it('rolls the picture evenly, the same small step each step of the move', () => {
+    const plan = carryUp(around, new Vector3(0, 1, 0), carriedUp());
+    const steps = 20;
+    let last = blank();
+    around(0, last);
+    carriedUpAt(plan, 0, last);
+    for (let i = 1; i <= steps; i += 1) {
+      const next = blank();
+      around(i / steps, next);
+      carriedUpAt(plan, i / steps, next);
+      expect(rollBetween(last, next)).toBeCloseTo(plan.left / steps, 2);
+      last = next;
+    }
+  });
+
+  it('leaves no roll to a move that only backs away along its line of sight', () => {
+    const away = (t: number, out: OrientedPose): void => {
+      out.position.set(0, 1, 3 + 5 * t);
+      out.target.set(0, 0, 0);
+      out.up.set(0, 1, 0);
+    };
+    expect(Math.abs(carryUp(away, new Vector3(0, 1, 0), carriedUp()).left)).toBeLessThan(1e-6);
   });
 });
