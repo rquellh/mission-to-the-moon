@@ -345,7 +345,21 @@ const LABEL_GAP_PX = 8;
 const LABEL_FADE_SECONDS = 0.5;
 /** How near its opacity a label's fade ends (see updateLabels). */
 const LABEL_FADE_DONE = 0.004;
-/** For this many story seconds after liftoff, a part left behind is drawn at the size its lander is drawn (see updateFleet). */
+/**
+ * A lander lifting off a body leaves part of itself at its site: its descent
+ * stage, and on the later flights a rover. A smaller craft is drawn larger for
+ * its size (see SIZE_EXPONENT in vehicles.ts), so at its own scale the ascent
+ * stage, and the parts left with it, which share that scale, are drawn about
+ * twice as large as the whole lander was: on the page turn from "Moonwalk
+ * ends" to "Liftoff from the Moon" the lander doubled in size at once. So for
+ * LIFTOFF_GROW_STORY_SECONDS of story time from liftoff the ascent stage grows,
+ * eased, from the scale the whole lander was drawn at to its own, by the story
+ * clock (so a page turn to the liftoff finds it at the whole lander's scale,
+ * and it grows only as the clock runs), and for LIFTOFF_SIZE_STORY_SECONDS
+ * everything at the site is drawn at the ascent stage's scale as drawn; after
+ * that each takes its own, which is the ascent stage's (see updateFleet).
+ */
+const LIFTOFF_GROW_STORY_SECONDS = 1.2;
 const LIFTOFF_SIZE_STORY_SECONDS = 1.5;
 const COMPANION_MARKER_M = 1500;
 const COMPANION_MARKER_PX = 9;
@@ -4785,6 +4799,35 @@ export class Stage implements Director {
   }
 
   /** Size, place, and show or hide each spacecraft for this frame. */
+  /** Story seconds since `shipId` lifted off a body other than Earth, on its climb from there at t; NaN on none. */
+  private sinceLiftoff(shipId: string, t: number): number {
+    const phase = this.path.phaseAt(shipId, t);
+    if (phase?.kind !== 'ascent' || phase.body === 'earth') return Number.NaN;
+    return this.player.storyTime - this.player.story.toStory(phaseStart(phase));
+  }
+
+  /**
+   * The scale a lander's ascent stage is drawn at just after liftoff,
+   * meters per CSS pixel, growing from the whole lander's to its own (see
+   * LIFTOFF_GROW_STORY_SECONDS), in the fleet's context as it is now; 0 when
+   * it is not lifting off.
+   */
+  private liftoffScale(ship: ShipState, model: ShipModel, t: number): number {
+    const since = this.sinceLiftoff(ship.id, t);
+    if (!(since < LIFTOFF_GROW_STORY_SECONDS)) return 0;
+    const phase = this.path.phaseAt(ship.id, t);
+    if (!phase) return 0;
+    const context = this.poseContext;
+    const own = model.metersPerPixelOf(model.shapeAt(t), context);
+    const whole = model.metersPerPixelOf(model.shapeAt(phaseStart(phase) - 1), context);
+    if (!(own > 0) || !(whole > 0)) return 0;
+    return MathUtils.lerp(
+      whole,
+      own,
+      smoothstep(0, LIFTOFF_GROW_STORY_SECONDS, Math.max(0, since)),
+    );
+  }
+
   private updateFleet(dt: number, snap: boolean): void {
     if (!this.fleet) return;
     // A move out of the journey view draws a craft behind Earth or the Moon
@@ -4974,6 +5017,8 @@ export class Stage implements Director {
         if (own > 0 && pairScale > 0)
           context.metersPerPixel = MathUtils.lerp(own, pairScale, pair.arranged);
       }
+      if (context.metersPerPixel <= 0)
+        context.metersPerPixel = this.liftoffScale(ship, anchorModel, t);
       anchorModel.update(closeUp(ship, anchorModel, pose), context);
       this.modelPlaces[anchorIndex]?.copy(pose.position);
     }
@@ -5045,6 +5090,7 @@ export class Stage implements Director {
       }
       context.opacity =
         this.opacityOf(ship, i === moverIndex ? pair?.anchor : undefined) * (1 - companion(ship));
+      if (context.metersPerPixel <= 0) context.metersPerPixel = this.liftoffScale(ship, model, t);
       model.update(closeUp(ship, model, pose), context);
       this.modelPlaces[i]?.copy(pose.position);
     }
@@ -5079,8 +5125,8 @@ export class Stage implements Director {
       context.unitsPerPixel = this.unitsPerPixelAt(this.sitePosition, shown, tanHalf);
       // Sized like the ascent stage that lifted off from it (smaller in the journey view),
       // or, while the lander still stands there, like the lander. Just after liftoff it
-      // takes the ascent stage's size as drawn, which eases from the whole lander's, so
-      // the two grow together rather than the part appearing at the larger size.
+      // takes the ascent stage's size as drawn, which grows from the whole lander's (see
+      // LIFTOFF_GROW_STORY_SECONDS), so the two grow together.
       if (journey) context.maxPixels = JOURNEY_LEFT_BEHIND_MAX_PX;
       context.sizeScale =
         screenScale *
@@ -5090,10 +5136,7 @@ export class Stage implements Director {
       const phase = this.path.phaseAt(part.shipId, t)?.kind;
       const drawnLander = lander !== undefined && lander.root.visible;
       const standing = drawnLander && phase === 'surface';
-      const rising =
-        drawnLander &&
-        phase === 'ascent' &&
-        this.player.storyTime - this.player.story.toStory(part.from) < LIFTOFF_SIZE_STORY_SECONDS;
+      const rising = drawnLander && this.sinceLiftoff(part.shipId, t) < LIFTOFF_SIZE_STORY_SECONDS;
       context.metersPerPixel = standing || rising ? lander.drawnMetersPerPixel : 0;
       part.update(shown, this.sitePosition, this.siteUp, site?.front ?? this.worldUp, context);
       // While the lander still stands there, the part is not left behind yet: no label.
