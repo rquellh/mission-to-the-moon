@@ -49,7 +49,10 @@
  * the end of its last hurry to the stop); and when the camera moves to the
  * stop's view, by the tour's plan (tripViewSeconds in src/app/tour.ts), from
  * the view of the stop it leaves. The scene can still move the camera later
- * (while its fast-forward view shows) or sooner (see Tour.watchScene).
+ * (while its fast-forward view shows) or sooner (see Tour.watchScene). The
+ * stops, the trips' lengths and whether the camera moves follow the flight's
+ * tour style (StyleRules in src/app/tour.ts): on an every-event tour no trip
+ * moves the camera, and a page turn jumps the clock and plays nothing.
  */
 import { writeFile } from 'node:fs/promises';
 import { openBrowser, sleep } from './cast.mjs';
@@ -82,6 +85,20 @@ async function measure(missionId, near, even, usualTrips) {
   const story = sim.createStoryTime(sim.storyKeyTimes(path, eventTimes), { ease: !even });
   const partings = sim.partingsAtEvents(path, eventTimes);
   const keys = story.keyTimes.map((t) => [t, story.toStory(t)]);
+  // The flight's tour style (see StyleRules in src/app/tour.ts), or on a build from before tour
+  // styles, the one tour there was: its key moments, each in its own view.
+  const rules = tour.tourRules?.(bundle.mission) ?? {
+    stops: (mission) => mission.events.filter((event) => event.keyMoment ?? event.inTour),
+    view: (mission, stop) => views.nearestView(mission, stop.view),
+    tripSeconds: tour.tripSeconds,
+    viewOnTrips: true,
+    showsDrops: false,
+    pageTurns: false,
+  };
+  const drops = rules.showsDrops
+    ? (await import('/src/app/drops.ts')).dropsAtEvents(bundle, eventTimes)
+    : [];
+  const stays = rules.pageTurns ? sim.staysOnSurface(path) : [];
 
   /**
    * Mission seconds per story second at story time `at`, read from the clock
@@ -213,9 +230,10 @@ async function measure(missionId, near, even, usualTrips) {
     view: event.view,
     stop: null,
   }));
+  const tourStops = rules.stops(bundle.mission);
   let stopNumber = 0;
   for (const [i, event] of bundle.mission.events.entries()) {
-    if (event.inTour) events[i].stop = stopNumber += 1;
+    if (tourStops.includes(event)) events[i].stop = stopNumber += 1;
   }
   const eventStories = events.map((event) => event.story);
   const nearEvent = (at) => eventStories.some((e) => Math.abs(e - at) <= near);
@@ -318,13 +336,25 @@ async function measure(missionId, near, even, usualTrips) {
   };
 
   const stops = events.filter((event) => event.stop !== null);
+  /** Where the clock rests at a stop, in story seconds, by the tour's own rule (Tour.restFor). */
   const restOf = (event) => {
-    const parting = partings.find(({ start }) => Math.abs(start - event.seconds) < 1e-6);
-    if (!parting) return event.story;
-    const beside = story.toStory(parting.end) - event.story;
-    if (!(beside > 0)) return event.story;
-    const after = Math.min(tour.PARTING_REST_STORY_SECONDS, tour.PARTING_REST_MAX_SHARE * beside);
-    return story.toStory(story.toMission(event.story + after));
+    const at = (time) => Math.abs(time - event.seconds) < 1e-6;
+    const parting = partings.find(({ start }) => at(start));
+    if (parting) {
+      const beside = story.toStory(parting.end) - event.story;
+      if (!(beside > 0)) return event.story;
+      const after = Math.min(tour.PARTING_REST_STORY_SECONDS, tour.PARTING_REST_MAX_SHARE * beside);
+      return story.toStory(story.toMission(event.story + after));
+    }
+    if (drops.some(at)) {
+      const next = stops.find((stop) => stop.story > event.story + 1e-6)?.story ?? story.length;
+      const after = Math.min(
+        tour.DROP_REST_STORY_SECONDS,
+        tour.PARTING_REST_MAX_SHARE * (next - event.story),
+      );
+      if (after > 1e-6) return story.toStory(story.toMission(event.story + after));
+    }
+    return event.story;
   };
   const trips = [];
   for (let i = 0; i + 1 < stops.length; i += 1) {
@@ -332,21 +362,46 @@ async function measure(missionId, near, even, usualTrips) {
     const to = stops[i + 1];
     const start = restOf(from);
     const span = to.story - start;
-    const usual = tour.tripSeconds(span);
-    const played = play(start, span, usual);
-    // When the camera moves to the stop's view, by the tour's plan, from the view of the stop just left.
-    const fromView = views.nearestView(bundle.mission, from.view);
-    const toView = views.nearestView(bundle.mission, to.view);
-    const viewAt = !(played.seconds > tour.VIEW_LEAD_SECONDS)
-      ? 0
-      : tour.tripViewSeconds
-        ? tour.tripViewSeconds({
-            fromView,
-            toView,
-            missionToStop: to.seconds - story.toMission(start),
-            plan: played.plan,
-          })
-        : played.seconds - tour.VIEW_LEAD_SECONDS;
+    // A page turn jumps the clock: no play at all (see StyleRules.pageTurns).
+    const page =
+      stays.length > 0 &&
+      sim.stillBetween(stays, story.toMission(start), story.toMission(restOf(to)));
+    const usual = page ? 0 : rules.tripSeconds(span);
+    const played = page
+      ? {
+          seconds: 0,
+          limited: false,
+          over: 1,
+          finalRun: 0,
+          plan: null,
+          topSpeed: 0,
+          topLaps: null,
+          unhurried: null,
+          openLaps: null,
+        }
+      : play(start, span, usual);
+    // When the camera moves to the stop's view, by the tour's plan, from the view of the stop
+    // just left; null when the tour keeps one view (see StyleRules.viewOnTrips).
+    const fromView = rules.view(
+      bundle.mission,
+      bundle.mission.events.find((e) => e.id === from.id),
+    );
+    const toView = rules.view(
+      bundle.mission,
+      bundle.mission.events.find((e) => e.id === to.id),
+    );
+    const viewAt = !rules.viewOnTrips
+      ? null
+      : !(played.seconds > tour.VIEW_LEAD_SECONDS)
+        ? 0
+        : tour.tripViewSeconds
+          ? tour.tripViewSeconds({
+              fromView,
+              toView,
+              missionToStop: to.seconds - story.toMission(start),
+              plan: played.plan,
+            })
+          : played.seconds - tour.VIEW_LEAD_SECONDS;
     const { plan: _plan, ...kept } = played;
     const trip = {
       from: from.stop,
@@ -355,6 +410,7 @@ async function measure(missionId, near, even, usualTrips) {
       toTitle: to.title,
       span,
       usual,
+      page,
       ...kept,
       fromView,
       toView,
@@ -552,7 +608,7 @@ async function run() {
   console.log(`    of those, a stand-in: ${at(data.standInTop)}`);
 
   console.log(
-    `\ntour trips (Next): the trip, then a parting's play from its event to where it rests. Real seconds as played, and as usual without the clock's hurry limit (a trip held back takes longer, up to ${tripLimits.longest ?? tripLimits.usual} s); its final run, from the end of its last hurry to the stop; and when the camera moves to the stop's view, as planned from the view of the stop it leaves`,
+    `\ntour trips (Next): the trip, then at a parting or a part let go, the play from its event to where it rests (a page turn jumps the clock and plays nothing). Real seconds as played, and as usual without the clock's hurry limit (a trip held back takes longer, up to ${tripLimits.longest ?? tripLimits.usual} s); its final run, from the end of its last hurry to the stop; and when the camera moves to the stop's view, as planned from the view of the stop it leaves`,
   );
   console.log(
     '  trip     story s  real s (usual)  top pace  fastest drawn at 1x or slower        fastest drawn overall              final run  camera at        to',
@@ -571,14 +627,20 @@ async function run() {
       notes.push(
         `over the clock's hurry limit by x${trip.over.toFixed(2)} where it holds the trip back: it would take longer than ${tripLimits.longest} s`,
       );
-    const real = `${trip.seconds.toFixed(1).padStart(5)} (${trip.usual.toFixed(1).padStart(4)})`;
-    const camera = `${trip.viewAt.toFixed(1).padStart(5)} s ${trip.toView}`;
+    const real = trip.page
+      ? ' page turn  '
+      : `${trip.seconds.toFixed(1).padStart(5)} (${trip.usual.toFixed(1).padStart(4)})`;
+    // A tour that keeps one view moves no camera on a trip (see StyleRules.viewOnTrips).
+    const camera =
+      trip.viewAt === null || trip.viewAt === undefined
+        ? `  -     ${trip.toView}`
+        : `${trip.viewAt.toFixed(1).padStart(5)} s ${trip.toView}`;
     console.log(
       `  ${String(trip.from).padStart(2)} -> ${String(trip.to).padEnd(2)} ${trip.span.toFixed(2).padStart(7)}  ${real}  ${trip.topSpeed.toFixed(2).padStart(6)}x   ${lapAt(trip.unhurried).padEnd(36)}  ${lapAt(trip.topLaps).padEnd(33)}  ${`${trip.finalRun.toFixed(1)} s`.padStart(8)}  ${camera.padEnd(16)} ${trip.toTitle}${notes.length ? `\n${' '.repeat(18)}^ ${notes.join('; ')}` : ''}`,
     );
     if (trip.parting) {
       console.log(
-        `     parting ${trip.parting.span.toFixed(2).padStart(5)}  ${trip.parting.seconds.toFixed(1).padStart(5)}         ${trip.parting.topSpeed.toFixed(2).padStart(6)}x   ${lapAt(trip.parting.unhurried).padEnd(36)}  ${lapAt(trip.parting.topLaps)}`,
+        `     rest    ${trip.parting.span.toFixed(2).padStart(5)}  ${trip.parting.seconds.toFixed(1).padStart(5)}         ${trip.parting.topSpeed.toFixed(2).padStart(6)}x   ${lapAt(trip.parting.unhurried).padEnd(36)}  ${lapAt(trip.parting.topLaps)}`,
       );
     }
   }
