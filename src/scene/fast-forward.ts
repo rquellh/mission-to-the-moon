@@ -1,9 +1,12 @@
 /**
- * Fast forward's two rules, apart from the scene so they can be tested:
- * when a craft laps its body too fast to be drawn (inFastForward), and the
- * ring that stands for it then, which must be a closed lap of its body
- * (closedLapStart, writeLap). See the fast-forward block in stage.ts for how
- * the scene uses them.
+ * Fast forward's rules, apart from the scene so they can be tested: when a
+ * craft laps its body too fast to be drawn at its true place
+ * (inFastForward); the ring drawn for it then, which must be a closed lap of
+ * its body (closedLapStart, writeLap); the stand-in, its model gliding round
+ * that ring at a calm pace of its own (glideRevolutions, ringPointAt,
+ * ringHeadingAt); and the hand-back to its true place when fast forward ends
+ * (handBackOpacity, stepHandBack). See the fast-forward block in stage.ts for
+ * how the scene uses them.
  */
 
 /**
@@ -15,8 +18,8 @@
  * 8.8 seconds "better": Eagle's last lap before its descent, in Explore at
  * normal speed, takes about that long and stays a drawn model.
  */
-export const FAST_FORWARD_ON_LAP_SECONDS = 7;
-export const FAST_FORWARD_OFF_LAP_SECONDS = 8;
+export const FAST_FORWARD_ON_LAP_SECONDS = 20;
+export const FAST_FORWARD_OFF_LAP_SECONDS = 24;
 
 /** Whether a craft going around its body `lapsPerSecond` times a second of real time is in fast forward, given whether it was. */
 export function inFastForward(lapsPerSecond: number, was: boolean): boolean {
@@ -169,4 +172,176 @@ export function writeLap(
         (out[3 * j + c] as number) + along * ((_a[c] as number) - (_end[c] as number));
     }
   }
+}
+
+/*
+ * The stand-in. While a craft is in fast forward its true place races round
+ * the body, so its model is not drawn there: it stands in for the craft on
+ * the ring, gliding round at one steady, calm pace in real time, one lap in
+ * FAST_FORWARD_GLIDE_LAP_SECONDS, whatever the clock's pace, the tour's
+ * hurry, or Explore's speed. It sets off from the craft's true place at the
+ * pace the craft went into fast forward at (one lap in
+ * FAST_FORWARD_ON_LAP_SECONDS) and eases to its own over
+ * FAST_FORWARD_GLIDE_EASE_SECONDS, so it neither jumps nor slows with a
+ * jolt. The 40 seconds is a working figure, twice the slowest lap that goes
+ * to the ring; it is not a number the owner gave.
+ */
+export const FAST_FORWARD_GLIDE_LAP_SECONDS = 40;
+export const FAST_FORWARD_GLIDE_EASE_SECONDS = 1;
+
+const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
+const smooth = (x: number): number => {
+  const u = clamp01(x);
+  return u * u * (3 - 2 * u);
+};
+
+/** The stand-in's pace in laps a second, `seconds` of real time after it set off at `startRate` laps a second. */
+export function glideRate(seconds: number, startRate: number): number {
+  const end = 1 / FAST_FORWARD_GLIDE_LAP_SECONDS;
+  return startRate + (end - startRate) * smooth(seconds / FAST_FORWARD_GLIDE_EASE_SECONDS);
+}
+
+/**
+ * The laps the stand-in has glided `seconds` of real time after it set off
+ * at `startRate` laps a second (not below 0): glideRate summed over that
+ * time, so it never decreases.
+ */
+export function glideRevolutions(seconds: number, startRate: number): number {
+  const start = Math.max(0, startRate);
+  const end = 1 / FAST_FORWARD_GLIDE_LAP_SECONDS;
+  const ease = FAST_FORWARD_GLIDE_EASE_SECONDS;
+  const s = Math.max(0, seconds);
+  if (s >= ease) return (ease * (start + end)) / 2 + end * (s - ease);
+  // The ease is a smoothstep of the time, whose sum from 0 to u is u³ - u⁴ / 2.
+  const u = s / ease;
+  return start * s + (end - start) * ease * (u ** 3 - u ** 4 / 2);
+}
+
+/**
+ * How much of the stand-in's distance from the ring as it sets off (from
+ * the craft's true place to the ring's point there, at most what the lap
+ * misses closing by) is still added, `seconds` of real time in: all of it at
+ * first, so it starts where the craft is, and none once the glide has eased
+ * to its own pace, so from then on it is on the ring.
+ */
+export function seedShare(seconds: number): number {
+  return 1 - smooth(seconds / FAST_FORWARD_GLIDE_EASE_SECONDS);
+}
+
+/** Where a phase falls on a ring: at point j, and `u` of the way on toward point j + 1 (0 to 1). */
+interface RingStep {
+  readonly j: number;
+  readonly u: number;
+}
+
+/** Where `phase` (a share of a lap, any number, taken round the lap) falls on a ring of `count` points. */
+function ringStep(count: number, phase: number): RingStep {
+  const along = (phase - Math.floor(phase)) * count;
+  const j = Math.min(count - 1, Math.max(0, Math.floor(along)));
+  return { j, u: Math.max(0, Math.min(1, along - j)) };
+}
+
+/**
+ * The point a share `phase` of a lap round a ring of `count` points (point j
+ * at j / count of the lap, as writeLap writes them; the last point leads
+ * back to the first), on the straight line between its two neighbours, as
+ * the ring is drawn: into `out` at `offset`.
+ */
+export function ringPointAt(
+  ring: ArrayLike<number>,
+  count: number,
+  phase: number,
+  out: { [i: number]: number },
+  offset = 0,
+): void {
+  const { j, u } = ringStep(count, phase);
+  const k = (j + 1) % count;
+  for (let c = 0; c < 3; c += 1) {
+    const a = ring[3 * j + c] ?? 0;
+    const b = ring[3 * k + c] ?? 0;
+    out[offset + c] = a + (b - a) * u;
+  }
+}
+
+/**
+ * The way on round a ring of `count` points (as ringPointAt) at `phase`, as
+ * a unit vector into `out`: the way the craft flies, since a lap's points go
+ * in the order it flies them. It turns smoothly from one point to the next,
+ * not in steps at the points. Left as it is when the ring has no length there.
+ */
+export function ringHeadingAt(
+  ring: ArrayLike<number>,
+  count: number,
+  phase: number,
+  out: { [i: number]: number },
+): void {
+  const { j, u } = ringStep(count, phase);
+  const before = (j - 1 + count) % count;
+  const next = (j + 1) % count;
+  const after = (j + 2) % count;
+  const heading = [0, 0, 0];
+  for (let c = 0; c < 3; c += 1) {
+    // The way at points j and j + 1, each from its two neighbours, blended between them.
+    const at = (ring[3 * next + c] ?? 0) - (ring[3 * before + c] ?? 0);
+    const on = (ring[3 * after + c] ?? 0) - (ring[3 * j + c] ?? 0);
+    heading[c] = at + (on - at) * u;
+  }
+  const length = Math.hypot(heading[0] as number, heading[1] as number, heading[2] as number);
+  if (!(length > 1e-12)) return;
+  for (let c = 0; c < 3; c += 1) out[c] = (heading[c] as number) / length;
+}
+
+/*
+ * The hand-back. When fast forward ends, the model goes back to the craft's
+ * true place with a dissolve over FAST_FORWARD_HANDBACK_SECONDS of real time:
+ * it fades out where it stands in and fades in at its true place, moving at
+ * HANDBACK_SWITCH of the way through, with nothing drawn, so it is never seen
+ * to jump. A stand-in within HANDBACK_EASE_DEG of its true place (round the
+ * body) eases across instead, drawn all the while.
+ */
+export const FAST_FORWARD_HANDBACK_SECONDS = 0.5;
+export const HANDBACK_SWITCH = 0.5;
+export const HANDBACK_EASE_DEG = 4;
+
+/** How visible the model is a share `progress` of the way through a hand-back that dips: fully at either end, not at all at the switch. */
+export function handBackOpacity(progress: number): number {
+  const p = clamp01(progress);
+  return p < HANDBACK_SWITCH
+    ? 1 - smooth(p / HANDBACK_SWITCH)
+    : smooth((p - HANDBACK_SWITCH) / (1 - HANDBACK_SWITCH));
+}
+
+/**
+ * A hand-back's progress `dt` seconds of real time on (back toward 0 for a
+ * negative `dt`: fast forward came back before the model moved). A step
+ * across the switch stops on it, so one frame is drawn with the model hidden
+ * at the switch however long the frames are: it leaves one place and appears
+ * at the other unseen.
+ */
+export function stepHandBack(progress: number, dt: number): number {
+  const next = clamp01(progress + dt / FAST_FORWARD_HANDBACK_SECONDS);
+  const crosses =
+    (progress < HANDBACK_SWITCH && next > HANDBACK_SWITCH) ||
+    (progress > HANDBACK_SWITCH && next < HANDBACK_SWITCH);
+  return crosses ? HANDBACK_SWITCH : next;
+}
+
+/**
+ * Whether a stand-in at `standIn` is close enough to its craft's true place
+ * `truePlace` to ease across to it without dipping out and in: no farther
+ * from it than an arc of HANDBACK_EASE_DEG round the body's center `center`
+ * at the craft's distance from it.
+ */
+export function handBackEases(
+  standIn: ArrayLike<number>,
+  truePlace: ArrayLike<number>,
+  center: ArrayLike<number>,
+): boolean {
+  let apart = 0;
+  let radius = 0;
+  for (let c = 0; c < 3; c += 1) {
+    apart += ((standIn[c] ?? 0) - (truePlace[c] ?? 0)) ** 2;
+    radius += ((truePlace[c] ?? 0) - (center[c] ?? 0)) ** 2;
+  }
+  return Math.sqrt(apart) <= Math.sqrt(radius) * ((HANDBACK_EASE_DEG * Math.PI) / 180);
 }
