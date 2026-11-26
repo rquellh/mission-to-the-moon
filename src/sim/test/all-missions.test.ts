@@ -29,7 +29,15 @@ import {
 import type { LeftBehind, VehicleChange } from '../../content/vehicle-types.ts';
 import { buildFlightPath } from '../build.ts';
 import { AnchoredOrbit } from '../segments.ts';
-import { createStoryTime, storyKeyTimes } from '../story-time.ts';
+import {
+  CALM_LAP_STORY_SECONDS,
+  createStoryTime,
+  EASE_GENTLE_PACE,
+  storyIntervalLength,
+  storyKeyTimes,
+  SWING_LAP_STORY_SECONDS,
+  type StoryTime,
+} from '../story-time.ts';
 import type { FlightPlan } from '../types.ts';
 import {
   continuityProblems,
@@ -461,6 +469,88 @@ for (const folder of flights) {
       );
 
       expect(short).toEqual([]);
+    });
+  });
+
+  describe(`${id}: story clock`, () => {
+    /** The flight's clock as main.ts builds it, and what it was built from. */
+    const built = () => {
+      if (!folder.path) throw new Error('the plan does not build');
+      const eventTimes = story.events.map((event) => elapsedToSeconds(event.elapsed));
+      const keys = storyKeyTimes(folder.path, eventTimes);
+      return { keys, clock: createStoryTime(keys) };
+    };
+    /** Mission seconds per story second at mission time t, from the story seconds a hundredth of a second either side. */
+    const paceAt = (clock: StoryTime, t: number): number =>
+      0.02 / (clock.toStory(t + 0.01) - clock.toStory(t - 0.01));
+
+    it('runs forward and back, each key at the story second its stretches add up to, none shorter than usual', () => {
+      const { clock } = built();
+      const problems: string[] = [];
+      let sum = 0;
+      clock.keyTimes.forEach((key, i) => {
+        if (Math.abs(clock.toStory(key) - sum) > 1e-9) problems.push(`key ${key} is not at ${sum}`);
+        if (Math.abs(clock.toMission(sum) - key) > 1e-6 * Math.max(1, Math.abs(key)))
+          problems.push(`story ${sum} is not at key ${key}`);
+        const stretch = clock.stretches[i];
+        if (!stretch) return;
+        if (stretch.length < storyIntervalLength(stretch.to - stretch.from) - 1e-9)
+          problems.push(`the stretch from ${key} is shorter than usual`);
+        sum += stretch.length;
+      });
+      let previous = -Infinity;
+      for (let k = 0; k <= 20_000; k += 1) {
+        const s = (clock.length * k) / 20_000;
+        const t = clock.toMission(s);
+        if (!(t > previous)) problems.push(`runs backward at story ${s}`);
+        if (Math.abs(clock.toStory(t) - s) > 1e-9) problems.push(`story ${s} comes back off`);
+        previous = t;
+      }
+      assert.equal(problems.length, 0, report(problems.slice(0, 10)));
+    });
+
+    it(`keeps every craft on no closed lap to one lap in ${SWING_LAP_STORY_SECONDS} story seconds`, () => {
+      const { keys, clock } = built();
+      const turns = keys.turns!;
+      const problems: string[] = [];
+      for (const [start, end] of turns.open) {
+        const samples = turns.samples(start, end);
+        const at = samples.flatMap((t, k) => [t, (t + (samples[k + 1] ?? t)) / 2]);
+        for (const t of at) {
+          const lapIn = 1 / (paceAt(clock, t) * turns.openRate(t));
+          if (lapIn < SWING_LAP_STORY_SECONDS * (1 - 1e-3))
+            problems.push(`at ${t.toFixed(0)} s a craft laps once in ${lapIn.toFixed(2)} s`);
+        }
+      }
+      assert.equal(problems.length, 0, report(problems.slice(0, 10)));
+    });
+
+    it(`plays its calm, parting and docking stretches evenly, with no craft faster than once in ${CALM_LAP_STORY_SECONDS} story seconds, and eases the rest from the gentle pace`, () => {
+      const { keys, clock } = built();
+      const turns = keys.turns!;
+      const problems: string[] = [];
+      for (const stretch of clock.stretches) {
+        const { from, to, length, play } = stretch;
+        const s0 = clock.toStory(from);
+        const name = `${play} stretch from ${from.toFixed(0)} s`;
+        if (play === 'eased') {
+          // Just after its start and just before its end: no faster than the gentle pace.
+          const start = (clock.toMission(s0 + 0.01) - from) / 0.01;
+          const end = (to - clock.toMission(s0 + length - 0.01)) / 0.01;
+          if (Math.max(start, end) > EASE_GENTLE_PACE * (1 + 1e-6))
+            problems.push(`${name} ends at ${start.toFixed(0)} and ${end.toFixed(0)}`);
+          continue;
+        }
+        let fastest = Math.max(turns.rate(from), turns.rate(to));
+        for (const t of turns.samples(from, to)) fastest = Math.max(fastest, turns.rate(t));
+        const lapIn = 1 / (((to - from) / length) * fastest);
+        if (lapIn < CALM_LAP_STORY_SECONDS * (1 - 1e-9))
+          problems.push(`${name}: a craft laps once in ${lapIn.toFixed(2)} s`);
+        const middle = (clock.toMission(s0 + length / 2) - from) / (length / 2);
+        if (Math.abs(middle / ((to - from) / length) - 1) > 1e-6)
+          problems.push(`${name} does not play at one pace`);
+      }
+      assert.equal(problems.length, 0, report(problems.slice(0, 10)));
     });
   });
 
