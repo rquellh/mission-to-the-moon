@@ -226,6 +226,31 @@ const CHASE_DISTANCE_SECONDS = 0.8;
  */
 const CHASE_SAME_SPOT_RAD = 1e-5;
 /**
+ * With a tour's stop ahead (see expectStop), over the trip's last
+ * CHASE_STOP_SECONDS the chase heads evenly for its frame and distance at the
+ * stop, so it is there as the clock stops: trailing its craft's heading, it
+ * went on turning after the clock had stopped (up to 2.8 s at 25 degrees a
+ * second on the way into "Parachutes open").
+ */
+const CHASE_STOP_SECONDS = 3;
+
+/**
+ * A stop a tour's trip will bring the clock to, told by the tour (see
+ * Stage.expectStop): its mission time, when it will be there (in frame time,
+ * performance.now's clock), how long the calm move from the steady view to
+ * the chase there takes (NaN until worked out), and the chase's frame and
+ * distance there, once worked out (see Stage.headForStop).
+ */
+interface StopAhead {
+  at: number;
+  endMs: number;
+  needMs: number;
+  frame?: Quaternion;
+  distance?: number;
+  /** When the chase began to head for the stop, in frame time (see Stage.headForStop). */
+  fromMs?: number;
+}
+/**
  * The ship view's up is a body's vertical within the first of these heights
  * above it (in its radii) and ecliptic north beyond the second, so the
  * horizon is level near a body (see chaseUpWeights). The change between the
@@ -902,13 +927,12 @@ export class Stage implements Director {
   /** The chase as it will be at a tour's stop (see expectStop and leavesForStop). */
   private readonly stopPose = orientedPose();
   private readonly nowPose = orientedPose();
-  /**
-   * A stop a tour's trip will bring the clock to, told by the tour (see
-   * expectStop): its mission time, when it will be there (in frame time,
-   * performance.now's clock), and how long the calm move from the steady view
-   * to the chase there takes (NaN until worked out).
-   */
-  private stopAhead: { at: number; endMs: number; needMs: number } | null = null;
+  /** The stop a tour's trip will bring the clock to, if the tour said (see expectStop). */
+  private stopAhead: StopAhead | null = null;
+  /** The chase's own frame and distance under the last frame's turn toward a stop (see headForStop). */
+  private readonly chaseOwnFrame = new Quaternion();
+  private chaseOwnDistance = 0;
+  private chaseHeading = false;
   /** True while the move under way heads for a fixed end, the chase as it will be at chaseAt (see setOffForStop). */
   private fixedEnd = false;
   /** True from a move with a fixed end until the clock reaches chaseAt: the camera holds at that end. */
@@ -3107,9 +3131,15 @@ export class Stage implements Director {
     if (this.path.direction(ship.id, at, this.mix, this.scratch))
       pose.forward.fromArray(this.scratch);
     this.radialUp(pose.position, pose.up);
-    // chaseFrameFor keeps the heading it found, for the chase now: put back the chase's own.
+    // chaseFrameFor keeps the heading it found, for the chase now: put back the chase's own. It
+    // reads the craft and the moment it frames for from chased and chaseTime: that craft, then.
     this.dryForward.copy(this.chaseForward);
+    const [savedAt, savedOverride] = [this.chaseAt, this.chaseOverride];
+    this.chaseAt = at;
+    this.chaseOverride = ship;
     const frame = this.chaseFrameFor(pose, this.q8);
+    this.chaseAt = savedAt;
+    this.chaseOverride = savedOverride;
     this.chaseForward.copy(this.dryForward);
     out.target.copy(pose.position);
     out.position
@@ -3822,7 +3852,7 @@ export class Stage implements Director {
   }
 
   /** The tour's stop ahead (see expectStop), while it is still ahead and the clock runs toward it. */
-  private usableStop(): { at: number; endMs: number; needMs: number } | null {
+  private usableStop(): StopAhead | null {
     const stop = this.stopAhead;
     if (!stop) return null;
     if (!this.player.playing || this.player.time >= stop.at || this.viewNow !== 'spacecraft') {
@@ -3923,6 +3953,48 @@ export class Stage implements Director {
    * fast-forward view hides the chase, the frame is where the ship is at once.
    */
   private followChase(dt: number, jumped: boolean): void {
+    // Back to the chase's own frame under last frame's turn toward a stop, while that goes on.
+    if (this.chaseHeading) {
+      this.chaseHeading = false;
+      if (!jumped && this.usableStop()) {
+        this.chaseFrame.copy(this.chaseOwnFrame);
+        this.chaseDistance = this.chaseOwnDistance;
+      }
+    }
+    this.followChaseOwn(dt, jumped);
+    if (!jumped && !this.reducedMotion && !this.fastView.on && !this.chaseHeld) this.headForStop();
+  }
+
+  /**
+   * Over a tour trip's last CHASE_STOP_SECONDS, turn the chase from its own
+   * frame toward its frame at the stop, by a share that grows evenly to all of
+   * it as the clock stops, and its distance likewise (its own frame is kept, so
+   * the share is of the way from it each frame, not compounded).
+   */
+  private headForStop(): void {
+    const stop = this.usableStop();
+    if (!stop) return;
+    const left = (stop.endMs - this.nowMs) / 1000;
+    if (left > CHASE_STOP_SECONDS) return;
+    // Worked out each frame: a craft that comes to rest (a landing) keeps the heading the chase
+    // had last, so its frame there is known only as the chase gets there.
+    const end = this.chaseAtTime(stop.at, this.stopPose);
+    if (!end) return;
+    stop.frame = (stop.frame ?? new Quaternion()).copy(this.q8);
+    stop.distance = this.chaseAutoDistance(this.dryPose);
+    stop.fromMs ??= this.nowMs;
+    // From nothing when it begins to all of it when the clock is due at the stop, evenly in frame
+    // time (the mission clock slows into the stop, so by it the turn would end early and quickly).
+    const share = stop.endMs > stop.fromMs ? smoothstep(stop.fromMs, stop.endMs, this.nowMs) : 0;
+    this.chaseOwnFrame.copy(this.chaseFrame);
+    this.chaseOwnDistance = this.chaseDistance;
+    this.chaseHeading = true;
+    this.chaseFrame.slerp(stop.frame, share);
+    this.chaseDistance += ((stop.distance ?? this.chaseDistance) - this.chaseDistance) * share;
+  }
+
+  /** The chase as it follows its craft (see followChase). */
+  private followChaseOwn(dt: number, jumped: boolean): void {
     const ship = this.chaseSubject();
     const target = this.chaseFrameFor(ship, this.q1);
     const auto = this.chaseAutoDistance(ship);
