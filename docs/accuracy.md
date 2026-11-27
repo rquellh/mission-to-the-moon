@@ -6,7 +6,7 @@ Event times, places, and facts come from the cited sources, and each mission was
 
 The spacecraft are simple shapes built in code and drawn far larger than life so you can see them. When two spacecraft fly side by side, the gap between them is not to scale.
 
-The hands-on extras are practice toys, not simulators, and say so on screen; the facts they show (staging times, docking times, landing places, rocket heights) come from the missions' own citations or from sources registered for that extra.
+The hands-on extras are practice toys, not simulators, and say so on screen; the facts they show (staging times, docking times, landing places, rocket heights, how the first Moon landing came down) come from the missions' own citations or are cited by the extra itself to registered sources. A game's own sentences about the real flights have their sources folded under its Start button, labeled as theirs.
 
 Each mission's flight plan and vehicle file list, in their opening comments, which values are illustrations. "How this is drawn" on the site explains the same thing in plain words.
 

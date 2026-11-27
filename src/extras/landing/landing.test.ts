@@ -1,7 +1,8 @@
 /**
- * "Land on the Moon" ends each landing with the real landing and "Up next":
- * back to the flight it was opened over, or, opened from the list, the
- * flight of the first landing. Running out of fuel ends a run with "Try
+ * "Land on the Moon" folds the sources of its own sentences about the real
+ * flights under its Start button, and ends each landing with the real
+ * landing and "Up next": back to the flight it was opened over, or, opened
+ * from the list, the flight of the first landing. Running out of fuel ends a run with "Try
  * again" and no "Up next", a bump on the boulders says why and lets the run
  * carry on, and sliding on past the clear patch says to slide back. The real
  * extra runs in the real sheet and is flown with its buttons as the frames
@@ -83,6 +84,38 @@ const withoutItsView = (): void => {
 };
 
 describe('land on the moon', () => {
+  describe('the start screen', () => {
+    it('folds the sources of its sentences about the real flights under Start, labeled as theirs', async () => {
+      withoutItsView();
+      const { user } = await mountMission('gemini-3', { loadExtra });
+      await openFromTheList(user);
+      await within(theSheet()).findByRole('button', { name: 'Start' });
+
+      const sources = within(theSheet()).getByRole('group', {
+        description:
+          'Where the sentences on the boulders, the real descent, and the top half flying the crew back to orbit come from:',
+      });
+      expect(sources).toHaveTextContent('Sources (9)');
+
+      await user.click(within(sources).getByText('Sources (9)'));
+
+      expect(sources).toHaveAttribute('open');
+      for (const title of [
+        'Apollo 11 Mission Report (MSC-00171)',
+        'Apollo by the Numbers: A Statistical Reference (NASA SP-2000-4029)',
+        'NSSDCA Master Catalog',
+        'Apollo Lunar Descent and Ascent Trajectories (NASA TM X-58040)',
+      ])
+        expect(within(sources).getByText(title)).toBeVisible();
+      expect(
+        within(sources).getByRole('link', { name: /^Section 4\.10\.3, "Powered Descent"/ }),
+      ).toHaveAttribute(
+        'href',
+        'https://www.nasa.gov/wp-content/uploads/static/apollo50th/pdf/A11_MissionReport.pdf',
+      );
+    });
+  });
+
   describe('the end of a landing', () => {
     it('keeps focus on the landed line, and opened from the list, offers the real landing and opens Apollo 11 at it', async () => {
       withoutItsView();
