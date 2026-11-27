@@ -2772,7 +2772,7 @@ export class Stage implements Director {
   private chaseAutoDistance(ship: ShipPose): number {
     const toEarth = ship.position.length() - EARTH_RADIUS;
     const toMoon = ship.position.distanceTo(this.moonCenter) - MOON_RADIUS;
-    const nearMoon = this.nearMoon(ship.position);
+    const nearMoon = toMoon / MOON_RADIUS < toEarth / EARTH_RADIUS;
     const radius = nearMoon ? MOON_RADIUS : EARTH_RADIUS;
     const height = Math.max(0, nearMoon ? toMoon : toEarth);
     return MathUtils.clamp(0.75 * radius + 0.5 * height, 0.15, 3.5);
