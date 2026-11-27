@@ -1,5 +1,6 @@
 import { sources as extraDocking } from './extras/docking.ts';
 import { sources as extraLandingSites } from './extras/landing-sites.ts';
+import { sources as extraOrbit } from './extras/orbit.ts';
 import { sources as extraPatches } from './extras/patches.ts';
 import { sources as extraRockets } from './extras/rockets.ts';
 import { sources as extraStages } from './extras/stages.ts';
@@ -63,7 +64,7 @@ const SHARED = {
     publisher: 'NASA',
     url: 'https://www.nasa.gov/wp-content/uploads/2023/03/sp-4203.pdf',
     checked: '2026-11-15',
-    use: 'The narrative history of each Gemini flight.',
+    use: 'The narrative history of each Gemini flight. In "Fly to orbit", that ground computers carried out the Gemini launch vehicle\'s radio guidance.',
   },
   'nssdca-master-catalog': {
     title: 'NSSDCA Master Catalog',
@@ -147,6 +148,7 @@ export const SOURCES = {
   ...extraLandingSites,
   ...extraRockets,
   ...extraPatches,
+  ...extraOrbit,
 } as const satisfies Record<string, Source>;
 
 /** The id of a registered source. */
@@ -193,5 +195,6 @@ export const SOURCE_GROUPS: SourceGroups = {
     'landing-sites': extraLandingSites,
     rockets: extraRockets,
     patches: extraPatches,
+    orbit: extraOrbit,
   },
 };

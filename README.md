@@ -75,8 +75,9 @@ Those are ordinary links, and any moment of any flight can be one.
 
 ## Things to try
 
-Under the missions are six things to try and explore:
+Under the missions are seven things to try and explore:
 
+- [**Fly to orbit**](https://moon.ryanquellhorst.com/?extra=orbit): tip a rocket over a step at a time, drop its empty stages, and reach orbit speed before the fuel runs out.
 - [**Drop the stages**](https://moon.ryanquellhorst.com/?extra=stages): help a rocket climb to orbit by dropping each part at the right moment.
 - [**Dock two spacecraft**](https://moon.ryanquellhorst.com/?extra=docking): fly a Gemini slowly into the docking cone of its Agena target, the way Gemini 8's crew did first.
 - [**Land on the Moon**](https://moon.ryanquellhorst.com/?extra=landing): bring a lunar module down past the boulders to clear ground before the fuel runs out, the way Apollo 11's crew did first.
@@ -84,10 +85,10 @@ Under the missions are six things to try and explore:
 - [**Three rockets**](https://moon.ryanquellhorst.com/?extra=rockets): the three rockets that launched the Gemini and Apollo crews, side by side at their true heights.
 - [**Mission patches**](https://moon.ryanquellhorst.com/?extra=patches): a book of the crews' patches that fills in, in color, as you open each flight. The book is kept on your own device.
 
-A liftoff or docking card in a mission offers the matching one with a "Try it" button, and so
-does Apollo 11's "Powered descent begins" card.
+A liftoff card in a mission offers Drop the stages with a "Try it" button, a docking card offers
+Dock two spacecraft, and Apollo 11's "Powered descent begins" card offers Land on the Moon.
 
-The three hands-on ones end the same way, with **Up next**: one button back to the flight it was
+The four hands-on ones end the same way, with **Up next**: one button back to the flight it was
 opened from, or, opened from the list, to the flight where it really happened. Under it are
 another thing to try, something to explore, and **Try again**. On a phone the next step stays
 pinned at the bottom of the screen.
@@ -106,8 +107,8 @@ checked against its sources before it went on the list.
 The picture is a drawing. The flight path is computed from the published points of each flight
 (burns, orbits, landing, splashdown) and drawn as a smooth curve between them, so it shows the
 shape of the trip and not every turn. The spacecraft are simple shapes, drawn far larger than
-life so you can see them. The two hands-on things to try, dropping the stages and docking, are
-practice toys, not simulators, and say so on screen.
+life so you can see them. The four hands-on things to try (flying to orbit, dropping the stages,
+docking, and landing) are practice toys, not simulators, and say so on screen.
 
 "How this is drawn" on the site explains the same thing, and
 [What is real and what is drawn](docs/accuracy.md) has the full account, with how the facts are
@@ -127,5 +128,5 @@ machine, the tests, how the folders are laid out, and how to add a mission, whic
 
 ## Status
 
-All 21 flights, the Apollo 1 page, and the six things to try are in. What is left is polish
+All 21 flights, the Apollo 1 page, and the seven things to try are in. What is left is polish
 before launch.

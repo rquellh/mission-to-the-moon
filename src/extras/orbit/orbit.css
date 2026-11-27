@@ -1,0 +1,735 @@
+/* "Fly to orbit". Phone first: the picture on top, filling what the controls
+   leave, so the whole flying screen fits without scrolling; side by side on
+   wide screens. */
+
+[data-extra='orbit'].extra-host {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-extra='orbit'] .orbit {
+  /* The sheet's title bar and the room around the extra, apart from the two
+     safe edges, all in src/styles/main.css: the Close button's 44px
+     (`.button` min-height), the title bar's 10px bottom padding
+     (`.dialog--full .dialog__head`) and 1px border (`.dialog__head`), and the
+     18px above and below the extra (`.extra-host`). Keep it in step with
+     those rules. */
+  --orbit-sheet-room: 91px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+/* The picture: the 3D view, or the flat picture without it. */
+[data-extra='orbit'] .orbit__view {
+  /* Where the fuel strip sits and how tall it is, so the labels can keep clear of it. */
+  --orbit-strip-top: 10px;
+  --orbit-strip-tall: 38px;
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 220px;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-bg);
+}
+
+/* In orbit the picture steps back to a set size, with the result under it. */
+[data-extra='orbit'] .orbit[data-phase='orbit'] .orbit__view {
+  flex: 0 0 250px;
+  min-height: 0;
+}
+
+[data-extra='orbit'] .orbit__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The fuel strip, across the top of the picture. */
+[data-extra='orbit'] .orbit__fuel {
+  position: absolute;
+  top: var(--orbit-strip-top);
+  right: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--orbit-strip-tall);
+  padding: 8px 12px;
+  line-height: 20px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+[data-extra='orbit'] .orbit__fuel .orbit__label {
+  white-space: nowrap;
+}
+
+[data-extra='orbit'] .orbit__fuel-word {
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* A bar that fills from the left: the bottom stage's fuel. */
+[data-extra='orbit'] .orbit__bar {
+  flex: 1 1 auto;
+  display: flex;
+  min-width: 24px;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--color-line);
+}
+
+[data-extra='orbit'] .orbit__bar-fill {
+  display: block;
+  width: 100%;
+  border-radius: 3px;
+  background: var(--color-accent);
+}
+
+/* An empty tank: a dashed outline with nothing in it. */
+[data-extra='orbit'] .orbit__bar.is-empty {
+  border: 1px dashed var(--color-text-muted);
+  background: transparent;
+}
+
+/* "Thick air" and "Orbit": pinned to the picture's left edge, so they never
+   land on the rocket's column, each just above its line, clear of it by half
+   the line's width on screen (--orbit-line, set by script from the scene's
+   own size). With the 3D view script gives the line's place from the top
+   (--orbit-tag-at, from the scene), and a label never rises under the fuel
+   strip. */
+[data-extra='orbit'] .orbit__tag {
+  --orbit-tag-lift: calc(16px + var(--orbit-line) / 2 + 3px);
+  position: absolute;
+  top: max(
+    calc(var(--orbit-tag-at) - var(--orbit-tag-lift)),
+    calc(var(--orbit-strip-top) + var(--orbit-strip-tall) + 4px)
+  );
+  left: 12px;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+[data-extra='orbit'] .orbit__tag--orbit {
+  color: var(--color-accent);
+}
+
+/* The legend for the ring at the end of the path ahead, at the bottom right
+   over the ground: a ring like it (its radius on screen is --orbit-ring, set
+   by script from the scene's own size), then its words. */
+[data-extra='orbit'] .orbit__legend {
+  position: absolute;
+  right: 12px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+[data-extra='orbit'] .orbit__legend-ring {
+  flex: none;
+  width: calc(2 * var(--orbit-ring));
+  height: calc(2 * var(--orbit-ring));
+  border: var(--orbit-line) solid var(--color-accent);
+  border-radius: 50%;
+}
+
+/* No WebGL: the flat picture, under the fuel strip, filling the rest of the view. */
+[data-extra='orbit'] .orbit__view--flat {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-extra='orbit'] .orbit__view--flat .orbit__fuel {
+  position: static;
+  flex: none;
+  margin: var(--orbit-strip-top) var(--orbit-strip-top) 0;
+}
+
+/* The flat picture's box. Its play area stands on the bottom edge and fits
+   inside, so one unit of the rules is the smaller of its width and height
+   shares (--orbit-wide and --orbit-tall, the play area in units, set by
+   script), and each edge label sits its line's height in units
+   (--orbit-tag-units) above the bottom. */
+[data-extra='orbit'] .orbit__flat {
+  --orbit-unit: min(100cqw / var(--orbit-wide), 100cqh / var(--orbit-tall));
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  container-type: size;
+}
+
+[data-extra='orbit'] .orbit__flat .orbit__tag {
+  top: auto;
+  bottom: calc(var(--orbit-tag-units) * var(--orbit-unit) + var(--orbit-line) / 2 + 3px);
+}
+
+[data-extra='orbit'] .orbit__picture {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The flat picture's shapes. Its sizes are in units of the rules (one unit of
+   the viewBox each), set in index.ts or here. */
+[data-extra='orbit'] .orbit__flat-band {
+  fill: var(--color-text);
+  fill-opacity: 0.05;
+}
+
+[data-extra='orbit'] .orbit__flat-edge {
+  stroke: var(--color-text-muted);
+  stroke-opacity: 0.5;
+  stroke-width: 0.1;
+  stroke-dasharray: 0.4 0.4;
+}
+
+[data-extra='orbit'] .orbit__flat-ground {
+  fill: var(--color-hover);
+}
+
+[data-extra='orbit'] .orbit__flat-ground-edge {
+  stroke: var(--color-line-strong);
+  stroke-width: 0.1;
+}
+
+[data-extra='orbit'] .orbit__flat-pad {
+  fill: var(--color-text-faint);
+}
+
+[data-extra='orbit'] .orbit__flat-tower {
+  stroke: var(--color-text-faint);
+  stroke-width: 0.15;
+  stroke-linecap: round;
+}
+
+[data-extra='orbit'] .orbit__flat-orbit {
+  stroke: var(--color-accent);
+  stroke-opacity: 0.5;
+  stroke-width: 0.15;
+  stroke-dasharray: 0.6 0.5;
+}
+
+[data-extra='orbit'] .orbit__flat-trail {
+  fill: none;
+  stroke: var(--color-text);
+  stroke-opacity: 0.2;
+  stroke-width: 0.15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-extra='orbit'] .orbit__flat-ahead {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 0.15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 0.3 0.5;
+}
+
+[data-extra='orbit'] .orbit__flat-ring {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 0.15;
+}
+
+[data-extra='orbit'] .orbit__flat-body {
+  fill: var(--color-text);
+  fill-opacity: 0.88;
+}
+
+[data-extra='orbit'] .orbit__flat-body--first {
+  fill: var(--color-text-muted);
+  fill-opacity: 1;
+}
+
+[data-extra='orbit'] .orbit__flat-stripe,
+[data-extra='orbit'] .orbit__flat-bell {
+  fill: var(--color-text-faint);
+}
+
+[data-extra='orbit'] .orbit__flat-flame {
+  fill: var(--color-accent);
+  fill-opacity: 0.85;
+}
+
+[data-extra='orbit'] .orbit__flat-fall {
+  fill: none;
+  stroke: var(--color-text-muted);
+  stroke-width: 0.1;
+  stroke-linecap: round;
+  stroke-dasharray: 0.3 0.5;
+}
+
+[data-extra='orbit'] .orbit__flat-riser {
+  fill: none;
+  stroke: var(--color-text);
+  stroke-opacity: 0.6;
+  stroke-width: 0.075;
+}
+
+[data-extra='orbit'] .orbit__flat-canopy {
+  fill: var(--color-hover);
+  stroke: var(--color-text);
+  stroke-width: 0.125;
+}
+
+/* The column beside or under the picture. */
+[data-extra='orbit'] .orbit__side,
+[data-extra='orbit'] .orbit__intro,
+[data-extra='orbit'] .orbit__choose,
+[data-extra='orbit'] .orbit__fly,
+[data-extra='orbit'] .orbit__after {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Before a run. */
+[data-extra='orbit'] .orbit__intro .extra-text {
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+[data-extra='orbit'] .orbit__intro-rule {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+/* The caption that ties the folded sources under Start to the sentences they
+   back, spaced as in "Land on the Moon": a rule over the caption, and the fold
+   close under it. */
+[data-extra='orbit'] .orbit__source-for {
+  margin: 0 0 -12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-line);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+[data-extra='orbit'] .orbit__intro .sources {
+  margin-top: 0;
+  border-top: 0;
+}
+
+[data-extra='orbit'] .orbit__sources {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* On a phone held upright, the start screen keeps the picture and Start
+   where they were before the sources came: the caption and its fold are
+   left out of the layout and hang below the practice-toy note (and the
+   no-3D note, when there is one), reached by scrolling. (They lie in the
+   extra's column, under the two buttons, on wide screens.) */
+[data-extra='orbit'] .orbit[data-phase='intro'] {
+  position: relative;
+}
+
+[data-extra='orbit'] .orbit__sources {
+  position: absolute;
+  top: calc(100% + 16px);
+  right: 0;
+  left: 0;
+  padding-bottom: calc(var(--safe-bottom) + 18px);
+}
+
+[data-extra='orbit'] .orbit__choose .extra-heading {
+  margin: 0;
+}
+
+[data-extra='orbit'] .orbit__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-extra='orbit'] .orbit__choices .button {
+  width: 100%;
+}
+
+/* Small capitals over a value: the read-outs, the fuel strip, the rocket's line. */
+[data-extra='orbit'] .orbit__label {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* The read-outs: three across while flying, in the approved pictures' shares, and two at orbit. */
+[data-extra='orbit'] .orbit__readouts {
+  display: grid;
+  grid-template-columns: minmax(0, 86fr) minmax(0, 130fr) minmax(0, 122fr);
+  gap: 10px;
+}
+
+[data-extra='orbit'] .orbit__readouts--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+[data-extra='orbit'] .orbit__readout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 10px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-raised);
+}
+
+[data-extra='orbit'] .orbit__readout .orbit__label {
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+
+[data-extra='orbit'] .orbit__value {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+[data-extra='orbit'] .orbit__pips {
+  display: flex;
+  gap: 4px;
+}
+
+[data-extra='orbit'] .orbit__pip {
+  flex: 1 1 0;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--color-line);
+}
+
+[data-extra='orbit'] .orbit__pip.is-on {
+  background: var(--color-accent);
+}
+
+/* The line at the end of the sideways speed pips: orbit speed. */
+[data-extra='orbit'] .orbit__pips-mark {
+  flex: none;
+  width: 2px;
+  height: 18px;
+  margin: -3px 0 -3px 2px;
+  border-radius: 1px;
+  background: var(--color-text);
+}
+
+[data-extra='orbit'] .orbit__coach {
+  min-height: 2.8em;
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+/* The controls: Tip back, Drop it, and Tip over in a row, each with its key hint under it. */
+[data-extra='orbit'] .orbit__controls {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+[data-extra='orbit'] .orbit__control {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+[data-extra='orbit'] .orbit__tilt,
+[data-extra='orbit'] .orbit__drop {
+  flex-direction: column;
+  gap: 2px;
+  height: 64px;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+[data-extra='orbit'] .orbit__tilt {
+  width: 64px;
+  padding: 0;
+  border-radius: 14px;
+  font-size: 0.6875rem;
+}
+
+[data-extra='orbit'] .orbit__tilt.is-firing {
+  border-color: var(--color-accent-line);
+  background: var(--color-accent-soft);
+}
+
+[data-extra='orbit'] .orbit__tilt-icon {
+  width: 24px;
+  height: 24px;
+}
+
+[data-extra='orbit'] .orbit__drop {
+  width: 150px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 1rem;
+}
+
+[data-extra='orbit'] .orbit__drop-note {
+  font-size: 0.6875rem;
+  font-weight: 400;
+}
+
+[data-extra='orbit'] .orbit__drop.button--primary .orbit__drop-note {
+  font-weight: 600;
+}
+
+/* Nothing to drop: dimmed, but still a button that keeps the focus and says "Not yet" when pressed. */
+[data-extra='orbit'] .orbit__drop[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+[data-extra='orbit'] .orbit__drop[aria-disabled='true']:hover {
+  background: var(--color-raised);
+}
+
+[data-extra='orbit'] .orbit__key {
+  color: var(--color-text-faint);
+  font-size: 0.6875rem;
+  line-height: 16px;
+}
+
+/* Key hints only where there is likely a keyboard. */
+@media (hover: none), (pointer: coarse) {
+  [data-extra='orbit'] .orbit__key {
+    display: none;
+  }
+}
+
+[data-extra='orbit'] .orbit__rule {
+  max-width: none;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+[data-extra='orbit'] .orbit__rule span {
+  display: block;
+}
+
+[data-extra='orbit'] .orbit__again {
+  align-self: center;
+}
+
+/* In orbit. */
+[data-extra='orbit'] .orbit__result {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+[data-extra='orbit'] .orbit__real {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-raised);
+}
+
+[data-extra='orbit'] .orbit__real .extra-heading {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+[data-extra='orbit'] .orbit__real .extra-text {
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+[data-extra='orbit'] .orbit__real .extra-note {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+[data-extra='orbit'] .orbit__drops {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+[data-extra='orbit'] .orbit__drops p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+[data-extra='orbit'] .orbit__real .sources {
+  margin: -6px 0 -10px;
+  border-top: 0;
+}
+
+/* The practice-toy note and the no-3D note: read before a run and in orbit;
+   on a phone the flying screen has no room for them. */
+[data-extra='orbit'] .orbit__note {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--color-text-faint);
+}
+
+/* Wide, the notes sit at the bottom of the side column. */
+[data-extra='orbit'] .orbit__note--toy {
+  margin-top: auto;
+}
+
+[data-extra='orbit'] .orbit--flying .orbit__note {
+  display: none;
+}
+
+@media (min-width: 860px), (min-width: 600px) and (orientation: landscape) {
+  [data-extra='orbit'] .orbit {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  /* The ground is at the bottom of the picture, so the picture keeps to the
+     height of the screen (less the sheet's title bar and the room around the
+     extra, --orbit-sheet-room with the two safe edges) and stays put while a
+     long side column scrolls beside it. Stretched to a long column, the
+     ground would be off the bottom of the screen. */
+  [data-extra='orbit'] .orbit__view {
+    --orbit-strip-top: 12px;
+    position: sticky;
+    top: 18px;
+    align-self: flex-start;
+    height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--orbit-sheet-room));
+    min-height: 200px;
+  }
+
+  [data-extra='orbit'] .orbit[data-phase='orbit'] .orbit__view {
+    flex: 1 1 auto;
+    min-height: 200px;
+  }
+
+  [data-extra='orbit'] .orbit__side {
+    flex: 0 0 min(380px, 42%);
+    min-width: 0;
+  }
+
+  /* In the column, the rule over the caption sits 16px under Try another
+     rocket, as it does under Start in "Land on the Moon". */
+  [data-extra='orbit'] .orbit__sources {
+    position: static;
+    margin-top: 6px;
+    padding-bottom: 0;
+  }
+
+  [data-extra='orbit'] .orbit--flying .orbit__side,
+  [data-extra='orbit'] .orbit__fly {
+    gap: 12px;
+  }
+
+  [data-extra='orbit'] .orbit__fuel {
+    right: auto;
+    left: 12px;
+    width: min(400px, calc(100% - 24px));
+  }
+
+  [data-extra='orbit'] .orbit__view--flat .orbit__fuel {
+    width: auto;
+  }
+
+  [data-extra='orbit'] .orbit--flying .orbit__note {
+    display: block;
+  }
+}
+
+/* Short and wide (a phone held sideways): the whole flying screen still fits
+   with no scrolling, with the key hints or without them. The rule line and
+   the notes go, the column is a little wider so the out-of-fuel message
+   takes fewer lines, and everything sits closer. */
+@media (min-width: 600px) and (orientation: landscape) and (max-height: 540px) {
+  [data-extra='orbit'] .orbit__side {
+    flex-basis: min(420px, 50%);
+  }
+
+  [data-extra='orbit'] .orbit--flying .orbit__side,
+  [data-extra='orbit'] .orbit__fly {
+    gap: 6px;
+  }
+
+  [data-extra='orbit'] .orbit__rule,
+  [data-extra='orbit'] .orbit--flying .orbit__note {
+    display: none;
+  }
+
+  [data-extra='orbit'] .orbit__fly .orbit__readout {
+    gap: 4px;
+    padding: 6px 8px 8px;
+  }
+
+  [data-extra='orbit'] .orbit__fly .orbit__readout .orbit__label {
+    line-height: 14px;
+  }
+
+  [data-extra='orbit'] .orbit__fly .orbit__value {
+    line-height: 18px;
+  }
+
+  [data-extra='orbit'] .orbit__coach {
+    min-height: 2.6em;
+    font-size: 0.875rem;
+    line-height: 1.3;
+  }
+
+  [data-extra='orbit'] .orbit__tilt,
+  [data-extra='orbit'] .orbit__drop {
+    height: 52px;
+  }
+
+  [data-extra='orbit'] .orbit__control {
+    gap: 2px;
+  }
+
+  [data-extra='orbit'] .orbit__key {
+    line-height: 14px;
+  }
+}
+
+/* The sections above set their own display, so `hidden` needs saying again. */
+[data-extra='orbit'] [hidden] {
+  display: none !important;
+}

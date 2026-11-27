@@ -108,6 +108,7 @@ describe('the mission list', () => {
       const list = await openTheList(user);
 
       expect(namesIn(within(list).getByRole('region', { name: 'Try it yourself' }))).toEqual([
+        'Fly to orbit',
         'Drop the stages',
         'Dock two spacecraft',
         'Land on the Moon',

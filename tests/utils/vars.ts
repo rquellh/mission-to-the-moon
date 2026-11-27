@@ -57,6 +57,7 @@ export const MISSIONS = {
  * sheet shows. extras.test.ts checks that the list on the site shows each one.
  */
 export const EXTRAS = [
+  { id: 'orbit', title: 'Fly to orbit' },
   { id: 'stages', title: 'Drop the stages' },
   { id: 'docking', title: 'Dock two spacecraft' },
   { id: 'landing', title: 'Land on the Moon' },
@@ -82,6 +83,13 @@ export const TOUR = {
 
 /** Events and moments the tests open by address, with what the page shows there. */
 export const EVENTS = {
+  /** Apollo 11's liftoff, where "Fly to orbit" opened from the list leads ("Fly Apollo 11"). */
+  APOLLO_11_LIFTOFF: {
+    mission: 'apollo-11',
+    id: 'liftoff',
+    title: 'Liftoff',
+    name: 'Apollo 11',
+  },
   /** The first landing, where "Land on the Moon" opened from the list leads ("Fly Apollo 11"). */
   APOLLO_11_LANDING: {
     mission: 'apollo-11',

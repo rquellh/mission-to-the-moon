@@ -52,11 +52,12 @@ Look for the moment in the flight's own story (`src/content/missions/<id>/story.
 
 **The games already there**
 
-| Game                     | Folder    | Kind               | The player handles                             | Instead of failing                                                     |
-| ------------------------ | --------- | ------------------ | ---------------------------------------------- | ---------------------------------------------------------------------- |
-| Drop the stages          | `stages`  | Timing             | One thing, once for each part: when to press   | A part not dropped in time drops by itself                             |
-| Dock two spacecraft      | `docking` | Flying             | Aim and closing speed                          | A bump sends the ship back to try again                                |
-| Land on the Moon (draft) | `landing` | Flying, on a clock | Place, sideways slide, falling speed, and fuel | A bump back up. Out of fuel, the top half flies the crew back to orbit |
+| Game                | Folder    | Kind               | The player handles                                        | Instead of failing                                                                                               | Offered from                                                          |
+| ------------------- | --------- | ------------------ | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Fly to orbit        | `orbit`   | Flying, on a clock | Tilt, a step at a time, when to drop each stage, and fuel | An empty stage left on drops by itself. Out of fuel, the spacecraft comes down in the ocean under its parachutes | No card yet: the list, its address, and Up next after the other games |
+| Drop the stages     | `stages`  | Timing             | One thing, once for each part: when to press              | A part not dropped in time drops by itself                                                                       | Liftoff                                                               |
+| Dock two spacecraft | `docking` | Flying             | Aim and closing speed                                     | A bump sends the ship back to try again                                                                          | Each Gemini docking                                                   |
+| Land on the Moon    | `landing` | Flying, on a clock | Place, sideways slide, falling speed, and fuel            | A bump back up. Out of fuel, the top half flies the crew back to orbit                                           | Apollo 11's powered descent                                           |
 
 **Test the idea before drawing it**
 
@@ -168,7 +169,7 @@ Stay on the kind side. A ten-year-old should win within a few tries, and a mista
 
 ## 6. Build It as a Draft
 
-Copy the shape of the nearest game: `landing` or `docking` for something you fly, `stages` for something you time. Landing is the newest and has the most to copy, though it is still a draft. Docking is the one that is live.
+Copy the shape of the nearest game: `landing`, `orbit`, or `docking` for something you fly, `stages` for something you time. Landing has the most to copy.
 
 | File           | Holds                                                        | Keep in mind                                                                                |
 | -------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
