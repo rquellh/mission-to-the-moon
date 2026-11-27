@@ -16,7 +16,7 @@ test.describe('Guided tour', () => {
   test('a visitor follows the tour from stop to stop, skips to the end, starts again, and leaves', async ({
     sitePage,
   }) => {
-    // A trip takes 5 to 14 seconds, and longer on a busy machine drawing in software.
+    // A trip takes 5 to 15 seconds, and longer on a busy machine drawing in software.
     test.slow();
     const missionPage = new MissionPage(sitePage);
     const tourPage = new TourPanelPage(sitePage);

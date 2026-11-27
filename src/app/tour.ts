@@ -5,6 +5,7 @@ import {
   type MissionEvent,
 } from '../content/types.ts';
 import type { Director, Player } from './contract.ts';
+import { TRIP_ARRIVE_SECONDS } from './player.ts';
 import { nearestView } from './views.ts';
 
 /**
@@ -35,9 +36,11 @@ const DEFAULT_LEAD_IN_SECONDS = 3;
  * A trip takes as long as the story between the two stops lasts at normal
  * speed, kept within these: a hop between two close stops still has time to
  * be seen, and a long quiet stretch speeds up rather than keep anyone waiting.
+ * The clock squeezes a long stretch into the longest trip by hurrying through
+ * its middle only (see tripShape in player.ts).
  */
 export const TRIP_MIN_SECONDS = 5;
-export const TRIP_MAX_SECONDS = 14;
+export const TRIP_MAX_SECONDS = 15;
 
 /**
  * A Skip pressed this soon after a trip starts is ignored, in milliseconds,
@@ -52,8 +55,22 @@ export const SKIP_GUARD_MS = 400;
  * be out of it (the Moon view, while the ship is still days from the Moon).
  * The camera's move takes about 1.5 seconds, so the arrival is framed as the
  * stop intends. A trip this short or shorter moves the camera at the start.
+ * It is as long as a squeezed trip's arrival at normal speed, so the camera
+ * moves as the clock settles back to that speed, and the stop's view shows
+ * the run-in to the stop at the pace exploring would. The camera moves
+ * sooner when the ship view's fast-forward view ends on the way (see
+ * watchScene).
  */
-export const VIEW_LEAD_SECONDS = 4;
+export const VIEW_LEAD_SECONDS = TRIP_ARRIVE_SECONDS;
+
+/**
+ * The camera moves to the stop's view ahead of time (see watchScene) only
+ * when the stop is no more than this far off, in mission seconds. The ship is
+ * then already where the stop's view looks. Farther off it may be days from
+ * there (leaving the Moon for a splashdown), and the view would show a world
+ * with no ship in it.
+ */
+export const EARLY_VIEW_MISSION_SECONDS = 3600;
 
 /**
  * Travel may take this much longer than planned, in real seconds, before the
@@ -87,6 +104,10 @@ export class Tour {
   /** The stop's view, while a trip waits to move the camera to it (see VIEW_LEAD_SECONDS). */
   private viewLater: EventView | null = null;
   private viewAtMs = 0;
+  /** Stops listening to the scene while a trip waits to move the camera (see watchScene). */
+  private stopWatchingScene: (() => void) | null = null;
+  /** True once the ship view has shown the scene's fast-forward view on this trip. */
+  private sawFastForward = false;
   private readonly listeners = new Set<(tour: Tour) => void>();
 
   // Written out rather than as constructor parameter properties, so Node can
@@ -197,6 +218,9 @@ export class Tour {
     if (trip && seconds > VIEW_LEAD_SECONDS) {
       this.viewLater = view;
       this.viewAtMs = now + (seconds - VIEW_LEAD_SECONDS) * 1000;
+      this.sawFastForward = false;
+      // Heading for the ship view, the chase the camera returns to is where it is going anyway.
+      if (view !== 'spacecraft') this.stopWatchingScene = this.director.subscribe(this.watchScene);
     } else {
       this.director.setView(view);
     }
@@ -242,6 +266,28 @@ export class Tour {
     if (reached || !player.playing || this.now() > this.travelDeadlineMs) this.arrive();
   };
 
+  /**
+   * In the ship view, a trip can carry the ship around its body too fast to
+   * follow, and the scene then holds a steady view of the body instead of
+   * chasing the ship. When that ends while the trip still waits to move the
+   * camera, and the stop is near (see EARLY_VIEW_MISSION_SECONDS), the camera
+   * moves to the stop's view at once: otherwise the ship view would swoop back
+   * in to chase the ship only to pull out again for the stop's view moments
+   * later.
+   */
+  private readonly watchScene = (director: Director): void => {
+    if (this.phaseNow !== 'traveling' || !this.viewLater) return;
+    if (director.view !== 'spacecraft') {
+      this.sawFastForward = false;
+    } else if (director.fastForward) {
+      this.sawFastForward = true;
+    } else if (this.sawFastForward) {
+      this.sawFastForward = false;
+      const near = this.stopSeconds - this.player.time <= EARLY_VIEW_MISSION_SECONDS;
+      if (near) this.showStopView();
+    }
+  };
+
   private now(): number {
     return this.options.now ? this.options.now() : performance.now();
   }
@@ -274,6 +320,8 @@ export class Tour {
   private stopTravel(): void {
     this.stopWatching?.();
     this.stopWatching = null;
+    this.stopWatchingScene?.();
+    this.stopWatchingScene = null;
     this.viewLater = null;
   }
 
