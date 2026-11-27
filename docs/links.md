@@ -14,4 +14,4 @@ The same options work on the dev server address.
 - `view` is `earth`, `moon`, `spacecraft`, or `journey`.
 - `start=tour` or `start=explore` skips the first screen.
 - `event` opens a mission paused at one of its events, by the event's id.
-- `extra` opens one of the extras: `stages`, `docking`, `patches`, `landing-sites`, or `rockets`.
+- `extra` opens one of the extras: `stages`, `docking`, `landing`, `patches`, `landing-sites`, or `rockets`.

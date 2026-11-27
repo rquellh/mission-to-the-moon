@@ -51,10 +51,15 @@ export const MISSIONS = {
   UNKNOWN: 'apollo-99',
 } as const;
 
-/** Every extra that is ready (src/extras/<id>/meta.ts), in the mission list's order, with the title its sheet shows. */
+/**
+ * Every extra that is ready (src/extras/<id>/meta.ts), in the mission list's
+ * order (hands-on first, then the rest, each by `order`), with the title its
+ * sheet shows. extras.test.ts checks that the list on the site shows each one.
+ */
 export const EXTRAS = [
   { id: 'stages', title: 'Drop the stages' },
   { id: 'docking', title: 'Dock two spacecraft' },
+  { id: 'landing', title: 'Land on the Moon' },
   { id: 'patches', title: 'Mission patches' },
   { id: 'landing-sites', title: 'Six landings on the Moon' },
   { id: 'rockets', title: 'Three rockets' },
@@ -77,11 +82,13 @@ export const TOUR = {
 
 /** Events and moments the tests open by address, with what the page shows there. */
 export const EVENTS = {
+  /** The first landing, where "Land on the Moon" opened from the list leads ("Fly Apollo 11"). */
   APOLLO_11_LANDING: {
     mission: 'apollo-11',
     id: 'landing',
     title: 'The Eagle has landed',
     clock: '102:45:39',
+    name: 'Apollo 11',
   },
   APOLLO_11_FIRST_STEP: {
     mission: 'apollo-11',

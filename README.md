@@ -75,19 +75,21 @@ Those are ordinary links, and any moment of any flight can be one.
 
 ## Things to try
 
-Under the missions are five things to try and explore:
+Under the missions are six things to try and explore:
 
 - [**Drop the stages**](https://moon.ryanquellhorst.com/?extra=stages): help a rocket climb to orbit by dropping each part at the right moment.
 - [**Dock two spacecraft**](https://moon.ryanquellhorst.com/?extra=docking): fly a Gemini slowly into the docking cone of its Agena target, the way Gemini 8's crew did first.
+- [**Land on the Moon**](https://moon.ryanquellhorst.com/?extra=landing): bring a lunar module down past the boulders to clear ground before the fuel runs out, the way Apollo 11's crew did first.
 - [**Six landings on the Moon**](https://moon.ryanquellhorst.com/?extra=landing-sites): turn the Moon and find the six places where an Apollo lunar module landed.
 - [**Three rockets**](https://moon.ryanquellhorst.com/?extra=rockets): the three rockets that launched the Gemini and Apollo crews, side by side at their true heights.
 - [**Mission patches**](https://moon.ryanquellhorst.com/?extra=patches): a book of the crews' patches that fills in, in color, as you open each flight. The book is kept on your own device.
 
-A liftoff or docking card in a mission offers the matching one with a "Try it" button.
+A liftoff or docking card in a mission offers the matching one with a "Try it" button, and so
+does Apollo 11's "Powered descent begins" card.
 
-The two hands-on ones end the same way, with **Up next**: one button back to the flight it was
-opened from, or, opened from the list, to the flight where it really happened. Under it are the
-other thing to try, something to explore, and **Try again**. On a phone the next step stays
+The three hands-on ones end the same way, with **Up next**: one button back to the flight it was
+opened from, or, opened from the list, to the flight where it really happened. Under it are
+another thing to try, something to explore, and **Try again**. On a phone the next step stays
 pinned at the bottom of the screen.
 
 <p align="center">
@@ -125,5 +127,5 @@ machine, the tests, how the folders are laid out, and how to add a mission, whic
 
 ## Status
 
-All 21 flights, the Apollo 1 page, and the five things to try are in. What is left is polish
+All 21 flights, the Apollo 1 page, and the six things to try are in. What is left is polish
 before launch.
