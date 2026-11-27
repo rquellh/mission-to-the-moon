@@ -158,7 +158,7 @@ The interface tests (Vitest) run against the same modules, so a test id edit mus
 1. **Locators in constructor only** - define all locators in the constructor
 2. **No wrapper methods for simple actions** - don't wrap `.click()`, `.fill()`, `.getAttribute()`, etc.
 3. **Dynamic locators as arrow functions** - taking the entity's id
-4. **Methods ONLY for complex logic (4+ lines)** - chiefly `waitForLoad()`, reading the scene report (`ScenePage.report()`), the tour's Skip (`TourPanelPage.skipTrip()`), and flying the docking extra to its end (`DockingPage.dockByKeys()`)
+4. **Methods ONLY for complex logic (4+ lines)** - chiefly `waitForLoad()`, reading the scene report (`ScenePage.report()`), the tour's Skip (`TourPanelPage.skipTrip()`), and flying a hands-on extra to its end (`DockingPage.dockByKeys()`, `LandingPage.landByKeys()`)
 5. **No goto() methods** - tests use `sitePage.goto(URLS.TOUR(...))` directly
 
 ### Correct Pattern (TourPanelPage)
@@ -272,6 +272,7 @@ Each page object is the documentation of the test ids in its part of the site. K
 | `DialogsPage`    | About this mission, How this is drawn, Sources and credits (opened from "Tell me more"), a memorial page                                                                                                  | none                        |
 | `ExtraSheetPage` | the full-screen sheet an extra opens in, and "Up next" at the end of a run: its title, its one amber button, the picks, Try again, All missions, and on a phone "More to explore" and Show less           | `waitForLoad()`             |
 | `DockingPage`    | "Dock two spacecraft" inside the sheet: Start, the aim read-out, the docked line                                                                                                                          | `dockByKeys()`              |
+| `LandingPage`    | "Land on the Moon" inside the sheet: Start, the fuel, falling speed and sideways slide read-outs, the coach line, the landed line                                                                         | `landByKeys()`              |
 
 ---
 
@@ -784,6 +785,7 @@ tests/
 │   ├── EventCardPage.ts
 │   ├── ExtraSheetPage.ts
 │   ├── HubPage.ts
+│   ├── LandingPage.ts
 │   ├── MissionPage.ts
 │   ├── RecordsPage.ts
 │   ├── ScenePage.ts

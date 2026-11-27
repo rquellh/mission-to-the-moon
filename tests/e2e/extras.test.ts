@@ -2,16 +2,45 @@ import { test, expect } from '../fixtures';
 import { DockingPage } from '../pages/DockingPage';
 import { EventCardPage } from '../pages/EventCardPage';
 import { ExtraSheetPage } from '../pages/ExtraSheetPage';
+import { HubPage } from '../pages/HubPage';
+import { LandingPage } from '../pages/LandingPage';
 import { MissionPage } from '../pages/MissionPage';
+import { WelcomePage } from '../pages/WelcomePage';
 import { EVENTS, EXTRAS, MISSIONS, URLS } from '../utils/vars';
 
 /**
- * Every extra opens and closes, over a mission, with no errors: each loads
- * its own code (some with a 3D view of their own), which only the whole site
- * shows. What an extra does inside is its own tests' business. Desktop only.
+ * Every extra is in the mission list, and opens and closes, over a mission,
+ * with no errors: each loads its own code (some with a 3D view of their
+ * own), which only the whole site shows. A draft is listed only on the dev
+ * server, so against the built site the list shows that each extra here is
+ * ready. What an extra does inside is its own tests' business. Desktop only.
  */
 test.describe('Every extra opens and closes', () => {
   test.skip(({ isMobile }) => isMobile, 'One screen is enough to see that every extra loads.');
+
+  test('every extra here is in the mission list on the site, under its title', async ({
+    sitePage,
+  }) => {
+    const missionPage = new MissionPage(sitePage);
+    const welcomePage = new WelcomePage(sitePage);
+    const hubPage = new HubPage(sitePage);
+
+    // The list has no address of its own, so it is opened the way a visitor opens it.
+    await test.step('Open the mission list from the welcome', async () => {
+      await sitePage.goto(URLS.WELCOME(MISSIONS.DEFAULT));
+      await missionPage.waitForLoad();
+      await welcomePage.waitForLoad();
+      await welcomePage.allMissions.click();
+      await hubPage.waitForLoad();
+    });
+
+    await test.step('Each extra is listed, under its title', async () => {
+      for (const extra of EXTRAS) {
+        await expect(hubPage.extra(extra.id)).toBeVisible();
+        await expect(hubPage.extra(extra.id)).toContainText(extra.title);
+      }
+    });
+  });
 
   for (const extra of EXTRAS) {
     test(`${extra.id} opens over the mission and closes back to it`, async ({ sitePage }) => {
@@ -90,6 +119,48 @@ test.describe('The end of a hands-on extra', () => {
       await missionPage.waitForLoad();
       await expect(missionPage.missionName).toHaveText(realDocking.name);
       await expect(cardPage.title).toHaveText(realDocking.title);
+    });
+  });
+
+  test('a visitor lands the lunar module on clear ground, and flies the real first landing from Up next', async ({
+    sitePage,
+  }) => {
+    // Sliding over to the clear ground and coming down on it takes about 18 seconds of the toy's time.
+    test.slow();
+    const missionPage = new MissionPage(sitePage);
+    const extraSheetPage = new ExtraSheetPage(sitePage);
+    const landingPage = new LandingPage(sitePage);
+    const cardPage = new EventCardPage(sitePage);
+    const realLanding = EVENTS.APOLLO_11_LANDING;
+
+    await test.step('Open Land on the Moon on its own, over the welcome', async () => {
+      await sitePage.goto(URLS.EXTRA_ON_ITS_OWN('landing'));
+      await missionPage.waitForLoad();
+      await extraSheetPage.waitForLoad();
+      await expect(extraSheetPage.sheet).toHaveAttribute('data-extra', 'landing');
+    });
+
+    await test.step('Start, slide over to the clear ground with the keys, and land, with focus on the line that says so', async () => {
+      await landingPage.start.click();
+      await landingPage.landByKeys();
+      await expect(landingPage.landed).toBeFocused();
+    });
+
+    await test.step('Up next offers the real landing, its one button in view', async () => {
+      await expect(extraSheetPage.upNext).toBeVisible();
+      await expect(extraSheetPage.upNextTitle).toHaveText('See the real landing');
+      await expect(extraSheetPage.upNextPrimary).toHaveText(`Fly ${realLanding.name}`);
+      await expect(extraSheetPage.upNextPrimary).toBeInViewport();
+    });
+
+    await test.step('Fly it: the flight opens at its landing', async () => {
+      await extraSheetPage.upNextPrimary.click();
+      await expect(sitePage).toHaveURL(
+        new RegExp(`mission=${realLanding.mission}&event=${realLanding.id}`),
+      );
+      await missionPage.waitForLoad();
+      await expect(missionPage.missionName).toHaveText(realLanding.name);
+      await expect(cardPage.title).toHaveText(realLanding.title);
     });
   });
 });

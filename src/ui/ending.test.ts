@@ -285,7 +285,6 @@ describe('the end of a flight', () => {
         within(next).getByText(/^Apollo 12 was the second mission to land people on the Moon\./),
       ).toBeVisible();
       expect(within(next).getByRole('button', { name: 'Fly Apollo 12' })).toBeVisible();
-      // Still a draft, so it is picked here (the tests run as the dev server does) but not on the published site.
       expect(within(toTry).getByRole('heading', { level: 4 })).toHaveTextContent(
         'Land on the Moon',
       );
