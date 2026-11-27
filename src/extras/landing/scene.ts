@@ -1,10 +1,10 @@
 /**
  * The landing toy's 3D view, drawn with the scene kit: the lunar module seen
  * from the side, coming down over a field of boulders toward a patch of
- * clear, flat ground with more boulders past it. The kit draws the lander; the ground, the boulders, the shadow,
- * the flame and the amber guide lines are plain three.js shapes made here,
- * in flat, unlit colors (or flat-shaded rocks) so the kit's bright model
- * lighting does not wash them out.
+ * clear, flat ground with more boulders past it. The kit draws the lander;
+ * the ground, the boulders, the shadow, the flame and the amber guide lines
+ * are plain three.js shapes made here, in flat, unlit colors (or flat-shaded
+ * rocks) so the kit's bright model lighting does not wash them out.
  *
  * World axes: game x runs along world +X (to the right on screen) and game
  * height up world +Y, with the clear ground at y = 0. The lander flies in
@@ -12,30 +12,18 @@
  * meter is one meter of the model, so the lander is drawn at its own size
  * (about 8.4 m across the footpads, 5.7 m tall).
  *
- * The camera stands far back and a little raised, looking 4 degrees down,
- * so the ground reads as a band: the clear ground's line sits a fifth of
- * the way up the view, the ground in front of the lander's path fills the
- * bottom, and behind the path a short, darker strip of ground runs back to
- * low hills that stand for the horizon (the ground stops there, hidden by
- * the hills, so no gray reaches up behind the lander). Its distance is
- * worked out from the kit's field of view and the canvas's shape each time
- * the view is placed, so x from -21 to +21 at ground level and the top of a
- * lander at the highest it can fly always fit. For example:
- *
- *   358 x 396 (a phone): the kit widens the field to 39.5 degrees tall (36
- *   across). The camera is about 65 m back and 19 m up, and the width
- *   decides it: a lander at the right edge and at the highest has its
- *   footpad 3 px in from the side, x = -21 and +21 at ground level are 5 px
- *   in, the clear ground's line is at 317 px of 396, with the ground's far
- *   edge and the hills a little above it and the marker about 12 px below
- *   it. The lander at the start (x -10, height 18) has its footpads at 167
- *   px and its top at 119 px; the top of a lander at the highest is 67 px
- *   from the top, below the fuel strip.
- *   852 x 632 (a desktop): a 27 degree field. The height decides it: the
- *   camera is about 87 m back and 19 m up, the clear ground's line is at
- *   506 px of 632, the highest lander's top 56 px from the top, and about
- *   28 m of ground shows on each side, so the boulders run on past both
- *   sides of the patch.
+ * The camera stands far back and a little raised, looking slightly down
+ * (PITCH), so the ground reads as a band: the clear ground's line sits a
+ * fifth of the way up the view, the ground in front of the lander's path
+ * fills the bottom, and behind the path a short, darker strip of ground runs
+ * back to low hills that stand for the horizon (the ground stops there,
+ * hidden by the hills, so no gray reaches up behind the lander). Its
+ * distance is worked out from the kit's field of view and the canvas's
+ * shape whenever they change: the least distance that keeps the play area's
+ * width at ground level, a lander at the highest it can fly, and the
+ * marker's far end inside the view, with room left at the top for the fuel
+ * strip. A narrow canvas is fitted by its width, a wide one by its height,
+ * and on a wide one the boulders run on past both sides of the patch.
  */
 import {
   BufferGeometry,
@@ -110,8 +98,13 @@ const TOP_LINE_LOWEST = 0.5;
 const TOP_LINE_HIGHEST = 0.85;
 /** How near the sides the play area may come, in the view's units. */
 const SIDE_LINE = 0.985;
-/** The play area's half width at ground level. */
-const HALF_WIDTH = 21;
+/**
+ * How far the view shows to each side at ground level: out to the outer
+ * edge of a footpad with the lander at the side of the play area, and
+ * GROUND_ROOM past it.
+ */
+const GROUND_ROOM = 0.3;
+const HALF_WIDTH = RULES.maxSide + RULES.footHalfSpan + GROUND_ROOM;
 
 /** The ground: near and far colors, how far back it runs (to the hills), and how far it reaches to the sides. */
 const GROUND_NEAR = 0x2c2d30;
@@ -146,7 +139,7 @@ const ROCK_HALF = 0.7;
  * nearest the patch are unturned, so their edges are exact and stay off it.
  * Two pebbles lie on the patch, away from where the footpads come down.
  */
-type Boulder = readonly [
+export type Boulder = readonly [
   x: number,
   z: number,
   width: number,
@@ -155,7 +148,7 @@ type Boulder = readonly [
   turn: number,
   shape: 0 | 1,
 ];
-const BOULDERS: readonly Boulder[] = [
+export const BOULDERS: readonly Boulder[] = [
   // Left of the patch, on the lander's path.
   [-31, 0.4, 2.2, 1.15, 1.8, 0.3, 0],
   [-28.4, -0.9, 1.6, 1.05, 1.4, 1.1, 1],
@@ -235,13 +228,15 @@ const BOULDERS: readonly Boulder[] = [
 
 /** The engine's light, as stages draws it. */
 const FLAME = 0xffa64a;
+/** One glow of a flame: how far below the top of the flame it sits, its size, and its brightness. */
+type GlowRow = readonly [below: number, size: number, opacity: number];
 /**
- * The flame's glows, down from the bell: how far below it each sits, its
- * size and its brightness. They overlap, so the light adds up to a cone,
- * brightest and widest at the bell and fading out at its tip about 4.4 m
- * down (with FLAME_STRETCH), near the height of the lander's body.
+ * The flame's glows, down from the bell. They overlap, so the light adds up
+ * to a cone, brightest and widest at the bell and fading out at its tip
+ * about 4.4 m down (with FLAME_STRETCH), near the height of the lander's
+ * body.
  */
-const FLAME_GLOWS: ReadonlyArray<readonly [below: number, size: number, opacity: number]> = [
+const FLAME_GLOWS: readonly GlowRow[] = [
   [0.25, 2.7, 1],
   [0.8, 2.5, 0.95],
   [1.35, 2.2, 0.85],
@@ -252,7 +247,7 @@ const FLAME_GLOWS: ReadonlyArray<readonly [below: number, size: number, opacity:
   [3.9, 0.7, 0.18],
 ];
 /** The top stage's own flame, the same cone at about half the size, down from its base. */
-const ASCENT_GLOWS: ReadonlyArray<readonly [below: number, size: number, opacity: number]> = [
+const ASCENT_GLOWS: readonly GlowRow[] = [
   [0.15, 1.4, 1],
   [0.5, 1.25, 0.9],
   [0.85, 1.05, 0.75],
@@ -316,10 +311,10 @@ const DRIFT_DASHES = 32;
 const DRIFT_BELOW = 0.3;
 const DRIFT_GAP = 0.3;
 /** Widths on screen, CSS pixels, so the lines look the same at every canvas size. */
-const LINE_PX = 2;
+export const LINE_PX = 2;
 const TICK_PX = 10;
 const DRIFT_PX = 1.6;
-const RING_PX = 6;
+export const RING_PX = 6;
 
 /** Guide lines are drawn over everything; the shadow and glows come after the ground. */
 const SHADOW_ORDER = 1;
@@ -441,67 +436,12 @@ function dashShape(count: number, length: number, period: number, from = 0): Buf
   return geometry;
 }
 
-/** Where the lander was last placed, and the height of whatever is under it there (see groundUnder). */
-interface Place {
-  x: number;
-  height: number;
-  ground: number;
-}
-
-/** Where the split is: the bottom half drops and tips while the top half flies up and to one side, then hovers. */
-interface Split {
-  t: number;
-  x: number;
-  /** 1 when the top half goes to the right (the bottom half tips that way too), -1 to the left. */
-  side: number;
-  /** The lander's middle when the fuel ran out, and once the bottom half rests, tipped, on the ground. */
-  fromY: number;
-  toY: number;
-  /** How long the bottom half takes to drop. */
-  drop: number;
-  /** The footpads' height when the fuel ran out (the top half's base starts there), and where that base comes to rest. */
-  baseY: number;
-  restX: number;
-  restY: number;
-}
-
-export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
-  const view = createMiniView(canvas, { stars: true, controls: false, fov: FOV });
-  const { camera, scene } = view;
-  // Everything drawn is tens of meters away: a far-off near plane keeps the depth sharp where the shadow lies on the ground.
-  camera.near = 1;
-  camera.updateProjectionMatrix();
-
-  // The lander, its middle at the group's origin (the kit centers the model on its vertical middle).
-  const vehicle = createVehicle({ layout: 'alone', parts: LANDER });
-  const ascent = vehicle.object.getObjectByName(ASCENT_STAGE) ?? new Group();
-  const ascentParent = ascent.parent ?? vehicle.object;
-  const ascentRest = ascent.position.clone();
-  const ascentTurn = ascent.quaternion.clone();
-  const lander = new Group();
-  // The flame hangs from the bell, inside the lander's group so it leans with it.
-  const flame = new Group();
-  flame.position.set(0, vehicle.bottom + BELL, 0);
-  const flameGlows = FLAME_GLOWS.map(([below, size, opacity]) => {
-    const glow = createGlow(FLAME, size, opacity);
-    glow.position.set(0, -below, 0);
-    // Drawn after the ground and the shadow, which would otherwise paint over it.
-    glow.renderOrder = GLOW_ORDER;
-    flame.add(glow);
-    return { glow, opacity };
-  });
-  lander.add(vehicle.object, flame);
-  // The top stage's flame is placed in the world, under the stage wherever it flies.
-  const ascentGlows = ASCENT_GLOWS.map(([below, size, opacity]) => {
-    const glow = createGlow(FLAME, size, opacity);
-    glow.scale.set(size, size * FLAME_STRETCH, 1);
-    glow.renderOrder = GLOW_ORDER;
-    glow.visible = false;
-    return { glow, below, opacity };
-  });
-  const ascentSprites = ascentGlows.map(({ glow }) => glow);
-
-  // The ground, the hills, the crater and the boulders: drawn once, never moved.
+/**
+ * The ground, the hills, the crater and the boulders, in one group that is
+ * drawn once and never moved. The boulders' meshes come back too: freeing
+ * the group's shapes and materials does not free their instances.
+ */
+function createTerrain() {
   const terrain = new Group();
   const ground = new Mesh(
     groundShape(),
@@ -565,23 +505,17 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
     terrain.add(mesh);
     return mesh;
   });
+  return { terrain, rocks };
+}
 
-  // The shadow, lying on the ground under the lander.
-  const shadowMaterial = new MeshBasicMaterial({
-    color: 0x000000,
-    vertexColors: true,
-    transparent: true,
-    opacity: SHADOW_DARKEST,
-    depthWrite: false,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-  });
-  const shadow = new Mesh(shadowShape(), shadowMaterial);
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.renderOrder = SHADOW_ORDER;
-
-  // The amber guide lines face the camera and are drawn over everything, like a drawing on the glass.
+/**
+ * The amber guide lines, which face the camera and are drawn over
+ * everything, like a drawing on the glass: the clear-ground marker with a
+ * tick at each end, and the drift line with the ring it ends in, both
+ * hidden until a flight places them. Their widths on screen are set with
+ * the camera.
+ */
+function createGuideLines() {
   const amber = new MeshBasicMaterial({
     color: COLORS.main,
     transparent: true,
@@ -612,8 +546,129 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
   const ring = new Mesh(new RingGeometry(0.7, 1, 32), amber);
   ring.renderOrder = DRIFT_ORDER;
   ring.visible = false;
+  return { marker, markerLine, ticks, drift, ring };
+}
 
-  scene.add(terrain, lander, shadow, marker, drift, ring, ...ascentSprites);
+/** A flame's glows, one for each row, drawn after the ground and the shadow, which would otherwise paint over them. */
+function createFlameGlows(rows: readonly GlowRow[]) {
+  return rows.map(([below, size, opacity]) => {
+    const glow = createGlow(FLAME, size, opacity);
+    glow.renderOrder = GLOW_ORDER;
+    return { glow, below, size, opacity };
+  });
+}
+
+/**
+ * A value that eases toward a target, holds it a while, and eases back to
+ * 0: the lander's lean for a sideways push, and the flame's swell for an
+ * engine push. Under reduced motion it does not ease: with `stillJumps` it
+ * changes at once and changes back at once when the hold ends, and without
+ * it the value stays at 0.
+ */
+function createPulse(rate: number, stillJumps: boolean) {
+  let target = 0;
+  let hold = 0;
+  const pulse = {
+    value: 0,
+    /** Head for `to` and hold it for `seconds`. */
+    kick(to: number, seconds: number, still: boolean): void {
+      target = to;
+      hold = seconds;
+      if (still && stillJumps) pulse.value = to;
+    },
+    /** Move on by `seconds`; true while it is held or not yet back at 0. */
+    step(seconds: number, still: boolean): boolean {
+      if (!(hold > 0 || pulse.value !== 0)) return false;
+      hold = Math.max(0, hold - seconds);
+      const to = hold > 0 ? target : 0;
+      if (still) pulse.value = stillJumps ? to : 0;
+      else pulse.value = MathUtils.damp(pulse.value, to, rate, seconds);
+      if (hold === 0 && Math.abs(pulse.value) < SETTLED) pulse.value = 0;
+      return true;
+    },
+    /** Straight back to 0, holding nothing. */
+    clear(): void {
+      pulse.value = 0;
+      hold = 0;
+    },
+  };
+  return pulse;
+}
+
+/** Where the lander was last placed, and the height of whatever is under it there (see groundUnder). */
+interface Place {
+  x: number;
+  height: number;
+  ground: number;
+}
+
+/** Where the split is: the bottom half drops and tips while the top half flies up and to one side, then hovers. */
+interface Split {
+  t: number;
+  x: number;
+  /** 1 when the top half goes to the right (the bottom half tips that way too), -1 to the left. */
+  side: number;
+  /** The lander's middle when the fuel ran out, and once the bottom half rests, tipped, on the ground. */
+  fromY: number;
+  toY: number;
+  /** How long the bottom half takes to drop. */
+  drop: number;
+  /** The footpads' height when the fuel ran out (the top half's base starts there), and where that base comes to rest. */
+  baseY: number;
+  restX: number;
+  restY: number;
+}
+
+export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
+  const view = createMiniView(canvas, { stars: true, controls: false, fov: FOV });
+  const { camera, scene } = view;
+  // Everything drawn is tens of meters away: a far-off near plane keeps the depth sharp where the shadow lies on the ground.
+  camera.near = 1;
+  camera.updateProjectionMatrix();
+
+  // The lander, its middle at the group's origin (the kit centers the model on its vertical middle).
+  const vehicle = createVehicle({ layout: 'alone', parts: LANDER });
+  const ascent = vehicle.object.getObjectByName(ASCENT_STAGE) ?? new Group();
+  const ascentParent = ascent.parent ?? vehicle.object;
+  const ascentRest = ascent.position.clone();
+  const ascentTurn = ascent.quaternion.clone();
+  const lander = new Group();
+  // The flame hangs from the bell, inside the lander's group so it leans with it.
+  const flame = new Group();
+  flame.position.set(0, vehicle.bottom + BELL, 0);
+  const flameGlows = createFlameGlows(FLAME_GLOWS);
+  for (const { glow, below } of flameGlows) {
+    glow.position.set(0, -below, 0);
+    flame.add(glow);
+  }
+  lander.add(vehicle.object, flame);
+  // The top stage's flame is placed in the world, under the stage wherever it flies, and shows only after the split.
+  const ascentGlows = createFlameGlows(ASCENT_GLOWS);
+  for (const { glow, size } of ascentGlows) {
+    glow.scale.set(size, size * FLAME_STRETCH, 1);
+    glow.visible = false;
+  }
+
+  const { terrain, rocks } = createTerrain();
+
+  // The shadow, lying on the ground under the lander.
+  const shadowMaterial = new MeshBasicMaterial({
+    color: 0x000000,
+    vertexColors: true,
+    transparent: true,
+    opacity: SHADOW_DARKEST,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  });
+  const shadow = new Mesh(shadowShape(), shadowMaterial);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.renderOrder = SHADOW_ORDER;
+
+  const { marker, markerLine, ticks, drift, ring } = createGuideLines();
+
+  scene.add(terrain, lander, shadow, marker, drift, ring, ...ascentGlows.map(({ glow }) => glow));
 
   /** The points that must stay inside the sides, [x, height, z]: the ground's edge, a lander at the highest at the right edge (its footpads, then its top stage), and the marker's far tick, which is nearer the camera. */
   const landerHeight = vehicle.top - vehicle.bottom;
@@ -627,9 +682,10 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
   const look = new Vector3();
   const size = new Vector2();
   const point = new Vector3();
-  let fittedFov = 0;
-  let fittedAspect = 0;
-  let fittedHeight = 0;
+  // What the camera was last fitted to: NaN before the first fitting, so that one always counts as a change.
+  let fittedFov = Number.NaN;
+  let fittedAspect = Number.NaN;
+  let fittedHeight = Number.NaN;
   /** Meters per CSS pixel where the lander flies. */
   let pixel = 0.1;
 
@@ -639,13 +695,18 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
    * is `(rise - y) sin + (distance - z) cos` in front of it; the clear
    * ground's line lands on GROUND_LINE when rise / distance is
    * tan(PITCH + atan(-GROUND_LINE * t)), and each side point and the top of
-   * the highest lander then give the least distance that keeps them in. True
-   * when the canvas changed since the last time.
+   * the highest lander then give the least distance that keeps them in.
+   *
+   * Only the kit's field of view and aspect and the canvas's height go into
+   * it, so it does nothing, and says false, until one of them changes; true
+   * when it moved the camera. The interface ticks the view on the frame
+   * after the canvas changes size, once the kit has set the new field and
+   * aspect, so the camera follows the canvas without an observer here.
    */
   const placeCamera = (): boolean => {
     view.renderer.getSize(size);
-    const changed =
-      camera.fov !== fittedFov || camera.aspect !== fittedAspect || size.y !== fittedHeight;
+    if (camera.fov === fittedFov && camera.aspect === fittedAspect && size.y === fittedHeight)
+      return false;
     fittedFov = camera.fov;
     fittedAspect = camera.aspect;
     fittedHeight = size.y;
@@ -678,7 +739,7 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
     for (const tick of ticks) tick.scale.set(LINE_PX * pixel, TICK_PX * pixel, 1);
     ring.scale.setScalar(RING_PX * pixel);
     ring.quaternion.copy(camera.quaternion);
-    return changed;
+    return true;
   };
 
   // What the lander is doing.
@@ -689,12 +750,9 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
     ground: groundUnder(RULES.startX),
   };
   let clock = 0;
-  let lean = 0;
-  let leanTo = 0;
-  let leanHold = 0;
-  let swell = 0;
-  let swellTo = 0;
-  let swellHold = 0;
+  // Under reduced motion the lander never leans, and the flame changes size at once.
+  const lean = createPulse(LEAN_RATE, false);
+  const swell = createPulse(PUFF_RATE, true);
   /** How lit the engine is: 1 burning, 0 out. */
   let level = 1;
   let fading = false;
@@ -709,10 +767,11 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
   const placeLander = (): void => {
     // A lean swings one footpad down; near the ground, lift the lander so that pad stays on top.
     const dip =
-      RULES.footHalfSpan * Math.abs(Math.sin(lean)) + vehicle.bottom * (1 - Math.cos(lean));
+      RULES.footHalfSpan * Math.abs(Math.sin(lean.value)) +
+      vehicle.bottom * (1 - Math.cos(lean.value));
     const lift = Math.max(0, dip - Math.max(0, at.height - at.ground));
     lander.position.set(at.x, at.height - vehicle.bottom + lift, 0);
-    lander.rotation.set(0, 0, lean);
+    lander.rotation.set(0, 0, lean.value);
   };
 
   const placeFlame = (still: boolean): void => {
@@ -723,15 +782,22 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
     // Going out, it also draws in toward the bell.
     const base = 0.55 + 0.45 * level;
     flame.scale.set(
-      base * (1 + SWELL_WIDTH * swell),
-      base * (1 + swell) * FLAME_STRETCH * flicker,
+      base * (1 + SWELL_WIDTH * swell.value),
+      base * (1 + swell.value) * FLAME_STRETCH * flicker,
       1,
     );
     for (const { glow, opacity } of flameGlows) {
       glow.material.opacity = opacity * level * (still ? 1 : 0.94 + 0.06 * flicker);
       // The glows are drawn facing the camera; turned with the lean, the stretched flame leans too.
-      glow.material.rotation = lean;
+      glow.material.rotation = lean.value;
     }
+  };
+
+  /** Places the lander and its flame for this moment of a flight. */
+  const placeFlight = (flight: Flight, still: boolean): void => {
+    placeAt(flight);
+    placeLander();
+    placeFlame(still);
   };
 
   const placeShadow = (x: number, height: number): void => {
@@ -748,12 +814,12 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
 
   /** The dashed line from just under the footpads to where they will be in five seconds, ending in the ring. */
   const placeDrift = (flight: Flight): void => {
+    const to = ahead(flight);
     // Not when the end of the line would sit on the lander itself (a short drift, or one upward).
-    if (!driftShows(flight)) {
+    if (!driftShows(flight, to)) {
       hideDrift();
       return;
     }
-    const to = ahead(flight);
     ring.position.set(to.x, to.height, 0);
     ring.visible = true;
     const fromY = flight.height - DRIFT_BELOW;
@@ -811,16 +877,6 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
     placeShadow(now.x, lander.position.y + vehicle.bottom);
   };
 
-  // Keep the play area framed when the canvas changes size (the kit sets the new aspect and field first).
-  const resized = new ResizeObserver(() => {
-    const stop = view.addFrameCallback(() => {
-      stop();
-      placeCamera();
-      return true;
-    });
-  });
-  resized.observe(canvas);
-
   placeCamera();
   placeLander();
   placeFlame(true);
@@ -833,10 +889,9 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
       // After a landing or a split, the picture stays until reset puts the lander back together.
       if (phase === 'flying') {
         clock += seconds;
-        placeAt(flight);
-        if (still) lean = 0;
-        placeLander();
-        placeFlame(still);
+        // Reduced motion coming on partway through a lean straightens the lander at once.
+        if (still) lean.value = 0;
+        placeFlight(flight, still);
         placeShadow(flight.x, flight.height);
         placeDrift(flight);
       }
@@ -849,15 +904,11 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
         case 'right':
           // Under reduced motion the lander does not lean.
           if (still) return;
-          leanTo = thrust === 'left' ? LEAN : -LEAN;
-          leanHold = LEAN_HOLD;
+          lean.kick(thrust === 'left' ? LEAN : -LEAN, LEAN_HOLD, still);
           break;
         case 'up':
         case 'down':
-          swellTo = thrust === 'up' ? SWELL : -SHRINK;
-          swellHold = PUFF_HOLD;
-          // Under reduced motion it changes at once, and changes back after a moment.
-          if (still) swell = swellTo;
+          swell.kick(thrust === 'up' ? SWELL : -SHRINK, PUFF_HOLD, still);
           placeFlame(still);
           break;
       }
@@ -865,16 +916,12 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
     },
     land(flight, still) {
       phase = 'down';
-      lean = 0;
-      leanHold = 0;
-      swell = 0;
-      swellHold = 0;
+      lean.clear();
+      swell.clear();
       fading = !still && level > 0;
       if (still) level = 0;
-      placeAt(flight);
       placeCamera();
-      placeLander();
-      placeFlame(still);
+      placeFlight(flight, still);
       placeShadow(flight.x, flight.height);
       marker.visible = false;
       hideDrift();
@@ -882,16 +929,12 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
     },
     abort(flight, still) {
       phase = 'split';
-      lean = 0;
-      leanHold = 0;
-      swell = 0;
-      swellHold = 0;
+      lean.clear();
+      swell.clear();
       fading = false;
       level = 0;
-      placeAt(flight);
       placeCamera();
-      placeLander();
-      placeFlame(still);
+      placeFlight(flight, still);
       hideDrift();
       // Tipped, the bottom half rests on its lowest footpad's outer edge.
       const resting = -vehicle.bottom * Math.cos(TIP) + RULES.footHalfSpan * Math.sin(TIP);
@@ -911,7 +954,7 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
         restX: flight.x + side * REST_ASIDE,
         restY: Math.min(REST_HIGHEST, Math.max(at.ground + REST_RISE, flight.height + REST_LIFT)),
       };
-      for (const glow of ascentSprites) glow.visible = true;
+      for (const { glow } of ascentGlows) glow.visible = true;
       // Without motion, straight to the end picture: the same one the motion ends on.
       split = still ? null : next;
       placeSplit(next, still ? SPLIT_SECONDS : 0, still);
@@ -923,11 +966,9 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
       ascent.position.copy(ascentRest);
       ascent.quaternion.copy(ascentTurn);
       vehicle.setPartVisible(ASCENT_STAGE, true);
-      for (const glow of ascentSprites) glow.visible = false;
-      lean = 0;
-      leanHold = 0;
-      swell = 0;
-      swellHold = 0;
+      for (const { glow } of ascentGlows) glow.visible = false;
+      lean.clear();
+      swell.clear();
       level = 1;
       fading = false;
       marker.visible = true;
@@ -948,20 +989,10 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
       return { left, top };
     },
     tick(seconds, still) {
-      let moving = false;
-      if (leanHold > 0 || lean !== 0) {
-        leanHold = Math.max(0, leanHold - seconds);
-        lean = still ? 0 : MathUtils.damp(lean, leanHold > 0 ? leanTo : 0, LEAN_RATE, seconds);
-        if (leanHold === 0 && Math.abs(lean) < SETTLED) lean = 0;
-        moving = true;
-      }
-      if (swellHold > 0 || swell !== 0) {
-        swellHold = Math.max(0, swellHold - seconds);
-        const target = swellHold > 0 ? swellTo : 0;
-        swell = still ? target : MathUtils.damp(swell, target, PUFF_RATE, seconds);
-        if (swellHold === 0 && Math.abs(swell) < SETTLED) swell = 0;
-        moving = true;
-      }
+      // Both always move on, so neither is skipped when the other is still moving.
+      const leaning = lean.step(seconds, still);
+      const swelling = swell.step(seconds, still);
+      let moving = leaning || swelling;
       if (fading) {
         level = still ? 0 : Math.max(0, level - seconds / FADE_SECONDS);
         if (level === 0) fading = false;
@@ -985,12 +1016,18 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
       return moving;
     },
     dispose() {
-      resized.disconnect();
-      scene.remove(terrain, lander, shadow, marker, drift, ring, ...ascentSprites);
+      scene.remove(
+        terrain,
+        lander,
+        shadow,
+        marker,
+        drift,
+        ring,
+        ...ascentGlows.map(({ glow }) => glow),
+      );
       vehicle.dispose();
       // The glows' picture is shared by the kit; only their materials are ours.
-      for (const { glow } of flameGlows) glow.material.dispose();
-      for (const glow of ascentSprites) glow.material.dispose();
+      for (const { glow } of [...flameGlows, ...ascentGlows]) glow.material.dispose();
       disposeObject(terrain);
       for (const mesh of rocks) mesh.dispose();
       disposeObject(shadow);
