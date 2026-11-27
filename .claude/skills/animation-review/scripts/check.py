@@ -421,7 +421,9 @@ def card_lines(rec, signals):
             out(lines, f"  FAIL   {when}  \"{card}\" ({clock_text(event['seconds'])}) while the {clocks}, "
                 f"which has reached \"{stretch['reached_from']}\": up to {span_text(stretch['lead'])} early")
         elif state == 'behind':
-            out(lines, f"  behind {when}  \"{card}\" while the {clocks} has passed \"{stretch['reached_to']}\"")
+            # Not a breach by itself: between stops the tour's card keeps to the last stop reached.
+            out(lines, f"  behind {when}  \"{card}\" while the {clocks} has passed \"{stretch['reached_from']}\""
+                f" (as intended on the tour, whose card keeps to its stops; in Explore, look)")
         elif state == 'unknown':
             out(lines, f"  ?      {when}  \"{card}\" is not an event title of this flight")
         else:

@@ -33,7 +33,7 @@ export const TRIP_EASE_SECONDS = 1.5;
  * trip speeds up to its hurried pace over TRIP_HURRY_EASE_SECONDS, and slows
  * back down over as many, so the change of pace does not jolt.
  */
-const TRIP_DEPART_SECONDS = 6;
+export const TRIP_DEPART_SECONDS = 6;
 export const TRIP_ARRIVE_SECONDS = 4;
 const TRIP_HURRY_EASE_SECONDS = 1;
 
@@ -81,6 +81,11 @@ interface PaceStretch {
   seconds: number;
   from: number;
   to: number;
+}
+
+/** True when a trip of `seconds` real seconds covering `storySeconds` of story is squeezed: normal speed at each end and a hurry between (see TRIP_DEPART_SECONDS). */
+export function tripHurries(seconds: number, storySeconds: number): boolean {
+  return squeezedShape(0, seconds, storySeconds) !== null;
 }
 
 /**

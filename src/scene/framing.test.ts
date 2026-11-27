@@ -17,6 +17,8 @@ import { describe, expect, it } from 'vitest';
 import {
   aimAt,
   bodyTop,
+  calmestWay,
+  carryPose,
   clockJumped,
   divesPast,
   easeMove,
@@ -24,6 +26,8 @@ import {
   fitDistance,
   keepBodyUp,
   moveDuration,
+  moveShare,
+  moveTurn,
   seenAt,
   swingAngle,
   swingAround,
@@ -200,6 +204,103 @@ describe('swingAround, which way round', () => {
     expect(Math.min(...steps.map(distanceOf))).toBeGreaterThanOrEqual(
       Math.min(distanceOf(wide), distanceOf(side)) - 1e-9,
     );
+  });
+});
+
+describe('calmestWay', () => {
+  const side = pose(new Vector3(12.2, 1, 2), CENTER.clone());
+  const sight = CENTER.clone().sub(side.position).normalize();
+  /** `side`, its picture rolled by `degrees` about its line of sight. */
+  const rolled = (degrees: number): OrientedPose =>
+    pose(
+      side.position,
+      side.target,
+      side.up.clone().applyAxisAngle(sight, (degrees * Math.PI) / 180),
+    );
+  /** The roll a swing from `wide` takes, the short way round, to `rolled(degrees)`, in degrees. */
+  const rollTo = (degrees: number): number => {
+    const way: SwingWay = { longArc: false, longTwist: false, twist: Number.NaN };
+    swingAround(
+      wide,
+      rolled(degrees),
+      CENTER,
+      0.5,
+      pose(new Vector3(), new Vector3(), new Vector3()),
+      way,
+    );
+    return (way.twist * 180) / Math.PI;
+  };
+  // An end whose roll, the short way, is 170 degrees: nearly half a turn.
+  const nearHalf = Array.from({ length: 360 }, (_, a) => a).reduce((best, a) =>
+    Math.abs(Math.abs(rollTo(a)) - 170) < Math.abs(Math.abs(rollTo(best)) - 170) ? a : best,
+  );
+  // Rolling the end on by a degree that way adds a degree to the roll the short way.
+  const onward = Math.sign(rollTo(nearHalf)) * Math.sign(rollTo(nearHalf + 1) - rollTo(nearHalf));
+  const ways = (): SwingWay[] => [
+    { longArc: false, longTwist: false, twist: Number.NaN },
+    { longArc: false, longTwist: true, twist: Number.NaN },
+    { longArc: true, longTwist: false, twist: Number.NaN },
+    { longArc: true, longTwist: true, twist: Number.NaN },
+  ];
+  /** The move to an end that rolls on by `drift` degrees as the move goes (as the chase does, carried with its craft). */
+  const toRolling =
+    (drift: number) => (way: SwingWay, t: number, out: OrientedPose, share: number) =>
+      swingAround(wide, rolled(nearHalf + onward * drift * share), CENTER, t, out, way);
+  const turnOf = (drift: number, way: SwingWay): number =>
+    (moveTurn((t, out, share) => toRolling(drift)(way, t, out, share)) * 180) / Math.PI;
+
+  it('takes the short way round when the end holds still', () => {
+    const way = calmestWay(ways(), toRolling(0), (3 * Math.PI) / 180);
+
+    expect(way.longArc).toBe(false);
+    expect(way.longTwist).toBe(false);
+  });
+
+  it('rolls the other way to meet an end that rolls on away from the short way', () => {
+    const way = calmestWay(ways(), toRolling(80), (3 * Math.PI) / 180);
+    const short = { longArc: false, longTwist: false, twist: Number.NaN };
+
+    expect(way.longArc).toBe(false);
+    expect(way.longTwist).toBe(true);
+    // Left for the move to set as it goes.
+    expect(Number.isNaN(way.twist)).toBe(true);
+    expect(turnOf(80, way)).toBeLessThan(turnOf(80, short) - 90);
+  });
+});
+
+describe('carryPose', () => {
+  /** A craft 1.3 radii round the body, `angle` radians along its orbit (about +Y). */
+  const craftAt = (angle: number): Vector3 =>
+    CENTER.clone().add(new Vector3(1.3, 0, 0).applyAxisAngle(new Vector3(0, 1, 0), angle));
+  /** The chase of that craft: behind, above and beside it, with its up away from the body. */
+  const chaseAt = (angle: number): OrientedPose => {
+    const turn = (v: Vector3) => v.applyAxisAngle(new Vector3(0, 1, 0), angle);
+    return pose(
+      craftAt(angle).add(turn(new Vector3(0.3, 0.4, 0.5))),
+      craftAt(angle),
+      turn(new Vector3(1, 0, 0)),
+    );
+  };
+
+  it('finds the chase of a craft further along its orbit, carried round with it', () => {
+    const out = pose(new Vector3(), new Vector3(), new Vector3());
+    const turn = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), 1.2);
+
+    carryPose(chaseAt(0.4), craftAt(0.4), craftAt(1.6), turn, out);
+
+    expect(out.position.distanceTo(chaseAt(1.6).position)).toBeLessThan(1e-9);
+    expect(out.target.distanceTo(chaseAt(1.6).target)).toBeLessThan(1e-9);
+    expect(out.up.distanceTo(chaseAt(1.6).up)).toBeLessThan(1e-9);
+  });
+
+  it('only moves with a craft when the chase does not turn', () => {
+    const out = pose(new Vector3(), new Vector3(), new Vector3());
+    const offset = chaseAt(0.4).position.sub(craftAt(0.4));
+
+    carryPose(chaseAt(0.4), craftAt(0.4), craftAt(0.9), new Quaternion(), out);
+
+    expect(out.position.clone().sub(craftAt(0.9)).distanceTo(offset)).toBeLessThan(1e-9);
+    expect(out.up.distanceTo(chaseAt(0.4).up)).toBeLessThan(1e-9);
   });
 });
 
@@ -409,6 +510,17 @@ describe('easeMove', () => {
     expect(paces[0]!).toBeLessThan(0.01);
     expect(paces.at(-1)!).toBeLessThan(0.01);
     expect(Math.max(...paces)).toBeLessThanOrEqual(Math.PI / 2 + 1e-6);
+  });
+});
+
+describe('moveShare', () => {
+  it.each([0, 0.1, 0.25, 0.5, 0.8, 1])('undoes easeMove at %s of the move’s time', (share) => {
+    expect(moveShare(easeMove(share))).toBeCloseTo(share, 9);
+  });
+
+  it('stays within the move', () => {
+    expect(moveShare(-0.1)).toBe(0);
+    expect(moveShare(1.1)).toBe(1);
   });
 });
 
