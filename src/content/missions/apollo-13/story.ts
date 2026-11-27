@@ -289,7 +289,7 @@ export const story: Mission = {
         'The white Saturn V rocket lifts off beside its red launch tower as clouds of smoke billow out across the ground on both sides of the pad.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'center-engine-out',
@@ -364,7 +364,7 @@ export const story: Mission = {
         table('Call Signs', 'Apollo 13 row', ABTN_CALL_SIGNS),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'hybrid-midcourse',
@@ -452,7 +452,7 @@ export const story: Mission = {
         sourceUrl: 'https://www.nasa.gov/historical-sounds/',
       },
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'venting',
@@ -513,7 +513,7 @@ export const story: Mission = {
         'Inside the lunar module, a homemade square filter box with a taped, gridded face is fastened to the cabin wall, with a white hose running down from it.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ------------------------- Around the Moon ------------------------ */
@@ -543,7 +543,7 @@ export const story: Mission = {
         ),
       ],
       view: 'journey',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'far-side',
@@ -572,7 +572,7 @@ export const story: Mission = {
         'A slanting view across the rugged, cratered far side of the Moon, half in black shadow, with a large crater that has ridges in its center.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 's-ivb-impact',
@@ -628,7 +628,7 @@ export const story: Mission = {
         'A nearly full Moon against black space, showing its dark gray plains and bright cratered highlands. A dark blur covers part of its lower right edge.',
       ),
       view: 'journey',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- Coming home --------------------------- */
@@ -690,7 +690,7 @@ export const story: Mission = {
         'NASA (cropped)',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'farewell-aquarius',
@@ -725,7 +725,7 @@ export const story: Mission = {
         'A black-and-white view of the lunar module Aquarius against black space, seen from above: its bright, boxy upper stage with the round docking hatch at the center, an antenna dish at the top, and part of a landing leg below.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ----------------------------- Splashdown ---------------------------- */
@@ -781,7 +781,7 @@ export const story: Mission = {
         'The command module floats on the blue Pacific Ocean as its three red-and-white striped main parachutes settle onto the water. The recovery ship sits on the horizon at the upper left.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

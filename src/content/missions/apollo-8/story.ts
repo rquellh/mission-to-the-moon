@@ -326,7 +326,7 @@ export const story: Mission = {
         'The white Saturn V rocket climbs on a long trail of flame above billowing orange-brown smoke, seen from across the water, with marsh grass in front and seagulls in a blue sky.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'first-stage-separation',
@@ -402,7 +402,7 @@ export const story: Mission = {
       ],
       discrepancy: `${ABTN_DIFFERS} ignition at 002:50:37.79 (15:41:37 GMT), and its Earth Orbit Phase table gives the burn as 317.72 seconds (5 minutes 17.72 seconds). We follow the Mission Report's Table 3-I, 02:50:37.1.`,
       view: 'journey',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- To the Moon -------------------------- */
@@ -438,7 +438,7 @@ export const story: Mission = {
         "The rocket's spent third stage floats in black space, seen end-on from Apollo 8. On its end, where the adapter's panels have come off, stands the test article that took the place of a lunar module. Tiny sunlit specks drift around it.",
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'midcourse-correction',
@@ -496,7 +496,7 @@ export const story: Mission = {
         'A grainy black-and-white television picture of Earth: a bright, partly lit globe with swirls of cloud, low in the frame against dark space.',
       ),
       view: 'journey',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ------------------------- Around the Moon ------------------------ */
@@ -530,7 +530,7 @@ export const story: Mission = {
         "The Moon's far side seen from high above, looking south: gray, crater-covered ground curving away to a horizon under a black sky. A round crater with a dark floor sits right of center.",
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'lunar-television',
@@ -628,7 +628,7 @@ export const story: Mission = {
         'Earth, a half-lit blue and white globe, hangs in black space above the gray, curving horizon of the Moon.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'christmas-eve-broadcast',
@@ -676,7 +676,7 @@ export const story: Mission = {
         sourceUrl: 'https://www.nasa.gov/historical-sounds/',
       },
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- Coming home -------------------------- */
@@ -702,7 +702,7 @@ export const story: Mission = {
         summary('Transearth Phase'),
       ],
       view: 'journey',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'transearth-midcourse-correction',
@@ -847,7 +847,7 @@ export const story: Mission = {
         'Black-and-white photo of two Navy swimmers in wet suits standing on the flotation collar around the Apollo 8 capsule, one of them waving, beside an inflated life raft on the open sea.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'aboard-yorktown',

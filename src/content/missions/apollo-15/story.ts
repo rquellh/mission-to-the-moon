@@ -352,7 +352,7 @@ export const story: Mission = {
         'The white Saturn V rocket rises beside its orange launch tower on a column of bright flame, with clouds of exhaust billowing at its base under a deep blue sky.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'translunar-injection',
@@ -371,7 +371,7 @@ export const story: Mission = {
         summary('Translunar Phase'),
       ],
       view: 'journey',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- To the Moon -------------------------- */
@@ -446,7 +446,7 @@ export const story: Mission = {
       ],
       discrepancy: `${NMC_DIFFERS} command and service module gives lunar orbit insertion as 20:05:47 UT. Apollo by the Numbers gives 078:31:46.70, 20:05:46 GMT, which we follow.`,
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'undocking',
@@ -530,7 +530,7 @@ export const story: Mission = {
         "Black-and-white view from high above the Moon: a flat gray plain on the left, rugged mountains with long shadows on the right, and the winding channel of Hadley Rille running between them near Falcon's landing site.",
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'standup-eva',
@@ -577,7 +577,7 @@ export const story: Mission = {
       ],
       discrepancy: `${NMC_DIFFERS} lunar module (1971-063C) gives the first moonwalk as starting at 13:13:10 UT. Apollo by the Numbers gives 119:39:17, 13:13:17 GMT, which we follow; the Mission Report's Table 3-I agrees with it.`,
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'first-drive',
@@ -611,7 +611,7 @@ export const story: Mission = {
         'Scott, in a white spacesuit, works at the parked rover on a gray slope. Behind him the deep, shadowed channel of Hadley Rille curves away under a black sky.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'second-moonwalk',
@@ -648,7 +648,7 @@ export const story: Mission = {
         'Irwin, in a white spacesuit, salutes beside the United States flag. Behind him stand the lunar module Falcon and, at right, the rover with its dish antenna, below the broad gray slope of Hadley Delta.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'third-moonwalk',
@@ -707,7 +707,7 @@ export const story: Mission = {
       ],
       discrepancy: `${NMC_DIFFERS} command and service module and lunar module give liftoff as 17:11:22 UT. Apollo by the Numbers gives 171:37:23.2, 17:11:23 GMT, which we follow.`,
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'docking',
@@ -815,7 +815,7 @@ export const story: Mission = {
         'A film frame taken from the open hatch: Worden, in a white spacesuit with a tether trailing behind him, works beside the instrument bay on the side of the service module, against black space.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ----------------------------- Splashdown ---------------------------- */
@@ -894,7 +894,7 @@ export const story: Mission = {
         'Seen from above, the small cone-shaped command module hangs under three red-and-white striped parachutes over the dark blue Pacific. Two are fully open; the third, at left, has collapsed into a narrow bundle.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

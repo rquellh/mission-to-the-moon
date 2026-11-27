@@ -476,7 +476,7 @@ export const story: Mission = {
         'A white-and-black Titan II rocket rises past its red launch tower on a short bright flame, with clouds of tan and white smoke billowing across the pad under a pale blue sky streaked with high clouds.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ----------------------- Caught on the first orbit ---------------------- */
@@ -528,7 +528,7 @@ export const story: Mission = {
       discrepancy:
         'NASA\'s 55-years article has Conrad radio "Would you believe M=1?"; the voice transcript gives the call to Gordon, the pilot, at 1:30:15, and On the Shoulders of Titans to "a gleeful crew". We follow the transcript. The sources count the practice dockings differently (three more, NASA\'s article; two each, NSSDCA), so the text gives no number.',
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* -------------------------- Docked to the Agena ------------------------- */
@@ -578,7 +578,7 @@ export const story: Mission = {
         'Dick Gordon in a white spacesuit sits astride the dark front of the docked spacecraft, with a long antenna pole rising above him. The blue, cloud-covered Earth curves away at left, and the edge of the open hatch frames the right side of the picture.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'high-burn',
@@ -685,7 +685,7 @@ export const story: Mission = {
         'Looking down from high above, the western half of Australia spreads across the curved Earth, reddish-brown land dotted with small white clouds and edged by blue sea, under black space. A thin pole with a yellow tip rises into the view from the docked spacecraft at the bottom of the picture.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ------------------------------- The tether ------------------------------ */
@@ -755,7 +755,7 @@ export const story: Mission = {
         'The Agena, a small dark cylinder, floats far out above the blue ocean and scattered white clouds, with a thin tether line stretching toward it from the lower left. The curved edge of Earth and black space are at the top.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'rerendezvous',
@@ -890,7 +890,7 @@ export const story: Mission = {
       discrepancy:
         "The chronology's September 12 entry says the spacecraft landed less than three miles from the planned point, NASA's 55-years article within two miles of the target, and NSSDCA 4.9 km from it. We follow the chronology's Table A, 2.65 nautical miles. The 3 miles in the short text is our conversion of that.",
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

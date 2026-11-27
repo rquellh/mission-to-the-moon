@@ -192,6 +192,23 @@ describe('writeLap', () => {
     expect(between[COUNT - 1]).toBeLessThan(1.05 * typical);
   });
 
+  it('runs through the path itself where it is anchored, and still closes', () => {
+    // The orbit grows by 6% each lap; the craft is half way round the lap drawn.
+    const spiral = pathAround(6, (r) => 1.1 * (1 + 0.06 * r));
+    const points = new Float32Array(3 * COUNT);
+
+    writeLap(spiral, 2, 0, points, COUNT, 2.5);
+
+    // Half way round is along -x, at the radius the path has there.
+    const half = 3 * (COUNT / 2);
+    expect([points[half], points[half + 2]]).toEqual([
+      expect.closeTo(-1.1 * (1 + 0.06 * 2.5), 4),
+      expect.closeTo(0, 4),
+    ]);
+    const between = steps(points, COUNT).sort((a, b) => a - b);
+    expect(between[COUNT - 1]).toBeLessThan(1.05 * (between[COUNT / 2] as number));
+  });
+
   it('draws at the scale asked for, between readable and true', () => {
     const orbit = pathAround(3, () => 1.1);
     const lifted = pathAround(3, () => 1.5);

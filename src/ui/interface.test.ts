@@ -104,7 +104,7 @@ describe('the mission interface', () => {
       await mountMission('apollo-11', { start: 'tour' });
 
       expect(document.body).toHaveClass('is-touring');
-      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 1 of 12');
+      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 1 of 25');
       expect(screen.queryByRole('button', { name: 'Controls' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Next event' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Previous event' })).not.toBeInTheDocument();
@@ -112,7 +112,11 @@ describe('the mission interface', () => {
     });
 
     it('holds the card on the stop just left until the clock reaches the next, not each event it passes', async () => {
-      const { user, frames } = await mountMission('apollo-11', { start: 'tour' });
+      // A tour of key moments passes events between its stops.
+      const { user, frames } = await mountMission('apollo-11', {
+        start: 'tour',
+        story: (mission) => ({ ...mission, tour: 'key-moments' }),
+      });
       const card = screen.getByRole('region', { name: 'What is happening' });
 
       await user.click(screen.getByRole('button', { name: 'Next' }));
@@ -133,6 +137,44 @@ describe('the mission interface', () => {
       expect(
         within(card).getByRole('heading', { level: 3, name: 'Burn toward the Moon' }),
       ).toBeInTheDocument();
+    });
+
+    it('on a tour of every event, turns the card at each one as the clock reaches it', async () => {
+      const { user, frames } = await mountMission('apollo-11', { start: 'tour' });
+      const card = screen.getByRole('region', { name: 'What is happening' });
+
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      frames.advance(3);
+
+      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent(
+        'On the way to Stop 2 of 25',
+      );
+      expect(within(card).getByRole('heading', { level: 3, name: 'Liftoff' })).toBeInTheDocument();
+
+      frames.advance(3);
+
+      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 2 of 25');
+      expect(
+        within(card).getByRole('heading', { level: 3, name: 'First stage separates' }),
+      ).toBeInTheDocument();
+    });
+
+    it('on a tour of every event, rides along in the Ship view, whatever view each moment has when explored', async () => {
+      const { user, frames, director } = await mountMission('apollo-11', { start: 'tour' });
+      expect(director.view).toBe('spacecraft');
+
+      // On to "Burn toward the Moon", explored in the Both view, and "Into orbit around the Moon", in the Moon view.
+      for (let stop = 2; stop <= 8; stop += 1) {
+        await user.click(screen.getByRole('button', { name: 'Next' }));
+        frames.advance(0.5);
+        await user.click(screen.getByRole('button', { name: 'Skip to this stop' }));
+        expect(director.view).toBe('spacecraft');
+      }
+      await user.click(screen.getByRole('button', { name: 'Back' }));
+      frames.advance(8);
+
+      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 7 of 25');
+      expect(director.view).toBe('spacecraft');
     });
 
     it('notes the visit on this device once, however often it starts', async () => {

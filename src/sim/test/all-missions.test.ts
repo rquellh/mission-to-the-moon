@@ -17,6 +17,7 @@ import {
   RUN_UP_MAX_MISSION_SECONDS,
   RUN_UP_MIN_STORY_SECONDS,
   RUN_UP_STORY_SECONDS,
+  tourStops,
 } from '../../app/tour.ts';
 import { SOURCE_GROUPS, SOURCES, type Source } from '../../content/sources.ts';
 import {
@@ -451,18 +452,16 @@ for (const folder of flights) {
       // As the tour measures it (Tour.runUpFrom): the last few story seconds, or the last 30 minutes if fewer.
       const eventTimes = story.events.map((event) => elapsedToSeconds(event.elapsed));
       const clock = createStoryTime(storyKeyTimes(folder.path, eventTimes));
-      const runUps = story.events
-        .filter((event) => event.inTour)
-        .map((event) => {
-          const t = elapsedToSeconds(event.elapsed);
-          const at = clock.toStory(t);
-          const from = Math.max(
-            0,
-            at - RUN_UP_STORY_SECONDS,
-            clock.toStory(t - RUN_UP_MAX_MISSION_SECONDS),
-          );
-          return { id: event.id, at, seconds: at - from };
-        });
+      const runUps = tourStops(story).map((event) => {
+        const t = elapsedToSeconds(event.elapsed);
+        const at = clock.toStory(t);
+        const from = Math.max(
+          0,
+          at - RUN_UP_STORY_SECONDS,
+          clock.toStory(t - RUN_UP_MAX_MISSION_SECONDS),
+        );
+        return { id: event.id, at, seconds: at - from };
+      });
 
       const short = runUps.filter(
         ({ at, seconds }) => at >= RUN_UP_MIN_STORY_SECONDS && seconds < RUN_UP_MIN_STORY_SECONDS,
@@ -613,7 +612,7 @@ for (const folder of flights) {
       assert.equal(summary.duration, story.duration?.value, 'duration');
       assert.equal(
         summary.hasTour,
-        story.events.some((e) => e.inTour === true),
+        tourStops(story).length > 0,
         'hasTour says whether the story has tour stops',
       );
     });

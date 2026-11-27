@@ -131,7 +131,7 @@ describe('the mission list', () => {
         screen.queryByRole('region', { name: 'Ride along on Apollo 11' }),
       ).not.toBeInTheDocument();
       expect(document.body).not.toHaveClass('is-welcome');
-      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 1 of 12');
+      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 1 of 25');
       expect(document.title).toBe('Apollo 11 · Mission to the Moon');
       expect(navigation.address).toBeNull();
     });

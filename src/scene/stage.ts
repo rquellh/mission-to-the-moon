@@ -97,11 +97,10 @@ import {
 } from './framing';
 import { createMarkers, type MarkerPoint, type MarkerSet } from './markers';
 import { createMoon, type Moon } from './moon';
+import { orbitStays, sampleIndexAt, valueAtIndex } from './path-fade';
 import {
   createOrbitRing,
   createPathLine,
-  sampleIndexAt,
-  valueAtIndex,
   type OrbitRing,
   type PathFade,
   type PathLine,
@@ -241,20 +240,27 @@ const CHASE_OFFSET = new Vector3(-0.72, 0.34, 0.6).normalize();
 const SUBJECT_SCALE = 1.35;
 const ORBIT_SUBJECT_SCALE = 5;
 /**
- * A flight that stays in Earth orbit goes around many times, and drawn all
- * at once its orbits pile up into a band. There, the path still to come
- * fades out over the next revolution, flown revolutions older than the last
- * one dim, and those older than a few are gone. Revolutions are counted
- * along the path itself, so the fading follows the real period of the orbit
- * flown (a high orbit's longer one too). A Moon flight's path fades this way
- * only where it stays in lunar orbit for many revolutions (Apollo 11's
- * thirty are all drawn; the three-day stays of Apollo 15 to 17 fade).
+ * A path that goes around a body many times would pile its laps up into a
+ * band, each a little turned from the one before (see path-fade.ts), and up
+ * close they run beside the craft as near-copies of the lap it is on. So
+ * in each stay in orbit (the whole path of a flight that stays in Earth
+ * orbit; a Moon flight's parking orbit and its stay at the Moon) only the
+ * lap through the craft is drawn: bright behind it and dim ahead, both
+ * fading out a little under half a lap away, so the two halves meet softly
+ * across the orbit from it. Laps older than that, and laps still to come
+ * (a first, longer orbit before the burn that rounds it out, too), are not
+ * drawn. Revolutions are counted along the path itself, so the fading
+ * follows the real period of the orbit flown, and as the clock moves it
+ * moves with it: nothing appears or goes at once. Before a stay its first
+ * lap shows; after it, its last.
  */
 const ORBIT_FADE = {
-  future: [0.4, 1.0],
-  past: [1.0, 2.0, 0.28],
-  gone: [3.0, 5.0],
+  future: [0.35, 0.6],
+  past: [0.4, 0.65, 0],
+  gone: [0.6, 0.65],
 } as const;
+/** A path is low over a body, for its stays in orbit, within this many of the body's radii of its center (see orbitStays). */
+const ORBIT_STAY_RADII = 1.6;
 /*
  * In the ship view, another ship that is not paired with the followed one
  * (not docked, not keeping station, not about to dock) would be drawn as a
@@ -278,8 +284,6 @@ const COMPANION_MARKER_M = 1500;
 const COMPANION_MARKER_PX = 9;
 /** Story seconds over which a ship's line fades out once its path has ended (see fadeEndedPaths). */
 const PATH_END_FADE_STORY_SECONDS = 1.5;
-/** A stay in lunar orbit of more revolutions than this fades loop by loop. */
-const LONG_LUNAR_STAY_REVOLUTIONS = 40;
 /*
  * Fast forward: on a long flight the story clock can carry a craft around
  * its body several times a second. Drawn at its true place, the model would
@@ -300,7 +304,10 @@ const LONG_LUNAR_STAY_REVOLUTIONS = 40;
  * - Never while it is docked to another craft (drawn as part of it) or
  *   standing on a surface, and never with the clock stopped: then the model
  *   is at its true place.
- * - The ring fades in and out over FAST_FORWARD_CROSSFADE_SECONDS.
+ * - The ring fades in and out over FAST_FORWARD_CROSSFADE_SECONDS, and the
+ *   craft's own line gives way to it in the stay in orbit it is in, so the
+ *   ring is the one curve drawn round the body for that craft (see
+ *   updateTrail).
  *
  * The stand-in. The owner found craft going round the Moon or Earth "still
  * too fast", and proposed "cheating a bit ... similar to how we do when the
@@ -315,9 +322,9 @@ const LONG_LUNAR_STAY_REVOLUTIONS = 40;
  * jumps; it sits on the ring as drawn, at either scale, heading the way the
  * craft flies and upright over the body, as a craft in orbit is drawn.
  * Everything that places or shows the model (hidden behind a body or not,
- * its glow, its dot, a pair drawn round it, the pointer to it, the end of
- * its lit line) goes by where it is drawn (see drawnOf); the camera and the
- * framing go by the true place.
+ * its glow, its dot, a pair drawn round it, the pointer to it, how far its
+ * line is lit) goes by where it is drawn (see drawnOf and updateTrail); the
+ * camera and the framing go by the true place.
  *
  * The hand-back. When fast forward ends, the ring fades out and the model
  * goes back to its true place with a short dissolve (see
@@ -1592,8 +1599,8 @@ export class Stage implements Director {
    * Revolutions flown around the nearer body at each sample of a path (the
    * angle swept about Earth's or the Moon's center, at true scale), and the
    * stretches of it that fade loop by loop (see ORBIT_FADE): the whole path
-   * of a flight that stays in Earth orbit; for a Moon flight, each long stay
-   * in lunar orbit.
+   * of a flight that stays in Earth orbit; for a Moon flight, each stay in
+   * orbit, low over Earth or the Moon (see orbitStays).
    */
   private revolutionsOf(polyline: {
     readonly times: Float64Array;
@@ -1615,10 +1622,6 @@ export class Stage implements Director {
       const earthHeight = (p.length() - EARTH_RADIUS) / EARTH_RADIUS;
       return moonHeight < earthHeight;
     };
-    const lowOverMoon = (i: number): boolean => {
-      p.fromArray(p2, 3 * i);
-      return p.distanceTo(moonCenter) < MOON_RADIUS * 1.6;
-    };
     let total = 0;
     for (let i = 1; i < n; i += 1) {
       const center = nearMoonAt(i) ? moonCenter : this.origin;
@@ -1630,28 +1633,16 @@ export class Stage implements Director {
         total += Math.acos(MathUtils.clamp(a.dot(b) / (la * lb), -1, 1)) / (Math.PI * 2);
       revolutions[i] = total;
     }
-    const runs: Array<readonly [number, number]> = [];
-    if (n < 2) return { revolutions, runs };
-    if (this.orbitMission) {
-      runs.push([0, n - 1]);
-      return { revolutions, runs };
-    }
-    // Long stays low over the Moon.
-    let first = -1;
-    for (let i = 0; i <= n; i += 1) {
-      const low = i < n && lowOverMoon(i);
-      if (low && first < 0) first = i;
-      if (!low && first >= 0) {
-        const last = i - 1;
-        if (
-          (revolutions[last] ?? 0) - (revolutions[first] ?? 0) > LONG_LUNAR_STAY_REVOLUTIONS &&
-          runs.length < 4
-        )
-          runs.push([first, last]);
-        first = -1;
-      }
-    }
-    return { revolutions, runs };
+    if (n < 2) return { revolutions, runs: [] };
+    if (this.orbitMission) return { revolutions, runs: [[0, n - 1]] };
+    const low = Array.from({ length: n }, (_, i) => {
+      p.fromArray(p2, 3 * i);
+      return (
+        p.distanceTo(moonCenter) < MOON_RADIUS * ORBIT_STAY_RADII ||
+        p.length() < EARTH_RADIUS * ORBIT_STAY_RADII
+      );
+    });
+    return { revolutions, runs: orbitStays(revolutions, low) };
   }
 
   /**
@@ -4407,7 +4398,9 @@ export class Stage implements Director {
       const target = fast ? 1 : 0;
       const at = leapt || this.reducedMotion;
       if (fast && ship.lap) {
-        writeLap(ship.lap, start, this.mix, ship.ringWanted, RING_POINTS);
+        // Through the true place itself, where the craft's own line meets it (see writeLap).
+        const now = this.revolutionsAt(ship, t);
+        writeLap(ship.lap, start, this.mix, ship.ringWanted, RING_POINTS, now);
         ship.ringCenter.copy(this.nearMoon(ship.position) ? this.moonCenter : this.origin);
         // A ring that is not showing yet takes its lap as it is; one showing eases to a new one.
         if (ship.crossFade <= 0 || at || rescaled) ship.ringNow.set(ship.ringWanted);
@@ -4441,6 +4434,19 @@ export class Stage implements Director {
         changed = true;
       }
     });
+    // The ring and a craft's own lap are not quite one curve (see updateTrail), so the lap gives
+    // way to the ring. A craft docked to another is drawn as part of it, with no ring of its own,
+    // and its line is lit up to its true place, which races round with the other's: its lap gives
+    // way to the other's ring too, rather than racing round under it.
+    for (const ship of this.ships) {
+      const phase = ship.exists ? this.path.phaseAt(ship.id, t) : undefined;
+      const host =
+        phase?.kind === 'docked'
+          ? this.ships.find((other) => other.id === phase.target)
+          : undefined;
+      const covered = Math.max(ship.crossFade, host?.crossFade ?? 0);
+      this.lineOf.get(ship)?.setLapShown(1 - smoothstep(0, 1, covered));
+    }
     // The steady view frames the followed ship's ring (see updateFastView).
     const followed = this.followed;
     if (followed.crossFade > 0) {
@@ -4520,19 +4526,23 @@ export class Stage implements Director {
   }
 
   /**
-   * A ship's line is lit up to now and dimmer ahead (see updateWorld), so
-   * where the two meet marks the craft's true place, which in fast forward
-   * races round the ring (seen on a lap not flown before, and in the loops
-   * that fade by revolutions). While the ship stands in, its line is lit up
-   * to the stand-in instead, on the last lap the craft has flown past it, so
-   * that mark goes round with the model; as the model goes back to its true
-   * place, so does the line.
+   * A ship's line is lit up to now and dimmer ahead (see updateWorld), and
+   * in a stay in orbit only the lap around that point is drawn (see
+   * ORBIT_FADE), so that point is the craft's true place, which in fast
+   * forward races round the body. While its ring is wanted, the line is lit
+   * up to the stand-in instead, on the last lap the craft has flown past it,
+   * so what the line shows of the stay goes round with the model, not the
+   * race. The lap itself gives way to the ring meanwhile (see
+   * updateFastForward): the ring is the lap through the true place, and in
+   * a frame that turns with the Moon (see path-fade.ts) a lap flown before
+   * it runs a little beside it. As fast forward ends the line goes back to
+   * now at once, while the ring still covers the lap, so that is not seen.
    */
   private updateTrail(ship: ShipState, t: number): void {
     const line = this.lineOf.get(ship);
     if (!line) return;
     const revolutions = this.revolutionsAt(ship, t);
-    if (!ship.standIn || !ship.revolutions || !Number.isFinite(revolutions)) {
+    if (!ship.standIn || !ship.fast || !ship.revolutions || !Number.isFinite(revolutions)) {
       if (ship.trailLagged) line.setTime(t);
       ship.trailLagged = false;
       return;

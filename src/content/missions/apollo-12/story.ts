@@ -377,7 +377,7 @@ export const story: Mission = {
         'The white Saturn V rocket rises beside its red launch tower on a column of white smoke and flame, against a dark sky.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'lightning',
@@ -451,7 +451,7 @@ export const story: Mission = {
         sourceUrl: 'https://www.nasa.gov/historical-sounds/',
       },
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- To the Moon -------------------------- */
@@ -570,7 +570,7 @@ export const story: Mission = {
         'The lunar module Intrepid, gold and silver with its four landing legs spread, flies in black space above the gray, cratered surface of the Moon, photographed from Yankee Clipper in lunar orbit after the two had moved apart.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'landing',
@@ -612,7 +612,7 @@ export const story: Mission = {
       discrepancy:
         "NSSDCA's Master Catalog gives the landing as 06:54:35 UT, within about 180 meters of Surveyor 3. Apollo by the Numbers gives 06:54:36 GMT and 535 feet, agreeing with the Mission Report, which we follow. NASA's Apollo 12 page gives the correction as 4,190 feet; the Mission Report gives 4,200. NASA's Image and Video Library caption for AS12-48-7134 dates Surveyor 3's landing April 19, 1967; Apollo by the Numbers, the Mission Report, and NSSDCA give April 20.",
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- On the Moon --------------------------- */
@@ -691,7 +691,7 @@ export const story: Mission = {
         'Black-and-white photo of an astronaut in a white spacesuit reaching out to the camera of Surveyor 3, a spindly robot lander with a tilted flat panel on a mast, on the gray slope of a crater. The lunar module Intrepid stands on the horizon behind them.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- Coming home --------------------------- */
@@ -761,7 +761,7 @@ export const story: Mission = {
       ],
       discrepancy: `${NMC_DIFFERS} command and service module gives splashdown as 20:58:24 UT and puts it 6.9 kilometers (4.3 miles) from the Hornet. Apollo by the Numbers gives 20:58:25 GMT and 3.91 nautical miles, agreeing with the Mission Report's 244:36:25, which we follow.`,
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

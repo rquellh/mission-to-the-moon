@@ -387,7 +387,7 @@ export const story: Mission = {
         'Black-and-white view from a distance: the Titan II rocket climbs on a thin trail of flame above the launch pads, beside a huge white cloud of exhaust smoke, with a tall service tower at left.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'in-orbit',
@@ -424,7 +424,7 @@ export const story: Mission = {
       discrepancy:
         "On the Shoulders of Titans (page 286) gives the computer's reading at engine cutoff as 7830 meters per second (25,690 feet per second); we quote Stafford's call in the transcript. NSSDCA puts Gemini 7 about 1,900 km ahead at insertion; we follow On the Shoulders of Titans, 1992 km.",
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- The chase --------------------------- */
@@ -547,7 +547,7 @@ export const story: Mission = {
         ),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- Closing in -------------------------- */
@@ -610,7 +610,7 @@ export const story: Mission = {
         nmc('Mission Profile: "the final braking maneuver at 2:27 p.m. EST"'),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- Side by side ------------------------- */
@@ -657,7 +657,7 @@ export const story: Mission = {
         'Gemini 7, a white cone with a dark nose, floats high above the deep blue ocean and scattered white clouds, seen from Gemini 6A about 122 feet away. A thin strap trails from its wide end.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'trailing-cords',
@@ -727,7 +727,7 @@ export const story: Mission = {
         'Gemini 6A seen nose on from Gemini 7, about 38 feet away, against black space: its nose, at the top, glares white in the sunlight, and the words UNITED STATES show on its side.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'night-formation',
@@ -813,7 +813,7 @@ export const story: Mission = {
       discrepancy:
         "The chronology's December 15 entry says Gemini 6A withdrew to about 30 miles, and NSSDCA to roughly 50 km; we follow On the Shoulders of Titans and NASA's 55-years article. The Gemini VII mission report (page 4-6) puts the separation maneuver at approximately 269:30 on Gemini VII's clock, about 11:23 on Gemini 6A's (our arithmetic); we follow the chronology's end of station keeping.",
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- Coming home -------------------------- */
@@ -848,7 +848,7 @@ export const story: Mission = {
       discrepancy:
         "On the Shoulders of Titans says Stafford made the report; the Smithsonian's story says Schirra, and the transcript logs it to the command pilot's position. We do not name who spoke.",
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'retrofire',
@@ -883,7 +883,7 @@ export const story: Mission = {
         ),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'parachutes',
@@ -952,7 +952,7 @@ export const story: Mission = {
         'Water-level view of Gemini 6A floating in blue waves with both hatches open. Two astronauts in white suits and helmets sit inside while Navy swimmers in black wetsuits stand beside them on the yellow flotation collar.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'aboard-wasp',

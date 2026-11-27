@@ -40,5 +40,7 @@ export type {
   StretchPlay,
   Turns,
 } from './story-time.ts';
+export { staysOnSurface, stillBetween } from './surface.ts';
+export type { Stay } from './surface.ts';
 export { READABLE_MOON_DISTANCE, toReadable } from './warp.ts';
 export type * from './types.ts';

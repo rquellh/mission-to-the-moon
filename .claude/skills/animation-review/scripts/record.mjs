@@ -213,10 +213,16 @@ async function flightData(page, mission) {
     const { loadBundle } = await import('/src/content/missions/index.ts');
     const sim = await import('/src/sim/index.ts');
     const { elapsedToSeconds } = await import('/src/content/types.ts');
+    const tour = await import('/src/app/tour.ts');
     const bundle = await loadBundle(${JSON.stringify(mission)});
     const path = sim.buildFlightPath(bundle.flight);
     const times = bundle.mission.events.map((event) => elapsedToSeconds(event.elapsed));
     const story = sim.createStoryTime(sim.storyKeyTimes(path, times));
+    // The tour's own stops (see tourStops), or on a build from before tour styles, its key moments.
+    const keyMoment = (event) => Boolean(event.keyMoment ?? event.inTour);
+    const stops = tour.tourStops
+      ? tour.tourStops(bundle.mission)
+      : bundle.mission.events.filter(keyMoment);
     return {
       mission: bundle.mission.id,
       duration: story.length,
@@ -227,7 +233,8 @@ async function flightData(page, mission) {
         seconds: times[i],
         story: story.toStory(times[i]),
         view: event.view,
-        inTour: Boolean(event.inTour),
+        keyMoment: keyMoment(event),
+        tourStop: stops.includes(event),
       })),
       partings: sim.partingsAtEvents(path, times),
     };
@@ -426,7 +433,7 @@ async function tour(browser, options, mission, where) {
     if (where === 'start') return;
   }
 
-  const stops = flight.events.filter((event) => event.inTour);
+  const stops = flight.events.filter((event) => event.tourStop);
   const from = where === 'all' ? 1 : Number(where);
   const to = where === 'all' ? stops.length : from;
   if (!(from >= 1 && from <= stops.length))

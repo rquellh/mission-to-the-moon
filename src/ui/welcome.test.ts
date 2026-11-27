@@ -9,10 +9,14 @@ import { copy } from '../content/copy.ts';
 import type { Mission } from '../content/types.ts';
 import { mountMission, navigation, screen, visitedMissions, within } from '../test/test-utils.ts';
 
-/** Apollo 11 with no tour stops: every real flight has a tour, so a typed fixture. */
+/**
+ * Apollo 11 with no tour stops (a tour of its key moments, with none
+ * marked): every real flight has a tour, so a typed fixture.
+ */
 const withoutATour = (mission: Mission): Mission => ({
   ...mission,
-  events: mission.events.map((event) => ({ ...event, inTour: false })),
+  tour: 'key-moments',
+  events: mission.events.map((event) => ({ ...event, keyMoment: false })),
 });
 
 const theWelcome = (missionName: string): HTMLElement =>
@@ -41,7 +45,7 @@ describe('the welcome', () => {
     });
 
     it.each([
-      ['apollo-11', 'Apollo 11', '12 stops, from liftoff to splashdown'],
+      ['apollo-11', 'Apollo 11', '25 stops, from liftoff to splashdown'],
       ['gemini-3', 'Gemini 3', '6 stops, from liftoff to splashdown'],
     ])('says how many stops the tour of %s makes', async (id, missionName, stops) => {
       await mountMission(id);
@@ -86,7 +90,7 @@ describe('the welcome', () => {
         screen.queryByRole('region', { name: 'Ride along on Apollo 11' }),
       ).not.toBeInTheDocument();
       expect(document.body).not.toHaveClass('is-welcome');
-      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 1 of 12');
+      expect(screen.getByRole('region', { name: 'Guided tour' })).toHaveTextContent('Stop 1 of 25');
       expect(screen.getByRole('button', { name: 'Next' })).toHaveFocus();
       expect(document.title).toBe('Apollo 11 · Mission to the Moon');
       expect(visitedMissions()).toEqual(['apollo-11']);

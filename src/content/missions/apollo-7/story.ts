@@ -361,7 +361,7 @@ export const story: Mission = {
         'Black-and-white photo of the white Saturn IB rocket rising on a cloud of exhaust beside its launch tower, framed by two tall palm trees, while a crowd of people in white shirts watches from a lawn.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'in-orbit',
@@ -427,7 +427,7 @@ export const story: Mission = {
         'The top of the spent S-IVB stage seen from Apollo 7, its four adapter panels spread open like petals around a dark opening with a round white target inside, above the tan desert and blue sea of Sonora, Mexico.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'rendezvous',
@@ -460,7 +460,7 @@ export const story: Mission = {
       discrepancy:
         "Section 2.0 of the mission report gives terminal phase initiation as 29:16:45, the onboard computer's time, and section 8.1.3 gives 29:18:34, the ground's; Table 2-I gives 29:16:33, which we follow. Apollo by the Numbers puts the stage's fall at 162:27:15 (09:30 GMT on October 18), as does NSSDCA (9:30 UT); section 3.4 of the mission report gives 168:27:00, also on October 18. We give only the date.",
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ------------------------- Testing in orbit ------------------------ */
@@ -486,7 +486,7 @@ export const story: Mission = {
         ),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'hurricane',
@@ -572,7 +572,7 @@ export const story: Mission = {
       discrepancy:
         'Apollo by the Numbers gives the ignition as 259:39:16.36 and the firing as 11.79 seconds; the mission report gives 12.4 seconds in Table 3-V and section 3.2.2, while its Table 2-I times are 11.9 seconds apart. We follow Table 2-I for the time and say about 12 seconds.',
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'parachutes',
@@ -639,7 +639,7 @@ export const story: Mission = {
         'The scorched, cone-shaped Apollo 7 command module floats in gray-blue water, ringed by an orange flotation collar, with two white balloon-like bags on top. Two Navy swimmers in black wetsuits stand on the collar working on the spacecraft.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

@@ -386,7 +386,7 @@ export const story: Mission = {
         'A white Titan II rocket with black bands climbs on a bright flame above its red launch tower, as orange and white smoke billows across the pad under a blue sky.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'in-orbit',
@@ -447,7 +447,7 @@ export const story: Mission = {
         ),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'chase-called-off',
@@ -547,7 +547,7 @@ export const story: Mission = {
         ),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'floating-out',
@@ -596,7 +596,7 @@ export const story: Mission = {
         'Ed White floats in black space above the curved blue Earth, in a white spacesuit and gold visor, holding the gas gun out in his right hand. A gold-wrapped hose loops around him and leads back to the dark spacecraft at lower right.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'on-the-tether',
@@ -637,7 +637,7 @@ export const story: Mission = {
         'Ed White floats head down above the bright blue Earth and its curved edge against black space, holding the gas gun with a camera mounted on it, a gold-wrapped tether coiling around him.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'coming-back-in',
@@ -673,7 +673,7 @@ export const story: Mission = {
         'Ed White floats upside down, his boots toward the sky, high above blue ocean streaked with white clouds, joined to the dark spacecraft at left by a looping gold-wrapped cord.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'hatch-locked',
@@ -703,7 +703,7 @@ export const story: Mission = {
       discrepancy:
         "The Gemini chronology says the hatch was closed at 4 hours 54 minutes, and NASA's Gemini IV page and NSSDCA give 3:10 p.m. EST, the same time, with the cabin's repressurization beginning at 3:12:50 p.m. EST. We follow the mission report's section 4.1: final hatch closure and repressurization were completed at 05:06 (given to the minute; seconds written as 00).",
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* --------------------------- Four days in orbit ------------------------- */
@@ -871,7 +871,7 @@ export const story: Mission = {
       discrepancy:
         "Section 5.1.8.3 of the mission report (page 5-34) gives the first retrorocket's ignition as 97:40:00.7, and section 5.1.6 (page 5-27), as corrected by the report's change sheet (Change 1, pen-and-ink change 11, PDF page 3), gives the actual time of retrofire as 97:40:00.70, approximately 1.3 seconds early. We follow Table 4-I, 97:40:01.",
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'parachutes',
@@ -929,7 +929,7 @@ export const story: Mission = {
         'Seen from above, the dark Gemini 4 spacecraft floats in deep blue water inside a yellow flotation collar, with a swimmer at its open hatch. An astronaut in a white spacesuit sits in a yellow raft beside it while one swimmer holds on to the raft and another swims nearby.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'aboard-wasp',

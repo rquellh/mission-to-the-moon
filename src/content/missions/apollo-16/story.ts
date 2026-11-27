@@ -356,7 +356,7 @@ export const story: Mission = {
         'The white Saturn V climbs on a column of flame beside its orange launch tower, seen past palm trees and scrub, with huge clouds of exhaust rolling out on both sides under a blue sky.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'translunar-injection',
@@ -416,7 +416,7 @@ export const story: Mission = {
       discrepancy:
         "The Mission Report's Table 3-I gives undocking at 96:14:00, and NSSDCA's Master Catalog at 18:08:00 UT. Apollo by the Numbers and the Mission Report's Table 3-III give 96:13:31 (18:07:31 GMT), which we follow.",
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ---------------------------- On the Moon --------------------------- */
@@ -446,7 +446,7 @@ export const story: Mission = {
         ),
       ],
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'first-moonwalk',
@@ -484,7 +484,7 @@ export const story: Mission = {
         'Young, in a white spacesuit, hangs in the air a little above the gray ground as he salutes the United States flag. To the left stand the lunar module Orion and the parked rover, with the rounded slope of Stone Mountain behind, under a black sky.',
       ),
       view: 'moon',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'second-moonwalk',
@@ -597,7 +597,7 @@ export const story: Mission = {
         "A film frame taken from the open hatch: Mattingly, in a white spacesuit and a helmet with a red stripe, floats outside the spacecraft against black space. The back of Duke's white helmet fills the lower left corner.",
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'splashdown',
@@ -636,7 +636,7 @@ export const story: Mission = {
         'Seen from above, the command module hits the dark blue Pacific in a burst of white spray, under three red-and-white striped parachutes.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

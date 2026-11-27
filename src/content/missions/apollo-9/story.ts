@@ -344,7 +344,7 @@ export const story: Mission = {
         'The white Saturn V rocket rises from its launch pad on a bright burst of flame and smoke, seen far off between the trunks of tall palm trees under a cloudy sky.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'transposition-docking',
@@ -382,7 +382,7 @@ export const story: Mission = {
         "Looking down on the lunar module Spider, a boxy silver craft with gold foil and folded legs, still mounted on top of the rocket's round third stage, with white clouds far below.",
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ----------------------- Testing Spider docked ---------------------- */
@@ -459,7 +459,7 @@ export const story: Mission = {
         'Later in the spacewalk, Rusty Schweickart, in a white spacesuit and a boxy white backpack, leans over the edge of the lunar module with one arm reaching out toward its equipment, against black space. His helmet shows a gold visor with an orange-red outer visor over its upper half.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ------------------------- Spider on its own ------------------------ */
@@ -492,7 +492,7 @@ export const story: Mission = {
         'The lunar module Spider, a dark boxy craft on four thin landing legs spread wide, floats above white clouds and blue ocean far below.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'descent-stage-jettison',
@@ -566,7 +566,7 @@ export const story: Mission = {
         ),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'ascent-stage-jettison',
@@ -654,7 +654,7 @@ export const story: Mission = {
         ),
       ],
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 

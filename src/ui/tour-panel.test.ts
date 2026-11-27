@@ -138,7 +138,11 @@ describe('the tour panel', () => {
     });
 
     it('stops a recording playing on the card as the tour sets off for the next stop', async () => {
-      const { user, frames } = await mountMission('apollo-11', { start: 'tour' });
+      // On a tour of key moments: on Apollo 11's tour of every event, the landing turns straight to the first step (below).
+      const { user, frames } = await mountMission('apollo-11', {
+        start: 'tour',
+        story: (mission) => ({ ...mission, tour: 'key-moments' }),
+      });
       // Next and Skip to the landing, the sixth stop.
       for (let stop = 2; stop <= 6; stop += 1) {
         await user.click(screen.getByRole('button', { name: 'Next' }));
@@ -160,6 +164,54 @@ describe('the tour panel', () => {
       ).toBeInTheDocument();
       expect(
         within(theCard()).getByRole('button', { name: 'Listen to the recording, 15 seconds' }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  // Apollo 11 rides along through every event. On the Moon's surface nothing moves between
+  // two stops, so Next and Back turn straight to the next page.
+  describe('turning the page', () => {
+    const thePanel = (): HTMLElement => screen.getByRole('region', { name: 'Guided tour' });
+
+    /** Apollo 11's tour at the landing, its twelfth stop, reached with Next and Skip. */
+    async function atTheLanding(): Promise<{ user: User; frames: Frames }> {
+      const mounted = await mountMission('apollo-11', { start: 'tour' });
+      for (let stop = 2; stop <= 12; stop += 1) {
+        await mounted.user.click(screen.getByRole('button', { name: 'Next' }));
+        mounted.frames.advance(0.5);
+        await mounted.user.click(screen.getByRole('button', { name: 'Skip to this stop' }));
+      }
+      expect(
+        within(theCard()).getByRole('heading', { level: 3, name: 'The Eagle has landed' }),
+      ).toBeInTheDocument();
+      return mounted;
+    }
+
+    it('Next shows the next stop at once, with nothing to wait for', async () => {
+      const { user } = await atTheLanding();
+
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+
+      expect(thePanel()).toHaveTextContent('Stop 13 of 25');
+      expect(thePanel()).not.toHaveTextContent('On the way');
+      expect(
+        within(theCard()).getByRole('heading', { level: 3, name: 'First step on the Moon' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Next' })).toHaveFocus();
+    });
+
+    it('Back does the same', async () => {
+      const { user } = await atTheLanding();
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      expect(thePanel()).toHaveTextContent('Stop 14 of 25');
+
+      await user.click(screen.getByRole('button', { name: 'Back' }));
+
+      expect(thePanel()).toHaveTextContent('Stop 13 of 25');
+      expect(thePanel()).not.toHaveTextContent('On the way');
+      expect(
+        within(theCard()).getByRole('heading', { level: 3, name: 'First step on the Moon' }),
       ).toBeInTheDocument();
     });
   });

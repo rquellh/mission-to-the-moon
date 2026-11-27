@@ -427,7 +427,7 @@ export const story: Mission = {
       ],
       discrepancy: 'The Gemini chronology rounds the launch time to 3:47 p.m. EST.',
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
 
     /* ------------------------- Meeting the Agena ----------------------- */
@@ -469,7 +469,7 @@ export const story: Mission = {
         "The end of the chase: the long silver Agena, seen from Gemini 12 about 50 feet away before docking, with an American flag on its side and its dark docking collar at left, floats above Earth's blue oceans and white clouds. A thin rod from Gemini 12 rises at the bottom of the picture.",
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'docking',
@@ -499,7 +499,7 @@ export const story: Mission = {
         SUMMARY('1-2'),
       ],
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'eclipse',
@@ -569,7 +569,7 @@ export const story: Mission = {
         "Buzz Aldrin's face looks out from inside his spacesuit helmet, filling the right side of the picture. Behind him is the blue curve of Earth with white clouds, and in the lower left corner is a camera covered with printed labels.",
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'umbilical-eva',
@@ -612,7 +612,7 @@ export const story: Mission = {
         'Buzz Aldrin in a white spacesuit floats outside the spacecraft against black space, a long hose curving from his chest. The blue edge of Earth fills the left side of the picture.',
       ),
       view: 'spacecraft',
-      inTour: true,
+      keyMoment: true,
     },
     {
       id: 'tether',
@@ -733,7 +733,7 @@ export const story: Mission = {
         'Black-and-white view from above of rough gray ocean. Gemini 12, a small dark shape, sits in a long patch of white foam at right, still tied by its lines to its big striped main parachute, which is filled with air above the water at left.',
       ),
       view: 'earth',
-      inTour: true,
+      keyMoment: true,
     },
   ],
 
