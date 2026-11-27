@@ -8,8 +8,10 @@
  *
  *   node .claude/skills/animation-review/scripts/pace.mjs <mission> [--even] [--json PATH]
  *
- * --even builds the clock as it was before it eased long stretches (every
- * stretch at one even pace), to compare with.
+ * --even builds the clock with every stretch at one even pace (no easing, no
+ * held partings or approaches, no swings kept calm), to compare with.
+ * --usual-trips plays the tour's trips without the clock's hurry limit, as
+ * the tour did before it kept to it (see planTrip in src/app/player.ts).
  *
  * It loads the mission in headless Chrome from the dev server and imports the
  * app's own modules there (the story clock, the tour's trip and run-up rules,
@@ -17,38 +19,60 @@
  * window.stage (development builds only), so the numbers are the ones the app
  * uses. BASE sets the dev server (default http://localhost:5199).
  *
- * The pace is read from the clock itself, a moment at a time: a long stretch
- * does not run at one even pace (it eases into and out of its events, see
+ * The pace is read from the clock itself, a moment at a time: a stretch does
+ * not always run at one even pace (it may ease into and out of its events,
+ * and keep a craft swinging round a body to a calm pace; see
  * src/sim/story-time.ts). Laps per second is the mission seconds the clock
- * covers per real second, divided by the orbit's period. The owner's limit
- * for a drawn craft is about one lap in 8 seconds (0.125 laps/s).
+ * covers per real second, divided by the orbit's period. The limit used here
+ * for a drawn craft is one lap in 20 seconds (0.05 laps/s). It is a working
+ * figure, not the owner's: the owner called a lap of the Moon in 4.4 seconds
+ * "way too fast" and one in 8.8 "better", and then, with drawn craft kept to
+ * about one lap in 8 seconds, said the orbit animations were still too fast.
  *
- * Whether a craft is drawn or replaced by its ring follows the scene's rules
- * (src/scene/fast-forward.ts and Stage.updateFastForward): a ring only while
- * it laps faster than the fast-forward threshold (with its two levels) and
- * its path around now is a closed lap; never while docked, on a surface, or
- * with no parts of its own. The scene's cross-fade takes a moment to follow,
- * so a short fast stretch (a run-up) can still show a drawn craft racing
- * where the table says "ring". A recording's `7 laps` signal measures what
- * was actually drawn.
+ * Whether a craft is in fast forward follows the scene's rules
+ * (src/scene/fast-forward.ts and Stage.updateFastForward): only while it laps
+ * faster than the fast-forward threshold (with its two levels) and its path
+ * around now is a closed lap; never while docked, on a surface, or with no
+ * parts of its own. A craft in fast forward is still drawn: its stand-in
+ * glides round its ring at the glide's own pace (setting off at one lap in
+ * FAST_FORWARD_ON_LAP_SECONDS and easing to one in
+ * FAST_FORWARD_GLIDE_LAP_SECONDS over FAST_FORWARD_GLIDE_EASE_SECONDS of
+ * real time), whatever the clock's pace. So "fastest drawn" is what is shown:
+ * the true rate for a craft at its true place, the glide's for a stand-in
+ * (marked "stand-in"). A craft on no closed lap has no stand-in and is drawn
+ * at its true place however fast it goes: the tables single those out. A
+ * recording's `7 laps` signal measures what was actually drawn.
+ *
+ * Tour trips are planned as the tour plans them (planTrip in
+ * src/app/player.ts, with the clock's hurry limit): each trip's real length,
+ * and the usual length it would have without the limit; its final run (from
+ * the end of its last hurry to the stop); and when the camera moves to the
+ * stop's view, by the tour's plan (tripViewSeconds in src/app/tour.ts), from
+ * the view of the stop it leaves. The scene can still move the camera later
+ * (while its fast-forward view shows) or sooner (see Tour.watchScene).
  */
 import { writeFile } from 'node:fs/promises';
 import { openBrowser, sleep } from './cast.mjs';
 
 const BASE = (process.env.BASE ?? 'http://localhost:5199').replace(/\/$/, '');
-const LIMIT = 1 / 8;
+/** The working limit for a drawn craft, laps per real second: one lap in 20 seconds (see the top of this file). */
+const LIMIT_LAP_SECONDS = 20;
+const LIMIT = 1 / LIMIT_LAP_SECONDS;
 /** "Near an event": within this many story seconds of one, where the tour plays at Explore's pace. */
 const NEAR_STORY_SECONDS = 3;
 
 /** Runs in the page: everything the tables need. */
-async function measure(missionId, near, even) {
+async function measure(missionId, near, even, usualTrips) {
   const s = window.stage;
   if (!s) throw new Error('window.stage is missing: run against the dev server');
+  if (!s.fleet || !s.ships.some((ship) => ship.revolutions))
+    throw new Error('the stage has not built the mission yet (no craft or laps to measure)');
   const { loadBundle } = await import('/src/content/missions/index.ts');
   const sim = await import('/src/sim/index.ts');
   const { elapsedToSeconds } = await import('/src/content/types.ts');
   const tour = await import('/src/app/tour.ts');
   const player = await import('/src/app/player.ts');
+  const views = await import('/src/app/views.ts');
   const ff = await import('/src/scene/fast-forward.ts');
   const { EARTH_RADIUS, MOON_RADIUS } = await import('/src/content/physical-constants.ts');
 
@@ -127,27 +151,59 @@ async function measure(missionId, near, even) {
   };
 
   /**
-   * Follows the scene through a run of moments in order, each a mission time
-   * and the mission seconds the clock covers per real second there. For each
-   * moment it gives every craft drawn on its own: its laps per real second,
-   * and whether it is drawn or shown as its ring. It starts with no ring, as
-   * after a stop or a pause (the scene never fast-forwards a stopped clock).
+   * Follows the scene through a run of moments in order, each a mission time,
+   * the mission seconds the clock covers per real second there, and the real
+   * seconds since the moment before. For each moment it gives every craft
+   * drawn on its own: the laps per real second it is shown going round its
+   * body (`laps`: its true rate at its true place, or its stand-in's glide in
+   * fast forward), its true rate (`trueLaps`), whether it is a stand-in, and
+   * whether its path around now is no closed lap (`open`: drawn at its true
+   * place however fast it goes). It starts with no fast forward, as after a
+   * stop or a pause (the scene never fast-forwards a stopped clock), so a
+   * stand-in sets off at the pace a craft goes into fast forward at. On a
+   * build from before the stand-in, a craft in fast forward was hidden, and
+   * is shown going round at no pace at all.
    */
+  const glideRate = ff.glideRate ?? (() => 0);
   const follower = () => {
     const fast = ships.map(() => false);
-    return (t, missionPerReal) =>
+    const glided = ships.map(() => 0);
+    return (t, missionPerReal, dt) =>
       ships
         .map((ship, index) => {
-          const laps = turnRate(ship, index, t) * missionPerReal;
-          const lapping = ff.inFastForward(laps, fast[index]);
-          fast[index] = lapping && closes(ship, t);
-          // Drawn however fast it goes while its path around now is no closed lap (arriving, leaving, climbing).
-          const open = !fast[index] && laps > 1 / 8 && !closes(ship, t);
-          return { id: ship.id, laps, drawn: !fast[index], open };
+          const trueLaps = turnRate(ship, index, t) * missionPerReal;
+          const closed = closes(ship, t);
+          const was = fast[index];
+          fast[index] = ff.inFastForward(trueLaps, was) && closed;
+          glided[index] = fast[index] && was ? glided[index] + dt : 0;
+          const standIn = fast[index];
+          const laps = standIn
+            ? glideRate(glided[index], 1 / ff.FAST_FORWARD_ON_LAP_SECONDS)
+            : trueLaps;
+          return { id: ship.id, laps, trueLaps, standIn, open: !standIn && !closed };
         })
-        .filter((craft) => craft.laps > 0);
+        .filter((craft) => craft.trueLaps > 0);
   };
   const better = (best, candidate) => (candidate.laps > (best?.laps ?? 0) ? candidate : best);
+  /** The clock as the app hands it to the player and the tour (see main.ts), with its hurry limit. */
+  const map = {
+    duration: story.length,
+    toStory: (seconds) => story.toStory(seconds),
+    toElapsed: (seconds) => story.toMission(seconds),
+  };
+  if (story.hurryLimit && !usualTrips) map.hurryLimit = (seconds) => story.hurryLimit(seconds);
+  /** A trip as the player plays it (planTrip), or, on a build from before trips were planned, its usual shape. */
+  const planOf = (from, to, seconds) =>
+    player.planTrip
+      ? player.planTrip(map, from, to, seconds)
+      : {
+          seconds,
+          finalRun: player.TRIP_ARRIVE_SECONDS,
+          over: 1,
+          limited: false,
+          hurries: player.tripHurries(seconds, Math.abs(to - from)),
+          at: (e) => player.tripShape(e, seconds, Math.abs(to - from)),
+        };
 
   const events = bundle.mission.events.map((event, i) => ({
     id: event.id,
@@ -170,7 +226,10 @@ async function measure(missionId, near, even) {
   const stretches = [];
   let nearTop = null;
   let nearOpenTop = null;
+  let nearClosedTop = null;
   let anyTop = null;
+  let openTop = null;
+  let standInTop = null;
   for (let i = 0; i + 1 < keys.length; i += 1) {
     const [a, sa] = keys[i];
     const [b, sb] = keys[i + 1];
@@ -179,23 +238,29 @@ async function measure(missionId, near, even) {
     const endPace = paceAt(sb, sa, sb);
     let topPace = 0;
     let drawnTop = null;
-    let overallTop = null;
     const count = Math.max(2, Math.ceil((sb - sa) / step));
     for (let k = 0; k < count; k += 1) {
       const at = sa + ((sb - sa) * (k + 0.5)) / count;
       const pace = paceAt(at, sa, sb);
       topPace = Math.max(topPace, pace);
       const t = story.toMission(at);
-      for (const craft of explore(t, pace)) {
+      // At 1x a story second is a real second.
+      for (const craft of explore(t, pace, (sb - sa) / count)) {
         const entry = { ...craft, at, t, sinceStart: at - sa, beforeEnd: sb - at };
-        overallTop = better(overallTop, entry);
-        if (!craft.drawn) continue;
+        if (craft.standIn) standInTop = better(standInTop, entry);
         drawnTop = better(drawnTop, entry);
         anyTop = better(anyTop, entry);
+        if (craft.open) openTop = better(openTop, entry);
         if (nearEvent(at)) nearTop = better(nearTop, entry);
         if (nearEvent(at) && craft.open) nearOpenTop = better(nearOpenTop, entry);
+        if (nearEvent(at) && !craft.open) nearClosedTop = better(nearClosedTop, entry);
       }
     }
+    // How the clock plays the stretch (see story-time.ts), or, on a clock that does not say, whether
+    // its ends are slower than its average (eased).
+    const play =
+      story.stretches?.[i]?.play ??
+      (startPace < even * 0.999 && endPace < even * 0.999 ? 'eased' : 'even');
     stretches.push({
       from: a,
       to: b,
@@ -205,37 +270,51 @@ async function measure(missionId, near, even) {
       startPace,
       endPace,
       topPace,
-      // Eased in and out of its ends (see story-time.ts); a stretch played evenly has its ends at its even pace.
-      shoulders: startPace < even * 0.999 && endPace < even * 0.999,
+      play,
+      // Played longer than the clock's usual length for its mission time (see storyIntervalLength).
+      longer: sb - sa - sim.storyIntervalLength(b - a) > 1e-6,
+      shoulders: play === 'eased',
       followed: s.followedAt((a + b) / 2).id,
       drawnTop,
-      overallTop,
       fromEvents: events.filter((e) => Math.abs(e.seconds - a) < 1e-6).map((e) => e.id),
       toEvents: events.filter((e) => Math.abs(e.seconds - b) < 1e-6).map((e) => e.id),
     });
   }
 
-  // A play of `span` story seconds from `start` over `seconds` real seconds, as the player shapes it.
+  // A play of `span` story seconds from `start` asked for in `seconds` real seconds, as the player
+  // plans and plays it (a hurried trip the clock's craft hold back takes longer).
   const play = (start, span, seconds) => {
+    const plan = planOf(start, start + span, seconds);
     const follow = follower();
     let topSpeed = 0;
     let topLaps = null;
     let unhurried = null;
+    let openLaps = null;
     const dt = 0.02;
-    for (let e = 0; e <= seconds + 1e-9; e += dt) {
-      const shape = player.tripShape(e, seconds, Math.abs(span));
+    for (let e = 0; e <= plan.seconds + 1e-9; e += dt) {
+      const shape = plan.at(e);
       const speed = Math.abs(span) * shape.pace;
       const now = start + span * shape.share;
       const t = story.toMission(now);
       topSpeed = Math.max(topSpeed, speed);
-      for (const craft of follow(t, speed * paceAt(now))) {
-        if (!craft.drawn) continue;
+      for (const craft of follow(t, speed * paceAt(now), dt)) {
         const entry = { ...craft, at: e, speed };
         topLaps = better(topLaps, entry);
+        if (craft.open) openLaps = better(openLaps, entry);
         if (speed <= 1.0001) unhurried = better(unhurried, entry);
       }
     }
-    return { topSpeed, topLaps, unhurried };
+    return {
+      seconds: plan.seconds,
+      limited: plan.limited,
+      over: plan.over,
+      finalRun: plan.finalRun,
+      plan,
+      topSpeed,
+      topLaps,
+      unhurried,
+      openLaps,
+    };
   };
 
   const stops = events.filter((event) => event.stop !== null);
@@ -253,24 +332,39 @@ async function measure(missionId, near, even) {
     const to = stops[i + 1];
     const start = restOf(from);
     const span = to.story - start;
-    const seconds = tour.tripSeconds(span);
+    const usual = tour.tripSeconds(span);
+    const played = play(start, span, usual);
+    // When the camera moves to the stop's view, by the tour's plan, from the view of the stop just left.
+    const fromView = views.nearestView(bundle.mission, from.view);
+    const toView = views.nearestView(bundle.mission, to.view);
+    const viewAt = !(played.seconds > tour.VIEW_LEAD_SECONDS)
+      ? 0
+      : tour.tripViewSeconds
+        ? tour.tripViewSeconds({
+            fromView,
+            toView,
+            missionToStop: to.seconds - story.toMission(start),
+            plan: played.plan,
+          })
+        : played.seconds - tour.VIEW_LEAD_SECONDS;
+    const { plan: _plan, ...kept } = played;
     const trip = {
       from: from.stop,
       to: to.stop,
       fromTitle: from.title,
       toTitle: to.title,
       span,
-      seconds,
-      ...play(start, span, seconds),
+      usual,
+      ...kept,
+      fromView,
+      toView,
+      viewAt,
     };
     const rest = restOf(to);
     if (rest > to.story) {
       const restSeconds = tour.playSeconds(rest - to.story);
-      trip.parting = {
-        span: rest - to.story,
-        seconds: restSeconds,
-        ...play(to.story, rest - to.story, restSeconds),
-      };
+      const { plan: _restPlan, ...rested } = play(to.story, rest - to.story, restSeconds);
+      trip.parting = { span: rest - to.story, ...rested };
     }
     trips.push(trip);
   }
@@ -285,14 +379,8 @@ async function measure(missionId, near, even) {
     const base = { stop: stop.stop, title: stop.title, span };
     if (span < tour.RUN_UP_MIN_STORY_SECONDS)
       return { ...base, cut: true, seconds: 0, topSpeed: 0, topLaps: null, mission: 0 };
-    const seconds = tour.playSeconds(span);
-    return {
-      ...base,
-      cut: false,
-      seconds,
-      mission: stop.seconds - story.toMission(from),
-      ...play(from, span, seconds),
-    };
+    const { plan: _plan, ...played } = play(from, span, tour.playSeconds(span));
+    return { ...base, cut: false, mission: stop.seconds - story.toMission(from), ...played };
   });
 
   return {
@@ -302,19 +390,25 @@ async function measure(missionId, near, even) {
     thresholds: {
       onLap: ff.FAST_FORWARD_ON_LAP_SECONDS,
       offLap: ff.FAST_FORWARD_OFF_LAP_SECONDS,
-      // Undefined on a build from before the clock eased its long stretches.
+      // Undefined on a build from before the clock eased its stretches; calm and swing on one
+      // from before it read the craft's turning.
       ease: {
         gentle: sim.EASE_GENTLE_PACE,
-        start: sim.EASE_START_PACE,
-        full: sim.EASE_FULL_PACE,
         shoulder: sim.EASE_SHOULDER_STORY_SECONDS,
+        least: sim.EASE_SHOULDER_MIN_STORY_SECONDS,
         ramp: sim.EASE_RAMP_MISSION_SECONDS,
+        hurry: sim.EASE_MAX_HURRY,
+        calm: sim.CALM_LAP_STORY_SECONDS,
+        swing: sim.SWING_LAP_STORY_SECONDS,
       },
       runUp: {
         story: tour.RUN_UP_STORY_SECONDS,
         mission: tour.RUN_UP_MAX_MISSION_SECONDS,
         min: tour.RUN_UP_MIN_STORY_SECONDS,
       },
+      // Undefined on a build from before the stand-in, or before trips were held to the clock's limit.
+      glide: { lap: ff.FAST_FORWARD_GLIDE_LAP_SECONDS, ease: ff.FAST_FORWARD_GLIDE_EASE_SECONDS },
+      trip: { usual: tour.TRIP_MAX_SECONDS, longest: player.TRIP_LIMITED_MAX_SECONDS },
     },
     near,
     events,
@@ -322,7 +416,10 @@ async function measure(missionId, near, even) {
     even,
     nearTop,
     nearOpenTop,
+    nearClosedTop,
     anyTop,
+    openTop,
+    standInTop,
     trips,
     runUps,
   };
@@ -339,54 +436,72 @@ function main() {
   const mission = args.find((arg) => !arg.startsWith('--'));
   const jsonAt = args.indexOf('--json');
   if (!mission) {
-    console.error('Usage: pace.mjs <mission> [--even] [--json PATH]');
+    console.error('Usage: pace.mjs <mission> [--even] [--usual-trips] [--json PATH]');
     process.exit(2);
   }
-  return { mission, even: args.includes('--even'), json: jsonAt >= 0 ? args[jsonAt + 1] : null };
+  return {
+    mission,
+    even: args.includes('--even'),
+    usualTrips: args.includes('--usual-trips'),
+    json: jsonAt >= 0 ? args[jsonAt + 1] : null,
+  };
 }
 
 async function run() {
-  const { mission, even, json } = main();
+  const { mission, even, usualTrips, json } = main();
   const browser = await openBrowser({ width: 1280, height: 800 });
   let data;
   try {
     await browser.navigate(`${BASE}/?mission=${encodeURIComponent(mission)}&start=explore`);
-    for (let i = 0; i < 150; i += 1) {
-      if (await browser.page.evaluate('Boolean(window.stage && window.__missionScene)')) break;
+    // The stage exists before it has built the mission (its paths, laps and craft come once
+    // Earth has loaded): measured earlier, no craft would ever be seen lapping.
+    for (let i = 0; i < 300; i += 1) {
+      if (
+        await browser.page.evaluate(
+          'Boolean(window.stage && window.__missionScene && window.stage.fleet && window.stage.ships.some((ship) => ship.revolutions))',
+        )
+      )
+        break;
       await sleep(200);
     }
     data = await browser.page.evaluate(
-      `(${measure.toString()})(${JSON.stringify(mission)}, ${NEAR_STORY_SECONDS}, ${even})`,
+      `(${measure.toString()})(${JSON.stringify(mission)}, ${NEAR_STORY_SECONDS}, ${even}, ${usualTrips})`,
     );
   } finally {
     await browser.close();
   }
   if (json) await writeFile(json, `${JSON.stringify(data, null, 2)}\n`);
 
-  const { onLap, offLap, ease, runUp } = data.thresholds;
+  const { onLap, offLap, ease, runUp, glide, trip: tripLimits } = data.thresholds;
   const lapText = (laps) =>
     laps > 0 ? `${laps.toFixed(3)} (1 in ${(1 / laps).toFixed(1)} s)` : '-';
-  const lapAt = (entry) => (entry && entry.laps > 0 ? `${entry.id} ${lapText(entry.laps)}` : '-');
-  // Flags carry the numbers of the standards in SKILL.md. A craft on a closed lap is drawn up
-  // to the scene's faster threshold, so one passing between the two thresholds is marked as such.
+  const lapAt = (entry) =>
+    entry && entry.laps > 0
+      ? `${entry.id} ${lapText(entry.laps)}${entry.standIn ? ' stand-in' : ''}`
+      : '-';
+  // Flags carry the numbers of the standards in SKILL.md (7: a drawn craft never races around its
+  // body). A craft on a closed lap is drawn up to the scene's faster threshold, so one passing
+  // between the two thresholds is marked as such.
   const flag = (entry) =>
     !entry || entry.laps <= LIMIT
       ? ''
       : entry.laps <= 1 / onLap + 1e-3
-        ? `7: a drawn craft laps faster than once in 8 s, between the scene's two thresholds (once in ${onLap} to ${offLap} s)`
-        : '7: a drawn craft laps faster than once in 8 s';
+        ? `7: a drawn craft laps faster than once in ${LIMIT_LAP_SECONDS} s, between the scene's two thresholds (once in ${onLap} to ${offLap} s)`
+        : `7: a drawn craft laps faster than once in ${LIMIT_LAP_SECONDS} s`;
   const pace = (value) => value.toFixed(0).padStart(6);
 
   console.log(
     `${data.name} (${data.mission}): ${data.events.length} events, story ${data.duration.toFixed(1)} s at 1x.`,
   );
   console.log(
-    `The owner's limit for a drawn craft: ${LIMIT.toFixed(3)} laps/s (one lap in 8 s). The scene replaces a craft on a closed lap with its ring once it laps faster than once in ${onLap} s, and draws it again once slower than once in ${offLap} s (src/scene/fast-forward.ts).`,
+    `The limit used for a drawn craft: ${LIMIT.toFixed(3)} laps/s (one lap in ${LIMIT_LAP_SECONDS} s, a working figure: the owner called one in 8.8 s "better" than one in 4.4, then said the orbits were still too fast). The scene puts a craft on a closed lap into fast forward once it laps faster than once in ${onLap} s, and takes it out once slower than once in ${offLap} s (src/scene/fast-forward.ts)${glide.lap === undefined ? ', hiding it behind its ring meanwhile.' : `; meanwhile its stand-in glides round its ring, setting off at one lap in ${onLap} s and easing to one in ${glide.lap} s over ${glide.ease} s ("stand-in" below). A craft on no closed lap is drawn at its true place however fast it goes.`}`,
   );
   console.log(
     data.even || ease.gentle === undefined
       ? `The clock plays every stretch at one even pace (${data.even ? '--even' : 'a build from before it eased long stretches'}).`
-      : `The clock eases a stretch faster than ${ease.start} mission s per story s (fully from ${ease.full}): its first and last ${ease.shoulder} story s at ${ease.gentle}, then a ramp where the pace grows as (1 + t / ${ease.ramp} s)^2, t mission seconds into it, up to its middle's pace (src/sim/story-time.ts).`,
+      : ease.calm === undefined
+        ? `The clock eases a long stretch: its first and last ${ease.shoulder} story s at ${ease.gentle}, then a ramp where the pace grows as (1 + t / ${ease.ramp} s)^2, t mission seconds into it, up to its middle's pace (a build from before the clock read the craft's turning).`
+        : `The clock plays a stretch evenly when its craft, played evenly, lap no faster than once in ${ease.calm} s (*: eased; h: held, a parting or docking approach played evenly at no more than that; +: played longer than usual). An eased stretch plays its first and last ${ease.shoulder} story s (down to ${ease.least} where that leaves too little room) at ${ease.gentle}, then a ramp where the pace grows as (1 + t / ${ease.ramp} s)^2, t mission seconds into it, up to its middle's pace (at most ${ease.hurry} times the even pace); and where a craft is on no closed lap it keeps it to one lap in ${ease.swing} s (src/sim/story-time.ts).`,
   );
 
   console.log('\nevents');
@@ -398,11 +513,12 @@ async function run() {
   }
 
   console.log(
-    "\nstretches at Explore's 1x (one story second a second), played on from the start: mission seconds per story second at the start, on average, at the fastest and at the end (* eased into and out of its ends); the fastest lapping of a craft drawn on its own, and where (story s after the stretch starts / before it ends)",
+    "\nstretches at Explore's 1x (one story second a second), played on from the start: mission seconds per story second at the start, on average, at the fastest and at the end (* eased into and out of its ends, h held, + played longer than usual); the fastest lapping of a craft drawn on its own, and where (story s after the stretch starts / before it ends)",
   );
   console.log(
     '  story s           start   even    top    end  followed  fastest drawn (laps/s)           where          from -> to',
   );
+  const marks = { eased: '*', held: 'h', even: ' ' };
   for (const stretch of data.stretches) {
     const top = stretch.drawnTop;
     const name = `${stretch.fromEvents[0] ?? '(key)'} -> ${stretch.toEvents[0] ?? '(key)'}`;
@@ -412,42 +528,64 @@ async function run() {
         : `-${top.beforeEnd.toFixed(2)} s`
       : '';
     const warn = flag(top);
+    const mark = `${marks[stretch.play] ?? ' '}${stretch.longer ? '+' : ' '}`;
     console.log(
-      `  ${stretch.storyFrom.toFixed(2).padStart(6)}-${stretch.storyTo.toFixed(2).padEnd(7)}${stretch.shoulders ? '*' : ' '} ${pace(stretch.startPace)} ${pace(stretch.even)} ${pace(stretch.topPace)} ${pace(stretch.endPace)}  ${stretch.followed.padEnd(8)}  ${lapAt(top).padEnd(31)}  ${whereText.padEnd(13)}  ${name}${warn ? `\n${' '.repeat(18)}^ ${warn}` : ''}`,
+      `  ${stretch.storyFrom.toFixed(2).padStart(6)}-${stretch.storyTo.toFixed(2).padEnd(7)}${mark}${pace(stretch.startPace)} ${pace(stretch.even)} ${pace(stretch.topPace)} ${pace(stretch.endPace)}  ${stretch.followed.padEnd(8)}  ${lapAt(top).padEnd(31)}  ${whereText.padEnd(13)}  ${name}${warn ? `\n${' '.repeat(18)}^ ${warn}` : ''}`,
     );
   }
-  const eased = data.stretches.filter((stretch) => stretch.shoulders).length;
+  const count = (play) => data.stretches.filter((stretch) => stretch.play === play).length;
+  const longer = data.stretches.filter((stretch) => stretch.longer).length;
   console.log(
-    `  ${eased} of ${data.stretches.length} stretches eased into and out of their ends (*).`,
+    `  ${count('eased')} of ${data.stretches.length} stretches eased into and out of their ends (*), ${count('held')} held (h), ${longer} played longer than usual (+).`,
   );
+  const at = (entry) =>
+    entry ? `${lapAt(entry)} at story ${entry.at.toFixed(2)} s (${clock(entry.t)})` : '-';
   console.log(
-    `  fastest lapping of a drawn craft within ${data.near} story s of an event: ${data.nearTop ? `${lapAt(data.nearTop)} at story ${data.nearTop.at.toFixed(2)} s (${clock(data.nearTop.t)})` : '-'}`,
+    `  fastest lapping of a drawn craft within ${data.near} story s of an event: ${at(data.nearTop)}`,
   );
+  console.log(`    of those, on a closed lap: ${at(data.nearClosedTop)}`);
   console.log(
-    `  of those, fastest on no closed lap (arriving, leaving, climbing: no ring can stand in): ${data.nearOpenTop ? `${lapAt(data.nearOpenTop)} at story ${data.nearOpenTop.at.toFixed(2)} s (${clock(data.nearOpenTop.t)})` : '-'}`,
+    `    of those, on no closed lap (arriving, leaving, climbing: no ring can stand in): ${at(data.nearOpenTop)}`,
   );
-  console.log(
-    `  fastest lapping of a drawn craft anywhere: ${data.anyTop ? `${lapAt(data.anyTop)} at story ${data.anyTop.at.toFixed(2)} s (${clock(data.anyTop.t)})` : '-'}`,
-  );
+  console.log(`  fastest lapping of a drawn craft anywhere: ${at(data.anyTop)}`);
+  console.log(`    of those, on no closed lap: ${at(data.openTop)}`);
+  console.log(`    of those, a stand-in: ${at(data.standInTop)}`);
 
   console.log(
-    "\ntour trips (Next): the trip, then a parting's play from its event to where it rests",
+    `\ntour trips (Next): the trip, then a parting's play from its event to where it rests. Real seconds as played, and as usual without the clock's hurry limit (a trip held back takes longer, up to ${tripLimits.longest ?? tripLimits.usual} s); its final run, from the end of its last hurry to the stop; and when the camera moves to the stop's view, as planned from the view of the stop it leaves`,
   );
   console.log(
-    '  trip     story s  real s  top pace  fastest drawn at 1x or slower        fastest drawn overall            to',
+    '  trip     story s  real s (usual)  top pace  fastest drawn at 1x or slower        fastest drawn overall              final run  camera at        to',
   );
   for (const trip of data.trips) {
-    // At Explore's pace or slower the craft is seen as Explore shows it: there it must keep to 7.
+    // At Explore's pace or slower the craft is seen as Explore shows it: there it must keep to standard 7.
+    const notes = [];
     const warn = flag(trip.unhurried);
+    if (warn) notes.push(warn);
+    // On no closed lap no stand-in covers the hurry: the craft is drawn at its true place.
+    if (trip.openLaps && trip.openLaps.laps > LIMIT)
+      notes.push(
+        `7: in the hurry, a craft on no closed lap is drawn lapping once in ${(1 / trip.openLaps.laps).toFixed(1)} s`,
+      );
+    if (trip.over > 1)
+      notes.push(
+        `over the clock's hurry limit by x${trip.over.toFixed(2)} where it holds the trip back: it would take longer than ${tripLimits.longest} s`,
+      );
+    const real = `${trip.seconds.toFixed(1).padStart(5)} (${trip.usual.toFixed(1).padStart(4)})`;
+    const camera = `${trip.viewAt.toFixed(1).padStart(5)} s ${trip.toView}`;
     console.log(
-      `  ${String(trip.from).padStart(2)} -> ${String(trip.to).padEnd(2)} ${trip.span.toFixed(2).padStart(7)}  ${trip.seconds.toFixed(1).padStart(6)}  ${trip.topSpeed.toFixed(2).padStart(6)}x   ${lapAt(trip.unhurried).padEnd(36)}  ${lapAt(trip.topLaps).padEnd(31)}  ${trip.toTitle}${warn ? `\n${' '.repeat(18)}^ ${warn}` : ''}`,
+      `  ${String(trip.from).padStart(2)} -> ${String(trip.to).padEnd(2)} ${trip.span.toFixed(2).padStart(7)}  ${real}  ${trip.topSpeed.toFixed(2).padStart(6)}x   ${lapAt(trip.unhurried).padEnd(36)}  ${lapAt(trip.topLaps).padEnd(33)}  ${`${trip.finalRun.toFixed(1)} s`.padStart(8)}  ${camera.padEnd(16)} ${trip.toTitle}${notes.length ? `\n${' '.repeat(18)}^ ${notes.join('; ')}` : ''}`,
     );
     if (trip.parting) {
       console.log(
-        `     parting ${trip.parting.span.toFixed(2).padStart(5)}  ${trip.parting.seconds.toFixed(1).padStart(6)}  ${trip.parting.topSpeed.toFixed(2).padStart(6)}x   ${lapAt(trip.parting.unhurried).padEnd(36)}  ${lapAt(trip.parting.topLaps)}`,
+        `     parting ${trip.parting.span.toFixed(2).padStart(5)}  ${trip.parting.seconds.toFixed(1).padStart(5)}         ${trip.parting.topSpeed.toFixed(2).padStart(6)}x   ${lapAt(trip.parting.unhurried).padEnd(36)}  ${lapAt(trip.parting.topLaps)}`,
       );
     }
   }
+  const longerTrips = data.trips.filter((trip) => trip.seconds > trip.usual + 1e-6);
+  console.log(
+    `  ${longerTrips.length} of ${data.trips.length} trips take longer than usual${longerTrips.length ? `: ${longerTrips.map((trip) => `${trip.from} -> ${trip.to} ${trip.usual.toFixed(1)} -> ${trip.seconds.toFixed(1)} s`).join(', ')}` : ''}.`,
+  );
 
   console.log(
     `\nrun-ups (starting the tour, Back, starting over): the last ${runUp.story} story s before the stop, no more than ${runUp.mission / 60} mission minutes, or a straight cut when that leaves under ${runUp.min} story s`,

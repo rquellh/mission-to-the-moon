@@ -317,12 +317,13 @@ it('shows Earth when the scene reports a view an Earth-orbit flight does not off
 });
 ```
 
-| On the fake                           | Meaning                                                                            |
-| ------------------------------------- | ---------------------------------------------------------------------------------- |
-| `director.view`, `director.scaleMode` | The view and scale the scene is in                                                 |
-| `director.drawing`                    | False while the interface has asked the scene to stop drawing (an extra covers it) |
-| `director.cameraMovesTo(view)`        | The camera moved by itself                                                         |
-| `director.setFastForward(on)`         | The followed ship starts or stops circling too fast to follow                      |
+| On the fake                           | Meaning                                                                                                      |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `director.view`, `director.scaleMode` | The view and scale the scene is in                                                                           |
+| `director.drawing`                    | False while the interface has asked the scene to stop drawing (an extra covers it)                           |
+| `director.cameraMovesTo(view)`        | The camera moved by itself                                                                                   |
+| `director.setFastForward(on)`         | The followed ship starts or stops circling too fast to follow                                                |
+| `director.setFastForwardLaps(laps)`   | During fast forward, the ship has really flown this many laps since it began (the label counts whole orbits) |
 
 ### The Screen: `fakeFrames`
 

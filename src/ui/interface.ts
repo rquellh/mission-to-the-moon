@@ -17,6 +17,7 @@ import { byId, el, hiddenText, reducedMotionQuery } from './dom';
 import { setUpEnding, type EndingAfter } from './ending';
 import { setUpEventCard } from './event-card';
 import { setUpExtraSheet } from './extra-sheet';
+import { fillFastForwardMark, orbitsInFastForward } from './fast-forward-mark';
 import { missionDates, speakMissionTime } from './format';
 import { setUpHub, type HubOptions } from './hub';
 import { icon } from './icons';
@@ -208,14 +209,21 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   }
 
   // Fast forward: the scene says when the ship circles too fast to follow.
-  // A quiet mark shows by the clock, and screen readers hear why once, not
-  // on every lap.
+  // A quiet mark shows by the clock, counting the orbits the ship really
+  // flies once it has flown one (the tour's panel has its own, on a trip).
+  // Screen readers hear why once, here for both marks, not on every lap:
+  // neither mark is a live region, so the count is only read when a
+  // visitor goes to it.
   const fastMark = byId('clock-fast', HTMLSpanElement);
-  fastMark.textContent = copy.timeline.fastForward;
+  const fastOrbits = el('span', 'clock__orbits');
+  fastOrbits.setAttribute('data-testid', 'clock-fast-forward-orbits');
+  const showFastOrbits = fillFastForwardMark(fastMark, fastOrbits);
   let fastShown = false;
   let fastSpokenAt = -Infinity;
   director.subscribe(() => {
-    const fast = director.fastForward === true;
+    const orbits = orbitsInFastForward(director);
+    const fast = orbits !== null;
+    showFastOrbits(orbits ?? 0);
     if (fast === fastShown) return;
     fastShown = fast;
     fastMark.hidden = !fast;
@@ -399,7 +407,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     tourPhase = tour.phase;
     tourIndex = tour.index;
   });
-  setUpTourPanel(tour, { onExplore: explore });
+  setUpTourPanel(tour, { director, onExplore: explore });
 
   /* The welcome ------------------------------------------------------- */
   const welcomeOptions: WelcomeOptions = {

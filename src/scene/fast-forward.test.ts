@@ -1,13 +1,40 @@
 /**
  * Fast forward's two rules: a craft is replaced by its ring when it laps
- * its body faster than once in about 7 seconds, and drawn again below once
- * in about 8 (with nothing in between); and the ring is drawn only through
- * a lap of the path that closes on itself, with no chord where its ends
- * meet. The paths here are drawn around a body at the origin, in the plane
- * y = 0, starting along +x.
+ * its body faster than once in 20 seconds, and drawn again below once in 24
+ * (with nothing in between); and the ring is drawn only through a lap of
+ * the path that closes on itself, with no chord where its ends meet. Then
+ * its stand-in: its model glides round the ring at a calm pace of its own,
+ * sitting on the ring as drawn, and hands back to its true place with a dip
+ * that never shows it in two places. The paths here are drawn around a body
+ * at the origin, in the plane y = 0, starting along +x.
  */
 import { describe, expect, it } from 'vitest';
-import { closedLapStart, inFastForward, writeLap, type LapPath } from './fast-forward.ts';
+import {
+  CALM_LAP_STORY_SECONDS,
+  EASE_GENTLE_PACE,
+  PLAIN_ORBIT_SECONDS,
+  SWING_LAP_STORY_SECONDS,
+} from '../sim/story-time.ts';
+import {
+  closedLapStart,
+  FAST_FORWARD_GLIDE_EASE_SECONDS,
+  FAST_FORWARD_GLIDE_LAP_SECONDS,
+  FAST_FORWARD_HANDBACK_SECONDS,
+  FAST_FORWARD_OFF_LAP_SECONDS,
+  FAST_FORWARD_ON_LAP_SECONDS,
+  glideRate,
+  glideRevolutions,
+  handBackEases,
+  handBackOpacity,
+  HANDBACK_SWITCH,
+  inFastForward,
+  ringHeadingAt,
+  ringPointAt,
+  seedShare,
+  stepHandBack,
+  writeLap,
+  type LapPath,
+} from './fast-forward.ts';
 
 const ORIGIN = [0, 0, 0];
 const SAMPLES_PER_LAP = 200;
@@ -48,9 +75,10 @@ const lapIn = (seconds: number): number => 1 / seconds;
 
 describe('inFastForward', () => {
   it.each([
-    ['a lap in 8.8 seconds (Eagle before its descent, at normal speed)', 8.8, false],
-    ['a lap in 7.5 seconds', 7.5, false],
-    ['a lap in 6.5 seconds', 6.5, true],
+    ['a lap in 30 seconds (low Earth orbit either side of an event, at normal speed)', 30, false],
+    ['a lap in 21 seconds', 21, false],
+    ['a lap in 19 seconds', 19, true],
+    ['a lap in 8.8 seconds (once called "better" than 4.4, since still too fast)', 8.8, true],
     ['a lap in 5.2 seconds (Eagle and Columbia before docking)', 5.2, true],
     ['a lap in 4.4 seconds', 4.4, true],
   ])('draws the craft or its ring for %s, starting from the craft', (_name, seconds, ring) => {
@@ -58,9 +86,10 @@ describe('inFastForward', () => {
   });
 
   it.each([
-    ['a lap in 7.5 seconds', 7.5, true],
-    ['a lap in 7.9 seconds', 7.9, true],
-    ['a lap in 8.2 seconds', 8.2, false],
+    ['a lap in 21 seconds', 21, true],
+    ['a lap in 19 seconds', 19, true],
+    ['a lap in 23.5 seconds', 23.5, true],
+    ['a lap in 24.5 seconds', 24.5, false],
     ['a stopped clock', Infinity, false],
   ])(
     'keeps the ring or goes back to the craft for %s, starting from the ring',
@@ -68,6 +97,18 @@ describe('inFastForward', () => {
       expect(inFastForward(lapIn(seconds), true)).toBe(ring);
     },
   );
+
+  it("matches the story clock's own figures for a calm craft", () => {
+    // The clock plays a stretch evenly, and a parting or docking approach at no more than a pace,
+    // at which a craft laps once in the scene's slower threshold: drawn, and never between the two.
+    expect(CALM_LAP_STORY_SECONDS).toBe(FAST_FORWARD_OFF_LAP_SECONDS);
+    // On no closed lap, where no ring can stand in, it keeps a craft slower than the faster one.
+    expect(SWING_LAP_STORY_SECONDS).toBeGreaterThan(FAST_FORWARD_ON_LAP_SECONDS);
+    // Either side of an event, a low Earth orbit is drawn, slower than either threshold.
+    const lapAtTheEvents = PLAIN_ORBIT_SECONDS / EASE_GENTLE_PACE;
+    expect(inFastForward(lapIn(lapAtTheEvents), true)).toBe(false);
+    expect(lapAtTheEvents).toBeGreaterThan(FAST_FORWARD_OFF_LAP_SECONDS);
+  });
 });
 
 describe('closedLapStart', () => {
@@ -160,5 +201,158 @@ describe('writeLap', () => {
     writeLap(both, 0.5, 0.5, points, COUNT);
 
     expect(Math.hypot(points[0] as number, points[2] as number)).toBeCloseTo(1.3, 4);
+  });
+});
+
+describe("the stand-in's glide", () => {
+  const enteredAt = 1 / FAST_FORWARD_ON_LAP_SECONDS;
+  const calm = 1 / FAST_FORWARD_GLIDE_LAP_SECONDS;
+
+  it('sets off at the pace the craft went into fast forward at, and eases to its own', () => {
+    expect(glideRate(0, enteredAt)).toBeCloseTo(enteredAt, 9);
+    expect(glideRate(FAST_FORWARD_GLIDE_EASE_SECONDS / 2, enteredAt)).toBeCloseTo(
+      (enteredAt + calm) / 2,
+      9,
+    );
+    expect(glideRate(FAST_FORWARD_GLIDE_EASE_SECONDS, enteredAt)).toBeCloseTo(calm, 9);
+    expect(glideRate(30, enteredAt)).toBeCloseTo(calm, 9);
+  });
+
+  it('goes round once in 40 seconds of real time once it has eased, whatever it set off at', () => {
+    for (const start of [enteredAt, calm, 0]) {
+      const later = glideRevolutions(12, start);
+      expect(glideRevolutions(12 + 40, start) - later).toBeCloseTo(1, 9);
+    }
+  });
+
+  it('starts from where the craft is and moves on at its pace, never back', () => {
+    const steps = Array.from({ length: 301 }, (_, k) => k / 100);
+    const glided = steps.map((s) => glideRevolutions(s, enteredAt));
+
+    expect(glided[0]).toBe(0);
+    for (let k = 1; k < steps.length; k += 1) {
+      const step = (glided[k] as number) - (glided[k - 1] as number);
+      expect(step).toBeGreaterThan(0);
+      // The laps glided over each hundredth of a second are its pace then.
+      const middle = ((steps[k] as number) + (steps[k - 1] as number)) / 2;
+      expect(step / 0.01).toBeCloseTo(glideRate(middle, enteredAt), 4);
+    }
+  });
+
+  it('is at the true place as it sets off, and on the ring once it has eased', () => {
+    expect(seedShare(0)).toBe(1);
+    expect(seedShare(FAST_FORWARD_GLIDE_EASE_SECONDS / 2)).toBeCloseTo(0.5, 9);
+    expect(seedShare(FAST_FORWARD_GLIDE_EASE_SECONDS)).toBe(0);
+    expect(seedShare(10)).toBe(0);
+  });
+});
+
+describe('a place on a ring', () => {
+  const COUNT = 64;
+
+  it('is where the craft is round the lap, at the share of a lap it has flown', () => {
+    const orbit = pathAround(6, () => 1.1);
+    const ring = new Float32Array(3 * COUNT);
+    writeLap(orbit, 2.3, 0, ring, COUNT);
+    const point = [0, 0, 0];
+    const angle = 0.125 * Math.PI * 2;
+
+    // A craft that has flown 3.125 laps is an eighth of the way round, as on any other lap.
+    for (const phase of [0.125, 3.125, -0.875]) {
+      ringPointAt(ring, COUNT, phase, point);
+      expect(point[0]).toBeCloseTo(1.1 * Math.cos(angle), 3);
+      expect(point[2]).toBeCloseTo(1.1 * Math.sin(angle), 3);
+    }
+  });
+
+  it('is on the ring as drawn, straight between its points, the last leading to the first', () => {
+    const square = new Float32Array([1, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, -1]);
+    const point = [0, 0, 0];
+
+    ringPointAt(square, 4, 0.125, point);
+    expect(point).toEqual([0.5, 0, 0.5]);
+    ringPointAt(square, 4, 0.875, point);
+    expect(point).toEqual([0.5, 0, -0.5]);
+    ringPointAt(square, 4, 1, point);
+    expect(point).toEqual([1, 0, 0]);
+  });
+
+  it('heads the way the craft flies, turning smoothly from one point to the next', () => {
+    const orbit = pathAround(6, () => 1.1);
+    const ring = new Float32Array(3 * COUNT);
+    writeLap(orbit, 2.3, 0, ring, COUNT);
+    const heading = [0, 0, 0];
+    let last: number[] | null = null;
+    // Across two stretches between points, in small steps.
+    for (let k = 0; k <= 40; k += 1) {
+      const phase = 0.25 + (k / 40) * (2 / COUNT);
+      ringHeadingAt(ring, COUNT, phase, heading);
+      const angle = phase * Math.PI * 2;
+      // Along the orbit, the way it is flown (from +x toward +z).
+      expect(heading[0]).toBeCloseTo(-Math.sin(angle), 2);
+      expect(heading[2]).toBeCloseTo(Math.cos(angle), 2);
+      if (last) {
+        const dot =
+          (heading[0] as number) * (last[0] as number) +
+          (heading[2] as number) * (last[2] as number);
+        expect(Math.acos(Math.min(1, dot))).toBeLessThan(0.01);
+      }
+      last = [...heading];
+    }
+  });
+});
+
+describe('the hand-back', () => {
+  it('fades the model out where it stands in, then in at its true place, with nothing at the switch', () => {
+    expect(handBackOpacity(0)).toBe(1);
+    expect(handBackOpacity(HANDBACK_SWITCH / 2)).toBeCloseTo(0.5, 9);
+    expect(handBackOpacity(HANDBACK_SWITCH)).toBe(0);
+    expect(handBackOpacity((HANDBACK_SWITCH + 1) / 2)).toBeCloseTo(0.5, 9);
+    expect(handBackOpacity(1)).toBe(1);
+  });
+
+  it('takes about half a second', () => {
+    let progress = 0;
+    let frames = 0;
+    while (progress < 1) {
+      progress = stepHandBack(progress, 1 / 60);
+      frames += 1;
+    }
+    expect(FAST_FORWARD_HANDBACK_SECONDS).toBe(0.5);
+    expect(frames / 60).toBeCloseTo(0.5, 1);
+  });
+
+  it.each([
+    ['at 60 frames a second', 1 / 60],
+    ['at 10 frames a second', 0.1],
+    ['after a slow frame', 0.3],
+  ])('draws one frame with the model hidden as it moves, %s', (_name, dt) => {
+    const drawn: number[] = [];
+    let progress = 0;
+    while (progress < 1) {
+      progress = stepHandBack(progress, dt);
+      drawn.push(progress);
+    }
+    expect(drawn).toContain(HANDBACK_SWITCH);
+  });
+
+  it('goes back toward the stand-in when fast forward comes back before the model has moved', () => {
+    expect(stepHandBack(0.3, -0.05)).toBeCloseTo(0.2, 9);
+    expect(stepHandBack(0.05, -0.1)).toBe(0);
+    expect(stepHandBack(0.6, -0.1)).toBe(HANDBACK_SWITCH);
+  });
+
+  it('eases across, without the dip, only when the stand-in is within a few degrees of the true place', () => {
+    const at = (degrees: number, radius = 1.1): number[] => {
+      const angle = (degrees * Math.PI) / 180;
+      return [radius * Math.cos(angle), 0, radius * Math.sin(angle)];
+    };
+
+    expect(handBackEases(at(2), at(0), ORIGIN)).toBe(true);
+    expect(handBackEases(at(358), at(1), ORIGIN)).toBe(true);
+    expect(handBackEases(at(10), at(0), ORIGIN)).toBe(false);
+    expect(handBackEases(at(180), at(0), ORIGIN)).toBe(false);
+    // Right above it but well off its orbit (a ring left from before a burn) is not close.
+    expect(handBackEases(at(0, 1.4), at(0), ORIGIN)).toBe(false);
   });
 });

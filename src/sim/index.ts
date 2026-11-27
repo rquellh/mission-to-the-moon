@@ -12,19 +12,33 @@
 export { buildFlightPath } from './build.ts';
 export {
   approachesAtEvents,
+  CALM_LAP_STORY_SECONDS,
   closesToDocked,
   createStoryTime,
-  EASE_FULL_PACE,
   EASE_GENTLE_PACE,
-  EASE_MIDDLE_STORY_SECONDS,
+  EASE_MAX_HURRY,
   EASE_RAMP_MISSION_SECONDS,
+  EASE_SHOULDER_MIN_STORY_SECONDS,
   EASE_SHOULDER_STORY_SECONDS,
   EASE_START_PACE,
+  onNoClosedLap,
   partingsAtEvents,
   partsFromDocked,
+  PLAIN_ORBIT_SECONDS,
   storyIntervalLength,
   storyKeyTimes,
+  SWING_LAP_STORY_SECONDS,
+  turnsOf,
 } from './story-time.ts';
-export type { Approach, Parting, StoryTime, StoryTimeOptions } from './story-time.ts';
+export type {
+  Approach,
+  Parting,
+  StoryKeys,
+  StoryTime,
+  StoryTimeOptions,
+  Stretch,
+  StretchPlay,
+  Turns,
+} from './story-time.ts';
 export { READABLE_MOON_DISTANCE, toReadable } from './warp.ts';
 export type * from './types.ts';

@@ -12,13 +12,15 @@ Usage:
 --from/--to/--step   seconds after the mark (default the whole recording at 0.5 s)
 --at        tiles at exactly these times instead
 --around    crop each tile around a craft (its id, "followed", or "all" for every drawn craft),
-            from the craft's box in timeline.tsv (or its place in camera.tsv when it is faded)
+            from the craft's box in timeline.tsv (or where camera.tsv has its model drawn when it is
+            faded: in fast forward that is its stand-in's place on the ring, not its true place)
 --crop      a fixed crop, in CSS pixels as the timeline gives them (top left x, y, width, height)
 --per-sheet tiles per sheet (default 12)
 
 Each tile shows the frame that was on screen at its time: the last frame drawn at or before
 it. A still page draws no frames, so a tile can show an older frame; its label then says
-"frame from" that time. Times run on across sheets without a gap.
+"frame from" that time. "stand-in" in a label means the followed craft is drawn as a stand-in
+gliding round its ring, not at its true place. Times run on across sheets without a gap.
 """
 
 import json
@@ -157,11 +159,24 @@ class Recording:
         if name in boxes:
             b = boxes[name]
             return (b[0], b[1], max(b[2], b[3]))
-        # Faded or between samples: where the camera log projects the followed craft.
+        # Faded or between samples: where the camera log has the followed craft's model drawn (its
+        # stand-in's place in fast forward; its true place in a recording without the dx column).
         cam = self.nearest(self.camera, t)
-        if cam and cam.get('followed') == name and number(cam.get('sx')) is not None:
-            return (number(cam['sx']), number(cam['sy']), 12.0)
+        if cam and cam.get('followed') == name:
+            x, y = (cam.get('dx'), cam.get('dy')) if 'dx' in cam else (cam.get('sx'), cam.get('sy'))
+            if number(x) is not None and number(y) is not None:
+                return (number(x), number(y), 12.0)
         return None
+
+    def stand_in_at(self, t):
+        """True when the followed craft's model is a stand-in on its ring at t, not at its true place."""
+        row = self.nearest(self.timeline, t)
+        followed = row.get('followed') if row else None
+        for item in (row.get('glide') or '').split(' ') if row else []:
+            name, _, glide = item.partition(':')
+            if name == followed:
+                return number(glide) is not None
+        return False
 
     def label_at(self, t):
         row = self.nearest(self.timeline, t)
@@ -170,6 +185,8 @@ class Recording:
         bits = [clock_text(number(row.get('clock'))), row.get('view', '')]
         if row.get('ff') == '1':
             bits.append('ff')
+        if self.stand_in_at(t):
+            bits.append('stand-in')
         if row.get('playing') == '0':
             bits.append('stopped')
         return '  '.join(bits)
@@ -281,10 +298,10 @@ def steps(start, end, step):
     return [round(start + k * step, 3) for k in range(count)]
 
 
-# Which marks are about the camera (whole frame) and which about a craft (cropped around it).
-CAMERA_KINDS = {'turn', 'roll', 'swell', 'moving-at-rest', 're-aim', 'stall'}
-ORDER = ['jump', 'swell', 're-aim', 'moving-at-rest', 'turn', 'off', 'under', 'hidden', 'behind', 'vanish', 'pop',
-         'tilt', 'roll', 'laps', 'stall']
+# Which marks are drawn whole (the camera's, and a stand-in's place round its ring) and which cropped around the craft.
+CAMERA_KINDS = {'turn', 'roll', 'swell', 'moving-at-rest', 're-aim', 'stall', 'no-dip', 'glide-pace', 'glide-stop'}
+ORDER = ['jump', 'no-dip', 'swell', 're-aim', 'moving-at-rest', 'turn', 'off', 'under', 'hidden', 'behind', 'vanish', 'pop',
+         'glide-pace', 'glide-stop', 'off-ring', 'tilt', 'roll', 'laps', 'stall']
 
 
 def auto(rec):

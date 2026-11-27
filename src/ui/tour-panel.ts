@@ -1,9 +1,13 @@
+import type { Director } from '../app/contract';
 import type { Tour } from '../app/tour';
 import { copy } from '../content/copy';
 import { button, byId, el } from './dom';
+import { fillFastForwardMark, orbitsInFastForward } from './fast-forward-mark';
 import { icon } from './icons';
 
 export interface TourPanelOptions {
+  /** The 3D scene, which says when its fast forward shows. */
+  director: Director;
   /** Called when the person leaves the tour with Exit. */
   onExplore(): void;
 }
@@ -11,11 +15,12 @@ export interface TourPanelOptions {
 /**
  * The tour's controls inside the moment card, in place of Play and
  * Controls: which stop this is, a progress row, and Back, Next (Skip while
- * on the way, Finish at the last stop), and Exit. After the last stop the
- * panel steps aside for the end of the flight (see ending.ts); its
- * `data-phase` still says "finished".
+ * on the way, Finish at the last stop), and Exit. On the way, while the
+ * clock runs fast, "Fast forward · 12 orbits" takes the progress row's
+ * place. After the last stop the panel steps aside for the end of the
+ * flight (see ending.ts); its `data-phase` still says "finished".
  */
-export function setUpTourPanel(tour: Tour, { onExplore }: TourPanelOptions): void {
+export function setUpTourPanel(tour: Tour, { director, onExplore }: TourPanelOptions): void {
   const panel = byId('tour', HTMLElement);
 
   const steps = el('div', 'tour__steps');
@@ -29,6 +34,18 @@ export function setUpTourPanel(tour: Tour, { onExplore }: TourPanelOptions): voi
     return dot;
   });
   progress.append(...dots);
+  // Fast forward on a trip: the same words as the mark by the clock, which
+  // is out of sight on the tour. It stands in the progress row's place, so
+  // the card keeps its size and nothing in it moves as it comes and goes.
+  // Its words are in the page only while it shows, so outside a trip they
+  // are there once, by the clock.
+  const fast = el('p', 'tour__fast');
+  fast.setAttribute('data-testid', 'tour-fast-forward');
+  fast.hidden = true;
+  const fastWords = el('span');
+  const fastOrbits = el('span', 'tour__fast-orbits');
+  fastOrbits.setAttribute('data-testid', 'tour-fast-forward-orbits');
+  const showFastOrbits = fillFastForwardMark(fastWords, fastOrbits);
 
   const back = button('button button--quiet tour__back');
   back.setAttribute('data-testid', 'tour-back');
@@ -41,13 +58,24 @@ export function setUpTourPanel(tour: Tour, { onExplore }: TourPanelOptions): voi
   exit.setAttribute('data-testid', 'tour-exit');
   const stepper = el('div', 'tour__nav');
   stepper.append(back, next);
-  steps.append(count, progress, exit, stepper);
+  steps.append(count, fast, progress, exit, stepper);
 
   panel.replaceChildren(steps);
 
   back.addEventListener('click', () => tour.back());
   next.addEventListener('click', () => tour.next());
   exit.addEventListener('click', onExplore);
+
+  const renderFast = (): void => {
+    const orbits = tour.phase === 'traveling' ? orbitsInFastForward(director) : null;
+    const shown = orbits !== null;
+    if (shown !== (fastWords.parentNode === fast)) {
+      fast.replaceChildren(...(shown ? [fastWords] : []));
+    }
+    fast.hidden = !shown;
+    steps.classList.toggle('tour__steps--fast', shown);
+    showFastOrbits(orbits ?? 0);
+  };
 
   let lastPhase = tour.phase;
   const render = (): void => {
@@ -86,9 +114,11 @@ export function setUpTourPanel(tour: Tour, { onExplore }: TourPanelOptions): voi
       // Starting again from the end of the flight: Next takes keyboard focus.
       if (lastPhase === 'finished') next.focus();
     }
+    renderFast();
     lastPhase = phase;
   };
   tour.subscribe(render);
+  director.subscribe(renderFast);
   render();
 }
 
