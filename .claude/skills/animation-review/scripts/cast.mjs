@@ -33,6 +33,12 @@ import { pathToFileURL } from 'node:url';
 const CHROME =
   process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
+/**
+ * The dev server record.mjs and pace.mjs open (BASE, default http://localhost:5199).
+ * cast.mjs itself opens the whole URL it is given.
+ */
+export const BASE = (process.env.BASE ?? 'http://localhost:5199').replace(/\/$/, '');
+
 export const sleep = (ms) => new Promise((done) => setTimeout(done, Math.max(0, ms)));
 
 /* ------------------------------------------------------------------ */

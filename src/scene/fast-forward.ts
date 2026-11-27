@@ -9,6 +9,8 @@
  * how the scene uses them.
  */
 
+import { clamp, smoothstep } from '../sim/vec';
+
 /**
  * A craft drawn going around its body faster than once in
  * FAST_FORWARD_ON_LAP_SECONDS of real time is replaced by its ring; it is
@@ -107,7 +109,7 @@ const _b = [0, 0, 0];
  * mean distance from `center`, at true scale. Infinity when the path does
  * not cover that whole revolution.
  */
-export function lapGap(path: LapPath, start: number, center: ArrayLike<number>): number {
+function lapGap(path: LapPath, start: number, center: ArrayLike<number>): number {
   const revolutions = path.revolutions;
   const n = revolutions.length;
   if (n < 2) return Infinity;
@@ -234,16 +236,10 @@ export function writeLap(
 export const FAST_FORWARD_GLIDE_LAP_SECONDS = 40;
 export const FAST_FORWARD_GLIDE_EASE_SECONDS = 1;
 
-const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
-const smooth = (x: number): number => {
-  const u = clamp01(x);
-  return u * u * (3 - 2 * u);
-};
-
 /** The stand-in's pace in laps a second, `seconds` of real time after it set off at `startRate` laps a second. */
 export function glideRate(seconds: number, startRate: number): number {
   const end = 1 / FAST_FORWARD_GLIDE_LAP_SECONDS;
-  return startRate + (end - startRate) * smooth(seconds / FAST_FORWARD_GLIDE_EASE_SECONDS);
+  return startRate + (end - startRate) * smoothstep(seconds / FAST_FORWARD_GLIDE_EASE_SECONDS);
 }
 
 /**
@@ -270,7 +266,7 @@ export function glideRevolutions(seconds: number, startRate: number): number {
  * to its own pace, so from then on it is on the ring.
  */
 export function seedShare(seconds: number): number {
-  return 1 - smooth(seconds / FAST_FORWARD_GLIDE_EASE_SECONDS);
+  return 1 - smoothstep(seconds / FAST_FORWARD_GLIDE_EASE_SECONDS);
 }
 
 /** Where a phase falls on a ring: at point j, and `u` of the way on toward point j + 1 (0 to 1). */
@@ -350,10 +346,10 @@ export const HANDBACK_EASE_DEG = 4;
 
 /** How visible the model is a share `progress` of the way through a hand-back that dips: fully at either end, not at all at the switch. */
 export function handBackOpacity(progress: number): number {
-  const p = clamp01(progress);
+  const p = clamp(progress, 0, 1);
   return p < HANDBACK_SWITCH
-    ? 1 - smooth(p / HANDBACK_SWITCH)
-    : smooth((p - HANDBACK_SWITCH) / (1 - HANDBACK_SWITCH));
+    ? 1 - smoothstep(p / HANDBACK_SWITCH)
+    : smoothstep((p - HANDBACK_SWITCH) / (1 - HANDBACK_SWITCH));
 }
 
 /**
@@ -364,7 +360,7 @@ export function handBackOpacity(progress: number): number {
  * at the other unseen.
  */
 export function stepHandBack(progress: number, dt: number): number {
-  const next = clamp01(progress + dt / FAST_FORWARD_HANDBACK_SECONDS);
+  const next = clamp(progress + dt / FAST_FORWARD_HANDBACK_SECONDS, 0, 1);
   const crosses =
     (progress < HANDBACK_SWITCH && next > HANDBACK_SWITCH) ||
     (progress > HANDBACK_SWITCH && next < HANDBACK_SWITCH);

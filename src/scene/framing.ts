@@ -243,13 +243,6 @@ export function divesPast(from: CameraPose, to: CameraPose, body: SphereLike): b
   return false;
 }
 
-/** The angle, in radians, through which a move between two poses swings the camera around `center`. */
-export function swingAngle(from: CameraPose, to: CameraPose, center: Vector3): number {
-  _fromDir.subVectors(from.position, center);
-  _toDir.subVectors(to.position, center);
-  return _fromDir.angleTo(_toDir);
-}
-
 /**
  * Where a point is seen from a camera pose: across (x, to the right) and up
  * (y), each as a share of the point's distance in front of the camera. The

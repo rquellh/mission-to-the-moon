@@ -40,10 +40,9 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { availableParallelism, loadavg } from 'node:os';
 import { join, resolve } from 'node:path';
-import { openBrowser, parseSize, samePose, sleep } from './cast.mjs';
+import { BASE, openBrowser, parseSize, samePose, sleep } from './cast.mjs';
 
 const HERE = import.meta.dirname;
-const BASE = (process.env.BASE ?? 'http://localhost:5199').replace(/\/$/, '');
 
 /** Files whose served copy must match this checkout for the recording to describe it. */
 const STAMPED_FILES = [
