@@ -141,9 +141,9 @@ export type VehiclePart =
  * The parts that fall away from a ship when it lets go of them: spent
  * stages, an escape tower, a service module, a lunar module's stages, the
  * Gemini adapter's sections, an Atlas, a target's shroud. The scene draws
- * them drifting off over the moments after (its DROPPABLE, in
- * src/scene/vehicles.ts, lists the same parts), and an every-event tour
- * rests just after such a moment so it is seen (see src/app/drops.ts).
+ * them drifting off over the moments after (src/scene/vehicles.ts reads
+ * this list), and an every-event tour rests just after such a moment so it
+ * is seen (see src/app/drops.ts).
  * Parachutes, the crew outside and an open hatch come and go in their own
  * ways.
  */

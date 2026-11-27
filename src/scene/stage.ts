@@ -62,8 +62,10 @@ import {
   handBackEases,
   handBackOpacity,
   HANDBACK_SWITCH,
+  heldLap,
   indexAtValue,
   inFastForward,
+  lastPassage,
   ringHeadingAt,
   ringPointAt,
   seedShare,
@@ -75,7 +77,10 @@ import {
   aimAt,
   bodyTop,
   calmestWay,
+  carriedUp,
+  carriedUpAt,
   carryPose,
+  carryUp,
   clockJumped,
   easeMove,
   fitAcross,
@@ -208,6 +213,11 @@ const CHASE_TURN_MAX_DEG_PER_S = 30;
  */
 const CHASE_CARRY_MAX_DEG_PER_S = 45;
 const CHASE_DISTANCE_SECONDS = 0.8;
+/**
+ * A craft whose direction from its body's center turns less than this, in
+ * radians, across a jump of the clock rests where it was (see followChase).
+ */
+const CHASE_SAME_SPOT_RAD = 1e-5;
 /**
  * The ship view's up is a body's vertical within the first of these heights
  * above it (in its radii) and ecliptic north beyond the second, so the
@@ -356,7 +366,38 @@ const FAST_FORWARD_OFF = 0.3;
 const FAST_FORWARD_SECONDS = 0.45;
 /** Subscribers hear of the followed craft's laps in fast forward at most this often, in milliseconds (see Stage.fastForwardLaps). */
 const LAPS_NOTIFY_MS = 250;
-/** The steady view: this many degrees off the orbit's axis, toward the ship (see updateFastView). */
+/**
+ * The steady view looks at the ring from the direction the chase looks at its
+ * craft from, raised or lowered to between these many degrees above the plane
+ * of the orbit (see updateFastView). The chase looks from about 37 degrees;
+ * lowered to 28, its ring is still open, and the move back to a craft that
+ * has gone far round its ring rolls a fifth less (the roll a move round the
+ * body's axis needs grows with the height it looks from).
+ */
+const FAST_VIEW_ELEVATION_DEG = [20, 28] as const;
+/**
+ * A calm move, into or out of the ship view's steady view (see calmMs): it
+ * swings round the body as any move between two views of it does, but its
+ * up is carried along with its line of sight, so the picture rolls only as
+ * one even roll that makes up what that leaves, no faster than
+ * CALM_ROLL_DEG_PER_S (a working figure: the eye picks out a roll from about
+ * 20 degrees a second). It turns no faster than CALM_TURN_DEG_PER_S (check.py
+ * marks 60), lets the body's share of the picture change by no more than
+ * CALM_SHARE_PER_S a second (it marks a rise of 30 points within a second as
+ * a swell) and never lets it cover more than CALM_SHARE_MOST, unless an end
+ * does; and it takes up to CALM_MOVE_MAX_MS for that. Of the ways round the
+ * body (see SwingWay), the one that can take least time is taken: for a craft
+ * that has gone half way round its ring or more, the long way round, which
+ * turns further but hardly rolls.
+ */
+const CALM_ROLL_DEG_PER_S = 18;
+const CALM_TURN_DEG_PER_S = 55;
+const CALM_SHARE_PER_S = 0.25;
+const CALM_SHARE_MOST = 0.68;
+const CALM_MOVE_MAX_MS = 6000;
+/** Eased steps at which calmMs measures a way. */
+const CALM_SAMPLES = 48;
+/** The steady view: this many degrees off the orbit's axis, toward the ship, when the camera gives no direction to look from. */
 const FAST_FORWARD_TILT_DEG = 52;
 /** A ring's width in CSS pixels, its opacity, and how far its craft's color is lightened toward white. */
 const FAST_FORWARD_RING_PX = 4;
@@ -364,8 +405,13 @@ const RING_OPACITY = 0.9;
 const RING_LIGHTEN = 0.35;
 /** Points along a ring. */
 const RING_POINTS = 192;
-/** How quickly a ring eases to its craft's new orbit after a burn, in seconds of real time. */
-const RING_SETTLE_SECONDS = 0.15;
+/**
+ * How quickly a ring eases to its craft's new orbit, in seconds of real time:
+ * after a burn, and as the lap it is held to drifts from one lap to the next
+ * (see heldLap). The owner asked for a ring that holds still; one that must
+ * change takes a second or two to, never a frame or two.
+ */
+const RING_SETTLE_SECONDS = 0.6;
 /**
  * A craft that goes behind Earth or the Moon fades out over this many
  * seconds of real time, and fades in as it comes out, rather than vanishing
@@ -417,6 +463,25 @@ const LOW_ORBIT_EDGE_PX = 80;
  * a pixel at most, so it is made at once and `moving` never says otherwise.
  */
 const SAME_POSE_SHARE = 1e-3;
+/**
+ * A change of view that would fly a long way is made as a dissolve instead:
+ * the picture fades out over DISSOLVE_OUT_MS, the camera is put in the new
+ * view, and the picture fades back in over DISSOLVE_IN_MS, starting from the
+ * first frame drawn there (so a slow first frame of a new close view does not
+ * eat the fade). Flown, the tour's opening from the welcome's overview down to
+ * the rocket on its pad swept the picture round at 200 degrees a second, and
+ * Earth swelled from a few hundredths of the screen to most of it within a
+ * second. A move is that long when the camera's distance to what it looks at
+ * changes by more than FAR_ZOOM times (the journey view's diagram to a craft
+ * close up, or back), or what it looks at moves more than FAR_TRAVEL times the
+ * farther of the two distances (to a craft on the far side of a body). Moves
+ * between the Earth, Moon and ship views, which change distance less, still
+ * fly.
+ */
+const DISSOLVE_OUT_MS = 350;
+const DISSOLVE_IN_MS = 650;
+const FAR_ZOOM = 20;
+const FAR_TRAVEL = 4;
 /**
  * A camera move swings around Earth or the Moon (see swingAround) when the
  * points it looks at, at both ends, are within this many of the body's
@@ -582,6 +647,8 @@ interface ShipState extends ShipPose {
   readonly ringNow: Float32Array;
   readonly ringWanted: Float32Array;
   readonly ringCenter: Vector3;
+  /** Where round its body (in revolutions flown) the craft was as its ring came in, which the ring is held to (see heldLap); NaN before. */
+  ringAnchor: number;
   /** How far it is in sight, 0 (behind Earth or the Moon) to 1 (see HIDDEN_FADE_SECONDS); NaN while it does not exist. */
   seen: number;
 }
@@ -805,6 +872,30 @@ export class Stage implements Director {
    */
   private keepBody = false;
   private bodyTopFrom = Number.NaN;
+  /** True while the move under way is a calm one (see calmMs), its up carried along as calmUp has it. */
+  private calmMove = false;
+  private readonly calmUp = carriedUp();
+  /** True once the calm move under way has carried its up (see carryCalmUp). */
+  private calmCarried = false;
+  /** True while movePose is asked for a calm move's pose with the swing's own up, to carry the up along it. */
+  private rawPose = false;
+  private readonly calmPose = orientedPose();
+  private readonly calmLook = new Vector3();
+  private readonly calmNext = new Vector3();
+  /** The chase as it will be at a tour's stop (see expectStop and leavesForStop). */
+  private readonly stopPose = orientedPose();
+  private readonly nowPose = orientedPose();
+  /**
+   * A stop a tour's trip will bring the clock to, told by the tour (see
+   * expectStop): its mission time, when it will be there (in frame time,
+   * performance.now's clock), and how long the calm move from the steady view
+   * to the chase there takes (NaN until worked out).
+   */
+  private stopAhead: { at: number; endMs: number; needMs: number } | null = null;
+  /** True while the move under way heads for a fixed end, the chase as it will be at chaseAt (see setOffForStop). */
+  private fixedEnd = false;
+  /** True from a move with a fixed end until the clock reaches chaseAt: the camera holds at that end. */
+  private holdRest = false;
   /**
    * The move under way's destination as it set off, with its chased ship,
    * and whether that destination moves on as the move goes (the chase of a
@@ -850,6 +941,12 @@ export class Stage implements Director {
   private readonly upWeights = { earth: 0, moon: 0 };
   private readonly upEarth = new Float64Array(4 * CHASE_UP_SAMPLES + 1);
   private readonly upMoon = new Float64Array(4 * CHASE_UP_SAMPLES + 1);
+  /**
+   * True from a jump of the clock that left the chased craft resting where it
+   * was (a tour's page turn on the Moon) until it moves: the chase holds the
+   * frame it had, so the picture stays as it was (see followChase).
+   */
+  private chaseHeld = false;
   /** Where the chased ship was around its body last frame, to carry the chase around with it (see followChase). */
   private readonly chaseRadial = {
     ship: null as ShipState | null,
@@ -876,6 +973,14 @@ export class Stage implements Director {
   /* Loop. */
   private reducedMotion = false;
   private running = false;
+  /** Frames drawn since start(): a view asked for before the first is put there at once, unseen, as the canvas fades in. */
+  private framesSinceStart = 0;
+  /**
+   * A dissolve to a new view (see DISSOLVE_OUT_MS): fading out to the cut, or
+   * in after it; when its phase began, in frame time (NaN until the first
+   * frame of the new view is drawn); and the mission time the view is framed for.
+   */
+  private dissolve: { phase: 'out' | 'in'; fromMs: number; at: number } | null = null;
   /** What the fastForward getter says now. */
   private fastForwardShown = false;
   /**
@@ -950,6 +1055,15 @@ export class Stage implements Director {
   private readonly q5 = new Quaternion();
   private readonly q6 = new Quaternion();
   private readonly q7 = new Quaternion();
+  private readonly q8 = new Quaternion();
+  private readonly dryForward = new Vector3();
+  /** A ship as it will be at a later moment, for chaseAtTime. */
+  private readonly dryPose: ShipPose = {
+    exists: true,
+    position: new Vector3(),
+    forward: new Vector3(1, 0, 0),
+    up: new Vector3(0, 1, 0),
+  };
   /** The chased ship as it will be when a move ends (see destinationAhead). */
   private readonly futurePose: ShipPose = {
     exists: true,
@@ -1028,6 +1142,7 @@ export class Stage implements Director {
         ringNow: new Float32Array(RING_POINTS * 3),
         ringWanted: new Float32Array(RING_POINTS * 3),
         ringCenter: new Vector3(),
+        ringAnchor: Number.NaN,
         seen: Number.NaN,
         exists: false,
         position: new Vector3(),
@@ -1149,6 +1264,7 @@ export class Stage implements Director {
 
   start(): void {
     this.running = true;
+    this.framesSinceStart = 0;
     this.syncLoop();
   }
 
@@ -1219,7 +1335,7 @@ export class Stage implements Director {
    */
   get moving(): boolean {
     const tweening = this.cameraMove && this.cameraTween !== null && !this.cameraTween.done;
-    return this.pendingView === 'tween' || tweening;
+    return this.pendingView === 'tween' || tweening || this.dissolve !== null;
   }
 
   /**
@@ -1235,9 +1351,12 @@ export class Stage implements Director {
     const at = options.at;
     this.viewNow = nearestView(this.options.mission, view);
     this.userMovedCamera = false;
-    this.pendingView = options.instant || !this.running || this.reducedMotion ? 'instant' : 'tween';
+    // Before the first frame is drawn nothing has been seen yet (the canvas fades in as the scene starts).
+    const unseen = !this.running || this.framesSinceStart === 0;
+    this.pendingView = options.instant || unseen || this.reducedMotion ? 'instant' : 'tween';
     this.pendingAt = at !== undefined && Number.isFinite(at) ? at : null;
     this.endChaseAt(false);
+    this.stopAhead = null;
     if (this.viewNow === 'spacecraft') {
       this.chaseReady = false;
       this.chaseDirection.copy(CHASE_OFFSET);
@@ -1817,6 +1936,7 @@ export class Stage implements Director {
    */
   private endChaseAt(handOver: boolean): void {
     const before = this.chased();
+    this.holdRest = false;
     this.chaseAt = null;
     this.chaseOverride = null;
     if (!handOver || this.viewNow !== 'spacecraft' || this.pendingView) return;
@@ -2496,6 +2616,10 @@ export class Stage implements Director {
       ms?: number;
       sight?: boolean;
       body?: boolean;
+      /** A calm move (see calmMs). */
+      calm?: boolean;
+      /** Head for the chase as it will be at chaseAt, held still, not one carried along with its ship. */
+      fixedEnd?: boolean;
     } = {},
   ): void {
     this.settleDamping();
@@ -2506,14 +2630,19 @@ export class Stage implements Director {
     this.tweenMix = mix;
     const toMix = mix;
     // The destination moves with its anchor (a ship, or the Moon as the scale changes).
+    this.fixedEnd = how.fixedEnd === true && this.chaseAt !== null;
     const destination = (): OrientedPose =>
-      this.settledPose(this.tweenTo, this.viewNow === 'journey' ? toMix : this.mix);
-    destination();
+      this.fixedEnd
+        ? this.tweenTo
+        : this.settledPose(this.tweenTo, this.viewNow === 'journey' ? toMix : this.mix);
+    if (this.fixedEnd) this.chaseRestPose(this.tweenTo);
+    else destination();
     this.cameraTween?.cancel();
     this.cameraTween = null;
     this.cameraMove = false;
     this.fastMove = false;
     this.keepSight = false;
+    this.calmMove = false;
     if (this.samePose(this.tweenFrom, this.tweenTo)) {
       this.setCameraUp(this.tweenTo.up);
       this.applyPose(this.tweenTo);
@@ -2539,7 +2668,13 @@ export class Stage implements Director {
       this.player.speed > 0 &&
       this.chased().exists;
     this.swingWay = this.swingWays[0] as SwingWay;
-    const duration = how.ms ?? (this.reducedMotion ? 0 : this.planMove(body, move));
+    this.calmMove = how.calm === true && body !== null;
+    this.calmCarried = false;
+    let duration = how.ms ?? (this.reducedMotion ? 0 : this.planMove(body, move));
+    if (this.calmMove && body) {
+      const planned = this.planCalm(body);
+      if (how.ms === undefined && !this.reducedMotion) duration = planned;
+    }
     this.swingWay.twist = Number.NaN;
     this.controls.minDistance = 0;
     this.controls.maxDistance = Infinity;
@@ -2601,6 +2736,121 @@ export class Stage implements Director {
       seconds = ms / 1000;
     }
     return ms;
+  }
+
+  /**
+   * Plan the calm move just set up round `body` (tweenFrom to
+   * destinationStart, see calmMs): its way round into swingWay, and its up
+   * carried along that way into calmUp, against where its end will be when it
+   * ends for an end that moves on the way, as planMove does. Returns how long
+   * it takes, in milliseconds.
+   */
+  private planCalm(body: 'earth' | 'moon'): number {
+    let ms = this.calmMs(this.tweenFrom, this.destinationStart, body);
+    let end: OrientedPose = this.destinationStart;
+    if (this.destinationMoves) {
+      for (let round = 0; round < 2; round += 1) {
+        this.destinationAhead(
+          ms / 1000,
+          this.destinationStart,
+          this.shipStart,
+          this.planTo,
+          this.planEndShip,
+        );
+        end = this.planTo;
+        ms = this.calmMs(this.tweenFrom, end, body);
+      }
+    }
+    this.carryCalmUp(body, end);
+    return ms;
+  }
+
+  /** Carry the calm move's up along its way to `to` round `body`, with the move's own pose (see carryUp). */
+  private carryCalmUp(body: 'earth' | 'moon', to: OrientedPose): void {
+    this.rawPose = true;
+    this.swingWay.twist = Number.NaN;
+    const before = this.calmUp.left;
+    carryUp((t, out) => this.movePose(body, t, to, out), to.up, this.calmUp);
+    // Planned anew each frame for an end carried along, it keeps rolling the way it set off: a roll
+    // near half a turn would otherwise flip from one way round to the other.
+    if (this.calmCarried) {
+      while (this.calmUp.left - before > Math.PI) this.calmUp.left -= 2 * Math.PI;
+      while (this.calmUp.left - before < -Math.PI) this.calmUp.left += 2 * Math.PI;
+    }
+    this.calmCarried = true;
+    this.swingWay.twist = Number.NaN;
+    this.rawPose = false;
+  }
+
+  /**
+   * How long a calm move from `from` to `to` round `body` takes, in
+   * milliseconds, the way round it goes taking least (see
+   * CALM_ROLL_DEG_PER_S), which it leaves in swingWay: no less than the
+   * shortest move, and no more than CALM_MOVE_MAX_MS. Measured on the swing
+   * alone, without the turns that keep a craft in sight or the body up.
+   */
+  private calmMs(from: OrientedPose, to: OrientedPose, body: 'earth' | 'moon'): number {
+    const center = this.bodyCenter(body);
+    const radius = body === 'moon' ? MOON_RADIUS : EARTH_RADIUS;
+    const [shortest] = CAMERA_MOVE_MS;
+    const ends = Math.max(
+      this.bodyShare(from.position, center, radius),
+      this.bodyShare(to.position, center, radius),
+    );
+    const most = Math.max(CALM_SHARE_MOST, ends + 0.02);
+    const pose = this.calmPose;
+    const look = this.calmLook;
+    let best = Number.POSITIVE_INFINITY;
+    let bestWay = this.swingWays[0] as SwingWay;
+    for (const way of this.swingWays) {
+      way.twist = Number.NaN;
+      carryUp((t, out) => swingAround(from, to, center, t, out, way), to.up, this.calmUp);
+      way.twist = Number.NaN;
+      // Peaks per unit of the move's time, eased: turn and roll in radians, the body's share.
+      let turn = 0;
+      let rise = 0;
+      let largest = 0;
+      let shareBefore = this.bodyShare(from.position, center, radius);
+      look.subVectors(from.target, from.position).normalize();
+      for (let i = 1; i <= CALM_SAMPLES; i += 1) {
+        const t = easeMove(i / CALM_SAMPLES);
+        swingAround(from, to, center, t, pose, way);
+        const next = this.calmNext.subVectors(pose.target, pose.position).normalize();
+        turn = Math.max(turn, look.angleTo(next) * CALM_SAMPLES);
+        look.copy(next);
+        const share = this.bodyShare(pose.position, center, radius);
+        rise = Math.max(rise, (share - shareBefore) * CALM_SAMPLES);
+        largest = Math.max(largest, share);
+        shareBefore = share;
+      }
+      way.twist = Number.NaN;
+      if (largest > most) continue;
+      const roll = (Math.abs(this.calmUp.left) * Math.PI) / 2;
+      const seconds = Math.max(
+        turn / MathUtils.degToRad(CALM_TURN_DEG_PER_S),
+        roll / MathUtils.degToRad(CALM_ROLL_DEG_PER_S),
+        rise / CALM_SHARE_PER_S,
+      );
+      if (seconds < best - 0.01) {
+        best = seconds;
+        bestWay = way;
+      }
+    }
+    this.swingWay = bestWay;
+    return MathUtils.clamp(
+      Number.isFinite(best) ? best * 1000 : CALM_MOVE_MAX_MS,
+      shortest,
+      CALM_MOVE_MAX_MS,
+    );
+  }
+
+  /** About how much of the picture a body of `radius` at `center` covers, seen from `position` (0 to 1). */
+  private bodyShare(position: Vector3, center: Vector3, radius: number): number {
+    const distance = position.distanceTo(center);
+    if (distance <= radius) return 1;
+    const half = Math.tan(MathUtils.degToRad(this.camera.fov) / 2);
+    const across = Math.tan(Math.asin(radius / distance)) / half;
+    return Math.min(1, (Math.PI * across * across) / (4 * this.camera.aspect));
   }
 
   /**
@@ -2739,6 +2989,11 @@ export class Stage implements Director {
           : Math.min(atStart, atEnd);
       keepBodyUp(out, view.center, view.radius, floor);
     }
+    if (this.calmMove && !this.rawPose && body) {
+      // Its up carried along its way (see calmMs), for an end carried along with its ship each frame anew.
+      if (this.destinationMoves) this.carryCalmUp(body, to);
+      carriedUpAt(this.calmUp, t, out);
+    }
   }
 
   /**
@@ -2767,6 +3022,42 @@ export class Stage implements Director {
       { name: 'earth', center: this.origin, radius: EARTH_FRAME_RADIUS },
     ] as const;
     return swingBodyOf(from, to, bodies, SWING_REACH_RADII)?.name ?? null;
+  }
+
+  /** The ship view's chase as it will be at chaseAt, looking at the chased ship as it will be then, into `out` (see fixedEnd). */
+  private chaseRestPose(out: OrientedPose): OrientedPose {
+    out.target.copy(this.chaseSubject().position);
+    out.position.copy(out.target).add(this.destinationOffset(this.v1));
+    this.desiredUp(out.up);
+    return out;
+  }
+
+  /**
+   * The ship view's chase as it will be at mission time `at`, for the ship
+   * followed then, from the chase's direction and zoom now, into `out`;
+   * null when that ship does not fly then. It changes nothing the camera
+   * uses now.
+   */
+  private chaseAtTime(at: number, out: OrientedPose): OrientedPose | null {
+    const ship = this.followedAt(at);
+    const pose = this.dryPose;
+    if (!this.path.position(ship.id, at, this.mix, this.scratch)) return null;
+    pose.position.fromArray(this.scratch);
+    if (this.path.direction(ship.id, at, this.mix, this.scratch))
+      pose.forward.fromArray(this.scratch);
+    this.radialUp(pose.position, pose.up);
+    // chaseFrameFor keeps the heading it found, for the chase now: put back the chase's own.
+    this.dryForward.copy(this.chaseForward);
+    const frame = this.chaseFrameFor(pose, this.q8);
+    this.chaseForward.copy(this.dryForward);
+    out.target.copy(pose.position);
+    out.position
+      .copy(this.chaseDirection)
+      .applyQuaternion(frame)
+      .multiplyScalar(this.chaseAutoDistance(pose) * this.chaseZoom)
+      .add(pose.position);
+    out.up.set(0, 1, 0).applyQuaternion(frame);
+    return out;
   }
 
   /** True when two camera poses are the same, near enough that a move between them would not show. */
@@ -2851,11 +3142,98 @@ export class Stage implements Director {
   /** Frame the current view for mission time `at` (now unless given): instantly, or with a camera move. */
   private applyFraming(instant: boolean, at = this.player.time): void {
     if (instant) {
+      this.endDissolve();
       this.framingOffset(this.settledOffset, this.mix, at);
       this.jumpToSettled();
+    } else if (this.dissolve?.phase === 'out' || this.farMove(at)) {
+      this.startDissolve(at);
     } else {
+      this.endDissolve();
       this.startTween(this.mix, { at });
     }
+  }
+
+  /** True when a move from where the camera is to the view framed for `at` would fly a long way (see DISSOLVE_OUT_MS). */
+  private farMove(at: number): boolean {
+    this.framingOffset(this.settledOffset, this.mix, at);
+    const to = this.settledPose(this.tweenTo);
+    const fromLook = this.camera.position.distanceTo(this.controls.target);
+    const toLook = to.position.distanceTo(to.target);
+    const near = Math.max(Math.min(fromLook, toLook), 1e-9);
+    const far = Math.max(fromLook, toLook);
+    return far / near > FAR_ZOOM || this.controls.target.distanceTo(to.target) > FAR_TRAVEL * far;
+  }
+
+  /**
+   * Fade the picture out to a cut to the view framed for `at` (see
+   * DISSOLVE_OUT_MS), or carry on with one fading out already. One fading in
+   * fades out again from where it is.
+   */
+  private startDissolve(at: number): void {
+    this.cameraTween?.cancel();
+    this.cameraTween = null;
+    this.cameraMove = false;
+    const shown = this.dissolveLevel();
+    if (this.dissolve?.phase === 'out') {
+      this.dissolve.at = at;
+    } else {
+      // From the picture as faded as it is now, so it never brightens on the way out.
+      this.dissolve = { phase: 'out', fromMs: this.nowMs - (1 - shown) * DISSOLVE_OUT_MS, at };
+    }
+    this.needsRender = true;
+  }
+
+  /** How much of the picture shows through a dissolve now, 0 to 1 (1 with none under way). */
+  private dissolveLevel(): number {
+    const d = this.dissolve;
+    if (!d) return 1;
+    if (Number.isNaN(d.fromMs)) return 0;
+    const ms = d.phase === 'out' ? DISSOLVE_OUT_MS : DISSOLVE_IN_MS;
+    const p = MathUtils.clamp((this.nowMs - d.fromMs) / ms, 0, 1);
+    return d.phase === 'out' ? 1 - p : p;
+  }
+
+  /**
+   * Each frame of a dissolve: at the bottom of the fade, cut to the new view;
+   * once it has faded in again, end it. Returns true while it holds the
+   * camera where it is (fading out), when nothing else should move it.
+   */
+  private stepDissolve(): boolean {
+    const d = this.dissolve;
+    if (!d) return false;
+    if (d.phase === 'out') {
+      if (this.nowMs - d.fromMs < DISSOLVE_OUT_MS) {
+        this.showDissolve();
+        return true;
+      }
+      d.phase = 'in';
+      d.fromMs = Number.NaN;
+      this.offsetNow = { ...this.offsetTarget };
+      this.applyViewOffset();
+      this.framingOffset(this.settledOffset, this.mix, d.at);
+      this.jumpToSettled();
+      this.showDissolve();
+      return false;
+    }
+    if (Number.isNaN(d.fromMs)) d.fromMs = this.nowMs;
+    if (this.nowMs - d.fromMs >= DISSOLVE_IN_MS) this.endDissolve();
+    else this.showDissolve();
+    return false;
+  }
+
+  /** Show the picture as far as the dissolve under way has it (see dissolveLevel). */
+  private showDissolve(): void {
+    this.canvas.style.transition = 'none';
+    this.canvas.style.opacity = String(this.dissolveLevel());
+    this.needsRender = true;
+  }
+
+  /** End any dissolve: the picture shows in full again. */
+  private endDissolve(): void {
+    if (!this.dissolve) return;
+    this.dissolve = null;
+    this.canvas.style.removeProperty('opacity');
+    this.canvas.style.removeProperty('transition');
   }
 
   /** Put the camera where the current view rests now, with no move. */
@@ -3211,6 +3589,8 @@ export class Stage implements Director {
     }
 
     const shipView = this.viewNow === 'spacecraft';
+    // A jump of the clock leaves behind any stop a tour's trip was heading for.
+    if (jumped) this.stopAhead = null;
     if (this.pendingView) {
       const instant = this.pendingView === 'instant' || this.reducedMotion;
       const at = this.pendingAt ?? this.player.time;
@@ -3218,6 +3598,13 @@ export class Stage implements Director {
       this.pendingAt = null;
       this.applyFraming(instant, at);
       moved = true;
+    }
+    // A dissolve fading out holds the picture where it is until the cut (see DISSOLVE_OUT_MS).
+    if (this.stepDissolve()) return true;
+    if (moved) {
+      // The view asked for is framed: nothing below starts another move this frame.
+    } else if (shipView && this.chaseReady && this.fastView.on && this.leavesForStop()) {
+      // Off for the tour's stop ahead in time to rest there as the clock stops (see leavesForStop).
     } else if (shipView && this.chaseReady && this.wantsFastView() !== this.fastView.on) {
       // The followed craft went into fast forward, or came out of it (or the clock
       // stopped, which shows it at its true place): the ship view moves to its
@@ -3257,6 +3644,8 @@ export class Stage implements Director {
         this.cameraMove = false;
         this.fastMove = false;
         this.keepSight = false;
+        this.calmMove = false;
+        this.fixedEnd = false;
         this.controls.enabled = true;
         this.applyLimits();
         this.updateControls();
@@ -3275,7 +3664,9 @@ export class Stage implements Director {
       if (delta.lengthSq() > 1e-24) moved = true;
     }
     if (this.viewNow === 'spacecraft' && this.chaseReady) {
-      const pose = this.settledPose(this.restPose);
+      // After a move to the chase as it will be at a stop, the camera waits there for the clock.
+      const held = this.holdRest && this.chaseAt !== null;
+      const pose = held ? this.chaseRestPose(this.restPose) : this.settledPose(this.restPose);
       this.controls.target.copy(pose.target);
       this.camera.position.copy(pose.position);
       const steady = this.fastView.on;
@@ -3335,13 +3726,110 @@ export class Stage implements Director {
   private setFastView(on: boolean, jumped: boolean): void {
     if (on) this.updateFastView();
     else if (this.chaseReady) this.snapChase();
+    if (this.stopAhead) this.stopAhead.needMs = Number.NaN;
+    const stop = !on && !jumped && !this.reducedMotion ? this.usableStop() : null;
+    const end = stop ? this.chaseAtTime(stop.at, this.stopPose) : null;
+    if (stop && end) {
+      // A tour's stop ahead too soon for the move back to the chase as it follows its craft: to the
+      // chase as it will be at the stop, in the time left (see leavesForStop).
+      const left = stop.endMs - this.nowMs;
+      if (left < this.calmMs(this.cameraPose(this.nowPose), end, this.fastBody())) {
+        this.setOffForStop(stop, Math.max(left, CAMERA_MOVE_MS[0]));
+        return;
+      }
+    }
     this.fastView.on = on;
     if (jumped || this.reducedMotion) {
       this.jumpToSettled();
       return;
     }
-    this.startTween(this.mix, { keepOffset: true, sight: !on, body: true });
+    this.startTween(this.mix, { keepOffset: true, sight: !on, body: true, calm: true });
     this.fastMove = this.cameraTween !== null;
+  }
+
+  /**
+   * A tour's trip will stop the clock at mission time `at`, `inSeconds` real
+   * seconds from now, and leaves the camera in its view on the way. A move
+   * out of the ship view's steady view then sets off soon enough to come to
+   * rest as the clock stops, and goes as calmly as that time allows (see
+   * leavesForStop). Anything else that moves the clock or the camera
+   * forgets it.
+   */
+  expectStop(at: number, inSeconds: number): void {
+    if (!Number.isFinite(at) || !(inSeconds > 0)) return;
+    this.stopAhead = { at, endMs: performance.now() + inSeconds * 1000, needMs: Number.NaN };
+  }
+
+  /** The tour's stop ahead (see expectStop), while it is still ahead and the clock runs toward it. */
+  private usableStop(): { at: number; endMs: number; needMs: number } | null {
+    const stop = this.stopAhead;
+    if (!stop) return null;
+    if (!this.player.playing || this.player.time >= stop.at || this.viewNow !== 'spacecraft') {
+      this.stopAhead = null;
+      return null;
+    }
+    return stop;
+  }
+
+  /**
+   * In the ship view's steady view, with a tour's stop ahead: set off for the
+   * chase as it will be at the stop once the calm move there would only just
+   * get there in time, so the camera comes to rest as the clock stops however
+   * far round its ring the craft will be by then. Fast forward may still be
+   * on: the move heads for where the craft will be, held still, never for
+   * where it races round now. Returns true when it sets off.
+   */
+  private leavesForStop(): boolean {
+    if (this.cameraTween || this.reducedMotion) return false;
+    const stop = this.usableStop();
+    if (!stop) return false;
+    if (Number.isNaN(stop.needMs)) {
+      const end = this.chaseAtTime(stop.at, this.stopPose);
+      if (!end) {
+        this.stopAhead = null;
+        return false;
+      }
+      stop.needMs = this.calmMs(this.cameraPose(this.nowPose), end, this.fastBody());
+    }
+    const left = stop.endMs - this.nowMs;
+    if (left > stop.needMs) return false;
+    this.setOffForStop(stop, Math.max(left, CAMERA_MOVE_MS[0]));
+    return true;
+  }
+
+  /** Leave the steady view for the chase as it will be at `stop`, in a calm move of `ms` milliseconds. */
+  private setOffForStop(stop: { at: number }, ms: number): void {
+    this.stopAhead = null;
+    this.fastView.on = false;
+    this.chaseAt = stop.at;
+    const ship = this.followedAt(stop.at);
+    if (ship !== this.followed && ship.exists) this.chaseOverride = ship;
+    // Setting off while the craft still races round, unseen at its true place, the move keeps no
+    // sight of it: it would whirl after the true place.
+    const racing = this.followed.fast || this.fastForwardShown;
+    this.holdRest = true;
+    this.startTween(this.mix, {
+      at: stop.at,
+      sight: !racing,
+      body: true,
+      calm: true,
+      fixedEnd: true,
+      ms,
+    });
+    this.fastMove = this.cameraTween !== null;
+  }
+
+  /** The body the steady view looks at. */
+  private fastBody(): 'earth' | 'moon' {
+    return this.fastView.radius === MOON_RADIUS ? 'moon' : 'earth';
+  }
+
+  /** Where the camera is now, with its up, into `out`. */
+  private cameraPose(out: OrientedPose): OrientedPose {
+    out.position.copy(this.camera.position);
+    out.target.copy(this.controls.target);
+    out.up.copy(this.camera.up);
+    return out;
   }
 
   /**
@@ -3382,6 +3870,7 @@ export class Stage implements Director {
     const last = this.chaseRadial;
     const carried =
       last.ship === this.chased() && last.body === body && last.direction.dot(radial) > 0;
+    const stayed = carried && last.direction.angleTo(radial) < CHASE_SAME_SPOT_RAD;
     if (carried) {
       // Weighted by how far the up is that body's vertical: far off, the frame holds to ecliptic north.
       const weight = body === 'moon' ? this.upWeights.moon : this.upWeights.earth;
@@ -3394,6 +3883,11 @@ export class Stage implements Director {
     last.ship = this.chased();
     last.body = body;
     last.direction.copy(radial);
+    // A jump of the clock between two moments the craft rests on one spot leaves the picture
+    // where it was, until the craft moves: the frame its heading would want then may differ.
+    if (jumped && stayed) this.chaseHeld = true;
+    else if (!stayed) this.chaseHeld = false;
+    if (this.chaseHeld && !this.fastView.on) return;
     if (jumped || this.reducedMotion || this.fastView.on) {
       this.chaseFrame.copy(target);
       this.chaseDistance = auto;
@@ -3446,6 +3940,8 @@ export class Stage implements Director {
 
   /** Ease the picture's shift toward its target. Returns true while it moves. */
   private updateViewOffset(dt: number): boolean {
+    // A dissolve fading out holds the picture as it is; the cut puts the shift where it belongs.
+    if (this.dissolve?.phase === 'out') return false;
     const dx = this.offsetTarget.x - this.offsetNow.x;
     const dy = this.offsetTarget.y - this.offsetNow.y;
     if (Math.abs(dx) < 0.25 && Math.abs(dy) < 0.25) {
@@ -3572,6 +4068,7 @@ export class Stage implements Director {
     ) {
       this.renderFrame(dt, leapt);
     }
+    this.framesSinceStart += 1;
   };
 
   /** True while a spacecraft keeps turning or fading with the clock stopped (see ShipModel.idleTurning). */
@@ -4377,8 +4874,9 @@ export class Stage implements Director {
   /**
    * Put each ship in fast forward or take it out (see
    * FAST_FORWARD_CROSSFADE_SECONDS), fade its ring in or out, draw the ring
-   * through the closed lap of its path around now, easing to a new lap
-   * after a burn, and glide its stand-in round it (see updateStandIn). The
+   * through a closed lap held to where the craft was as the ring came in
+   * (see heldLap), easing to a new lap after a burn or as the orbit drifts
+   * (see RING_SETTLE_SECONDS), and glide its stand-in round it (see updateStandIn). The
    * ring keeps its last lap while it fades out. The followed ship's
    * fast-forward level, for the camera and the interface, eases over
    * FAST_FORWARD_SECONDS. `jumped` is any seek, `leapt` one of more than a
@@ -4398,12 +4896,22 @@ export class Stage implements Director {
       const target = fast ? 1 : 0;
       const at = leapt || this.reducedMotion;
       if (fast && ship.lap) {
-        // Through the true place itself, where the craft's own line meets it (see writeLap).
+        // Held to where the craft was as fast forward began (see heldLap), and through it, where
+        // the craft's own line meets it then (see writeLap); a new fast forward holds it afresh.
         const now = this.revolutionsAt(ship, t);
-        writeLap(ship.lap, start, this.mix, ship.ringWanted, RING_POINTS, now);
+        const fresh = ship.crossFade <= 0 || leapt || !(now >= ship.ringAnchor);
+        if (fresh) ship.ringAnchor = now;
+        const center = this.nearMoon(ship.position) ? this.moonAtTrueScale : this.atOrigin;
+        const held = heldLap(ship.lap, ship.ringAnchor, now, center);
+        if (Number.isNaN(held))
+          writeLap(ship.lap, start, this.mix, ship.ringWanted, RING_POINTS, now);
+        else {
+          const through = lastPassage(ship.ringAnchor, now);
+          writeLap(ship.lap, held, this.mix, ship.ringWanted, RING_POINTS, through);
+        }
         ship.ringCenter.copy(this.nearMoon(ship.position) ? this.moonCenter : this.origin);
         // A ring that is not showing yet takes its lap as it is; one showing eases to a new one.
-        if (ship.crossFade <= 0 || at || rescaled) ship.ringNow.set(ship.ringWanted);
+        if (fresh || rescaled) ship.ringNow.set(ship.ringWanted);
         else {
           const now = ship.ringNow;
           const wanted = ship.ringWanted;
@@ -4669,13 +5177,16 @@ export class Stage implements Director {
 
   /**
    * Choose the ship view's steady view as fast forward starts: of the
-   * followed ship's body from off its orbit's axis, on the side of the orbit
-   * the camera is on, tilted toward where the ship is, with the whole ring in
-   * frame. Its up keeps the ship's own up as the chase shows it, so the ship
-   * is at the top of its ring with the body below it, as in the chase, and
-   * the move there hardly rolls the picture. It then holds still for as long
-   * as fast forward lasts (a burn that changes the orbit under it does not
-   * refit it), unless the visitor turns it.
+   * followed ship's body, from the direction the camera looks at the ship
+   * from (the chase, backed far off), raised or lowered to between
+   * FAST_VIEW_ELEVATION_DEG above the orbit's plane, with the whole ring in
+   * frame. Its up is the ship's own up, as the chase has it. So the move
+   * there backs away along the chase's own line of sight, turning only to
+   * bring the body to the middle, and never rolls the picture (tilted off
+   * that line toward where the ship is, as it was, the move rolled at 36
+   * degrees a second). It then holds still for as long as fast forward lasts
+   * (a burn that changes the orbit under it does not refit it), unless the
+   * visitor turns it.
    */
   private updateFastView(): void {
     const view = this.fastView;
@@ -4694,17 +5205,33 @@ export class Stage implements Director {
     const side = this.f3.subVectors(this.camera.position, view.center).dot(normal);
     const preferred = this.f3.copy(this.sunDirection).multiplyScalar(0.6).add(this.worldUp);
     if (Math.abs(side) > 1e-6 ? side < 0 : normal.dot(preferred) < 0) normal.negate();
-    const tilt = MathUtils.degToRad(FAST_FORWARD_TILT_DEG);
-    view.direction
-      .copy(normal)
-      .multiplyScalar(Math.cos(tilt))
-      .addScaledVector(radial, Math.sin(tilt))
-      .normalize();
-    view.up
-      .copy(radial)
-      .multiplyScalar(Math.cos(tilt))
-      .addScaledVector(normal, -Math.sin(tilt))
-      .normalize();
+    // The direction the camera looks at the ship from, its height above the orbit's plane held within bounds.
+    const look = this.v3.subVectors(this.camera.position, ship.position);
+    const across = this.f3.copy(look).addScaledVector(normal, -look.dot(normal));
+    const [lowest, highest] = FAST_VIEW_ELEVATION_DEG;
+    if (look.lengthSq() > 1e-12 && across.lengthSq() > 1e-12) {
+      look.normalize();
+      const height = MathUtils.clamp(
+        Math.asin(MathUtils.clamp(look.dot(normal), -1, 1)),
+        MathUtils.degToRad(lowest),
+        MathUtils.degToRad(highest),
+      );
+      view.direction
+        .copy(across.normalize())
+        .multiplyScalar(Math.cos(height))
+        .addScaledVector(normal, Math.sin(height));
+    } else {
+      const tilt = MathUtils.degToRad(FAST_FORWARD_TILT_DEG);
+      view.direction
+        .copy(normal)
+        .multiplyScalar(Math.cos(tilt))
+        .addScaledVector(radial, Math.sin(tilt));
+    }
+    view.direction.normalize();
+    // The ship's own up, square to the line of sight.
+    view.up.copy(radial).addScaledVector(view.direction, -radial.dot(view.direction));
+    if (view.up.lengthSq() < 1e-12) view.up.copy(normal);
+    view.up.normalize();
     // The ring, as far as it reaches (but not some leftover ring far bigger than the orbit flown now).
     const reach = Math.max(view.radius, orbit, Math.min(this.ringRadius, 3 * orbit));
     const spheres: SphereLike[] = [

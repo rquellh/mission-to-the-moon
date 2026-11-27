@@ -657,3 +657,86 @@ export function swingAround(
   out.up.set(0, 1, 0).applyQuaternion(_start);
   out.target.set(0, 0, -1).applyQuaternion(_start).multiplyScalar(look).add(out.position);
 }
+
+/** Steps at which a move's up is carried along its way (see carryUp). */
+const CARRY_STEPS = 64;
+
+/**
+ * A move's up carried along its line of sight (see carryUp): the up at each
+ * of its steps, and the roll it is left short of the end's.
+ */
+export interface CarriedUp {
+  /** The up at each step, x, y, z each (CARRY_STEPS + 1 of them). */
+  readonly ups: Float64Array;
+  /** The roll the carried up is short of the end's, in radians about the line of sight at the end. */
+  left: number;
+}
+
+/** A carried up to plan into (see carryUp). */
+export function carriedUp(): CarriedUp {
+  return { ups: new Float64Array(3 * (CARRY_STEPS + 1)), left: 0 };
+}
+
+const _carryPose: OrientedPose = {
+  position: new Vector3(),
+  target: new Vector3(),
+  up: new Vector3(),
+};
+const _carryLook = new Vector3();
+const _carryNext = new Vector3();
+const _carryUp = new Vector3();
+const _carryWanted = new Vector3();
+const _carryTurn = new Quaternion();
+const _carryAcross = new Vector3();
+
+/** `up` made square to the line of sight `look` (a unit vector), into `out`. */
+function upSquareTo(up: Vector3, look: Vector3, out: Vector3): Vector3 {
+  out.copy(up).addScaledVector(look, -up.dot(look));
+  if (out.lengthSq() < 1e-12) out.set(0, 1, 0).addScaledVector(look, -look.y);
+  return out.normalize();
+}
+
+/**
+ * Carry a camera move's up along its way, into `plan`: the move's poses at
+ * `poseAt(t)` for t from 0 to 1 (not eased), its up at the start taken from
+ * there and turned only as the line of sight turns, never about it, so the
+ * picture does not roll. What that leaves it short of `endUp` at the end is
+ * the plan's `left`, which carriedUpAt spreads evenly over the move as one
+ * slow roll: the least roll the move's line of sight allows. Returns the plan.
+ */
+export function carryUp(
+  poseAt: (t: number, out: OrientedPose) => void,
+  endUp: Vector3,
+  plan: CarriedUp,
+): CarriedUp {
+  const ups = plan.ups;
+  poseAt(0, _carryPose);
+  _carryLook.subVectors(_carryPose.target, _carryPose.position).normalize();
+  upSquareTo(_carryPose.up, _carryLook, _carryUp).toArray(ups, 0);
+  for (let i = 1; i <= CARRY_STEPS; i += 1) {
+    poseAt(i / CARRY_STEPS, _carryPose);
+    _carryNext.subVectors(_carryPose.target, _carryPose.position).normalize();
+    _carryUp.applyQuaternion(_carryTurn.setFromUnitVectors(_carryLook, _carryNext));
+    upSquareTo(_carryUp, _carryNext, _carryUp).toArray(ups, 3 * i);
+    _carryLook.copy(_carryNext);
+  }
+  upSquareTo(endUp, _carryLook, _carryWanted);
+  _carryAcross.crossVectors(_carryUp, _carryWanted);
+  plan.left = Math.atan2(_carryAcross.dot(_carryLook), _carryUp.dot(_carryWanted));
+  return plan;
+}
+
+/**
+ * Give a pose on a move planned by carryUp its carried up, at `t` (0 to 1,
+ * eased as the move is): the up carried to there, square to the pose's own
+ * line of sight, turned about it by the share `t` of the roll left at the end.
+ */
+export function carriedUpAt(plan: CarriedUp, t: number, pose: OrientedPose): void {
+  const share = MathUtils.clamp(t, 0, 1);
+  const k = share * CARRY_STEPS;
+  const i = Math.min(CARRY_STEPS - 1, Math.floor(k));
+  _carryUp.fromArray(plan.ups, 3 * i).lerp(_carryWanted.fromArray(plan.ups, 3 * (i + 1)), k - i);
+  _carryLook.subVectors(pose.target, pose.position).normalize();
+  upSquareTo(_carryUp, _carryLook, pose.up);
+  pose.up.applyAxisAngle(_carryLook, plan.left * share);
+}

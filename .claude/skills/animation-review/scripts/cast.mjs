@@ -68,6 +68,7 @@ export const TIMELINE_COLUMNS = [
   'glide',
   'laps',
   'fflaps',
+  'shown',
 ];
 
 /** Columns of camera.tsv: one row every frame the page runs (see references/recording-files.md). */
@@ -116,6 +117,8 @@ export const CAMERA_COLUMNS = [
   'duy',
   'duz',
   'ring',
+  'shown',
+  'dissolve',
 ];
 
 /**
@@ -159,6 +162,14 @@ function pageProbe() {
   };
   const fixed = (value, digits) =>
     typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '-';
+  // How much of the 3D view shows (the canvas's opacity as drawn): below 1 while the page fades it
+  // in on loading, or while a change of view dissolves through it; a cut under it is not a move.
+  const pictureShown = () => {
+    const canvas = document.querySelector('canvas.stage');
+    if (!canvas) return '-';
+    const opacity = Number(getComputedStyle(canvas).opacity);
+    return fixed(opacity, 3);
+  };
   // A craft's box as its centre and size; the clear area as its top left corner and size.
   const centred = (b) =>
     b
@@ -277,6 +288,7 @@ function pageProbe() {
       glides,
       laps,
       s && typeof s.fastForwardLaps === 'number' ? fixed(s.fastForwardLaps, 2) : '-',
+      pictureShown(),
     ]);
   };
 
@@ -445,6 +457,10 @@ function pageProbe() {
       drawnAt ? fixed(d.y, 6) : '-',
       drawnAt ? fixed(d.z, 6) : '-',
       standIn ? fixed(offRing(ship, onScreen, q), 1) : '-',
+      pictureShown(),
+      // A change of view dissolving through a cut (Stage.dissolve): 'out' while the last view
+      // fades, 'in' as the new one shows; 'pending' for a view asked for and not framed yet.
+      s.dissolve ? s.dissolve.phase : s.pendingView ? 'pending' : '-',
     ]);
   };
   const loop = (frameMs) => {
