@@ -2,15 +2,30 @@ import assert from 'node:assert/strict';
 import { describe, expect, it } from 'vitest';
 import { flight as apollo8Flight } from '../../content/missions/apollo-8/flight.ts';
 import { story as apollo8 } from '../../content/missions/apollo-8/story.ts';
+import { flight as apollo9Flight } from '../../content/missions/apollo-9/flight.ts';
+import { story as apollo9 } from '../../content/missions/apollo-9/story.ts';
+import { flight as apollo10Flight } from '../../content/missions/apollo-10/flight.ts';
+import { story as apollo10 } from '../../content/missions/apollo-10/story.ts';
 import { flight as apollo11Flight } from '../../content/missions/apollo-11/flight.ts';
 import { story as apollo11 } from '../../content/missions/apollo-11/story.ts';
+import { flight as apollo15Flight } from '../../content/missions/apollo-15/flight.ts';
+import { story as apollo15 } from '../../content/missions/apollo-15/story.ts';
 import { flight as apollo16Flight } from '../../content/missions/apollo-16/flight.ts';
 import { story as apollo16 } from '../../content/missions/apollo-16/story.ts';
+import { flight as apollo17Flight } from '../../content/missions/apollo-17/flight.ts';
+import { story as apollo17 } from '../../content/missions/apollo-17/story.ts';
+import { flight as gemini6aFlight } from '../../content/missions/gemini-6a/flight.ts';
+import { story as gemini6a } from '../../content/missions/gemini-6a/story.ts';
+import { flight as gemini8Flight } from '../../content/missions/gemini-8/flight.ts';
+import { story as gemini8 } from '../../content/missions/gemini-8/story.ts';
+import { flight as gemini10Flight } from '../../content/missions/gemini-10/flight.ts';
+import { story as gemini10 } from '../../content/missions/gemini-10/story.ts';
 import { flight as gemini12Flight } from '../../content/missions/gemini-12/flight.ts';
 import { story as gemini12 } from '../../content/missions/gemini-12/story.ts';
-import { elapsedToSeconds, type Mission } from '../../content/types.ts';
+import { elapsedToSeconds, type ElapsedTime, type Mission } from '../../content/types.ts';
 import { buildFlightPath } from '../build.ts';
 import {
+  approachesAtEvents,
   createStoryTime,
   partingsAtEvents,
   storyIntervalLength,
@@ -106,7 +121,116 @@ describe('partings at events', () => {
   });
 });
 
+describe('approaches at events', () => {
+  it.each<[string, FlightPlan, Mission, ElapsedTime, ElapsedTime]>([
+    [
+      'Eagle closing in on Columbia, from the end of its braking burn (Apollo 11)',
+      apollo11Flight,
+      apollo11,
+      '127:46:38.2',
+      '128:03:00',
+    ],
+    [
+      'a lunar module closing in, from the end of its terminal phase initiation burn (Apollo 10)',
+      apollo10Flight,
+      apollo10,
+      '105:23:12.08',
+      '106:22:02',
+    ],
+    [
+      'a lunar module closing in, from when it was alongside (Apollo 9)',
+      apollo9Flight,
+      apollo9,
+      '098:30:51.2',
+      '099:02:26',
+    ],
+    [
+      'Gemini keeping station beside the Agena (Gemini 10)',
+      gemini10Flight,
+      gemini10,
+      '005:15:00',
+      '005:52:37.1',
+    ],
+    [
+      'Gemini keeping station from the event that marks it (Gemini 8)',
+      gemini8Flight,
+      gemini8,
+      '005:56:56',
+      '006:33:16',
+    ],
+  ])('find %s', (_name, plan, mission, start, end) => {
+    const { path, events } = keysOf(plan, mission);
+
+    expect(approachesAtEvents(path, events)).toEqual([
+      { start: elapsedToSeconds(start), end: elapsedToSeconds(end) },
+    ]);
+  });
+
+  it.each([
+    ['a flight with no docking (Apollo 8)', apollo8Flight, apollo8],
+    ['a docking with no event there (Apollo 16)', apollo16Flight, apollo16],
+    ['a rendezvous with no docking (Gemini 6A)', gemini6aFlight, gemini6a],
+  ])('find none for %s', (_name, plan, mission) => {
+    const { path, events } = keysOf(plan, mission);
+
+    expect(approachesAtEvents(path, events)).toEqual([]);
+  });
+});
+
 describe('story keys', () => {
+  it('give the final approach to a docking at an event a calm stretch of its own (Apollo 11)', () => {
+    const { keys } = keysOf(apollo11Flight, apollo11);
+    const approach = elapsedToSeconds('127:46:38.2');
+    const docking = elapsedToSeconds('128:03:00');
+    const story = createStoryTime(keys);
+    const storySeconds = story.toStory(docking) - story.toStory(approach);
+
+    expect(story.keyTimes).toContain(approach);
+    expect(storySeconds).toBeCloseTo(storyIntervalLength(docking - approach));
+    // Six story seconds for sixteen minutes: about a tenth of a lap of the Moon (two hours).
+    expect(storySeconds).toBeGreaterThan(6);
+  });
+
+  it('add only the end of the undocking and the start of the docking to Apollo 11', () => {
+    const { path, events, keys } = keysOf(apollo11Flight, apollo11);
+
+    expect(keys).toEqual([
+      path.start,
+      path.end,
+      ...events,
+      elapsedToSeconds('100:39:52.9'),
+      elapsedToSeconds('127:46:38.2'),
+    ]);
+  });
+
+  it.each([
+    ['Apollo 9', apollo9Flight, apollo9],
+    ['Apollo 10', apollo10Flight, apollo10],
+    ['Apollo 11', apollo11Flight, apollo11],
+    ['Apollo 15', apollo15Flight, apollo15],
+    ['Apollo 17', apollo17Flight, apollo17],
+    ['Gemini 10', gemini10Flight, gemini10],
+    ['Gemini 12', gemini12Flight, gemini12],
+  ])('lengthen %s by 6 to 7.5 story seconds, for its docking', (_name, plan, mission) => {
+    const { path, events, keys } = keysOf(plan, mission);
+    const without = keys.filter(
+      (key) => !approachesAtEvents(path, events).some((one) => one.start === key),
+    );
+
+    const added = createStoryTime(keys).length - createStoryTime(without).length;
+
+    expect(added).toBeGreaterThan(5.9);
+    expect(added).toBeLessThan(7.5);
+  });
+
+  it('add no key where an event already marks the final approach (Gemini 8)', () => {
+    const { path, events, keys } = keysOf(gemini8Flight, gemini8);
+
+    expect(createStoryTime(keys).keyTimes).toEqual(
+      createStoryTime([path.start, path.end, ...events]).keyTimes,
+    );
+  });
+
   it('give a lander flying beside the ship it undocked from, at an event, a stretch of its own', () => {
     const { path, keys } = keysOf(apollo11Flight, apollo11);
     const beside = path.ships.find((ship) => ship.role === 'lander')?.phases[0];
@@ -121,12 +245,15 @@ describe('story keys', () => {
     );
   });
 
-  it.each([
-    ['a lander that undocks with no event there (Apollo 16)', apollo16Flight, apollo16],
-    ['a main ship that undocks into station keeping (Gemini 12)', gemini12Flight, gemini12],
-  ])('add nothing for %s', (_name, plan, mission) => {
-    const { path, events, keys } = keysOf(plan, mission);
+  it('add nothing for a lander that undocks and docks with no event there (Apollo 16)', () => {
+    const { path, events, keys } = keysOf(apollo16Flight, apollo16);
 
     expect(keys).toEqual([path.start, path.end, ...events]);
+  });
+
+  it('add no key for a main ship that undocks into station keeping, only for its docking (Gemini 12)', () => {
+    const { path, events, keys } = keysOf(gemini12Flight, gemini12);
+
+    expect(keys).toEqual([path.start, path.end, ...events, elapsedToSeconds('003:46:00')]);
   });
 });

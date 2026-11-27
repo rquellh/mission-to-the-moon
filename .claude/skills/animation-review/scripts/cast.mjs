@@ -1,59 +1,438 @@
 #!/usr/bin/env node
 /**
- * Take screenshots of the site in headless Chrome, with software WebGL, and
- * report console errors. No dependencies: it talks to Chrome over the
- * DevTools protocol using Node's built-in WebSocket (Node 22 or later).
+ * Drive Mission to the Moon in headless Chrome and record what it draws:
+ * every frame, a timeline of the interface and the scene every 100 ms, and
+ * the camera's pose every frame. Chrome draws with software WebGL, so no GPU
+ * is needed. No packages: it talks to Chrome over the DevTools protocol with
+ * Node's built-in WebSocket (Node 22 or later).
  *
- * Usage:
- *   node tools/screenshot.mjs <url> [options]
+ * record.mjs uses this for whole recordings. Run it directly for anything
+ * record.mjs does not drive:
  *
- * Options:
- *   --size WxH            Viewport size in CSS pixels (default 1280x800).
- *   --out PATH            Save a screenshot here after all steps.
- *   --dpr N               Device pixel ratio (default 1).
- *   --mobile              Emulate a phone (touch, mobile viewport). On by default below 600 px wide.
- *   --desktop             Turn phone emulation off even below 600 px wide.
- *   --reduced-motion      Emulate prefers-reduced-motion: reduce.
- *   --no-webgl            Start Chrome without WebGL, to test the fallback.
- *   --timeout MS          Longest wait for any one step (default 20000).
- *   --step STEP           A step to run after the page loads; repeat for more, in order:
- *       wait:MS               Wait a number of milliseconds.
- *       waitfor:SELECTOR      Wait until an element matching SELECTOR is visible.
- *       click:SELECTOR        Click the center of the first visible match.
- *       key:KEY               Press a key: Tab, Shift+Tab, Enter, Space, Escape,
- *                             ArrowLeft, ArrowRight, ArrowUp, ArrowDown, PageUp,
- *                             PageDown, Home, End, or a single character.
- *       eval:JS               Evaluate JavaScript in the page and print the result.
- *       shot:PATH             Save a screenshot now.
- *   --fail-on-error       Exit with status 1 if the page logged any errors.
+ *   node .claude/skills/animation-review/scripts/cast.mjs <url> [options] --step STEP ...
  *
- * Example:
- *   node tools/screenshot.mjs http://localhost:5173/ --size 390x844 \
- *     --step waitfor:body.is-ready --step click:#welcome-explore --step wait:800 \
- *     --out assets-src/shots/phone.png
+ * Options: --size WxH (default 1440x900), --dpr N, --mobile, --desktop,
+ * --reduced-motion, --no-webgl, --timeout MS (longest wait for one step,
+ * default 30000), --out PATH (a screenshot after the steps), --fail-on-error.
+ * Each --step is one step, run in order; nothing is ever split, so a step may
+ * hold any JavaScript. Every step is described in
+ * .claude/skills/animation-review/references/cast-steps.md, and briefly by --help.
+ *
+ * The timeline and camera columns are described in
+ * .claude/skills/animation-review/references/recording-files.md.
+ *
+ * window.stage (the Stage, with its private fields) exists only in a
+ * development build, so run this against the dev server.
  */
 import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const CHROME =
   process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
+export const sleep = (ms) => new Promise((done) => setTimeout(done, Math.max(0, ms)));
+
+/* ------------------------------------------------------------------ */
+/* What the probe writes                                               */
+/* ------------------------------------------------------------------ */
+
+/** Columns of timeline.tsv: one row every 100 ms (see references/recording-files.md). */
+export const TIMELINE_COLUMNS = [
+  't',
+  'clock',
+  'story',
+  'playing',
+  'speed',
+  'pace',
+  'view',
+  'scale',
+  'ff',
+  'fastview',
+  'tween',
+  'usermoved',
+  'followed',
+  'counter',
+  'button',
+  'play',
+  'card',
+  'ending',
+  'clear',
+  'dock',
+  'ships',
+  'left',
+  'labels',
+  'classes',
+];
+
+/** Columns of camera.tsv: one row every frame the page runs (see references/recording-files.md). */
+export const CAMERA_COLUMNS = [
+  't',
+  'clock',
+  'story',
+  'playing',
+  'speed',
+  'view',
+  'followed',
+  'tween',
+  'usermoved',
+  'fastview',
+  'fade',
+  'ff',
+  'laps',
+  'near',
+  'ed',
+  'ex',
+  'ey',
+  'er',
+  'md',
+  'mx',
+  'my',
+  'mr',
+  'sx',
+  'sy',
+  'occluded',
+  'tilt',
+  'tiltw',
+  'fx',
+  'fy',
+  'fz',
+  'ux',
+  'uy',
+  'uz',
+  'w',
+  'h',
+];
+
+/**
+ * Installed in the page. It reads the scene through window.stage and
+ * window.__missionScene, and the interface through the DOM, and never changes
+ * either. Every read tolerates a page that is still loading.
+ */
+function pageProbe() {
+  if (window.__probe) return 'probe: ready';
+  const now = () => performance.timeOrigin + performance.now();
+  const probe = {
+    timeline: [],
+    camera: [],
+    sampler: 0,
+    cameraOn: false,
+    errors: [],
+    moonRadius: 1737.4 / 6371,
+  };
+  window.__probe = probe;
+  import('/src/content/physical-constants.ts')
+    .then((constants) => {
+      if (constants.MOON_RADIUS > 0) probe.moonRadius = constants.MOON_RADIUS;
+    })
+    .catch(() => {});
+
+  const shown = (el) => {
+    if (!el || el.getClientRects().length === 0) return false;
+    if (el.checkVisibility)
+      return el.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+    const style = getComputedStyle(el);
+    return style.visibility !== 'hidden' && style.display !== 'none';
+  };
+  const textOf = (selector) => {
+    const el = document.querySelector(selector);
+    if (!shown(el)) return '-';
+    return (el.textContent || '').replace(/\s+/g, ' ').trim() || '-';
+  };
+  const labelOf = (selector) => {
+    const el = document.querySelector(selector);
+    return shown(el) ? el.getAttribute('aria-label') || textOf(selector) : '-';
+  };
+  const fixed = (value, digits) =>
+    typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '-';
+  // A craft's box as its centre and size; the clear area as its top left corner and size.
+  const centred = (b) =>
+    b
+      ? `${Math.round(b.x + b.width / 2)},${Math.round(b.y + b.height / 2)},${Math.round(b.width)}x${Math.round(b.height)}`
+      : '-';
+  const cornered = (b) =>
+    b
+      ? `${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.width)}x${Math.round(b.height)}`
+      : '-';
+  const tweening = (s) => Boolean(s.cameraTween && !s.cameraTween.done);
+  const attempt = (read, fallback) => {
+    try {
+      return read();
+    } catch {
+      return fallback;
+    }
+  };
+  // The Stage, once it exists. Until then window.stage is the <canvas id="stage"> (named access on window).
+  const stageOf = () => {
+    const s = window.stage;
+    return s && s.camera && s.player && s.fastView ? s : null;
+  };
+
+  const sample = () => {
+    const s = stageOf();
+    const report = attempt(() => (window.__missionScene ? window.__missionScene() : null), null);
+    const player = s ? s.player : null;
+    const ships = report
+      ? report.ships
+          .map((ship, i) => {
+            const state = s?.ships?.[i];
+            if (state && !state.exists) return `${ship.id}:gone`;
+            const model = s?.fleet?.ships?.[i];
+            const fade = model && typeof model.fade === 'number' ? model.fade : 1;
+            const dot = s?.companionMarkers?.[i]?.visible ? '+dot' : '';
+            return `${ship.id}:${centred(ship.box)}@${fixed(fade, 2)}${dot}`;
+          })
+          .join(' ')
+      : '-';
+    const dock = document.querySelector('#dock');
+    const dockBox = shown(dock) ? dock.getBoundingClientRect() : null;
+    probe.timeline.push([
+      now(),
+      report ? fixed(report.time, 0) : '-',
+      player ? fixed(player.storyTime, 2) : '-',
+      player ? (player.playing ? 1 : 0) : '-',
+      player ? fixed(player.speed, 2) : '-',
+      s ? attempt(() => fixed(s.missionPace(), 0), '-') : '-',
+      report ? report.view : '-',
+      report ? report.scaleMode : '-',
+      report ? (report.fastForward ? 1 : 0) : '-',
+      s ? fixed(s.fastView.level, 2) : '-',
+      s ? (tweening(s) ? 1 : 0) : '-',
+      s ? (s.userMovedCamera ? 1 : 0) : '-',
+      report ? report.followed : '-',
+      textOf('[data-testid=tour-count]'),
+      textOf('[data-testid=tour-next]'),
+      labelOf('#play'),
+      textOf('#card-title'),
+      shown(document.querySelector('[data-testid=ending]')) ? 1 : 0,
+      report ? cornered(report.clear) : '-',
+      dockBox ? `${Math.round(dockBox.top)}+${Math.round(dockBox.height)}` : '-',
+      ships,
+      report
+        ? report.leftBehind.map((part) => `${part.part}:${centred(part.box)}`).join(' ') || '-'
+        : '-',
+      report
+        ? report.labels.map((label) => `${label.text}@${fixed(label.opacity, 2)}`).join('; ') || '-'
+        : '-',
+      (document.body?.className ?? '').replace(/\s+/g, ' ').trim() || '-',
+    ]);
+  };
+
+  // Laps the craft has flown around the body below it by mission time t, as the scene counts them (see Stage.revolutionsOf).
+  const lapsAt = (ship, t) => {
+    const times = ship.times;
+    const laps = ship.revolutions;
+    if (!times || !laps || times.length === 0) return NaN;
+    if (t <= times[0]) return laps[0];
+    const last = times.length - 1;
+    if (t >= times[last]) return laps[last];
+    let lo = 0;
+    let hi = last;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (times[mid] <= t) lo = mid;
+      else hi = mid;
+    }
+    const u = times[hi] > times[lo] ? (t - times[lo]) / (times[hi] - times[lo]) : 0;
+    return laps[lo] + (laps[hi] - laps[lo]) * u;
+  };
+
+  let scratch = null;
+  // `frameMs` is the frame's own timestamp, the one the clock steps by, so rates are not skewed when a callback runs late.
+  const cameraRow = (frameMs) => {
+    const s = stageOf();
+    if (!s) return;
+    const c = s.camera;
+    c.updateMatrixWorld();
+    if (!scratch) {
+      const V = c.position.constructor;
+      scratch = { f: new V(), u: new V(), r: new V(), p: new V(), a: new V() };
+    }
+    const { f, u, r, p, a } = scratch;
+    c.getWorldDirection(f);
+    u.set(0, 1, 0).applyQuaternion(c.quaternion);
+    r.set(1, 0, 0).applyQuaternion(c.quaternion);
+    const W = s.cssWidth;
+    const H = s.cssHeight;
+    const tanHalf = Math.tan((c.fov * Math.PI) / 360) / (c.zoom || 1);
+    // Where a point is drawn, in CSS pixels, or null when it is behind the camera.
+    const onScreen = (point) => {
+      if (a.copy(point).sub(c.position).dot(f) <= 0) return null;
+      p.copy(point).project(c);
+      return [((p.x + 1) / 2) * W, ((1 - p.y) / 2) * H];
+    };
+    // A body: the camera's distance from its centre in its radii, its centre on screen, and its radius on screen.
+    const disc = (centre, radius) => {
+      const distance = c.position.distanceTo(centre);
+      const at = onScreen(centre);
+      const px =
+        distance > radius ? (Math.tan(Math.asin(radius / distance)) / tanHalf) * (H / 2) : NaN;
+      return [
+        fixed(distance / radius, 4),
+        at ? fixed(at[0], 1) : '-',
+        at ? fixed(at[1], 1) : '-',
+        fixed(px, 1),
+      ];
+    };
+    const ship = s.followed;
+    const index = s.ships ? s.ships.indexOf(ship) : -1;
+    const model = index >= 0 ? s.fleet?.ships?.[index] : null;
+    const shipAt = ship && ship.exists ? onScreen(ship.position) : null;
+    const earthHeight = ship ? ship.position.length() - 1 : Infinity;
+    const moonHeight = ship
+      ? (ship.position.distanceTo(s.moonCenter) - probe.moonRadius) / probe.moonRadius
+      : Infinity;
+    const nearMoon = moonHeight < earthHeight;
+    let tilt = NaN;
+    let weight = NaN;
+    if (ship && ship.exists) {
+      // The craft's local up (away from the body below it), as the screen shows it: 0 when it points straight up the screen.
+      a.copy(ship.position)
+        .sub(nearMoon ? s.moonCenter : s.origin)
+        .normalize();
+      tilt = (Math.atan2(a.dot(r), a.dot(u)) * 180) / Math.PI;
+      weight = Math.hypot(a.dot(r), a.dot(u));
+    }
+    const player = s.player;
+    probe.camera.push([
+      performance.timeOrigin + frameMs,
+      fixed(player.time, 1),
+      fixed(player.storyTime, 3),
+      player.playing ? 1 : 0,
+      fixed(player.speed, 3),
+      s.viewNow,
+      ship ? ship.id : '-',
+      tweening(s) ? 1 : 0,
+      s.userMovedCamera ? 1 : 0,
+      fixed(s.fastView.level, 3),
+      model && typeof model.fade === 'number' ? fixed(model.fade, 3) : '-',
+      ship ? fixed(ship.fastForward, 3) : '-',
+      ship ? fixed(lapsAt(ship, player.time), 5) : '-',
+      nearMoon ? 'M' : 'E',
+      ...disc(s.origin, 1),
+      ...disc(s.moonCenter, probe.moonRadius),
+      shipAt ? fixed(shipAt[0], 1) : '-',
+      shipAt ? fixed(shipAt[1], 1) : '-',
+      ship && ship.exists ? attempt(() => (s.occluded(ship.position) ? 1 : 0), '-') : '-',
+      fixed(tilt, 2),
+      fixed(weight, 3),
+      fixed(f.x, 6),
+      fixed(f.y, 6),
+      fixed(f.z, 6),
+      fixed(u.x, 6),
+      fixed(u.y, 6),
+      fixed(u.z, 6),
+      W,
+      H,
+    ]);
+  };
+  const loop = (frameMs) => {
+    if (!probe.cameraOn) return;
+    try {
+      cameraRow(frameMs);
+    } catch (error) {
+      if (probe.errors.length < 5) probe.errors.push(`camera: ${error}`);
+    }
+    requestAnimationFrame(loop);
+  };
+
+  probe.startTimeline = (ms) => {
+    clearInterval(probe.sampler);
+    probe.timeline = [];
+    probe.sampler = setInterval(() => {
+      try {
+        sample();
+      } catch (error) {
+        if (probe.errors.length < 5) probe.errors.push(`timeline: ${error}`);
+      }
+    }, ms);
+  };
+  probe.startCamera = () => {
+    probe.camera = [];
+    if (probe.cameraOn) return;
+    probe.cameraOn = true;
+    requestAnimationFrame(loop);
+  };
+  probe.take = () => {
+    clearInterval(probe.sampler);
+    probe.cameraOn = false;
+    const taken = { timeline: probe.timeline, camera: probe.camera, errors: probe.errors };
+    probe.timeline = [];
+    probe.camera = [];
+    probe.errors = [];
+    return taken;
+  };
+  // What record.mjs and the rest/tourstop steps wait on.
+  probe.state = () => {
+    const s = stageOf();
+    const player = s ? s.player : null;
+    const counter = textOf('[data-testid=tour-count]');
+    const stop = /Stop (\d+) of (\d+)/.exec(counter);
+    const c = s ? s.camera : null;
+    return {
+      ready: Boolean(document.body?.classList.contains('is-ready') && window.__missionScene),
+      stop: stop ? Number(stop[1]) : null,
+      stops: stop ? Number(stop[2]) : null,
+      onTheWay: /On the way/.test(counter),
+      button: textOf('[data-testid=tour-next]'),
+      ending: shown(document.querySelector('[data-testid=ending]')),
+      card: textOf('#card-title'),
+      view: s ? s.viewNow : null,
+      playing: player ? player.playing : false,
+      clock: player ? player.time : null,
+      story: player ? player.storyTime : null,
+      tween: s ? tweening(s) : false,
+      pending: s ? Boolean(s.pendingView) : false,
+      fast: s ? s.fastView.level : 0,
+      pose: c
+        ? [
+            c.position.x,
+            c.position.y,
+            c.position.z,
+            c.quaternion.x,
+            c.quaternion.y,
+            c.quaternion.z,
+            c.quaternion.w,
+          ]
+        : null,
+    };
+  };
+  return 'probe: installed';
+}
+
+export const PROBE_SOURCE = `(${pageProbe.toString()})()`;
+
+/** True when two camera poses from probe.state() are the same to well under a pixel. */
+export function samePose(a, b) {
+  if (!a || !b) return false;
+  const scale = Math.max(1e-6, Math.hypot(a[0], a[1], a[2]));
+  for (let i = 0; i < 3; i += 1) if (Math.abs(a[i] - b[i]) > 1e-6 * scale) return false;
+  for (let i = 3; i < 7; i += 1) if (Math.abs(a[i] - b[i]) > 1e-6) return false;
+  return true;
+}
 
 /* ------------------------------------------------------------------ */
 /* Arguments                                                           */
 /* ------------------------------------------------------------------ */
 
+export function parseSize(text) {
+  const match = /^(\d+)x(\d+)$/.exec(text);
+  if (!match) throw new Error('--size must look like 390x844');
+  return { width: Number(match[1]), height: Number(match[2]) };
+}
+
 function parseArgs(argv) {
   const options = {
     url: null,
-    width: 1280,
-    height: 800,
+    width: 1440,
+    height: 900,
     dpr: 1,
     mobile: null,
     reducedMotion: false,
     webgl: true,
-    timeout: 20000,
+    timeout: 30000,
     out: null,
     steps: [],
     failOnError: false,
@@ -66,13 +445,9 @@ function parseArgs(argv) {
       return value;
     };
     switch (arg) {
-      case '--size': {
-        const match = /^(\d+)x(\d+)$/.exec(next());
-        if (!match) throw new Error('--size must look like 390x844');
-        options.width = Number(match[1]);
-        options.height = Number(match[2]);
+      case '--size':
+        Object.assign(options, parseSize(next()));
         break;
-      }
       case '--out':
         options.out = next();
         break;
@@ -134,7 +509,7 @@ async function launchChrome(options) {
     `--window-size=${options.width},${options.height}`,
   ];
   if (options.webgl) {
-    // Software WebGL, so screenshots work without a GPU.
+    // Software WebGL, so it works without a GPU.
     args.push('--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist');
   } else {
     args.push('--disable-3d-apis', '--disable-webgl');
@@ -224,10 +599,8 @@ async function connect(endpoint) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Page helpers                                                        */
+/* The page and its steps                                              */
 /* ------------------------------------------------------------------ */
-
-const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
 const KEYS = {
   Tab: { code: 'Tab', keyCode: 9 },
@@ -244,9 +617,59 @@ const KEYS = {
   End: { code: 'End', keyCode: 35 },
 };
 
+/** The buttons `press:NAME` clicks. */
+export const BUTTONS = {
+  next: '[data-testid=tour-next]',
+  skip: '[data-testid=tour-next]',
+  back: '[data-testid=tour-back]',
+  exit: '[data-testid=tour-exit]',
+  again: '[data-testid=ending-again]',
+  play: '#play',
+  pause: '#play',
+  controls: '#controls-toggle',
+  'event-next': '#event-next',
+  'event-previous': '#event-previous',
+  scale: '#scale-toggle',
+};
+
+export const STEP_HELP = `Steps (each --step is one step; see references/cast-steps.md):
+  wait:MS                 wait
+  waitfor:SELECTOR        wait until an element is visible
+  waituntil:JS            wait until a JavaScript expression is truthy
+  assert:JS               stop with an error unless the expression is truthy
+  click:SELECTOR          click the first visible match
+  press:NAME              click a named button: ${Object.keys(BUTTONS).join(', ')}
+  key:KEY                 press a key (Tab, Enter, Space, Escape, arrows, Page/Home/End, a character)
+  drag:X1,Y1,X2,Y2[,MS]   drag with the left button over MS (default 300)
+  wheel:X,Y,DY            one scroll-wheel step
+  eval:JS                 evaluate in the page (awaits promises) and print the result
+  shot:PATH               save a screenshot (device pixels)
+  stall:MS                block the page's main thread for MS: a deliberate slow frame
+  tourstop:N              drive the tour until it rests at stop N (fails loudly if it cannot)
+  rest:MS[,MAX]           wait until the clock, the tour and the camera have been still for MS
+  clock:T[,MAX]           wait until the mission clock reaches T (seconds or HHH:MM:SS)
+  story:S[,MAX]           wait until the story clock reaches S seconds
+  probe                   install the in-page probe (timeline, camera, state)
+  cast:DIR                start keeping every frame the page draws
+  mark                    time zero for frames, timeline and camera log
+  timeline[:MS]           start sampling the interface and scene every MS (default 100)
+  camera                  start logging the camera every frame
+  uncast                  stop keeping frames and write them to DIR/pNNNNN.jpg (ms after the mark)
+  save:DIR                stop the timeline and camera log; write DIR/timeline.tsv and DIR/camera.tsv`;
+
+/** Mission seconds from "HHH:MM:SS" or plain seconds. */
+export function missionSeconds(text) {
+  if (/^-?\d+(\.\d+)?$/.test(text)) return Number(text);
+  const negative = text.trim().startsWith('-');
+  const [h = 0, m = 0, s = 0] = text.replace('-', '').split(':').map(Number);
+  const total = h * 3600 + m * 60 + s;
+  return negative ? -total : total;
+}
+
 function makePage(cdp, sessionId, options) {
   const send = (method, params) => cdp.send(method, params, sessionId);
-  const castState = { mark: null, dir: null, frames: [], stop: null };
+  const cast = { dir: null, frames: [], stop: null };
+  let markMs = null;
 
   const evaluate = async (expression) => {
     const result = await send('Runtime.evaluate', {
@@ -262,8 +685,8 @@ function makePage(cdp, sessionId, options) {
     return result.result.value;
   };
 
-  const waitFor = async (check, what) => {
-    const deadline = Date.now() + options.timeout;
+  const waitFor = async (check, what, timeout = options.timeout) => {
+    const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
       if (await check()) return;
       await sleep(100);
@@ -319,10 +742,149 @@ function makePage(cdp, sessionId, options) {
     await send('Input.dispatchKeyEvent', { ...base, type: 'keyUp' });
   };
 
+  const click = async (selector) => {
+    let point = null;
+    await waitFor(async () => (point = await visibleCenter(selector)) !== null, selector);
+    const at = { x: point.x, y: point.y, button: 'left', clickCount: 1 };
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y });
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...at });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...at });
+  };
+
+  const installProbe = () => evaluate(PROBE_SOURCE);
+  /** What the page is doing now (see probe.state); installs the probe first if a new page lacks it. */
+  const state = async () => {
+    const now = await evaluate('window.__probe ? window.__probe.state() : null');
+    if (now) return now;
+    await installProbe();
+    return evaluate('window.__probe.state()');
+  };
+
+  /** Wait until the clock, the tour and the camera have been still for `ms`, at most `max`. Returns true if they were. */
+  const waitForRest = async (ms, max) => {
+    const deadline = Date.now() + max;
+    let since = null;
+    let last = null;
+    while (Date.now() < deadline) {
+      const now = await state();
+      const still =
+        now.ready &&
+        !now.playing &&
+        !now.tween &&
+        !now.pending &&
+        now.fast < 0.001 &&
+        !now.onTheWay &&
+        samePose(now.pose, last);
+      last = now.pose;
+      if (still) {
+        since ??= Date.now();
+        if (Date.now() - since >= ms) return true;
+      } else {
+        since = null;
+      }
+      await sleep(100);
+    }
+    return false;
+  };
+
+  /** Press Next, Skip or Back until the tour rests at stop `n`. */
+  const tourStop = async (n) => {
+    const deadline = Date.now() + Math.max(options.timeout, 25000 * n);
+    let pressedAt = 0;
+    while (Date.now() < deadline) {
+      const now = await state();
+      if (now.stop === null) {
+        await sleep(200);
+        continue;
+      }
+      if (n < 1 || n > now.stops) throw new Error(`tourstop:${n}: the tour has ${now.stops} stops`);
+      const sincePress = Date.now() - pressedAt;
+      if (now.stop === n && !now.onTheWay && !now.playing) {
+        if (await waitForRest(800, 8000)) {
+          const settled = await state();
+          if (settled.stop === n && !settled.onTheWay) return settled;
+        }
+        continue;
+      }
+      if (sincePress < 600) {
+        await sleep(100);
+        continue;
+      }
+      // On the way (to any stop): skip to it, once the tour's guard against a double tap has passed.
+      if (now.onTheWay) await click(BUTTONS.skip);
+      else if (now.stop < n) await click(BUTTONS.next);
+      else await click(BUTTONS.back);
+      pressedAt = Date.now();
+      await sleep(150);
+    }
+    throw new Error(`tourstop:${n}: the tour did not come to rest at stop ${n}`);
+  };
+
+  const waitForClock = async (read, target, max, what) => {
+    const deadline = Date.now() + max;
+    while (Date.now() < deadline) {
+      const now = await state();
+      if (now[read] !== null && now[read] >= target) return true;
+      await sleep(50);
+    }
+    console.log(`${what}: not reached in ${max} ms`);
+    return false;
+  };
+
+  const startCast = async (dir) => {
+    cast.dir = resolve(dir);
+    await rm(cast.dir, { recursive: true, force: true });
+    await mkdir(cast.dir, { recursive: true });
+    cast.frames = [];
+    cast.stop?.();
+    cast.stop = cdp.on((event) => {
+      if (event.sessionId !== sessionId || event.method !== 'Page.screencastFrame') return;
+      const { data, metadata, sessionId: frameSession } = event.params;
+      send('Page.screencastFrameAck', { sessionId: frameSession }).catch(() => {});
+      cast.frames.push({ ms: metadata.timestamp * 1000, data });
+    });
+    // Chrome casts in CSS pixels whatever the device pixel ratio (a phone at --dpr 2 casts 390x844,
+    // its screenshots are 780x1688); sheets.py scales by each frame's own size, so crops agree.
+    await send('Page.startScreencast', { format: 'jpeg', quality: 85, everyNthFrame: 1 });
+  };
+
+  const stopCast = async () => {
+    await send('Page.stopScreencast').catch(() => {});
+    cast.stop?.();
+    cast.stop = null;
+    const zero = markMs ?? cast.frames[0]?.ms ?? 0;
+    for (const frame of cast.frames) {
+      const ms = Math.round(frame.ms - zero);
+      const name = `${ms < 0 ? 'm' : 'p'}${String(Math.abs(ms)).padStart(5, '0')}.jpg`;
+      await writeFile(join(cast.dir, name), Buffer.from(frame.data, 'base64'));
+    }
+    const count = cast.frames.length;
+    cast.frames = [];
+    return { dir: cast.dir, count };
+  };
+
+  /** Stop the probe and write timeline.tsv and camera.tsv, with times in seconds after the mark. */
+  const saveProbe = async (dir) => {
+    const taken = await evaluate('window.__probe ? window.__probe.take() : null');
+    if (!taken) throw new Error('save: no probe in the page (run timeline or camera first)');
+    const zero = markMs ?? taken.timeline[0]?.[0] ?? taken.camera[0]?.[0] ?? 0;
+    const toText = (columns, rows, digits) =>
+      `${columns.join('\t')}\n${rows
+        .map((row) => [((row[0] - zero) / 1000).toFixed(digits), ...row.slice(1)].join('\t'))
+        .join('\n')}\n`;
+    const folder = resolve(dir);
+    await mkdir(folder, { recursive: true });
+    await writeFile(join(folder, 'timeline.tsv'), toText(TIMELINE_COLUMNS, taken.timeline, 2));
+    await writeFile(join(folder, 'camera.tsv'), toText(CAMERA_COLUMNS, taken.camera, 3));
+    for (const error of taken.errors) console.log(`probe error: ${error}`);
+    return { timeline: taken.timeline.length, camera: taken.camera.length };
+  };
+
   const runStep = async (step) => {
     const colon = step.indexOf(':');
     const kind = colon === -1 ? step : step.slice(0, colon);
     const arg = colon === -1 ? '' : step.slice(colon + 1);
+    const limits = () => arg.split(',').map((part) => part.trim());
     switch (kind) {
       case 'wait':
         await sleep(Number(arg) || 0);
@@ -330,27 +892,29 @@ function makePage(cdp, sessionId, options) {
       case 'waitfor':
         await waitFor(async () => (await visibleCenter(arg)) !== null, arg);
         break;
-      case 'click': {
-        let point = null;
-        await waitFor(async () => (point = await visibleCenter(arg)) !== null, arg);
-        const at = { x: point.x, y: point.y, button: 'left', clickCount: 1 };
-        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y });
-        await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...at });
-        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...at });
+      case 'waituntil':
+        await waitFor(async () => Boolean(await evaluate(arg)), arg);
+        break;
+      case 'assert': {
+        const value = await evaluate(arg);
+        if (!value) throw new Error(`assert failed: ${arg} (got ${JSON.stringify(value)})`);
+        break;
+      }
+      case 'click':
+        await click(arg);
+        break;
+      case 'press': {
+        const selector = BUTTONS[arg];
+        if (!selector) throw new Error(`press:${arg}: no such button (${Object.keys(BUTTONS)})`);
+        await click(selector);
         break;
       }
       case 'key':
         await press(arg);
         break;
-      case 'eval':
-        console.log(`eval: ${JSON.stringify(await evaluate(arg))}`);
-        break;
-      case 'shot':
-        await screenshot(arg);
-        break;
       case 'drag': {
-        // drag:x1,y1,x2,y2 with the left button, in 10 steps.
-        const [x1, y1, x2, y2] = arg.split(',').map(Number);
+        const [x1, y1, x2, y2, ms = 300] = arg.split(',').map(Number);
+        const steps = 12;
         await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x1, y: y1 });
         await send('Input.dispatchMouseEvent', {
           type: 'mousePressed',
@@ -360,15 +924,15 @@ function makePage(cdp, sessionId, options) {
           buttons: 1,
           clickCount: 1,
         });
-        for (let k = 1; k <= 10; k += 1) {
+        for (let k = 1; k <= steps; k += 1) {
           await send('Input.dispatchMouseEvent', {
             type: 'mouseMoved',
-            x: x1 + ((x2 - x1) * k) / 10,
-            y: y1 + ((y2 - y1) * k) / 10,
+            x: x1 + ((x2 - x1) * k) / steps,
+            y: y1 + ((y2 - y1) * k) / steps,
             button: 'left',
             buttons: 1,
           });
-          await sleep(30);
+          await sleep(ms / steps);
         }
         await send('Input.dispatchMouseEvent', {
           type: 'mouseReleased',
@@ -385,60 +949,66 @@ function makePage(cdp, sessionId, options) {
         await send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: 0, deltaY: dy });
         break;
       }
-      case 'mark':
-        castState.mark = Date.now() / 1000;
-        console.log(`mark ${castState.mark}`);
+      case 'eval':
+        console.log(`eval: ${JSON.stringify(await evaluate(arg))}`);
         break;
-      case 'cast': {
-        castState.dir = resolve(arg);
-        await mkdir(castState.dir, { recursive: true });
-        castState.frames = [];
-        castState.stop = cdp.on(async (event) => {
-          if (event.sessionId !== sessionId || event.method !== 'Page.screencastFrame') return;
-          const { data, metadata, sessionId: frameSession } = event.params;
-          send('Page.screencastFrameAck', { sessionId: frameSession }).catch(() => {});
-          castState.frames.push({ t: metadata.timestamp, data });
-        });
-        await send('Page.startScreencast', { format: 'jpeg', quality: 75, everyNthFrame: 1 });
+      case 'shot':
+        await screenshot(arg);
         break;
-      }
-      case 'uncast': {
-        await send('Page.stopScreencast');
-        castState.stop?.();
-        const zero = castState.mark ?? castState.frames[0]?.t ?? 0;
-        for (const frame of castState.frames) {
-          const ms = Math.round((frame.t - zero) * 1000);
-          const name = `${ms < 0 ? 'm' : 'p'}${String(Math.abs(ms)).padStart(5, '0')}.jpg`;
-          await writeFile(join(castState.dir, name), Buffer.from(frame.data, 'base64'));
-        }
-        console.log(`cast: ${castState.frames.length} frames in ${castState.dir}`);
-        break;
-      }
-      case 'rec':
-        await evaluate(`(() => {
-          window.__rec = []; window.__recOn = true;
-          const s = window.stage;
-          const loop = () => {
-            if (!window.__recOn) return;
-            const c = s.camera.position, t = s.controls.target, u = s.camera.up, q = s.camera.quaternion, m = s.moonCenter;
-            const p = m.clone().project(s.camera);
-            const e = s.origin.clone().project(s.camera);
-            window.__rec.push([Date.now() / 1000, c.x, c.y, c.z, t.x, t.y, t.z, u.x, u.y, u.z, q.x, q.y, q.z, q.w, m.x, m.y, m.z, p.x, p.y, p.z, e.x, e.y, e.z, s.camera.fov, s.camera.aspect, s.viewNow, s.fastView.level]);
-            requestAnimationFrame(loop);
-          };
-          requestAnimationFrame(loop);
-          return 1;
-        })()`);
-        break;
-      case 'dump': {
-        const rows = await evaluate('(window.__recOn = false, JSON.stringify(window.__rec))');
-        const file = resolve(arg);
-        await mkdir(dirname(file), { recursive: true });
-        await writeFile(
-          file,
-          JSON.stringify({ mark: castState.mark ?? null, rows: JSON.parse(rows) }),
+      case 'stall':
+        await evaluate(
+          `(() => { const end = performance.now() + ${Number(arg) || 0}; while (performance.now() < end) {} return true; })()`,
         );
-        console.log(`dump: ${file}`);
+        break;
+      case 'tourstop': {
+        const at = await tourStop(Number(arg));
+        console.log(`tourstop: at stop ${at.stop} of ${at.stops}: ${at.card}`);
+        break;
+      }
+      case 'rest': {
+        const [ms = '2000', max = String(options.timeout)] = limits();
+        const rested = await waitForRest(Number(ms), Number(max));
+        if (!rested) console.log(`rest: still moving after ${max} ms`);
+        break;
+      }
+      case 'clock': {
+        const [time, max = String(options.timeout)] = limits();
+        await waitForClock('clock', missionSeconds(time), Number(max), step);
+        break;
+      }
+      case 'story': {
+        const [seconds, max = String(options.timeout)] = limits();
+        await waitForClock('story', Number(seconds), Number(max), step);
+        break;
+      }
+      case 'probe':
+        await installProbe();
+        break;
+      case 'cast':
+        await startCast(arg);
+        break;
+      case 'mark':
+        markMs = Date.now();
+        console.log(`mark ${markMs}`);
+        break;
+      case 'timeline':
+        await installProbe();
+        await evaluate(`window.__probe.startTimeline(${Number(arg) || 100})`);
+        break;
+      case 'camera':
+        await installProbe();
+        await evaluate('window.__probe.startCamera()');
+        break;
+      case 'uncast': {
+        const { dir, count } = await stopCast();
+        console.log(`cast: ${count} frames in ${dir}`);
+        break;
+      }
+      case 'save': {
+        const counts = await saveProbe(arg);
+        console.log(
+          `save: ${counts.timeline} timeline rows, ${counts.camera} camera rows in ${arg}`,
+        );
         break;
       }
       default:
@@ -446,33 +1016,46 @@ function makePage(cdp, sessionId, options) {
     }
   };
 
-  return { send, evaluate, screenshot, runStep };
+  return {
+    send,
+    evaluate,
+    screenshot,
+    runStep,
+    state,
+    waitForRest,
+    installProbe,
+    get markMs() {
+      return markMs;
+    },
+    set markMs(value) {
+      markMs = value;
+    },
+  };
 }
 
-/* ------------------------------------------------------------------ */
-/* Main                                                                */
-/* ------------------------------------------------------------------ */
-
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
-  if (options.help || !options.url) {
-    console.log(
-      'Usage: node tools/screenshot.mjs <url> [--size WxH] [--out PATH] [--step STEP ...]',
-    );
-    console.log('See the comment at the top of tools/screenshot.mjs for every option.');
-    process.exit(options.help ? 0 : 2);
-  }
-
-  const chrome = await launchChrome(options);
+/**
+ * Start Chrome with one page, emulating the screen in `options` (width,
+ * height, dpr, mobile, reducedMotion, webgl, timeout). Returns the page, the
+ * console errors it has logged so far, navigate(url), and close().
+ */
+export async function openBrowser(options) {
+  const settings = {
+    width: 1440,
+    height: 900,
+    dpr: 1,
+    reducedMotion: false,
+    webgl: true,
+    timeout: 30000,
+    ...options,
+  };
+  settings.mobile ??= settings.width < 600;
+  const chrome = await launchChrome(settings);
   const cdp = await connect(chrome.endpoint);
   const errors = [];
-  let failed = false;
-
   try {
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
-    const page = makePage(cdp, sessionId, options);
-
+    const page = makePage(cdp, sessionId, settings);
     cdp.on((event) => {
       if (event.sessionId !== sessionId) return;
       const { method, params } = event;
@@ -492,61 +1075,106 @@ async function main() {
         );
       }
     });
-
     await page.send('Runtime.enable');
     await page.send('Log.enable');
     await page.send('Page.enable');
     await page.send('Emulation.setDeviceMetricsOverride', {
-      width: options.width,
-      height: options.height,
-      deviceScaleFactor: options.dpr,
-      mobile: options.mobile,
+      width: settings.width,
+      height: settings.height,
+      deviceScaleFactor: settings.dpr,
+      mobile: settings.mobile,
     });
-    if (options.mobile) {
+    if (settings.mobile) {
       await page.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
     }
     await page.send('Emulation.setEmulatedMedia', {
       features: [
         {
           name: 'prefers-reduced-motion',
-          value: options.reducedMotion ? 'reduce' : 'no-preference',
+          value: settings.reducedMotion ? 'reduce' : 'no-preference',
         },
       ],
     });
 
-    const loaded = new Promise((done) => {
-      const stop = cdp.on((event) => {
-        if (event.sessionId === sessionId && event.method === 'Page.loadEventFired') {
-          stop();
-          done();
-        }
+    /**
+     * Load an address and wait for its load event. With `probeFromStart`, the
+     * probe is in the page before any of its scripts run, already sampling.
+     */
+    const navigate = async (url, { probeFromStart = false } = {}) => {
+      let injected = null;
+      if (probeFromStart) {
+        const source = `${PROBE_SOURCE}; window.__probe.startTimeline(100); window.__probe.startCamera();`;
+        ({ identifier: injected } = await page.send('Page.addScriptToEvaluateOnNewDocument', {
+          source,
+        }));
+      }
+      const loaded = new Promise((done) => {
+        const stop = cdp.on((event) => {
+          if (event.sessionId === sessionId && event.method === 'Page.loadEventFired') {
+            stop();
+            done();
+          }
+        });
       });
-    });
-    await page.send('Page.navigate', { url: options.url });
-    await Promise.race([loaded, sleep(options.timeout)]);
+      await page.send('Page.navigate', { url });
+      await Promise.race([loaded, sleep(settings.timeout)]);
+      if (injected)
+        await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: injected });
+    };
 
+    const close = async () => {
+      cdp.close();
+      await chrome.close();
+    };
+    return { page, errors, navigate, close, settings };
+  } catch (error) {
+    cdp.close();
+    await chrome.close();
+    throw error;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Command line                                                        */
+/* ------------------------------------------------------------------ */
+
+async function main() {
+  const options = parseArgs(process.argv.slice(2));
+  if (options.help || !options.url) {
+    console.log(
+      'Usage: node .claude/skills/animation-review/scripts/cast.mjs <url> [--size WxH] [--dpr N] [--mobile] [--reduced-motion] [--out PATH] --step STEP ...',
+    );
+    console.log(STEP_HELP);
+    process.exit(options.help ? 0 : 2);
+  }
+
+  const browser = await openBrowser(options);
+  let failed = false;
+  try {
+    await browser.navigate(options.url);
     for (const step of options.steps) {
-      await page.runStep(step);
+      await browser.page.runStep(step);
     }
-    if (options.out) await page.screenshot(options.out);
+    if (options.out) await browser.page.screenshot(options.out);
   } catch (error) {
     failed = true;
     console.error(`Error: ${error.message}`);
   } finally {
-    cdp.close();
-    await chrome.close();
+    await browser.close();
   }
 
-  if (errors.length) {
-    console.log(`Console errors (${errors.length}):`);
-    for (const error of errors) console.log(`  ${error}`);
+  if (browser.errors.length) {
+    console.log(`Console errors (${browser.errors.length}):`);
+    for (const error of browser.errors) console.log(`  ${error}`);
   } else {
     console.log('Console errors: none');
   }
-  if (failed || (options.failOnError && errors.length)) process.exit(1);
+  if (failed || (options.failOnError && browser.errors.length)) process.exit(1);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

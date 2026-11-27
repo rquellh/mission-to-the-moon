@@ -172,6 +172,37 @@ test.describe('What the scene draws', () => {
     });
   });
 
+  test('while Eagle closes in on Columbia to dock, both are drawn, apart, clear of the card', async ({
+    sitePage,
+  }) => {
+    const missionPage = new MissionPage(sitePage);
+    const scenePage = new ScenePage(sitePage);
+    const closing = MOMENTS.APOLLO_11_CLOSING_ON_COLUMBIA;
+
+    await test.step('Open the final approach in the Ship view', async () => {
+      await sitePage.goto(URLS.TIME(closing.mission, closing.t, 'spacecraft'));
+      await missionPage.waitForLoad();
+      await scenePage.waitForLoad();
+    });
+
+    // The camera eases into the view, so wait for it to settle around the pair.
+    await test.step('The view follows Eagle, and Columbia is drawn beside it rather than over it', async () => {
+      await expect
+        .poll(async () => {
+          const report = await scenePage.report();
+          const eagle = shipOf(report, 'lm').box;
+          const columbia = shipOf(report, 'csm').box;
+          return {
+            followed: report.followed,
+            eagleClear: eagle !== null && isInside(eagle, report.clear),
+            columbiaClear: columbia !== null && isInside(columbia, report.clear),
+            apart: eagle !== null && columbia !== null && !overlaps(eagle, columbia),
+          };
+        })
+        .toEqual({ followed: 'lm', eagleClear: true, columbiaClear: true, apart: true });
+    });
+  });
+
   test('on the Gemini 4 spacewalk the astronaut and the gas gun are drawn above the capsule', async ({
     sitePage,
   }) => {
