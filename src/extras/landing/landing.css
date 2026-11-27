@@ -495,6 +495,108 @@
   }
 }
 
+/* A phone held sideways: a short, wide screen (a computer window is taller,
+   and a phone held upright is not wide). While flying, the whole game fits
+   with no scrolling: the picture, the read-outs in a narrow column beside it,
+   and the controls at the right edge, with the coach line under the picture
+   and Start over under the controls. The rule beside the controls is left
+   out (the start screen says the same), and so is the practice-toy note, as
+   on a phone held upright. */
+@media (min-width: 600px) and (orientation: landscape) and (max-height: 500px) {
+  [data-extra='landing'] .landing--flying {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 156px auto;
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'view readouts pad'
+      'coach coach aside';
+    gap: 8px 12px;
+  }
+
+  /* Their boxes step aside, so the read-outs, the coach line, and the controls sit in the grid. */
+  [data-extra='landing'] .landing--flying .landing__side,
+  [data-extra='landing'] .landing--flying .landing__fly,
+  [data-extra='landing'] .landing--flying .landing__controls {
+    display: contents;
+  }
+
+  [data-extra='landing'] .landing--flying .landing__view:not(.landing__view--flat) {
+    position: relative;
+    top: auto;
+    align-self: stretch;
+    height: auto;
+    min-height: 0;
+  }
+
+  [data-extra='landing'] .landing--flying .landing__view {
+    grid-area: view;
+  }
+
+  [data-extra='landing'] .landing--flying .landing__readouts {
+    grid-area: readouts;
+    grid-template-columns: minmax(0, 1fr);
+    align-self: start;
+    gap: 8px;
+  }
+
+  [data-extra='landing'] .landing--flying .landing__readout {
+    gap: 6px;
+    padding: 8px 12px 10px;
+  }
+
+  [data-extra='landing'] .landing--flying .landing__coach {
+    grid-area: coach;
+    align-self: center;
+  }
+
+  [data-extra='landing'] .landing--flying .landing__pad {
+    grid-area: pad;
+    align-self: center;
+    grid-template-columns: repeat(3, 52px);
+    grid-template-rows: repeat(3, 52px);
+  }
+
+  [data-extra='landing'] .landing--flying .landing__aside {
+    grid-area: aside;
+    align-self: end;
+  }
+
+  [data-extra='landing'] .landing--flying .landing__rule,
+  [data-extra='landing'] .landing--flying .landing__simple {
+    display: none;
+  }
+
+  /* Before starting, Start stays in reach at the bottom of the screen while
+     the words scroll under it: they fade out just above it, and the sheet's
+     own color hides them in its rounded corners and below it. */
+  [data-extra='landing'] .landing__intro > .button {
+    position: sticky;
+    bottom: 12px;
+    box-shadow: 0 0 0 5px var(--color-surface-solid);
+  }
+
+  [data-extra='landing'] .landing__intro > .button::before,
+  [data-extra='landing'] .landing__intro > .button::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    left: -1px;
+    pointer-events: none;
+  }
+
+  [data-extra='landing'] .landing__intro > .button::before {
+    bottom: 100%;
+    height: 16px;
+    background: linear-gradient(to bottom, transparent, var(--color-surface-solid));
+  }
+
+  [data-extra='landing'] .landing__intro > .button::after {
+    top: 100%;
+    height: 12px;
+    background: var(--color-surface-solid);
+  }
+}
+
 /* The sections above set their own display, so `hidden` needs saying again. */
 [data-extra='landing'] [hidden] {
   display: none !important;
