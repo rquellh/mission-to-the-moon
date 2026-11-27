@@ -32,6 +32,7 @@ import {
   type Phase,
   type ShipTrack,
 } from '../sim';
+import { smoothstepBetween } from '../sim/vec';
 import {
   AMBIENT_INTENSITY,
   BODY_VIEW_ANGLE_DEG,
@@ -264,16 +265,13 @@ interface ChaseLater {
 /**
  * A stop a tour's trip will bring the clock to, told by the tour (see
  * Stage.expectStop): its mission time, when it will be there (in frame time,
- * performance.now's clock), how long the calm move from the steady view to
- * the chase there takes (NaN until worked out), and the chase's frame and
- * distance there, once worked out (see Stage.headForStop).
+ * performance.now's clock), and how long the calm move from the steady view
+ * to the chase there takes (NaN until worked out).
  */
 interface StopAhead {
   at: number;
   endMs: number;
   needMs: number;
-  frame?: Quaternion;
-  distance?: number;
   /** When the chase began to head for the stop, in frame time (see Stage.headForStop). */
   fromMs?: number;
   /**
@@ -685,14 +683,23 @@ function isDrawn(material: Material | Material[]): boolean {
   return list.some((one) => one.visible && (!one.transparent || one.opacity > 0.05));
 }
 
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = MathUtils.clamp((x - edge0) / (edge1 - edge0), 0, 1);
-  return t * t * (3 - 2 * t);
-}
-
 /** `value` moved toward `target` by at most `step`, without passing it. */
 function stepToward(value: number, target: number, step: number): number {
   return value < target ? Math.min(target, value + step) : Math.max(target, value - step);
+}
+
+/**
+ * Turn the chase's frame `frame` toward `target` as the chase eases over
+ * `seconds`: over about CHASE_TURN_SECONDS, never faster than
+ * CHASE_TURN_MAX_DEG_PER_S (see followChase).
+ */
+function easeChaseTurn(frame: Quaternion, target: Quaternion, seconds: number): void {
+  const rest = frame.angleTo(target);
+  if (rest > 1e-9) {
+    const eased = rest * (1 - Math.exp(-seconds / CHASE_TURN_SECONDS));
+    const step = Math.min(eased, MathUtils.degToRad(CHASE_TURN_MAX_DEG_PER_S) * seconds);
+    frame.slerp(target, step / rest);
+  }
 }
 
 /** The two turns OrbitControls keeps between the camera's up and the world's up (its own `_quat` and `_quatInverse`). */
@@ -1515,9 +1522,7 @@ export class Stage implements Director {
   private alreadyFramed(): boolean {
     this.framingOffset(this.settledOffset, this.mix, this.pendingAt ?? this.player.time);
     this.settledPose(this.tweenTo);
-    this.tweenFrom.position.copy(this.camera.position);
-    this.tweenFrom.target.copy(this.controls.target);
-    this.tweenFrom.up.copy(this.camera.up);
+    this.cameraPose(this.tweenFrom);
     return this.samePose(this.tweenFrom, this.tweenTo);
   }
 
@@ -2272,7 +2277,7 @@ export class Stage implements Director {
       let opacity = 1;
       if (ship !== this.main && ship.track.end < this.path.end - 1) {
         const end = this.player.story.toStory(ship.track.end);
-        opacity = 1 - smoothstep(end, end + PATH_END_FADE_STORY_SECONDS, story);
+        opacity = 1 - smoothstepBetween(end, end + PATH_END_FADE_STORY_SECONDS, story);
       }
       this.lineOf.get(ship)?.setOpacity(opacity);
       this.eventMarkers?.setGroupOpacity(i, opacity);
@@ -2340,11 +2345,7 @@ export class Stage implements Director {
 
   /** Unit vector away from the nearer body (by height in body radii). */
   private radialUp(position: Vector3, out: Vector3): Vector3 {
-    const toEarth = position.length();
-    const toMoon = position.distanceTo(this.moonCenter);
-    const earthHeight = (toEarth - EARTH_RADIUS) / EARTH_RADIUS;
-    const moonHeight = (toMoon - MOON_RADIUS) / MOON_RADIUS;
-    if (moonHeight < earthHeight) out.subVectors(position, this.moonCenter);
+    if (this.nearMoon(position)) out.subVectors(position, this.moonCenter);
     else out.copy(position);
     if (out.lengthSq() < 1e-12) out.set(0, 1, 0);
     return out.normalize();
@@ -2696,8 +2697,8 @@ export class Stage implements Director {
       else point.copy(ship.position);
       const earthHeight = (point.length() - EARTH_RADIUS) / EARTH_RADIUS;
       const moonHeight = (point.distanceTo(this.moonCenter) - MOON_RADIUS) / MOON_RADIUS;
-      this.upEarth[k] = 1 - smoothstep(near, far, earthHeight);
-      this.upMoon[k] = 1 - smoothstep(near, far, moonHeight);
+      this.upEarth[k] = 1 - smoothstepBetween(near, far, earthHeight);
+      this.upMoon[k] = 1 - smoothstepBetween(near, far, moonHeight);
     }
     let earth = 0;
     let moon = 0;
@@ -2771,7 +2772,7 @@ export class Stage implements Director {
   private chaseAutoDistance(ship: ShipPose): number {
     const toEarth = ship.position.length() - EARTH_RADIUS;
     const toMoon = ship.position.distanceTo(this.moonCenter) - MOON_RADIUS;
-    const nearMoon = toMoon / MOON_RADIUS < toEarth / EARTH_RADIUS;
+    const nearMoon = this.nearMoon(ship.position);
     const radius = nearMoon ? MOON_RADIUS : EARTH_RADIUS;
     const height = Math.max(0, nearMoon ? toMoon : toEarth);
     return MathUtils.clamp(0.75 * radius + 0.5 * height, 0.15, 3.5);
@@ -2809,9 +2810,7 @@ export class Stage implements Director {
     } = {},
   ): void {
     this.settleDamping();
-    this.tweenFrom.position.copy(this.camera.position);
-    this.tweenFrom.target.copy(this.controls.target);
-    this.tweenFrom.up.copy(this.camera.up);
+    this.cameraPose(this.tweenFrom);
     if (!how.keepOffset) this.framingOffset(this.settledOffset, mix, how.at);
     this.tweenMix = mix;
     const toMix = mix;
@@ -3092,12 +3091,7 @@ export class Stage implements Director {
     this.radialUp(future.position, future.up);
     const wanted = this.chaseFrameFor(future, this.q6);
     const carried = this.q7.copy(turn).multiply(this.chaseFrame);
-    const rest = carried.angleTo(wanted);
-    if (rest > 1e-9) {
-      const eased = rest * (1 - Math.exp(-seconds / CHASE_TURN_SECONDS));
-      const step = Math.min(eased, MathUtils.degToRad(CHASE_TURN_MAX_DEG_PER_S) * seconds);
-      carried.slerp(wanted, step / rest);
-    }
+    easeChaseTurn(carried, wanted, seconds);
     turn.copy(carried).multiply(this.q5.copy(this.chaseFrame).invert());
     return carryPose(pose, ship, shipOut, turn, out);
   }
@@ -3852,11 +3846,7 @@ export class Stage implements Director {
       moved = true;
       if (this.cameraTween.done) {
         this.cameraTween = null;
-        this.cameraMove = false;
-        this.fastMove = false;
-        this.keepSight = false;
-        this.calmMove = false;
-        this.fixedEnd = false;
+        this.endMove();
         this.controls.enabled = true;
         this.applyLimits();
         this.updateControls();
@@ -3908,6 +3898,15 @@ export class Stage implements Director {
     // A turn of the ship view's steady view is kept as that view, and of the chase as the chase's offset.
     if (changed) this.keepCameraOffset();
     return moved || changed;
+  }
+
+  /** Clear what the camera move just ended or dropped had set (the caller clears cameraTween). */
+  private endMove(): void {
+    this.cameraMove = false;
+    this.fastMove = false;
+    this.keepSight = false;
+    this.calmMove = false;
+    this.fixedEnd = false;
   }
 
   /**
@@ -4017,11 +4016,7 @@ export class Stage implements Director {
     // Not flown: the steady view holds for a dissolve to the chase (see CUT_LOST_MS).
     (this.cameraTween as Tween | null)?.cancel();
     this.cameraTween = null;
-    this.cameraMove = false;
-    this.fastMove = false;
-    this.keepSight = false;
-    this.calmMove = false;
-    this.fixedEnd = false;
+    this.endMove();
     this.chaseAt = chaseAt;
     this.chaseOverride = chaseOverride;
     this.holdRest = holdRest;
@@ -4147,7 +4142,7 @@ export class Stage implements Director {
     const ship = this.chaseSubject();
     this.chaseFrameFor(ship, this.chaseFrame);
     this.chaseDistance = this.chaseAutoDistance(ship);
-    const body = this.nearMoon(ship.position) ? 'moon' : 'earth';
+    const body = this.nearerBody(ship.position);
     const last = this.chaseRadial;
     last.ship = this.chased();
     last.body = body;
@@ -4205,12 +4200,14 @@ export class Stage implements Director {
     if (!end) return;
     if (stop.fromMs === undefined) {
       const toGo = MathUtils.radToDeg(this.chaseFrame.angleTo(end.frame));
+      const soonest = Math.max(CHASE_STOP_SECONDS, toGo / CHASE_STOP_DEG_PER_S);
+      // Before the soonest it can begin it is too soon whether or not the craft circles its
+      // body, so that is looked for only from then on.
+      if (left > soonest) return;
       // Not sooner while the craft circles its body: it may yet go into fast forward, and the
       // steady view then comes first (the turn begins afresh after it, see forgetHeading).
       const circling = !Number.isNaN(this.closedLap(this.chased(), this.player.time));
-      const need = circling
-        ? CHASE_STOP_SECONDS
-        : Math.max(CHASE_STOP_SECONDS, toGo / CHASE_STOP_DEG_PER_S);
+      const need = circling ? CHASE_STOP_SECONDS : soonest;
       if (left > need) return;
       stop.fromMs = this.nowMs;
       if (left > CHASE_STOP_SECONDS) {
@@ -4222,11 +4219,10 @@ export class Stage implements Director {
         if (stop.turn.w < 0) stop.turn.set(-stop.turn.x, -stop.turn.y, -stop.turn.z, -stop.turn.w);
       }
     }
-    stop.frame = (stop.frame ?? new Quaternion()).copy(end.frame);
-    stop.distance = end.distance;
     // From nothing when it begins to all of it when the clock is due at the stop, eased in frame
     // time (the mission clock slows into the stop, so by it the turn would end early and quickly).
-    const share = stop.endMs > stop.fromMs ? smoothstep(stop.fromMs, stop.endMs, this.nowMs) : 0;
+    const share =
+      stop.endMs > stop.fromMs ? smoothstepBetween(stop.fromMs, stop.endMs, this.nowMs) : 0;
     this.chaseOwnFrame.copy(this.chaseFrame);
     this.chaseOwnDistance = this.chaseDistance;
     this.chaseHeading = true;
@@ -4238,9 +4234,9 @@ export class Stage implements Director {
       partTurn(turn, share, turn.w < 0, this.q2);
       this.chaseFrame.copy(this.q2).multiply(stop.startFrame);
     } else {
-      this.chaseFrame.slerp(stop.frame, share);
+      this.chaseFrame.slerp(end.frame, share);
     }
-    this.chaseDistance += ((stop.distance ?? this.chaseDistance) - this.chaseDistance) * share;
+    this.chaseDistance += (end.distance - this.chaseDistance) * share;
   }
 
   /** Forget any turn toward the stop ahead begun before the steady view came on (see headForStop). */
@@ -4257,7 +4253,7 @@ export class Stage implements Director {
     const ship = this.chaseSubject();
     const target = this.chaseFrameFor(ship, this.q1);
     const auto = this.chaseAutoDistance(ship);
-    const body = this.nearMoon(ship.position) ? 'moon' : 'earth';
+    const body = this.nearerBody(ship.position);
     const radial = this.f3.subVectors(ship.position, this.bodyCenter(body)).normalize();
     const last = this.chaseRadial;
     const carried =
@@ -4285,12 +4281,7 @@ export class Stage implements Director {
       this.chaseDistance = auto;
       return;
     }
-    const angle = this.chaseFrame.angleTo(target);
-    if (angle > 1e-9) {
-      const eased = angle * (1 - Math.exp(-dt / CHASE_TURN_SECONDS));
-      const step = Math.min(eased, MathUtils.degToRad(CHASE_TURN_MAX_DEG_PER_S) * dt);
-      this.chaseFrame.slerp(target, step / angle);
-    }
+    easeChaseTurn(this.chaseFrame, target, dt);
     this.chaseDistance +=
       (auto - this.chaseDistance) * (1 - Math.exp(-dt / CHASE_DISTANCE_SECONDS));
   }
@@ -4420,7 +4411,7 @@ export class Stage implements Director {
       wanted > this.returnShown
         ? Math.min(wanted, this.returnShown + step)
         : Math.max(wanted, this.returnShown - step);
-    const shown = smoothstep(0, 1, this.returnShown);
+    const shown = smoothstepBetween(0, 1, this.returnShown);
     for (let i = 0; i < this.lines.length; i += 1)
       (this.lines[i] as PathLine).setReturnShown(shown);
     return true;
@@ -4604,17 +4595,17 @@ export class Stage implements Director {
         let arranged: number;
         if (moment.time > t) {
           const from = toStory(pairing.alongside ?? moment.time);
-          arranged = smoothstep(from - PAIR_ARRANGE_STORY_SECONDS, from, story);
+          arranged = smoothstepBetween(from - PAIR_ARRANGE_STORY_SECONDS, from, story);
         } else {
           arranged =
             1 -
-            smoothstep(
+            smoothstepBetween(
               PAIR_CLOSE_STORY_SECONDS,
               PAIR_CLOSE_STORY_SECONDS + PAIR_ARRANGE_STORY_SECONDS,
               storyApart,
             );
         }
-        const closing = smoothstep(0, PAIR_CLOSE_STORY_SECONDS, storyApart);
+        const closing = smoothstepBetween(0, PAIR_CLOSE_STORY_SECONDS, storyApart);
         consider(
           {
             anchor: this.main,
@@ -4642,9 +4633,10 @@ export class Stage implements Director {
         Math.min(to + PAIR_CLOSE_STORY_SECONDS, gone - PAIR_ARRANGE_STORY_SECONDS),
       );
       let arranged: number;
-      if (story < from) arranged = smoothstep(from - PAIR_ARRANGE_STORY_SECONDS, from, story);
+      if (story < from)
+        arranged = smoothstepBetween(from - PAIR_ARRANGE_STORY_SECONDS, from, story);
       else if (story <= to) arranged = 1;
-      else arranged = 1 - smoothstep(letGo, letGo + PAIR_ARRANGE_STORY_SECONDS, story);
+      else arranged = 1 - smoothstepBetween(letGo, letGo + PAIR_ARRANGE_STORY_SECONDS, story);
       if (arranged <= 0) continue;
       const meters = this.metersApart(span.anchor, span.mover, t);
       if (!Number.isFinite(meters)) continue;
@@ -4662,7 +4654,7 @@ export class Stage implements Director {
       if (span.closes && to - from >= PAIR_CLOSE_STORY_SECONDS)
         left = MathUtils.clamp((to - story) / (to - from), 0, 1);
       else if (span.closes)
-        left = smoothstep(
+        left = smoothstepBetween(
           0,
           1,
           Math.max(
@@ -4670,7 +4662,7 @@ export class Stage implements Director {
             (span.to - t) / STATION_CLOSE_MISSION_SECONDS,
           ),
         );
-      const opening = (span.opens ? smoothstep(0, 1, since) : 1) * left;
+      const opening = (span.opens ? smoothstepBetween(0, 1, since) : 1) * left;
       // Once the station keeping is over, the room grows with their real distance over a
       // stretch of story time, not at once: the path can move one of them kilometers away
       // in a burn of a few mission seconds (Apollo 10's and 11's separation burns).
@@ -4679,7 +4671,7 @@ export class Stage implements Director {
           ? MathUtils.lerp(
               this.roomFor(0),
               this.roomFor(meters),
-              smoothstep(to, to + PAIR_CLOSE_STORY_SECONDS, story),
+              smoothstepBetween(to, to + PAIR_CLOSE_STORY_SECONDS, story),
             )
           : this.roomFor(meters);
       consider(
@@ -4718,7 +4710,8 @@ export class Stage implements Director {
     const real = realPixels > 1e-6 ? offset.normalize() : this.v1.copy(dock);
     // After undocking, the real geometry takes over as they drift apart.
     let a = arranged;
-    if (a >= 1 && realPixels > minPixels) a = 1 - smoothstep(minPixels, 3 * minPixels, realPixels);
+    if (a >= 1 && realPixels > minPixels)
+      a = 1 - smoothstepBetween(minPixels, 3 * minPixels, realPixels);
     const cos = MathUtils.clamp(real.dot(dock), -1, 1);
     const angle = Math.acos(cos) * a;
     const across = this.v3.copy(dock).addScaledVector(real, -cos);
@@ -4818,9 +4811,9 @@ export class Stage implements Director {
   private opacityOf(ship: ShipState, partner?: ShipState): number {
     const seen = Number.isNaN(ship.seen) ? 0 : ship.seen;
     const shown = this.reducedMotion
-      ? 1 - smoothstep(0, 1, ship.crossFade)
+      ? 1 - smoothstepBetween(0, 1, ship.crossFade)
       : Math.min(this.dipOf(ship), partner ? this.dipOf(partner) : 1);
-    return shown * smoothstep(0, 1, seen);
+    return shown * smoothstepBetween(0, 1, seen);
   }
 
   /** How far a ship's model is in sight through its hand-back's dip: 1 when none is under way (see handBackOpacity). */
@@ -4884,7 +4877,7 @@ export class Stage implements Director {
     return MathUtils.lerp(
       whole,
       own,
-      smoothstep(0, LIFTOFF_GROW_STORY_SECONDS, Math.max(0, since)),
+      smoothstepBetween(0, LIFTOFF_GROW_STORY_SECONDS, Math.max(0, since)),
     );
   }
 
@@ -5006,7 +4999,7 @@ export class Stage implements Director {
       if (paired >= 1) return 0;
       const meters = this.metersApart(ship, this.followed, t);
       return Number.isFinite(meters)
-        ? (1 - paired) * smoothstep(COMPANION_MODEL_M, COMPANION_MARKER_M, meters)
+        ? (1 - paired) * smoothstepBetween(COMPANION_MODEL_M, COMPANION_MARKER_M, meters)
         : 0;
     };
     // Where each model is drawn this frame (its stand-in's place, or beside its partner), for its dot.
@@ -5240,7 +5233,7 @@ export class Stage implements Director {
       }
       const near =
         1 -
-        smoothstep(
+        smoothstepBetween(
           LABEL_NEAR_MOON_RADII[0],
           LABEL_NEAR_MOON_RADII[1],
           this.camera.position.distanceTo(site) / MOON_RADIUS,
@@ -5339,7 +5332,9 @@ export class Stage implements Director {
     const settle = 1 - Math.exp(-dt / RING_SETTLE_SECONDS);
     let changed = false;
     this.ships.forEach((ship, index) => {
-      const lapping = inFastForward(this.turnRate(ship, index, t) * pace, ship.fast);
+      // A clock that does not move laps nothing, whatever the craft's rate.
+      const rate = pace === 0 ? 0 : this.turnRate(ship, index, t) * pace;
+      const lapping = inFastForward(rate, ship.fast);
       const start = lapping ? this.closedLap(ship, t) : Number.NaN;
       const fast = !Number.isNaN(start);
       const target = fast ? 1 : 0;
@@ -5384,7 +5379,7 @@ export class Stage implements Director {
       if (!ring) return;
       if (ship.crossFade > 0) {
         if (fast) ring.setPoints(ship.ringNow, RING_POINTS);
-        ring.setOpacity(RING_OPACITY * smoothstep(0, 1, ship.crossFade));
+        ring.setOpacity(RING_OPACITY * smoothstepBetween(0, 1, ship.crossFade));
         changed = true;
       } else if (ring.mesh.visible) {
         ring.setOpacity(0);
@@ -5402,7 +5397,7 @@ export class Stage implements Director {
           ? this.ships.find((other) => other.id === phase.target)
           : undefined;
       const covered = Math.max(ship.crossFade, host?.crossFade ?? 0);
-      this.lineOf.get(ship)?.setLapShown(1 - smoothstep(0, 1, covered));
+      this.lineOf.get(ship)?.setLapShown(1 - smoothstepBetween(0, 1, covered));
     }
     // The steady view frames the followed ship's ring (see updateFastView).
     const followed = this.followed;
@@ -5416,7 +5411,7 @@ export class Stage implements Director {
       this.ringRadius = radius;
     }
     // The event markers would stand still on the ring while the ship goes around many times: they fade as it comes in.
-    if (changed) this.eventMarkers?.setOpacity(1 - smoothstep(0, 1, followed.crossFade));
+    if (changed) this.eventMarkers?.setOpacity(1 - smoothstepBetween(0, 1, followed.crossFade));
     return changed;
   }
 
@@ -5598,7 +5593,7 @@ export class Stage implements Director {
     if (pose.up.lengthSq() < 1e-12) pose.up.copy(ship.up);
     pose.up.normalize();
     if (!Number.isNaN(ship.handBack) && ship.handBackEases) {
-      const w = smoothstep(0, 1, ship.handBack);
+      const w = smoothstepBetween(0, 1, ship.handBack);
       pose.position.lerp(ship.position, w);
       pose.forward.lerp(ship.forward, w).normalize();
       pose.up.lerp(ship.up, w).normalize();
@@ -5622,6 +5617,11 @@ export class Stage implements Director {
     const earthHeight = (position.length() - EARTH_RADIUS) / EARTH_RADIUS;
     const moonHeight = (position.distanceTo(this.moonCenter) - MOON_RADIUS) / MOON_RADIUS;
     return moonHeight < earthHeight;
+  }
+
+  /** The body a point is nearer (see nearMoon). */
+  private nearerBody(position: Vector3): 'earth' | 'moon' {
+    return this.nearMoon(position) ? 'moon' : 'earth';
   }
 
   /**

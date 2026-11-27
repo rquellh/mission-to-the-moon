@@ -164,6 +164,12 @@ export function smoothstep(u: number): number {
   return u * u * (3 - 2 * u);
 }
 
+/** Cubic smoothstep of x between two edges: 0 at edge0 and before, 1 at edge1 and after. */
+export function smoothstepBetween(edge0: number, edge1: number, x: number): number {
+  const u = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return u * u * (3 - 2 * u);
+}
+
 /** Derivative of smoothstep with respect to u. */
 export function smoothstepSlope(u: number): number {
   if (u <= 0 || u >= 1) return 0;

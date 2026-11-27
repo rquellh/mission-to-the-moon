@@ -1,7 +1,8 @@
 /**
- * The camera's moves between views (swingAround, divesPast, swingAngle,
- * swingBodyOf), keeping a craft in sight on the way (seenAt, aimAt), and how
- * a move is paced (easeMove, moveDuration). A move between two views of a
+ * The camera's moves between views (swingAround, divesPast, swingBodyOf,
+ * and swingAngle, this file's own measure of a swing), keeping a craft in
+ * sight on the way (seenAt, aimAt), and how a move is paced (easeMove,
+ * moveDuration). A move between two views of a
  * body must go around it, never coming closer to it than the nearer end, so
  * the body never looks bigger on the way; it must slide the body across the
  * picture in a straight line, or keep the craft on one; it must turn the
@@ -34,7 +35,6 @@ import {
   moveTurn,
   partTurn,
   seenAt,
-  swingAngle,
   swingAround,
   swingBodyOf,
   type ClockReading,
@@ -72,6 +72,13 @@ function path(from: OrientedPose, to: OrientedPose, steps = 400): OrientedPose[]
 }
 
 const distanceOf = (p: OrientedPose): number => p.position.distanceTo(CENTER);
+
+/** The angle, in radians, through which a move between two poses swings the camera around `center`. */
+function swingAngle(from: OrientedPose, to: OrientedPose, center: Vector3): number {
+  const fromDir = new Vector3().subVectors(from.position, center);
+  const toDir = new Vector3().subVectors(to.position, center);
+  return fromDir.angleTo(toDir);
+}
 
 /** The camera's orientation at a pose, as Object3D.lookAt turns a camera. */
 const orientationOf = (p: OrientedPose): Quaternion =>
