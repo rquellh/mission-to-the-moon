@@ -34,6 +34,8 @@ export const RULES = {
   /** The most falling steps that still make a soft touchdown, and the most the lander can have. */
   gentleFalling: 4,
   maxFalling: 6,
+  /** A touchdown at this many falling steps or fewer is told as gentle; a faster one that still lands, as firm. */
+  lightFalling: 2,
   /** The most steps the lander can be rising by. */
   maxRising: 2,
   /** The most sideways pushes that still count as almost still, and the most the lander can have. */
@@ -150,10 +152,10 @@ export function ahead(flight: Flight, seconds: number = RULES.aheadSeconds) {
  * Whether a line to where the lander will be in five seconds is worth
  * drawing: only when that spot is clear of where the lander is now, out past
  * a footpad or well below the footpads. A short drift, or any drift upward,
- * would put the line's end on top of the lander itself.
+ * would put the line's end on top of the lander itself. Pass the spot when
+ * it is already worked out, to save working it out again.
  */
-export function driftShows(flight: Flight): boolean {
-  const spot = ahead(flight);
+export function driftShows(flight: Flight, spot = ahead(flight)): boolean {
   return (
     Math.abs(spot.x - flight.x) > RULES.footHalfSpan + 1 ||
     flight.height - spot.height >= RULES.aheadMin

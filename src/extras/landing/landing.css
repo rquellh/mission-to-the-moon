@@ -7,6 +7,13 @@
 }
 
 [data-extra='landing'] .landing {
+  /* The sheet's title bar and the room around the extra, apart from the two
+     safe edges, all in src/styles/main.css: the Close button's 44px
+     (`.button` min-height), the title bar's 10px bottom padding
+     (`.dialog--full .dialog__head`) and 1px border (`.dialog__head`), and the
+     18px above and below the extra (`.extra-host`). Keep it in step with
+     those rules. */
+  --landing-sheet-room: 91px;
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
@@ -79,16 +86,18 @@
   pointer-events: none;
 }
 
-/* "in 5 seconds" sits beside the drift ring, on its right, or on its left near the right edge. */
+/* "in 5 seconds" sits beside the drift ring, on its right, or on its left near the right edge,
+   5px clear of it. The point the scene gives is the ring's middle, and script sets the ring's
+   radius on screen as --landing-ring. */
 [data-extra='landing'] .landing__tag--ahead {
   color: var(--color-text-muted);
   font-size: 0.6875rem;
   font-weight: 400;
-  transform: translate(11px, -50%);
+  transform: translate(calc(var(--landing-ring) + 5px), -50%);
 }
 
 [data-extra='landing'] .landing__tag--ahead.landing__tag--before {
-  transform: translate(calc(-100% - 11px), -50%);
+  transform: translate(calc(-100% - var(--landing-ring) - 5px), -50%);
 }
 
 /* No WebGL: a short note and two bars instead of the picture. */
@@ -476,14 +485,14 @@
 
   /* The ground is at the bottom of the picture, so the picture keeps to the
      height of the screen (less the sheet's title bar and the room around the
-     extra, 91px with the two safe edges) and stays put while a long side
-     column scrolls beside it. Stretched to a long column, the ground would
-     be off the bottom of the screen. */
+     extra, --landing-sheet-room with the two safe edges) and stays put while
+     a long side column scrolls beside it. Stretched to a long column, the
+     ground would be off the bottom of the screen. */
   [data-extra='landing'] .landing__view:not(.landing__view--flat) {
     position: sticky;
     top: 18px;
     align-self: flex-start;
-    height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 91px);
+    height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--landing-sheet-room));
     min-height: 200px;
   }
 

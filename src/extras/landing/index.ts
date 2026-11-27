@@ -38,7 +38,7 @@ import {
   type Thrust,
 } from './game.ts';
 import { meta } from './meta.ts';
-import { createLandingScene, type LandingScene } from './scene.ts';
+import { RING_PX, createLandingScene, type LandingScene } from './scene.ts';
 
 /** The mission of the first landing, whose story the end of a run shows. */
 const FIRST_LANDING = 'apollo-11';
@@ -47,25 +47,14 @@ const FIRST_LANDING = 'apollo-11';
 /* Facts from the missions' stories.                                   */
 /* ------------------------------------------------------------------ */
 
-/** Says a story's title names a landing: "The Eagle has landed", "Landing". */
-const LANDING_WORD = /\bland(s|ed|ing)?\b/i;
-
 /**
- * A story's landing event: the one the visitor came from when it is a
- * landing, else the one called "landing", else the first in the landing
- * chapter whose title says landing. The moment that offers this game need
- * not be the landing (Apollo 11 offers it as the powered descent begins),
- * so offering it does not make a moment the landing.
+ * A story's landing: the event called "landing", which every flight that
+ * landed has. The moment that offers this game need not be the landing
+ * (Apollo 11 offers it as the powered descent begins), so offering it does
+ * not make a moment the landing.
  */
-function landingEvent(mission: Mission, from: string | null): MissionEvent | undefined {
-  const byTitle = (event: MissionEvent): boolean =>
-    event.chapter === 'landing' && LANDING_WORD.test(event.title);
-  const isLanding = (event: MissionEvent): boolean => event.id === 'landing' || byTitle(event);
-  return (
-    mission.events.find((event) => event.id === from && isLanding(event)) ??
-    mission.events.find((event) => event.id === 'landing') ??
-    mission.events.find(byTitle)
-  );
+function landingEvent(mission: Mission): MissionEvent | undefined {
+  return mission.events.find((event) => event.id === 'landing');
 }
 
 /** The lunar module's radio name, as the mission's cited call signs give it: "Eagle". */
@@ -90,6 +79,36 @@ function elapsedInWords(elapsed: ElapsedTime): string {
   if (Number(m)) parts.push(unit(String(Number(m)), 'minute'));
   if (Number(s)) parts.push(unit(s.replace(/^0(?=\d)/, ''), 'second'));
   return parts.join(' ');
+}
+
+/** The landing the end of a run shows as the real one: its flight's story, and the landing in it. */
+interface RealLanding {
+  mission: Mission;
+  event: MissionEvent;
+}
+
+/** The landing in a flight's story; null when the story does not load or tells of no landing. */
+async function landingIn(context: ExtraContext, id: string): Promise<RealLanding | null> {
+  const bundle = await context.loadBundle(id).catch(() => null);
+  const event = bundle ? landingEvent(bundle.mission) : undefined;
+  return bundle && event ? { mission: bundle.mission, event } : null;
+}
+
+/**
+ * The real landing to show: that of the flight this was opened over, when
+ * it has one, else Apollo 11's, whose story loads only then. Null when that
+ * does not load either.
+ */
+async function realLanding(
+  context: ExtraContext,
+  params: URLSearchParams,
+): Promise<RealLanding | null> {
+  const from = params.get('mission');
+  if (from && from !== FIRST_LANDING && context.summaries.some((summary) => summary.id === from)) {
+    const theirs = await landingIn(context, from);
+    if (theirs) return theirs;
+  }
+  return landingIn(context, FIRST_LANDING);
 }
 
 /* ------------------------------------------------------------------ */
@@ -135,7 +154,8 @@ const TEXT = {
   slide: 'Sideways slide',
   slideWord: { still: 'Almost still', left: 'Sliding left', right: 'Sliding right' },
   clearGround: 'Clear ground',
-  inFive: 'in 5 seconds',
+  // Beside the drift ring: where the lander will be this far ahead.
+  aheadLabel: `in ${RULES.aheadSeconds} seconds`,
   coach: {
     rising: 'You are going up. Push Faster to come back down.',
     hovering: 'You are hovering, and that burns fuel. Push Faster to come down.',
@@ -152,14 +172,14 @@ const TEXT = {
     stopLeft: 'Clear ground below. Push Right to stop your slide.',
     clearBelow: 'Clear ground below. Come down slowly.',
   },
-  bump: ({ tooFast, sliding, rocks }: Extract<Contact, { kind: 'bump' }>): string =>
-    rocks
-      ? 'Rocks. The lander cannot stand on boulders. Slide over to clear ground.'
-      : tooFast && sliding
-        ? 'Too hard, and still sliding. Slow down and stop your slide before you touch.'
-        : tooFast
-          ? 'Too hard. Slow your fall before you touch down.'
-          : 'Still sliding. Stop your slide before you touch down.',
+  // Why a bump did not land (see bumpWord).
+  bump: {
+    rocks: 'Rocks. The lander cannot stand on boulders. Slide over to clear ground.',
+    tooFastAndSliding:
+      'Too hard, and still sliding. Slow down and stop your slide before you touch.',
+    tooFast: 'Too hard. Slow your fall before you touch down.',
+    sliding: 'Still sliding. Stop your slide before you touch down.',
+  },
   backToStart: 'You are back at the start.',
   started: 'Started. The lander is coming down fast over the boulders.',
   fuelLow: 'Fuel is getting low.',
@@ -201,13 +221,6 @@ const TEXT = {
     'A practice toy, not a simulator. The real descent took more than twelve minutes, and a computer helped the crew most of the way down. The distances and speeds here are not the real ones.',
 } as const;
 
-const KEYS: ReadonlyMap<string, Thrust> = new Map([
-  ['ArrowUp', 'up'],
-  ['ArrowDown', 'down'],
-  ['ArrowLeft', 'left'],
-  ['ArrowRight', 'right'],
-]);
-
 /** The key each button answers to, by its name. */
 const KEY_NAME: Readonly<Record<Thrust, string>> = {
   up: 'ArrowUp',
@@ -215,6 +228,11 @@ const KEY_NAME: Readonly<Record<Thrust, string>> = {
   left: 'ArrowLeft',
   right: 'ArrowRight',
 };
+
+/** The push each key makes: the same table, the other way round. */
+const KEYS: ReadonlyMap<string, Thrust> = new Map(
+  Object.entries(KEY_NAME).map(([thrust, key]) => [key, thrust as Thrust]),
+);
 
 /** The key hint shown on each button, where there is likely a keyboard. */
 const KEY_HINT: Readonly<Record<Thrust, string>> = {
@@ -234,6 +252,51 @@ const BUMP_MESSAGE_SECONDS = 4;
 const SETTLE_SECONDS = 0.8;
 /** Where the "Clear ground" label goes: under the middle of the clear patch's marker, in front of the lander's path. */
 const CLEAR_LABEL = { x: (RULES.clearFrom + RULES.clearTo) / 2, height: -2.5 };
+
+/** What the falling-speed read-out says. */
+function fallingWord(f: Flight): string {
+  if (f.pushesDown < 0) return TEXT.speed.rising;
+  if (f.pushesDown === 0) return TEXT.speed.hovering;
+  return isTooFast(f) ? TEXT.speed.fast : TEXT.speed.gentle;
+}
+
+/** What the slide read-out says. */
+function slideWord(f: Flight): string {
+  if (isStill(f)) return TEXT.slideWord.still;
+  return f.pushesX < 0 ? TEXT.slideWord.left : TEXT.slideWord.right;
+}
+
+/** What the fuel strip says. */
+function fuelWord(f: Flight): string {
+  const left = fuelLeft(f);
+  if (left >= 0.5) return TEXT.fuelWord.plenty;
+  if (left >= 0.15) return TEXT.fuelWord.low;
+  return left > 0 ? TEXT.fuelWord.almost : TEXT.fuelWord.empty;
+}
+
+/** What the result says of the fuel left after landing. */
+function fuelLeftWord(f: Flight): string {
+  const left = fuelLeft(f);
+  if (left >= 0.6) return TEXT.fuelLeftWord.most;
+  if (left >= 0.4) return TEXT.fuelLeftWord.half;
+  if (left >= 0.18) return TEXT.fuelLeftWord.quarter;
+  return TEXT.fuelLeftWord.none;
+}
+
+/** True when the ground under where the lander will be in 5 seconds is the clear patch. */
+const clearAhead = (f: Flight): boolean => groundUnder(ahead(f).x) === 0;
+
+/** Why a bump did not land: the boulders first, then too fast, still sliding, or both. */
+function bumpWord({ tooFast, sliding, rocks }: Extract<Contact, { kind: 'bump' }>): string {
+  if (rocks) return TEXT.bump.rocks;
+  if (tooFast && sliding) return TEXT.bump.tooFastAndSliding;
+  if (tooFast) return TEXT.bump.tooFast;
+  return TEXT.bump.sliding;
+}
+
+/* ------------------------------------------------------------------ */
+/* Pieces of the screen.                                               */
+/* ------------------------------------------------------------------ */
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -287,17 +350,198 @@ function fillBar(): FillBar {
 /** Where a place across the ground sits on the flat track: 0 at the play area's left edge, 100 at its right. */
 const acrossPercent = (x: number): number => ((x + RULES.maxSide) / (2 * RULES.maxSide)) * 100;
 
-/** Puts a label over the picture where the scene says a point is, or hides it when the point is out of view. */
-function place(tag: HTMLElement, spot: { left: number; top: number } | null): void {
-  tag.hidden = spot === null;
-  if (!spot) return;
-  tag.style.left = `${(spot.left * 100).toFixed(2)}%`;
-  tag.style.top = `${(spot.top * 100).toFixed(2)}%`;
+/** A label over the picture, for the eye only, placed where the scene says a point is. */
+interface PictureLabel {
+  element: HTMLSpanElement;
+  /** Puts it at the point (fractions of the canvas from its top left corner), or hides it when the point is out of view. */
+  place(spot: { left: number; top: number } | null): void;
+}
+
+/** A label over the picture, hidden until placed; placing it again where it already is writes nothing. */
+function pictureLabel(className: string, text: string): PictureLabel {
+  const element = el('span', className, text);
+  element.setAttribute('aria-hidden', 'true');
+  element.hidden = true;
+  let left = Number.NaN;
+  let top = Number.NaN;
+  return {
+    element,
+    place(spot) {
+      if (element.hidden !== (spot === null)) element.hidden = spot === null;
+      if (!spot || (spot.left === left && spot.top === top)) return;
+      left = spot.left;
+      top = spot.top;
+      element.style.left = `${(left * 100).toFixed(2)}%`;
+      element.style.top = `${(top * 100).toFixed(2)}%`;
+    },
+  };
+}
+
+/** The falling-speed and slide read-outs, and the parts of them that change as it flies. */
+function flightReadouts() {
+  const readouts = el('div', 'landing__readouts');
+  const fallPanel = el('div', 'landing__readout');
+  const pipRow = el('div', 'landing__pips');
+  pipRow.setAttribute('aria-hidden', 'true');
+  const pips = Array.from({ length: PIPS }, (_, index) => {
+    const pip = el(
+      'span',
+      index < RULES.gentleFalling ? 'landing__pip' : 'landing__pip landing__pip--fast',
+    );
+    pipRow.append(pip);
+    return pip;
+  });
+  const fallValue = el('p', 'landing__value');
+  fallValue.setAttribute('data-testid', 'landing-falling');
+  fallPanel.append(el('p', 'landing__label', TEXT.falling), pipRow, fallValue);
+
+  const slidePanel = el('div', 'landing__readout');
+  // The marker shows which way and how fast the slide is; inside the outlined middle is almost still.
+  const slideTrack = el('div', 'landing__track');
+  slideTrack.setAttribute('aria-hidden', 'true');
+  const slideMarker = el('span', 'landing__marker');
+  slideTrack.append(el('span', 'landing__zone'), slideMarker);
+  const slideValue = el('p', 'landing__value');
+  slideValue.setAttribute('data-testid', 'landing-slide');
+  slidePanel.append(el('p', 'landing__label', TEXT.slide), slideTrack, slideValue);
+  readouts.append(fallPanel, slidePanel);
+  return { readouts, fallPanel, pips, fallValue, slidePanel, slideMarker, slideValue };
+}
+
+/** The real landing: its flight and day, its title, what happened, how long after liftoff, and the sources. */
+function realStory({ mission, event }: RealLanding): HTMLDivElement {
+  const story = el('div', 'landing__real');
+  const citations: Citation[] = [...event.citations, ...(mission.launch?.citations ?? [])];
+  story.append(
+    el('p', 'landing__label', TEXT.realLine(mission, event)),
+    el('h3', 'extra-heading', event.title),
+    // The longer text: for a landing it tells the fuel that was left and the crew's words.
+    el('p', 'extra-text', event.text.more ?? event.text.short),
+    el('p', 'extra-note', TEXT.when(mission, event)),
+    sourcesBlock(citations, event.discrepancy, mission.launch?.discrepancy),
+  );
+  return story;
+}
+
+/** After landing: the landed line, the result, and the real landing; "Up next" goes at its end. */
+function afterLanding(landedText: string, real: RealLanding | null) {
+  const after = el('section', 'landing__after');
+  after.hidden = true;
+  const landedLine = el('p', 'landing__landed', landedText);
+  landedLine.setAttribute('data-testid', 'landing-landed');
+  // Focus goes here on landing, so a screen reader reads on from it.
+  landedLine.tabIndex = -1;
+
+  const results = el('div', 'landing__readouts');
+  const touchdownPanel = el('div', 'landing__readout landing__readout--spread');
+  const touchdownValue = el('p', 'landing__value');
+  touchdownPanel.append(el('p', 'landing__label', TEXT.touchdown), touchdownValue);
+  const leftPanel = el('div', 'landing__readout');
+  const { bar: leftBar, fill: leftFill } = fillBar();
+  const leftValue = el('p', 'landing__value');
+  leftPanel.append(el('p', 'landing__label', TEXT.fuelLeft), leftBar, leftValue);
+  results.append(touchdownPanel, leftPanel);
+  after.append(landedLine, results);
+  if (real) after.append(realStory(real));
+  return { after, landedLine, touchdownValue, leftFill, leftValue };
+}
+
+/** The picture without the 3D view, and how to show a moment of the flight on it. */
+interface FlatView {
+  element: HTMLDivElement;
+  /** Shows how high the lander is and where it is over the ground. */
+  show(flight: Flight): void;
+}
+
+/** Without the 3D view: a note, and two plain bars for how high the lander is and where it is over the ground. */
+function flatView(): FlatView {
+  const element = el('div', 'landing__fallback');
+  const { bar: heightBar, fill: heightFill } = fillBar();
+  const acrossTrack = el('div', 'landing__track');
+  acrossTrack.setAttribute('aria-hidden', 'true');
+  // The outlined part is where the lander's middle is when both footpads are over the clear patch.
+  const clearZone = el('span', 'landing__zone');
+  const clearStart = acrossPercent(RULES.clearFrom + RULES.footHalfSpan);
+  const clearEnd = acrossPercent(RULES.clearTo - RULES.footHalfSpan);
+  clearZone.style.left = `${clearStart.toFixed(2)}%`;
+  clearZone.style.width = `${(clearEnd - clearStart).toFixed(2)}%`;
+  const acrossMarker = el('span', 'landing__marker');
+  acrossTrack.append(clearZone, acrossMarker);
+  element.append(
+    el('p', 'extra-note', TEXT.noWebgl),
+    el('p', 'landing__label', TEXT.height),
+    heightBar,
+    el('p', 'landing__label', TEXT.across),
+    acrossTrack,
+  );
+  return {
+    element,
+    show(flight) {
+      const high = Math.max(0, Math.min(1, flight.height / RULES.startHeight));
+      heightFill.style.width = `${(high * 100).toFixed(1)}%`;
+      acrossMarker.style.left = `${acrossPercent(flight.x).toFixed(2)}%`;
+    },
+  };
+}
+
+/** What's next: back to the flight waiting behind the sheet, or the flight where the landing really happened. */
+function nextStep(
+  context: ExtraContext,
+  params: URLSearchParams,
+  real: RealLanding | null,
+): UpNextOptions {
+  if (context.origin === 'flight') {
+    const flight =
+      context.summaries.find((summary) => summary.id === context.missionId)?.name ??
+      context.missionId;
+    // "After the landing" only when the flight was left at the landing shown here.
+    const atTheLanding =
+      real !== null &&
+      real.mission.id === context.missionId &&
+      params.get('event') === real.event.id;
+    return {
+      title: TEXT.pickUp(flight, atTheLanding),
+      line: TEXT.waiting,
+      primary: { label: TEXT.back(flight), run: () => context.close() },
+    };
+  }
+  if (real) {
+    const { mission, event } = real;
+    return {
+      title: TEXT.seeReal,
+      line: TEXT.flightAndMonth(mission.name, monthOf(mission.launch?.value.utc ?? '')),
+      sentence: TEXT.opensAt,
+      mission: mission.id,
+      primary: {
+        label: TEXT.fly(mission.name),
+        run: () => context.openMission(mission.id, { event: event.id }),
+      },
+    };
+  }
+  // The story of the first landing did not load: its flight can still be flown.
+  const first = context.summaries.find((summary) => summary.id === FIRST_LANDING);
+  const name = first?.name ?? FIRST_LANDING;
+  return {
+    title: TEXT.seeReal,
+    line: TEXT.flightAndMonth(name, monthOf(first?.date ?? '')),
+    mission: FIRST_LANDING,
+    primary: {
+      label: TEXT.fly(name),
+      run: () => context.openMission(FIRST_LANDING, { start: 'explore' }),
+    },
+  };
 }
 
 /* ------------------------------------------------------------------ */
 /* The extra.                                                          */
 /* ------------------------------------------------------------------ */
+
+/** Where a run is: before it, flying, down (settling, then landed), or out of fuel (the halves parting, then at rest). */
+type Phase = 'intro' | 'flying' | 'settling' | 'landed' | 'aborting' | 'aborted';
+/** Down on clear ground: settling on its footpads, or landed. */
+const isDown = (phase: Phase): boolean => phase === 'settling' || phase === 'landed';
+/** Out of fuel: the two halves parting, or come to rest. */
+const isOut = (phase: Phase): boolean => phase === 'aborting' || phase === 'aborted';
 
 async function mount(
   host: HTMLElement,
@@ -307,34 +551,9 @@ async function mount(
   const { signal } = context;
   const loading = el('p', 'extra-note', TEXT.loading);
   host.append(loading);
-
-  // Apollo 11's story (its landing and its lunar module's name), and the
-  // story of the landing flight this was opened from, if any.
-  const fromMission = params.get('mission');
-  const otherId =
-    fromMission &&
-    fromMission !== FIRST_LANDING &&
-    context.summaries.some((summary) => summary.id === fromMission)
-      ? fromMission
-      : null;
-  const [first, other] = await Promise.all([
-    context.loadBundle(FIRST_LANDING).catch(() => null),
-    otherId ? context.loadBundle(otherId).catch(() => null) : Promise.resolve(null),
-  ]);
+  const real = await realLanding(context, params);
   if (signal.aborted) return { dispose() {} };
   loading.remove();
-
-  const otherEvent = other ? landingEvent(other.mission, params.get('event')) : undefined;
-  // Opened at a moment of Apollo 11 itself, that moment wins when it is a landing.
-  const firstEvent = first
-    ? landingEvent(first.mission, fromMission === FIRST_LANDING ? params.get('event') : null)
-    : undefined;
-  const real =
-    other && otherEvent
-      ? { mission: other.mission, event: otherEvent }
-      : first && firstEvent
-        ? { mission: first.mission, event: firstEvent }
-        : null;
 
   let still = context.reducedMotion();
   context.onReducedMotionChange((reduced) => {
@@ -385,33 +604,8 @@ async function mount(
   // While flying, and after the fuel runs out.
   const flying = el('section', 'landing__fly');
   flying.hidden = true;
-
-  const readouts = el('div', 'landing__readouts');
-  const fallPanel = el('div', 'landing__readout');
-  const pipRow = el('div', 'landing__pips');
-  pipRow.setAttribute('aria-hidden', 'true');
-  const pips = Array.from({ length: PIPS }, (_, index) => {
-    const pip = el(
-      'span',
-      index < RULES.gentleFalling ? 'landing__pip' : 'landing__pip landing__pip--fast',
-    );
-    pipRow.append(pip);
-    return pip;
-  });
-  const fallValue = el('p', 'landing__value');
-  fallValue.setAttribute('data-testid', 'landing-falling');
-  fallPanel.append(el('p', 'landing__label', TEXT.falling), pipRow, fallValue);
-
-  const slidePanel = el('div', 'landing__readout');
-  // The marker shows which way and how fast the slide is; inside the outlined middle is almost still.
-  const slideTrack = el('div', 'landing__track');
-  slideTrack.setAttribute('aria-hidden', 'true');
-  const slideMarker = el('span', 'landing__marker');
-  slideTrack.append(el('span', 'landing__zone'), slideMarker);
-  const slideValue = el('p', 'landing__value');
-  slideValue.setAttribute('data-testid', 'landing-slide');
-  slidePanel.append(el('p', 'landing__label', TEXT.slide), slideTrack, slideValue);
-  readouts.append(fallPanel, slidePanel);
+  const { readouts, fallPanel, pips, fallValue, slidePanel, slideMarker, slideValue } =
+    flightReadouts();
 
   const coach = el('p', 'landing__coach');
   coach.setAttribute('data-testid', 'landing-coach');
@@ -422,8 +616,7 @@ async function mount(
   const pad = el('div', 'landing__pad');
   pad.setAttribute('role', 'group');
   pad.setAttribute('aria-label', TEXT.pad);
-  const thrustButtons = new Map<Thrust, HTMLButtonElement>();
-  for (const thrust of ['up', 'left', 'right', 'down'] as const) {
+  const thrustButton = (thrust: Thrust): HTMLButtonElement => {
     const control = button(`button landing__thrust landing__thrust--${thrust}`);
     control.setAttribute('aria-keyshortcuts', KEY_NAME[thrust]);
     // The word is the button's name; the key hint is only for the eye.
@@ -431,9 +624,16 @@ async function mount(
     key.setAttribute('aria-hidden', 'true');
     control.append(arrowIcon(thrust), el('span', undefined, TEXT.thrust[thrust]), key);
     control.addEventListener('click', () => fire(thrust), { signal });
-    thrustButtons.set(thrust, control);
-    pad.append(control);
-  }
+    return control;
+  };
+  const thrustButtons = {
+    up: thrustButton('up'),
+    left: thrustButton('left'),
+    right: thrustButton('right'),
+    down: thrustButton('down'),
+  };
+  // A cross, in the order Tab takes them: up on top, left and right, then down.
+  pad.append(thrustButtons.up, thrustButtons.left, thrustButtons.right, thrustButtons.down);
   const aside = el('div', 'landing__aside');
   const startOver = button('button', TEXT.startOver);
   aside.append(el('p', 'extra-note landing__rule', TEXT.rule), startOver);
@@ -441,88 +641,14 @@ async function mount(
   flying.append(readouts, coach, controls);
 
   // After landing.
-  const after = el('section', 'landing__after');
-  after.hidden = true;
   const landedText = TEXT.landed(landerName(real?.mission));
-  const landedLine = el('p', 'landing__landed', landedText);
-  landedLine.setAttribute('data-testid', 'landing-landed');
-  // Focus goes here on landing, so a screen reader reads on from it.
-  landedLine.tabIndex = -1;
+  const { after, landedLine, touchdownValue, leftFill, leftValue } = afterLanding(landedText, real);
 
-  const results = el('div', 'landing__readouts');
-  const touchdownPanel = el('div', 'landing__readout landing__readout--spread');
-  const touchdownValue = el('p', 'landing__value');
-  touchdownPanel.append(el('p', 'landing__label', TEXT.touchdown), touchdownValue);
-  const leftPanel = el('div', 'landing__readout');
-  const { bar: leftBar, fill: leftFill } = fillBar();
-  const leftValue = el('p', 'landing__value');
-  leftPanel.append(el('p', 'landing__label', TEXT.fuelLeft), leftBar, leftValue);
-  results.append(touchdownPanel, leftPanel);
-  after.append(landedLine, results);
-
-  if (real) {
-    const { mission, event } = real;
-    const story = el('div', 'landing__real');
-    const citations: Citation[] = [...event.citations, ...(mission.launch?.citations ?? [])];
-    story.append(
-      el('p', 'landing__label', TEXT.realLine(mission, event)),
-      el('h3', 'extra-heading', event.title),
-      // The longer text: for a landing it tells the fuel that was left and the crew's words.
-      el('p', 'extra-text', event.text.more ?? event.text.short),
-      el('p', 'extra-note', TEXT.when(mission, event)),
-      sourcesBlock(citations, event.discrepancy, mission.launch?.discrepancy),
-    );
-    after.append(story);
-  }
-
-  /** What's next: back to the flight waiting behind the sheet, or the flight where the landing really happened. */
-  const nextStep = (): UpNextOptions => {
-    if (context.origin === 'flight') {
-      const flight =
-        context.summaries.find((summary) => summary.id === context.missionId)?.name ??
-        context.missionId;
-      // "After the landing" only when the flight was left at the landing shown here.
-      const atTheLanding =
-        real !== null &&
-        real.mission.id === context.missionId &&
-        params.get('event') === real.event.id;
-      return {
-        title: TEXT.pickUp(flight, atTheLanding),
-        line: TEXT.waiting,
-        primary: { label: TEXT.back(flight), run: () => context.close() },
-      };
-    }
-    if (real) {
-      const { mission, event } = real;
-      return {
-        title: TEXT.seeReal,
-        line: TEXT.flightAndMonth(mission.name, monthOf(mission.launch?.value.utc ?? '')),
-        sentence: TEXT.opensAt,
-        mission: mission.id,
-        primary: {
-          label: TEXT.fly(mission.name),
-          run: () => context.openMission(mission.id, { event: event.id }),
-        },
-      };
-    }
-    // The story of the first landing did not load: its flight can still be flown.
-    const first = context.summaries.find((summary) => summary.id === FIRST_LANDING);
-    const name = first?.name ?? FIRST_LANDING;
-    return {
-      title: TEXT.seeReal,
-      line: TEXT.flightAndMonth(name, monthOf(first?.date ?? '')),
-      mission: FIRST_LANDING,
-      primary: {
-        label: TEXT.fly(name),
-        run: () => context.openMission(FIRST_LANDING, { start: 'explore' }),
-      },
-    };
-  };
   // Built afresh at each landing, where the run's buttons go, so it always starts folded on a phone.
   let upNext: HTMLElement | null = null;
   const showUpNext = (): void => {
     const block = context.upNext({
-      ...nextStep(),
+      ...nextStep(context, params, real),
       actions: [{ label: TEXT.tryAgain, again: true, run: () => begin(true) }],
     });
     if (upNext) upNext.replaceWith(block);
@@ -537,51 +663,30 @@ async function mount(
   /* ------------------------------ 3D view ----------------------------- */
 
   let scene: LandingScene | null = null;
-  let clearTag: HTMLElement | null = null;
-  let aheadTag: HTMLElement | null = null;
-  let heightFill: HTMLElement | null = null;
-  let acrossMarker: HTMLElement | null = null;
+  // With the 3D view, the two labels over it; without it, the plain bars in its place.
+  let labels: { clear: PictureLabel; ahead: PictureLabel } | null = null;
+  let flat: FlatView | null = null;
   try {
     scene = createLandingScene(canvas);
     // Two small labels over the picture, under the fuel strip, placed each frame where the scene says.
-    clearTag = el('span', 'landing__tag landing__tag--clear', TEXT.clearGround);
-    aheadTag = el('span', 'landing__tag landing__tag--ahead', TEXT.inFive);
-    for (const tag of [clearTag, aheadTag]) {
-      tag.setAttribute('aria-hidden', 'true');
-      tag.hidden = true;
-    }
-    fuelStrip.before(clearTag, aheadTag);
+    labels = {
+      clear: pictureLabel('landing__tag', TEXT.clearGround),
+      ahead: pictureLabel('landing__tag landing__tag--ahead', TEXT.aheadLabel),
+    };
+    // The drift label keeps clear of the ring by the ring's size on screen.
+    stage.style.setProperty('--landing-ring', `${RING_PX}px`);
+    fuelStrip.before(labels.clear.element, labels.ahead.element);
   } catch (error) {
     console.warn(error);
     canvas.remove();
     // Without the 3D view, two plain bars show how high the lander is and where it is over the ground.
-    const fallback = el('div', 'landing__fallback');
-    const { bar: heightBar, fill } = fillBar();
-    heightFill = fill;
-    const acrossTrack = el('div', 'landing__track');
-    acrossTrack.setAttribute('aria-hidden', 'true');
-    // The outlined part is where the lander's middle is when both footpads are over the clear patch.
-    const clearZone = el('span', 'landing__zone');
-    const clearStart = acrossPercent(RULES.clearFrom + RULES.footHalfSpan);
-    const clearEnd = acrossPercent(RULES.clearTo - RULES.footHalfSpan);
-    clearZone.style.left = `${clearStart.toFixed(2)}%`;
-    clearZone.style.width = `${(clearEnd - clearStart).toFixed(2)}%`;
-    acrossMarker = el('span', 'landing__marker');
-    acrossTrack.append(clearZone, acrossMarker);
-    fallback.append(
-      el('p', 'extra-note', TEXT.noWebgl),
-      el('p', 'landing__label', TEXT.height),
-      heightBar,
-      el('p', 'landing__label', TEXT.across),
-      acrossTrack,
-    );
-    stage.append(fallback);
+    flat = flatView();
+    stage.append(flat.element);
     stage.classList.add('landing__view--flat');
   }
 
   /* ------------------------------ Playing ----------------------------- */
 
-  type Phase = 'intro' | 'flying' | 'settling' | 'landed' | 'aborting' | 'aborted';
   let phase: Phase = 'intro';
   let flight = startFlight();
   let touchFalling = 0;
@@ -591,45 +696,8 @@ async function mount(
   let shownFalling = Number.NaN;
   const timers = new Set<number>();
 
-  const fallingWord = (f: Flight): string =>
-    f.pushesDown < 0
-      ? TEXT.speed.rising
-      : f.pushesDown === 0
-        ? TEXT.speed.hovering
-        : isTooFast(f)
-          ? TEXT.speed.fast
-          : TEXT.speed.gentle;
-
-  const slideWord = (f: Flight): string =>
-    isStill(f) ? TEXT.slideWord.still : f.pushesX < 0 ? TEXT.slideWord.left : TEXT.slideWord.right;
-
-  const fuelWord = (f: Flight): string => {
-    const left = fuelLeft(f);
-    return left >= 0.5
-      ? TEXT.fuelWord.plenty
-      : left >= 0.15
-        ? TEXT.fuelWord.low
-        : left > 0
-          ? TEXT.fuelWord.almost
-          : TEXT.fuelWord.empty;
-  };
-
-  const fuelLeftWord = (f: Flight): string => {
-    const left = fuelLeft(f);
-    return left >= 0.6
-      ? TEXT.fuelLeftWord.most
-      : left >= 0.4
-        ? TEXT.fuelLeftWord.half
-        : left >= 0.18
-          ? TEXT.fuelLeftWord.quarter
-          : TEXT.fuelLeftWord.none;
-  };
-
-  /** True when the ground under where the lander will be in 5 seconds is the clear patch. */
-  const clearAhead = (f: Flight): boolean => groundUnder(ahead(f).x) === 0;
-
   const coachWord = (f: Flight): string => {
-    if (phase === 'aborting' || phase === 'aborted') return TEXT.outOfFuel;
+    if (isOut(phase)) return TEXT.outOfFuel;
     if (bumpLeft > 0) return bumpMessage;
     if (f.pushesDown < 0) return TEXT.coach.rising;
     if (f.pushesDown === 0) return TEXT.coach.hovering;
@@ -651,7 +719,7 @@ async function mount(
   /** The read-outs and the coach line, from the flight as it is now. */
   const showReadouts = (): void => {
     // Out of fuel, the read-outs follow the top half, with the crew: straight back up.
-    const out = phase === 'aborting' || phase === 'aborted';
+    const out = isOut(phase);
     const shown: Flight = out ? { ...flight, pushesX: 0, pushesDown: -1 } : flight;
     if (shownFalling !== shown.pushesDown) {
       shownFalling = shown.pushesDown;
@@ -673,28 +741,23 @@ async function mount(
     fuelFill.style.width = `${(left * 100).toFixed(1)}%`;
     fuelBar.classList.toggle('is-empty', left <= 0);
     setText(fuelValue, fuelWord(flight));
-    if (heightFill) {
-      const high = Math.max(0, Math.min(1, flight.height / RULES.startHeight));
-      heightFill.style.width = `${(high * 100).toFixed(1)}%`;
-    }
-    if (acrossMarker) acrossMarker.style.left = `${acrossPercent(flight.x).toFixed(2)}%`;
+    flat?.show(flight);
   };
 
   /** The two labels over the picture: the clear ground while its marker shows, and the drift while it is drawn. */
   const placeLabels = (): void => {
-    if (!scene || !clearTag || !aheadTag) return;
-    const marked = phase !== 'settling' && phase !== 'landed';
-    place(clearTag, marked ? scene.spot(CLEAR_LABEL.x, CLEAR_LABEL.height) : null);
+    if (!scene || !labels) return;
+    labels.clear.place(isDown(phase) ? null : scene.spot(CLEAR_LABEL.x, CLEAR_LABEL.height));
     const drift = ahead(flight);
-    const drawn = (phase === 'intro' || phase === 'flying') && driftShows(flight);
+    const drawn = (phase === 'intro' || phase === 'flying') && driftShows(flight, drift);
     const spot = drawn ? scene.spot(drift.x, drift.height) : null;
-    place(aheadTag, spot);
+    labels.ahead.place(spot);
     // Near the right edge, the label goes on the ring's other side so it stays in view.
-    aheadTag.classList.toggle('landing__tag--before', spot !== null && spot.left > 0.7);
+    labels.ahead.element.classList.toggle('landing__tag--before', spot !== null && spot.left > 0.7);
   };
 
   const showPhase = (): void => {
-    const out = phase === 'aborting' || phase === 'aborted';
+    const out = isOut(phase);
     const flyingLayout = phase !== 'intro' && phase !== 'landed';
     intro.hidden = phase !== 'intro';
     flying.hidden = !flyingLayout;
@@ -703,41 +766,36 @@ async function mount(
     root.dataset['phase'] = phase;
     root.classList.toggle('landing--flying', flyingLayout);
     // Out of fuel the controls stay on screen, but only the run again works: it becomes the one main action.
-    for (const control of thrustButtons.values()) control.disabled = out;
+    for (const control of Object.values(thrustButtons)) control.disabled = out;
     setText(startOver, out ? TEXT.tryAgain : TEXT.startOver);
     startOver.classList.toggle('button--primary', out);
     canvas.setAttribute(
       'aria-label',
-      phase === 'settling' || phase === 'landed'
-        ? TEXT.canvasLanded
-        : out
-          ? TEXT.canvasAborted
-          : TEXT.canvas,
+      isDown(phase) ? TEXT.canvasLanded : out ? TEXT.canvasAborted : TEXT.canvas,
     );
   };
 
+  /** The read-outs' words for the flight as it is now. */
+  const wordsNow = (): readonly [falling: string, slide: string, fuel: string] => [
+    fallingWord(flight),
+    slideWord(flight),
+    fuelWord(flight),
+  ];
   // What the read-outs last said aloud, so only a change is said again.
-  let saidFalling = fallingWord(flight);
-  let saidSlide = slideWord(flight);
-  let saidFuel = fuelWord(flight);
+  let said = wordsNow();
   const hearNothingNew = (): void => {
-    saidFalling = fallingWord(flight);
-    saidSlide = slideWord(flight);
-    saidFuel = fuelWord(flight);
+    said = wordsNow();
   };
   /** What changed since it was last said: a read-out's new word, or a fuel warning the first time the fuel word gets there. */
   const news = (): string[] => {
+    const [saidFalling, saidSlide, saidFuel] = said;
+    said = wordsNow();
+    const [falling, slide, fuel] = said;
     const messages: string[] = [];
-    const falling = fallingWord(flight);
-    const slide = slideWord(flight);
-    const fuel = fuelWord(flight);
     if (falling !== saidFalling) messages.push(`${falling}.`);
     if (slide !== saidSlide) messages.push(`${slide}.`);
     if (fuel !== saidFuel && fuel === TEXT.fuelWord.low) messages.push(TEXT.fuelLow);
     if (fuel !== saidFuel && fuel === TEXT.fuelWord.almost) messages.push(TEXT.fuelAlmost);
-    saidFalling = falling;
-    saidSlide = slide;
-    saidFuel = fuel;
     return messages;
   };
   const announceNews = (): void => {
@@ -767,8 +825,9 @@ async function mount(
       showPhase();
     }
     placeLabels();
-    if ((phase === 'landed' || phase === 'aborted') && !moving) endLoop();
-    if (phase === 'intro') endLoop();
+    // The loop stops before a run, where a frame comes only from a resize, and at a run's end once the picture is still.
+    const over = phase === 'landed' || phase === 'aborted';
+    if (phase === 'intro' || (over && !moving)) endLoop();
   };
   const startLoop = (): void => {
     if (stopLoop) return;
@@ -801,49 +860,50 @@ async function mount(
     if (phase !== 'flying') return;
     push(flight, thrust);
     scene?.puff(thrust, still);
-    const control = thrustButtons.get(thrust);
-    if (control) {
-      control.classList.add('is-firing');
-      const timer = window.setTimeout(() => {
-        control.classList.remove('is-firing');
-        timers.delete(timer);
-      }, 180);
-      timers.add(timer);
-    }
+    const control = thrustButtons[thrust];
+    control.classList.add('is-firing');
+    const timer = window.setTimeout(() => {
+      control.classList.remove('is-firing');
+      timers.delete(timer);
+    }, 180);
+    timers.add(timer);
     announceNews();
     showReadouts();
     startLoop();
   }
 
+  /** The footpads reached the ground (a landing or a bump), or the tank ran dry. */
   function touch(contact: Contact): void {
-    if (contact.kind === 'landed') {
-      touchFalling = contact.falling;
-      scene?.land(flight, still);
-      // The read-outs keep their last words while it settles; only the gauges show it down.
-      showGauges();
-      if (still) settle();
-      else {
-        phase = 'settling';
-        settleLeft = SETTLE_SECONDS;
-        showPhase();
-      }
-      return;
+    switch (contact.kind) {
+      case 'landed':
+        touchFalling = contact.falling;
+        scene?.land(flight, still);
+        // The read-outs keep their last words while it settles; only the gauges show it down.
+        showGauges();
+        if (still) settle();
+        else {
+          phase = 'settling';
+          settleLeft = SETTLE_SECONDS;
+          showPhase();
+        }
+        break;
+      case 'empty':
+        runOut();
+        break;
+      case 'bump':
+        bumpMessage = bumpWord(contact);
+        bumpLeft = BUMP_MESSAGE_SECONDS;
+        if (still) {
+          // Under reduced motion, a bump is a plain reset: straight back to the start.
+          flight = startFlight();
+          bumpMessage = `${bumpMessage} ${TEXT.backToStart}`;
+        }
+        shownFalling = Number.NaN;
+        // The bump's message says what happened; the read-outs' new words are not said over it.
+        hearNothingNew();
+        context.announce(bumpMessage);
+        break;
     }
-    if (contact.kind === 'empty') {
-      runOut();
-      return;
-    }
-    bumpMessage = TEXT.bump(contact);
-    bumpLeft = BUMP_MESSAGE_SECONDS;
-    if (still) {
-      // Under reduced motion, a bump is a plain reset: straight back to the start.
-      flight = startFlight();
-      bumpMessage = `${bumpMessage} ${TEXT.backToStart}`;
-    }
-    shownFalling = Number.NaN;
-    // The bump's message says what happened; the read-outs' new words are not said over it.
-    hearNothingNew();
-    context.announce(bumpMessage);
   }
 
   /** Down and settled: the result, the real landing, and what's next. */
@@ -851,7 +911,7 @@ async function mount(
     phase = 'landed';
     setText(
       touchdownValue,
-      touchFalling <= 2 ? TEXT.touchdownWord.gentle : TEXT.touchdownWord.firm,
+      touchFalling <= RULES.lightFalling ? TEXT.touchdownWord.gentle : TEXT.touchdownWord.firm,
     );
     leftFill.style.width = `${(fuelLeft(flight) * 100).toFixed(1)}%`;
     setText(leftValue, fuelLeftWord(flight));
@@ -885,16 +945,14 @@ async function mount(
     showPhase();
     showReadouts();
     scene?.fly(flight, 0, still);
-    if (focus) thrustButtons.get('up')?.focus();
+    if (focus) thrustButtons.up.focus();
     context.announce(TEXT.started);
     startLoop();
   };
 
   startButton.addEventListener('click', () => begin(true), { signal });
   // Out of fuel this is "Try again", the end of a run, so focus goes to the controls as it does from the end screen.
-  startOver.addEventListener('click', () => begin(phase === 'aborting' || phase === 'aborted'), {
-    signal,
-  });
+  startOver.addEventListener('click', () => begin(isOut(phase)), { signal });
 
   document.addEventListener(
     'keydown',
