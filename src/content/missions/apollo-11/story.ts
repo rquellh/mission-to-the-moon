@@ -544,6 +544,7 @@ export const story: Mission = {
     /* ----------------------------- Landing ---------------------------- */
     {
       id: 'powered-descent',
+      handsOn: 'landing',
       title: 'Powered descent begins',
       chapter: 'landing',
       elapsed: '102:33:05.01',

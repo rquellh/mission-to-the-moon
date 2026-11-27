@@ -1,0 +1,501 @@
+/* "Land on the Moon". Phone first: the 3D view on top, filling what the
+   controls leave; side by side on wide screens. */
+
+[data-extra='landing'].extra-host {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-extra='landing'] .landing {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+/* While flying, everything sits a little closer, so the whole screen fits a phone. */
+[data-extra='landing'] .landing--flying {
+  gap: 10px;
+}
+
+[data-extra='landing'] .landing__view {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 220px;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-bg);
+}
+
+/* After the landing the picture steps back to a set size, with the result under it. */
+[data-extra='landing'] .landing[data-phase='landed'] .landing__view:not(.landing__view--flat) {
+  flex: 0 0 260px;
+}
+
+[data-extra='landing'] .landing__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The fuel strip, across the top of the picture. */
+[data-extra='landing'] .landing__fuel {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+[data-extra='landing'] .landing__fuel .landing__bar {
+  flex: 1 1 auto;
+}
+
+[data-extra='landing'] .landing__fuel-word {
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* The two labels over the picture, placed by script where the scene says. */
+[data-extra='landing'] .landing__tag {
+  position: absolute;
+  color: var(--color-accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  /* The point the scene gives is just under the dashed marker, so the label hangs below it rather than sitting on the line. */
+  transform: translate(-50%, 2px);
+  pointer-events: none;
+}
+
+/* "in 5 seconds" sits beside the drift ring, on its right, or on its left near the right edge. */
+[data-extra='landing'] .landing__tag--ahead {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  transform: translate(11px, -50%);
+}
+
+[data-extra='landing'] .landing__tag--ahead.landing__tag--before {
+  transform: translate(calc(-100% - 11px), -50%);
+}
+
+/* No WebGL: a short note and two bars instead of the picture. */
+[data-extra='landing'] .landing__view--flat {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 14px 16px;
+  background: var(--color-raised);
+}
+
+[data-extra='landing'] .landing__view--flat .landing__fuel {
+  position: static;
+}
+
+[data-extra='landing'] .landing__fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Bars that fill from the left: the fuel, the fuel left, and the height. */
+[data-extra='landing'] .landing__bar {
+  display: flex;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--color-line);
+}
+
+[data-extra='landing'] .landing__bar-fill {
+  display: block;
+  width: 100%;
+  border-radius: 3px;
+  background: var(--color-accent);
+}
+
+/* An empty tank: a dashed outline with nothing in it. */
+[data-extra='landing'] .landing__bar.is-empty {
+  border: 1px dashed var(--color-text-muted);
+  background: transparent;
+}
+
+/* Tracks with an outlined zone and a marker: the slide, and over the ground without the 3D view. */
+[data-extra='landing'] .landing__track {
+  position: relative;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--color-line);
+}
+
+[data-extra='landing'] .landing__zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 38%;
+  width: 24%;
+  border: 1px solid var(--color-accent-line);
+  border-radius: 3px;
+}
+
+[data-extra='landing'] .landing__marker {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 6px;
+  height: 16px;
+  margin-left: -3px;
+  border-radius: 3px;
+  background: var(--color-text);
+}
+
+[data-extra='landing'] .landing__side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+[data-extra='landing'] .landing--flying .landing__side {
+  gap: 10px;
+}
+
+[data-extra='landing'] .landing__intro,
+[data-extra='landing'] .landing__fly,
+[data-extra='landing'] .landing__after,
+[data-extra='landing'] .landing__words {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-extra='landing'] .landing__intro,
+[data-extra='landing'] .landing__after {
+  gap: 16px;
+}
+
+[data-extra='landing'] .landing__fly {
+  gap: 10px;
+}
+
+[data-extra='landing'] .landing__words {
+  gap: 12px;
+}
+
+[data-extra='landing'] .landing__lead {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+[data-extra='landing'] .landing__how {
+  font-size: 0.9375rem;
+}
+
+/* Read-outs, and the result after landing. */
+[data-extra='landing'] .landing__readouts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+[data-extra='landing'] .landing__readout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-raised);
+  transition: border-color 200ms var(--ease-out);
+}
+
+[data-extra='landing'] .landing__readout--spread {
+  justify-content: space-between;
+}
+
+[data-extra='landing'] .landing__readout.is-good {
+  border-color: var(--color-accent-line);
+}
+
+[data-extra='landing'] .landing__readout.is-warn {
+  border-style: dashed;
+  border-color: var(--color-text-muted);
+}
+
+[data-extra='landing'] .landing__label {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+[data-extra='landing'] .landing__value {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+[data-extra='landing'] .landing__pips {
+  display: flex;
+  gap: 4px;
+}
+
+[data-extra='landing'] .landing__pip {
+  flex: 1 1 0;
+  height: 12px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: var(--color-line);
+}
+
+[data-extra='landing'] .landing__pip.is-on {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+/* The too-fast pips: dashed when empty, striped when lit. */
+[data-extra='landing'] .landing__pip--fast {
+  border-style: dashed;
+  border-color: var(--color-text-muted);
+  background: transparent;
+}
+
+[data-extra='landing'] .landing__pip--fast.is-on {
+  border-style: solid;
+  border-color: var(--color-accent);
+  background: repeating-linear-gradient(135deg, var(--color-accent) 0 3px, transparent 3px 6px);
+}
+
+[data-extra='landing'] .landing__coach {
+  min-height: 2.8em;
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+/* The controls: a cross for thumbs, with the rule and Start over beside it. */
+[data-extra='landing'] .landing__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 12px;
+}
+
+[data-extra='landing'] .landing__pad {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, 64px);
+  grid-template-rows: repeat(3, 64px);
+  gap: 6px;
+}
+
+[data-extra='landing'] .landing__thrust {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  border-radius: 14px;
+  font-size: 0.75rem;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+[data-extra='landing'] .landing__thrust--up {
+  grid-area: 1 / 2;
+}
+
+[data-extra='landing'] .landing__thrust--left {
+  grid-area: 2 / 1;
+}
+
+[data-extra='landing'] .landing__thrust--right {
+  grid-area: 2 / 3;
+}
+
+[data-extra='landing'] .landing__thrust--down {
+  grid-area: 3 / 2;
+}
+
+[data-extra='landing'] .landing__thrust.is-firing {
+  border-color: var(--color-accent-line);
+  background: var(--color-accent-soft);
+}
+
+[data-extra='landing'] .landing__arrow {
+  width: 22px;
+  height: 22px;
+}
+
+[data-extra='landing'] .landing__key {
+  padding: 0 5px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  line-height: 16px;
+}
+
+/* Key hints only where there is likely a keyboard. */
+@media (hover: none), (pointer: coarse) {
+  [data-extra='landing'] .landing__key {
+    display: none;
+  }
+}
+
+[data-extra='landing'] .landing__aside {
+  flex: 1 1 120px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+[data-extra='landing'] .landing__rule {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+/* After landing. */
+[data-extra='landing'] .landing__landed {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+[data-extra='landing'] .landing__real {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-raised);
+}
+
+[data-extra='landing'] .landing__real .extra-heading {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+[data-extra='landing'] .landing__real .extra-text {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+[data-extra='landing'] .landing__real .extra-note {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+[data-extra='landing'] .landing__real .sources {
+  margin: -6px 0 -10px;
+  border-top: 0;
+}
+
+/* The practice-toy note: read before starting and after landing; on a phone the flying screen has no room for it. */
+[data-extra='landing'] .landing__simple {
+  margin-top: auto;
+  font-size: 0.8125rem;
+  color: var(--color-text-faint);
+}
+
+[data-extra='landing'] .landing--flying .landing__simple {
+  display: none;
+}
+
+@media (min-width: 860px), (min-width: 600px) and (orientation: landscape) {
+  [data-extra='landing'] .landing,
+  [data-extra='landing'] .landing--flying {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  /* The ground is at the bottom of the picture, so the picture keeps to the
+     height of the screen (less the sheet's title bar and the room around the
+     extra, 91px with the two safe edges) and stays put while a long side
+     column scrolls beside it. Stretched to a long column, the ground would
+     be off the bottom of the screen. */
+  [data-extra='landing'] .landing__view:not(.landing__view--flat) {
+    position: sticky;
+    top: 18px;
+    align-self: flex-start;
+    height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 91px);
+    min-height: 200px;
+  }
+
+  [data-extra='landing'] .landing[data-phase='landed'] .landing__view:not(.landing__view--flat) {
+    flex: 1 1 auto;
+  }
+
+  [data-extra='landing'] .landing__view--flat {
+    flex: 1 1 auto;
+    align-self: flex-start;
+    min-height: 0;
+  }
+
+  [data-extra='landing'] .landing__side {
+    flex: 0 0 min(380px, 42%);
+  }
+
+  [data-extra='landing'] .landing--flying .landing__side {
+    gap: 12px;
+  }
+
+  [data-extra='landing'] .landing__fuel {
+    top: 12px;
+    right: auto;
+    left: 12px;
+    width: min(360px, calc(100% - 24px));
+  }
+
+  [data-extra='landing'] .landing__view--flat .landing__fuel {
+    width: auto;
+  }
+
+  [data-extra='landing'] .landing__tag {
+    font-size: 0.875rem;
+  }
+
+  [data-extra='landing'] .landing__tag--ahead {
+    font-size: 0.8125rem;
+  }
+
+  [data-extra='landing'] .landing__pad {
+    grid-template-columns: repeat(3, 72px);
+    grid-template-rows: repeat(3, 72px);
+  }
+
+  [data-extra='landing'] .landing--flying .landing__simple {
+    display: block;
+  }
+}
+
+/* The sections above set their own display, so `hidden` needs saying again. */
+[data-extra='landing'] [hidden] {
+  display: none !important;
+}
