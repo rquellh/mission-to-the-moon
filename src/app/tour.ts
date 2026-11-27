@@ -393,6 +393,12 @@ export class Tour {
   /** Real time in milliseconds when the clock's hold on a parting's event ends; null when not holding. */
   private holdUntilMs: number | null = null;
   /**
+   * True from the hold on the stop's event on, at a stop that rests after
+   * its event (see holdAtEvent): the stop's own action is playing under its
+   * card, so the tour is at the stop, not on its way (see onTheWay).
+   */
+  private atAction = false;
+  /**
    * Real time in milliseconds after which the tour stops waiting for the
    * camera to settle (see CAMERA_SETTLE_MAX_SECONDS): set during a hold, and
    * at the stop while the tour waits there; null otherwise.
@@ -482,6 +488,20 @@ export class Tour {
     return this.stops[shown] ?? null;
   }
 
+  /**
+   * True while the tour is on its way to its stop: traveling, and not yet
+   * at the stop's own action. At a stop that rests after its event (a
+   * parting, a part let go), the clock reaches the event, holds there, and
+   * plays on to the rest point with the stop's card already showing; from
+   * the hold on, the tour is at the stop, though it still says it is
+   * traveling (`phase`) and Next still skips to the rest point. On the way
+   * to an ordinary stop, it stays on its way until it stops, through any
+   * wait for the camera to settle (see CAMERA_SETTLE_MAX_SECONDS).
+   */
+  get onTheWay(): boolean {
+    return this.phaseNow === 'traveling' && !this.atAction;
+  }
+
   start(index = 0): void {
     this.goTo(index, 'run-up');
   }
@@ -559,6 +579,7 @@ export class Tour {
     const stop = this.stops[index];
     if (!stop) return;
     this.stopTravel();
+    this.atAction = false;
     this.indexNow = index;
     this.stopSeconds = elapsedToSeconds(stop.elapsed);
     this.targetStory = this.player.story.toStory(this.stopSeconds);
@@ -733,9 +754,11 @@ export class Tour {
   }
 
   /**
-   * At a parting's event: hold the clock still there, so the two craft are
-   * seen docked once the camera has settled, then play on to the rest point
-   * (see PARTING_HOLD_SECONDS). The tour is still on its way throughout.
+   * At a parting's event (or a part let go): hold the clock still there, so
+   * the two craft are seen docked once the camera has settled, then play on
+   * to the rest point (see PARTING_HOLD_SECONDS). The tour is still
+   * traveling throughout (`phase`), so Next skips to the rest point, but it
+   * is at the stop, no longer on its way (see onTheWay).
    */
   private holdAtEvent(): void {
     // Not listening while the clock is put exactly on the event (a trip lands
@@ -759,7 +782,9 @@ export class Tour {
     this.settleByMs = now + CAMERA_SETTLE_MAX_SECONDS * 1000;
     this.stopWatching = this.player.subscribe(this.watchTravel);
     requestAnimationFrame(this.watchHold);
-    this.tellShown();
+    // The stop's own action begins: the tour is at the stop now (see onTheWay), with its card.
+    this.atAction = true;
+    this.notify();
   }
 
   /** On each frame of a hold, play on to the rest point once it is over and the camera has settled. */

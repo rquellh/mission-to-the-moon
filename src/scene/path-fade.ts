@@ -108,6 +108,62 @@ export function wayDimming(
   return { before: first, dim: into * (1 - back) };
 }
 
+/**
+ * A craft that comes back near a body it left earlier (every flight's return
+ * to Earth) flies in past what it drew there on the way out: the climb, the
+ * lap kept of its parking orbit, and the leg out, which on Apollo starts over
+ * the same ocean the craft comes home to. Up close those lines cross the
+ * whole picture, run through the craft and cut across the body. So once the
+ * craft is back, the lines of its earlier time near that body are not drawn
+ * near it (see returnFade and PathLine's return fade).
+ *
+ * A sample is near Earth within RETURN_EARTH_RADII[0] of Earth's radii of its
+ * center at true scale, and near the Moon within RETURN_MOON_RADII[0] of the
+ * Moon's. The craft's return is felt as it comes in from there to the second
+ * of the pair, so the old lines fade out as it comes back. Earth's reaches far
+ * out: on the way home Earth comes into the Ship view's picture with the craft
+ * some 43 of its radii out, and the lines of the way out should be gone by
+ * then. It still ends short of the Moon's however near the Moon comes (see
+ * MOON_CLOSEST_KM).
+ */
+export const RETURN_EARTH_RADII = [50, 40] as const;
+export const RETURN_MOON_RADII = [20, 8] as const;
+/** The Moon's nearest to Earth (its perigee at its closest, center to center), in km. */
+export const MOON_CLOSEST_KM = 356_400;
+
+/**
+ * For each sample, the first sample of the stretch near one body that it is
+ * in, when the path was near that body before that stretch began (a return);
+ * otherwise -1 (a first visit, or near neither). `near` says which body each
+ * sample is near: 0 neither, any other number a body.
+ */
+export function returnStarts(near: ArrayLike<number>): Int32Array {
+  const n = near.length;
+  const out = new Int32Array(n).fill(-1);
+  const left = new Set<number>();
+  let body = 0;
+  let start = 0;
+  for (let i = 0; i < n; i += 1) {
+    const here = near[i] as number;
+    if (here !== body) {
+      if (body !== 0) left.add(body);
+      body = here;
+      start = i;
+    }
+    if (here !== 0 && left.has(here)) out[i] = start;
+  }
+  return out;
+}
+
+/**
+ * How far the return fade is in, 0 to 1, for a craft `radii` of its body's
+ * radii from its center on a return to that body, whose `zone` is
+ * RETURN_EARTH_RADII or RETURN_MOON_RADII.
+ */
+export function returnFade(radii: number, zone: readonly [number, number]): number {
+  return 1 - smoothstep(zone[1], zone[0], radii);
+}
+
 /** Which of `stays` (sample index ranges, as orbitStays gives them) a fractional sample index is in, or -1 for none. */
 export function stayAt(stays: ReadonlyArray<readonly [number, number]>, index: number): number {
   return stays.findIndex(([first, last]) => index >= first && index <= last);
