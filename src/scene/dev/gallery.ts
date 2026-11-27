@@ -54,7 +54,7 @@ import type {
   VehicleLayout,
   VehiclePart,
 } from '../../content/vehicle-types';
-import { buildFlightPath, createStoryTime } from '../../sim';
+import { buildFlightPath, createStoryTime, storyKeyTimes } from '../../sim';
 import { SHIP_AMBIENT_INTENSITY, SHIP_COLORS, SHIP_SUN_INTENSITY } from '../config';
 import { COLORS, createMiniView, createMoon, createVehicle, stackHeights } from '../kit';
 import { Stage } from '../stage';
@@ -415,11 +415,12 @@ async function showFlight(name: string): Promise<void> {
     label.textContent = `The test flight could not be built: ${String(error)}`;
     throw error;
   }
-  const storyTime = createStoryTime([
-    path.start,
-    path.end,
-    ...mission.events.map((e) => elapsedToSeconds(e.elapsed)),
-  ]);
+  const storyTime = createStoryTime(
+    storyKeyTimes(
+      path,
+      mission.events.map((e) => elapsedToSeconds(e.elapsed)),
+    ),
+  );
   const story: StoryMap = {
     duration: storyTime.length,
     toStory: (seconds) => storyTime.toStory(seconds),

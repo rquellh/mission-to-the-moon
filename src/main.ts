@@ -17,7 +17,7 @@ import {
 import { elapsedToSeconds, type EventView, type MissionSummary } from './content/types';
 import { extraFor, extras, hasExtra, isExtraReady, loadExtra } from './extras';
 import type { Stage } from './scene/stage';
-import { buildFlightPath, createStoryTime } from './sim';
+import { buildFlightPath, createStoryTime, storyKeyTimes } from './sim';
 import { byId, reducedMotionQuery } from './ui/dom';
 import { mountInterface, setUpMissionList, type MissionInterface } from './ui/interface';
 import { setUpStatus } from './ui/status';
@@ -45,16 +45,17 @@ function addressOf(id: string): string {
 
 /**
  * Load a flight and build its path and story time. Story time gives every
- * stretch between two events a watchable length.
+ * stretch between two events a watchable length (see storyKeyTimes).
  */
 async function prepareFlight(id: string) {
   const bundle = await loadBundle(id);
   const path = buildFlightPath(bundle.flight);
-  const storyTime = createStoryTime([
-    path.start,
-    path.end,
-    ...bundle.mission.events.map((event) => elapsedToSeconds(event.elapsed)),
-  ]);
+  const storyTime = createStoryTime(
+    storyKeyTimes(
+      path,
+      bundle.mission.events.map((event) => elapsedToSeconds(event.elapsed)),
+    ),
+  );
   return { bundle, path, storyTime };
 }
 

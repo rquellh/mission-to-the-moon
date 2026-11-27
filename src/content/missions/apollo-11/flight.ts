@@ -527,14 +527,27 @@ export const flight: FlightPlan = {
       role: 'lander',
       phases: [
         {
+          // From undocking until Columbia's separation burn, the two shared
+          // one orbit while Collins looked Eagle over (the "undocking" event
+          // in story.ts, and its sources): drawn as flying beside Columbia.
+          // This plan gives no distance between them for this stretch; the
+          // scene draws them a little apart.
+          kind: 'station',
+          label: 'Beside Columbia',
+          start: at('100:12:00', lunarOrbitTable('CSM/LM undocked')),
+          end: at('100:39:52.9', lunarOrbitTable('CSM/LM separation ignition')),
+          target: 'csm',
+        },
+        {
+          // It starts on Columbia's orbit, which it kept until its descent
+          // orbit insertion burn.
           kind: 'orbit',
           label: 'Undocked',
           body: 'moon',
-          start: at('100:12:00', lunarOrbitTable('CSM/LM undocked')),
+          start: at('100:39:52.9', lunarOrbitTable('CSM/LM separation ignition')),
           end: at('101:36:14.0', lunarOrbitTable('LM descent orbit insertion ignition')),
           ...CSM_PARKING_ORBIT,
           sense: RETROGRADE,
-          from: 'csm',
           endFix: { longitude: cite(-140.2, trajectoryTable('Descent orbit insertion, Ignition')) },
         },
         {

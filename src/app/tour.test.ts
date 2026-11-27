@@ -18,7 +18,7 @@ import { story as apollo15 } from '../content/missions/apollo-15/story.ts';
 import { flight as gemini7Flight } from '../content/missions/gemini-7/flight.ts';
 import { story as gemini7 } from '../content/missions/gemini-7/story.ts';
 import { elapsedToSeconds, type EventView, type Mission } from '../content/types.ts';
-import { buildFlightPath, createStoryTime } from '../sim/index.ts';
+import { buildFlightPath, createStoryTime, storyKeyTimes } from '../sim/index.ts';
 import type { FlightPlan } from '../sim/types.ts';
 import type { Director, StoryMap } from './contract.ts';
 import { MissionPlayer, tripShape } from './player.ts';
@@ -64,11 +64,12 @@ function fakeScreen(frameMs: number) {
 /** The player and tour, built the way main.ts builds them. */
 function setUp(mission: Mission, plan: FlightPlan, screen: Screen, options: TourOptions = {}) {
   const path = buildFlightPath(plan);
-  const story = createStoryTime([
-    path.start,
-    path.end,
-    ...mission.events.map((event) => elapsedToSeconds(event.elapsed)),
-  ]);
+  const story = createStoryTime(
+    storyKeyTimes(
+      path,
+      mission.events.map((event) => elapsedToSeconds(event.elapsed)),
+    ),
+  );
   const keys = story.keyTimes;
   const map: StoryMap = {
     duration: story.length,
