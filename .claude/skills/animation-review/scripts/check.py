@@ -113,6 +113,20 @@ def parse_ships(text):
     return ships
 
 
+def union_box(boxes):
+    """The box round some boxes, each (center x, center y, width, height)."""
+    left = min(x - w / 2 for x, y, w, h in boxes)
+    right = max(x + w / 2 for x, y, w, h in boxes)
+    top = min(y - h / 2 for x, y, w, h in boxes)
+    bottom = max(y + h / 2 for x, y, w, h in boxes)
+    return ((left + right) / 2, (top + bottom) / 2, right - left, bottom - top)
+
+
+def boxes_meet(a, b):
+    """True when two boxes (center x, center y, width, height) overlap."""
+    return abs(a[0] - b[0]) * 2 < a[2] + b[2] and abs(a[1] - b[1]) * 2 < a[3] + b[3]
+
+
 def parse_values(text):
     """'csm:0.12345 lm:- agena:gone' -> {'csm': 0.12345, 'lm': None, 'agena': None}; {} for a recording without the column."""
     values = {}
@@ -199,6 +213,7 @@ class Recording:
             row['_clock'] = number(row['clock'])
             row['_story'] = number(row['story'])
             row['_ships'] = parse_ships(row['ships'])
+            row['_left'] = parse_ships(row.get('left'))
             row['_clear'] = parse_rect(row['clear'])
             # Each craft's glide while its model is a stand-in (None while it is at its true place), and its true laps.
             # A recording from before the stand-in has neither column: no stand-in anywhere.
@@ -248,11 +263,11 @@ class Recording:
         return min(matches, key=lambda event: abs(event['seconds'] - mission))
 
     def tour_at(self, t):
-        """'way' while the tour is on its way to a stop, 'stop' at one, None off the tour."""
+        """'way' while the tour is on its way to a stop or plays the stop's own action (the button reads Skip), 'stop' at rest at one, None off the tour."""
         row = self.timeline_at(t)
-        if not row or not row['counter'].startswith('Stop'):
+        if not row or 'Stop' not in row['counter']:
             return None
-        return 'way' if 'On the way' in row['counter'] else 'stop'
+        return 'way' if 'On the way' in row['counter'] or 'Skip' in (row.get('button') or '') else 'stop'
 
     def timeline_at(self, t):
         best = None
@@ -734,7 +749,14 @@ def find_marks(rec, rows):
                     marks.append(('vanish', row['_t'], 0, f'{name} drawn, then not, without fading'))
             elif ship['box'] is not None and ship['fade'] >= DRAWN:
                 size0 = max(before['box'][2], before['box'][3])
-                size1 = max(ship['box'][2], ship['box'][3])
+                # A craft that leaves part of itself behind (a lander lifting off) is measured with the
+                # parts that appear where it was as it does, so splitting in two at one scale is not a
+                # jump in size.
+                box1 = union_box([ship['box']] + [
+                    part['box'] for key, part in row.get('_left', {}).items()
+                    if part['box'] is not None and (prev.get('_left', {}).get(key) or {}).get('box') is None
+                    and boxes_meet(part['box'], before['box'])])
+                size1 = max(box1[2], box1[3])
                 if size0 > 6 and size1 > 6 and max(size0, size1) / min(size0, size1) > 1.5:
                     marks.append(('pop', row['_t'], size1 / size0, f'{name} from {size0:.0f} to {size1:.0f} px in 100 ms'))
     # Standard 22: the followed craft's stand-in every frame, every other craft's from the timeline.

@@ -564,7 +564,12 @@ export interface SwingWay {
 const _partAxis = new Vector3();
 
 /** A share of the turn `turn` (taken the short way round, or the long way when `long`), into `out`. */
-function partTurn(turn: Quaternion, share: number, long: boolean, out: Quaternion): Quaternion {
+export function partTurn(
+  turn: Quaternion,
+  share: number,
+  long: boolean,
+  out: Quaternion,
+): Quaternion {
   const sign = turn.w < 0 ? -1 : 1;
   const across = Math.hypot(turn.x, turn.y, turn.z);
   if (across < 1e-12) return out.identity();

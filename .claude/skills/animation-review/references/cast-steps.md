@@ -27,7 +27,7 @@ node .claude/skills/animation-review/scripts/record.mjs page <url> --out DIR [op
 
 Each `--before`, `--press` and `--after` is exactly one step. Nothing is split, so a step may hold any JavaScript, `||` and all.
 
-On the tour, the recorder drives the tour to the stop with `tourstop:N` (press, then wait until the counter reads that stop at rest), checks the stop again after the `--before` steps, and fails loudly if the tour is anywhere else. Under `--reduced-motion` each press jumps a whole stop; `tourstop` handles that.
+On the tour, the recorder drives the tour to the stop with `tourstop:N` (press, then wait until the counter names that stop, the button no longer reads Skip, and everything is still: the counter names a stop as soon as its card shows, before the stop's own action has played), checks the stop again after the `--before` steps, and fails loudly if the tour is anywhere else. Under `--reduced-motion` each press jumps a whole stop; `tourstop` handles that.
 
 ## Sequences
 

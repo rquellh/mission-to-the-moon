@@ -89,6 +89,7 @@ import {
   keepBodyUp,
   moveDuration,
   moveShare,
+  partTurn,
   seenAt,
   swingAround,
   swingBodyOf,
@@ -104,10 +105,9 @@ import { createMarkers, type MarkerPoint, type MarkerSet } from './markers';
 import { createMoon, type Moon } from './moon';
 import {
   orbitStays,
-  RETURN_EARTH_RADII,
-  RETURN_MOON_RADII,
   returnFade,
   returnStarts,
+  returnZone,
   sampleIndexAt,
   valueAtIndex,
 } from './path-fade';
@@ -229,12 +229,27 @@ const CHASE_DISTANCE_SECONDS = 0.8;
 const CHASE_SAME_SPOT_RAD = 1e-5;
 /**
  * With a tour's stop ahead (see expectStop), over the trip's last
- * CHASE_STOP_SECONDS the chase heads evenly for its frame and distance at the
- * stop, so it is there as the clock stops: trailing its craft's heading, it
- * went on turning after the clock had stopped (up to 2.8 s at 25 degrees a
- * second on the way into "Parachutes open").
+ * CHASE_STOP_SECONDS the chase heads for its frame and distance at the stop,
+ * easing in and out over that time, so it is there as the clock stops:
+ * trailing its craft's heading, it went on turning after the clock had
+ * stopped (up to 2.8 s at 25 degrees a second on the way into "Parachutes
+ * open").
  */
 const CHASE_STOP_SECONDS = 3;
+/**
+ * A turn the chase still has to make to its frame at the stop that would
+ * take longer than CHASE_STOP_SECONDS at this many degrees a second, on
+ * average, starts that much sooner (at the trip's start at the soonest): on
+ * the way home into "Letting go of the service module" the frame had to turn
+ * 171 degrees after 10 s, 164 of them in 7 s as the craft came in to Earth
+ * (its up from ecliptic north to Earth's vertical, its heading from toward
+ * Earth to along its orbit), and the picture rolled at up to 30 degrees a
+ * second. Such a long turn is planned one way round from the frame the chase
+ * had as it began (see headForStop): eased in and out, its peak is about half
+ * as fast again as this. Not while the craft circles its body, where it may
+ * go into fast forward and the steady view comes first.
+ */
+const CHASE_STOP_DEG_PER_S = 12;
 
 /** The ship view's chase as it will be at a later moment (see Stage.chaseAtTime). */
 interface ChaseLater {
@@ -261,6 +276,13 @@ interface StopAhead {
   distance?: number;
   /** When the chase began to head for the stop, in frame time (see Stage.headForStop). */
   fromMs?: number;
+  /**
+   * For a long turn to the stop (see CHASE_STOP_DEG_PER_S), the chase's frame
+   * as it began, and the turn from it to the frame at the stop, kept one way
+   * round from frame to frame.
+   */
+  startFrame?: Quaternion;
+  turn?: Quaternion;
 }
 /**
  * The ship view's up is a body's vertical within the first of these heights
@@ -344,7 +366,21 @@ const LABEL_GAP_PX = 8;
 const LABEL_FADE_SECONDS = 0.5;
 /** How near its opacity a label's fade ends (see updateLabels). */
 const LABEL_FADE_DONE = 0.004;
-/** For this many story seconds after liftoff, a part left behind is drawn at the size its lander is drawn (see updateFleet). */
+/**
+ * A lander lifting off a body leaves part of itself at its site: its descent
+ * stage, and on the later flights a rover. A smaller craft is drawn larger for
+ * its size (see SIZE_EXPONENT in vehicles.ts), so at its own scale the ascent
+ * stage, and the parts left with it, which share that scale, are drawn about
+ * twice as large as the whole lander was: on the page turn from "Moonwalk
+ * ends" to "Liftoff from the Moon" the lander doubled in size at once. So for
+ * LIFTOFF_GROW_STORY_SECONDS of story time from liftoff the ascent stage grows,
+ * eased, from the scale the whole lander was drawn at to its own, by the story
+ * clock (so a page turn to the liftoff finds it at the whole lander's scale,
+ * and it grows only as the clock runs), and for LIFTOFF_SIZE_STORY_SECONDS
+ * everything at the site is drawn at the ascent stage's scale as drawn; after
+ * that each takes its own, which is the ascent stage's (see updateFleet).
+ */
+const LIFTOFF_GROW_STORY_SECONDS = 1.2;
 const LIFTOFF_SIZE_STORY_SECONDS = 1.5;
 const COMPANION_MARKER_M = 1500;
 const COMPANION_MARKER_PX = 9;
@@ -1831,16 +1867,10 @@ export class Stage implements Director {
     const p = new Vector3();
     for (let i = 0; i < n; i += 1) {
       p.fromArray(polyline.truePositions, 3 * i);
-      const earth = p.length() / EARTH_RADIUS;
       const moon = p.distanceTo(moonTrue) / MOON_RADIUS;
-      // The Moon's zone first: Earth's reaches far out toward it (see RETURN_EARTH_RADII).
-      if (moon < RETURN_MOON_RADII[0]) {
-        bodies[i] = 2;
-        fades[i] = returnFade(moon, RETURN_MOON_RADII);
-      } else if (earth < RETURN_EARTH_RADII[0]) {
-        bodies[i] = 1;
-        fades[i] = returnFade(earth, RETURN_EARTH_RADII);
-      }
+      const zone = returnZone(moon);
+      bodies[i] = zone;
+      fades[i] = returnFade(zone, moon);
     }
     const starts = returnStarts(bodies);
     if (!starts.some((start) => start >= 0)) return null;
@@ -3896,14 +3926,19 @@ export class Stage implements Director {
 
   /**
    * Move the ship view into its steady view (`on`) or back out to the chase:
-   * one move, as long as its turn of the picture needs (see CAMERA_MOVE_MS),
-   * which `moving` reports. Going in, it sets off from where the camera is,
-   * not from the chase, which then follows a craft lapping its body too fast
-   * to watch; coming out it keeps the craft, drawn again, in sight. Either
-   * way the body's top edge never sinks lower in the picture than it is at
-   * either end (see keepBodyUp), so the body does not drop out of the bottom
-   * of the picture, behind the card, as the camera backs away from it. After
-   * a jump of the clock, or under reduced motion, it is there at once.
+   * one calm move round the body (see planCalm and calmMs), as long as its
+   * turn, roll and change of the body's share need (see CALM_ROLL_DEG_PER_S
+   * and the limits beside it), up to CALM_MOVE_MAX_MS, which `moving`
+   * reports. With a tour's stop ahead too soon for that move back to the
+   * chase as it follows its craft, it heads for the chase as it will be at
+   * the stop, in the time left (see setOffForStop). Going in, it sets off
+   * from where the camera is, not from the chase, which then follows a craft
+   * lapping its body too fast to watch; coming out it keeps the craft, drawn
+   * again, in sight. Either way the body's top edge never sinks lower in the
+   * picture than it is at either end (see keepBodyUp), so the body does not
+   * drop out of the bottom of the picture, behind the card, as the camera
+   * backs away from it. After a jump of the clock, or under reduced motion,
+   * it is there at once.
    */
   private setFastView(on: boolean, jumped: boolean): void {
     if (on) this.updateFastView();
@@ -4140,35 +4175,81 @@ export class Stage implements Director {
       }
     }
     this.followChaseOwn(dt, jumped);
-    if (!jumped && !this.reducedMotion && !this.fastView.on && !this.chaseHeld) this.headForStop();
+    if (!jumped && !this.reducedMotion && !this.chaseHeld) {
+      // Under the steady view nothing heads for the stop; out of it, heading begins afresh from there.
+      if (this.fastView.on) this.forgetHeading();
+      else this.headForStop();
+    }
   }
 
   /**
-   * Over a tour trip's last CHASE_STOP_SECONDS, turn the chase from its own
-   * frame toward its frame at the stop, by a share that grows evenly to all of
-   * it as the clock stops, and its distance likewise (its own frame is kept, so
-   * the share is of the way from it each frame, not compounded).
+   * On a tour trip, turn the chase toward its frame at the stop, by a share
+   * that eases in and out (a smoothstep in frame time) from none where it
+   * begins to all of it when the clock is due at the stop, and its distance
+   * likewise. It begins CHASE_STOP_SECONDS before the stop, or sooner for a
+   * turn still to make that a calm rate needs longer for (see
+   * CHASE_STOP_DEG_PER_S). A turn begun in time is made from the chase's own
+   * frame as it follows its craft (kept, so the share is of the way from it
+   * each frame, not compounded); a longer one from the frame the chase had as
+   * it began, one way round: from a frame that keeps moving, the turn near
+   * half a turn it can be would go one way round on one frame and the other
+   * on the next, and the craft's own turning would show through it.
    */
   private headForStop(): void {
     const stop = this.usableStop();
     if (!stop) return;
     const left = (stop.endMs - this.nowMs) / 1000;
-    if (left > CHASE_STOP_SECONDS) return;
     // Worked out each frame: a craft that comes to rest (a landing) keeps the heading the chase
     // had last, so its frame there is known only as the chase gets there.
     const end = this.chaseAtTime(stop.at, this.stopLater);
     if (!end) return;
+    if (stop.fromMs === undefined) {
+      const toGo = MathUtils.radToDeg(this.chaseFrame.angleTo(end.frame));
+      // Not sooner while the craft circles its body: it may yet go into fast forward, and the
+      // steady view then comes first (the turn begins afresh after it, see forgetHeading).
+      const circling = !Number.isNaN(this.closedLap(this.chased(), this.player.time));
+      const need = circling
+        ? CHASE_STOP_SECONDS
+        : Math.max(CHASE_STOP_SECONDS, toGo / CHASE_STOP_DEG_PER_S);
+      if (left > need) return;
+      stop.fromMs = this.nowMs;
+      if (left > CHASE_STOP_SECONDS) {
+        // The way round it takes from here: the shorter, as it begins.
+        stop.startFrame = this.chaseFrame.clone();
+        stop.turn = new Quaternion()
+          .copy(end.frame)
+          .multiply(this.q2.copy(this.chaseFrame).invert());
+        if (stop.turn.w < 0) stop.turn.set(-stop.turn.x, -stop.turn.y, -stop.turn.z, -stop.turn.w);
+      }
+    }
     stop.frame = (stop.frame ?? new Quaternion()).copy(end.frame);
     stop.distance = end.distance;
-    stop.fromMs ??= this.nowMs;
-    // From nothing when it begins to all of it when the clock is due at the stop, evenly in frame
+    // From nothing when it begins to all of it when the clock is due at the stop, eased in frame
     // time (the mission clock slows into the stop, so by it the turn would end early and quickly).
     const share = stop.endMs > stop.fromMs ? smoothstep(stop.fromMs, stop.endMs, this.nowMs) : 0;
     this.chaseOwnFrame.copy(this.chaseFrame);
     this.chaseOwnDistance = this.chaseDistance;
     this.chaseHeading = true;
-    this.chaseFrame.slerp(stop.frame, share);
+    if (stop.startFrame && stop.turn) {
+      // The turn from where it began to the stop's frame now, the same way round as last frame.
+      const turn = this.q3.copy(end.frame).multiply(this.q2.copy(stop.startFrame).invert());
+      if (turn.dot(stop.turn) < 0) turn.set(-turn.x, -turn.y, -turn.z, -turn.w);
+      stop.turn.copy(turn);
+      partTurn(turn, share, turn.w < 0, this.q2);
+      this.chaseFrame.copy(this.q2).multiply(stop.startFrame);
+    } else {
+      this.chaseFrame.slerp(stop.frame, share);
+    }
     this.chaseDistance += ((stop.distance ?? this.chaseDistance) - this.chaseDistance) * share;
+  }
+
+  /** Forget any turn toward the stop ahead begun before the steady view came on (see headForStop). */
+  private forgetHeading(): void {
+    const stop = this.stopAhead;
+    if (!stop) return;
+    delete stop.fromMs;
+    delete stop.startFrame;
+    delete stop.turn;
   }
 
   /** The chase as it follows its craft (see followChase). */
@@ -4778,6 +4859,35 @@ export class Stage implements Director {
   }
 
   /** Size, place, and show or hide each spacecraft for this frame. */
+  /** Story seconds since `shipId` lifted off a body other than Earth, on its climb from there at t; NaN on none. */
+  private sinceLiftoff(shipId: string, t: number): number {
+    const phase = this.path.phaseAt(shipId, t);
+    if (phase?.kind !== 'ascent' || phase.body === 'earth') return Number.NaN;
+    return this.player.storyTime - this.player.story.toStory(phaseStart(phase));
+  }
+
+  /**
+   * The scale a lander's ascent stage is drawn at just after liftoff,
+   * meters per CSS pixel, growing from the whole lander's to its own (see
+   * LIFTOFF_GROW_STORY_SECONDS), in the fleet's context as it is now; 0 when
+   * it is not lifting off.
+   */
+  private liftoffScale(ship: ShipState, model: ShipModel, t: number): number {
+    const since = this.sinceLiftoff(ship.id, t);
+    if (!(since < LIFTOFF_GROW_STORY_SECONDS)) return 0;
+    const phase = this.path.phaseAt(ship.id, t);
+    if (!phase) return 0;
+    const context = this.poseContext;
+    const own = model.metersPerPixelOf(model.shapeAt(t), context);
+    const whole = model.metersPerPixelOf(model.shapeAt(phaseStart(phase) - 1), context);
+    if (!(own > 0) || !(whole > 0)) return 0;
+    return MathUtils.lerp(
+      whole,
+      own,
+      smoothstep(0, LIFTOFF_GROW_STORY_SECONDS, Math.max(0, since)),
+    );
+  }
+
   private updateFleet(dt: number, snap: boolean): void {
     if (!this.fleet) return;
     // A move out of the journey view draws a craft behind Earth or the Moon
@@ -4967,6 +5077,8 @@ export class Stage implements Director {
         if (own > 0 && pairScale > 0)
           context.metersPerPixel = MathUtils.lerp(own, pairScale, pair.arranged);
       }
+      if (context.metersPerPixel <= 0)
+        context.metersPerPixel = this.liftoffScale(ship, anchorModel, t);
       anchorModel.update(closeUp(ship, anchorModel, pose), context);
       this.modelPlaces[anchorIndex]?.copy(pose.position);
     }
@@ -5038,6 +5150,7 @@ export class Stage implements Director {
       }
       context.opacity =
         this.opacityOf(ship, i === moverIndex ? pair?.anchor : undefined) * (1 - companion(ship));
+      if (context.metersPerPixel <= 0) context.metersPerPixel = this.liftoffScale(ship, model, t);
       model.update(closeUp(ship, model, pose), context);
       this.modelPlaces[i]?.copy(pose.position);
     }
@@ -5072,8 +5185,8 @@ export class Stage implements Director {
       context.unitsPerPixel = this.unitsPerPixelAt(this.sitePosition, shown, tanHalf);
       // Sized like the ascent stage that lifted off from it (smaller in the journey view),
       // or, while the lander still stands there, like the lander. Just after liftoff it
-      // takes the ascent stage's size as drawn, which eases from the whole lander's, so
-      // the two grow together rather than the part appearing at the larger size.
+      // takes the ascent stage's size as drawn, which grows from the whole lander's (see
+      // LIFTOFF_GROW_STORY_SECONDS), so the two grow together.
       if (journey) context.maxPixels = JOURNEY_LEFT_BEHIND_MAX_PX;
       context.sizeScale =
         screenScale *
@@ -5083,10 +5196,7 @@ export class Stage implements Director {
       const phase = this.path.phaseAt(part.shipId, t)?.kind;
       const drawnLander = lander !== undefined && lander.root.visible;
       const standing = drawnLander && phase === 'surface';
-      const rising =
-        drawnLander &&
-        phase === 'ascent' &&
-        this.player.storyTime - this.player.story.toStory(part.from) < LIFTOFF_SIZE_STORY_SECONDS;
+      const rising = drawnLander && this.sinceLiftoff(part.shipId, t) < LIFTOFF_SIZE_STORY_SECONDS;
       context.metersPerPixel = standing || rising ? lander.drawnMetersPerPixel : 0;
       part.update(shown, this.sitePosition, this.siteUp, site?.front ?? this.worldUp, context);
       // While the lander still stands there, the part is not left behind yet: no label.
