@@ -6,8 +6,9 @@ import { existsSync, readdirSync } from 'node:fs';
  *
  * A folder with flight.ts is a flight: its plan must build into a sound
  * path, and its story, vehicle, summary, sources, and photos must agree with
- * it and with each other. A folder with memorial.ts (Apollo 1) is a page of
- * remembrance: its citations and photo are checked.
+ * it and with each other, and give Fly to orbit a rocket it can fly. A folder
+ * with memorial.ts (Apollo 1) is a page of remembrance: its citations and
+ * photo are checked.
  *
  * Run with `npm test`. Each mission gets its own group of tests, named by
  * its folder.
@@ -28,6 +29,7 @@ import {
   type MissionSummary,
 } from '../../content/types.ts';
 import type { LeftBehind, VehicleChange } from '../../content/vehicle-types.ts';
+import { realEnd, rocketFrom } from '../../extras/orbit/rocket.ts';
 import { buildFlightPath } from '../build.ts';
 import { AnchoredOrbit } from '../segments.ts';
 import {
@@ -618,6 +620,54 @@ for (const folder of flights) {
     });
   });
 }
+
+/* ------------------------------------------------------------------ */
+/* Fly to orbit, over every flight.                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Each rocket's stages, and how many of them the player drops on the way to
+ * orbit (all but the last), by the name its flight's story gives it.
+ */
+const ROCKETS = new Map([
+  ['Titan II Gemini Launch Vehicle', { stages: 2, drops: 1 }],
+  ['Saturn IB', { stages: 2, drops: 1 }],
+  ['Saturn V', { stages: 3, drops: 2 }],
+]);
+
+/** The rocket's name as a story gives it, without its serial number: "Saturn V". */
+const rocketNameOf = (story: Mission): string =>
+  story.launch?.value.vehicle.replace(/\s*\([^)]*\)\s*$/, '') ?? '';
+
+/**
+ * "Fly to orbit", opened over a flight, reads the flight's own files with
+ * rocketFrom (src/extras/orbit/rocket.ts): with no rocket there, it would
+ * fly Apollo 11's instead. Its climb must start at the flight's liftoff (so
+ * "Up next" says "after liftoff" when it was opened there), and its end
+ * screen tells an event of the flight's own (realEnd: the one at orbit
+ * insertion, or else the liftoff).
+ */
+describe('all missions: Fly to orbit at liftoff', () => {
+  it.each(flights.map((folder) => [folder.id, folder] as const))(
+    "%s: Fly to orbit flies the flight's own rocket with that rocket's stages and ends on an event of the flight's own",
+    (id, { story, flight, vehicle, leftBehind }) => {
+      const rocket = rocketFrom({ mission: story, flight, vehicle, leftBehind });
+      const end = rocket && realEnd(rocket);
+
+      expect({
+        flight: rocket?.mission.id,
+        rocket: rocket && { stages: rocket.stages, drops: rocket.drops.length },
+        climbStartsAt: rocket?.climb.liftoffEvent?.id,
+        endsOnItsOwnEvent: story.events.some((event) => event === end?.event),
+      }).toEqual({
+        flight: id,
+        rocket: ROCKETS.get(rocketNameOf(story)),
+        climbStartsAt: 'liftoff',
+        endsOnItsOwnEvent: true,
+      });
+    },
+  );
+});
 
 /* ------------------------------------------------------------------ */
 /* Each memorial.                                                      */

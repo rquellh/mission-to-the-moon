@@ -24,6 +24,8 @@ import { summary as gemini12 } from '../content/missions/gemini-12/summary.ts';
 import type { MissionSummary } from '../content/types.ts';
 import { meta as docking } from '../extras/docking/meta.ts';
 import { meta as landingSites } from '../extras/landing-sites/meta.ts';
+import { meta as landing } from '../extras/landing/meta.ts';
+import { meta as orbit } from '../extras/orbit/meta.ts';
 import { meta as patches } from '../extras/patches/meta.ts';
 import { meta as rockets } from '../extras/rockets/meta.ts';
 import { meta as stages } from '../extras/stages/meta.ts';
@@ -43,7 +45,7 @@ const LIST: readonly MissionSummary[] = [
 ];
 
 /** The real extras list, in its order: hands-on first. */
-const EXTRAS = [stages, docking, patches, landingSites, rockets];
+const EXTRAS = [orbit, stages, docking, landing, patches, landingSites, rockets];
 
 describe('nextFlight', () => {
   it.each([
@@ -106,8 +108,8 @@ describe('handsOnPick', () => {
 
 describe('otherHandsOn', () => {
   it.each([
-    ['the docking after the stages', 'stages', EXTRAS, 'docking'],
-    ['the stages after the docking', 'docking', EXTRAS, 'stages'],
+    ['Fly to orbit after the stages', 'stages', EXTRAS, 'orbit'],
+    ['the stages after Fly to orbit', 'orbit', EXTRAS, 'stages'],
     [
       'the first hands-on extra listed, never an extra to explore',
       'patches',

@@ -265,16 +265,14 @@ describe('the extras sheet', () => {
       ).toBeVisible();
       expect(next).toHaveTextContent('Your flight is waiting where you left it.');
       const toTry = within(next).getByRole('group', { name: 'Try it yourself' });
-      expect(within(toTry).getByRole('heading', { level: 4 })).toHaveTextContent(
-        'Dock two spacecraft',
-      );
+      expect(within(toTry).getByRole('heading', { level: 4 })).toHaveTextContent('Fly to orbit');
       const toExplore = within(next).getByRole('group', { name: 'More to explore' });
       expect(within(toExplore).getByRole('heading', { level: 4 })).toHaveTextContent(
         'Six landings on the Moon',
       );
       expect(within(next).getAllByRole('button')).toEqual([
         within(next).getByRole('button', { name: 'Back to Apollo 11' }),
-        within(toTry).getByRole('button', { name: 'Open Dock two spacecraft' }),
+        within(toTry).getByRole('button', { name: 'Open Fly to orbit' }),
         within(toExplore).getByRole('button', { name: 'Open Six landings on the Moon' }),
         within(next).getByRole('button', { name: 'Try again' }),
         within(next).getByRole('button', { name: 'Pick another' }),
@@ -307,18 +305,18 @@ describe('the extras sheet', () => {
       const tryIt = screen.getByRole('button', { name: 'Try it: Drop the stages' });
       const next = await endFromLiftoff(user);
 
-      await user.click(within(next).getByRole('button', { name: 'Open Dock two spacecraft' }));
+      await user.click(within(next).getByRole('button', { name: 'Open Fly to orbit' }));
 
-      const docking = screen.getByRole('dialog', { name: 'Dock two spacecraft' });
+      const orbit = screen.getByRole('dialog', { name: 'Fly to orbit' });
       expect(
-        await within(docking).findByText('Dock two spacecraft for apollo-11, opened from a flight'),
+        await within(orbit).findByText('Fly to orbit for apollo-11, opened from a flight'),
       ).toBeInTheDocument();
       expect(
-        within(docking).queryByText('Drop the stages for apollo-11, opened from a flight'),
+        within(orbit).queryByText('Drop the stages for apollo-11, opened from a flight'),
       ).not.toBeInTheDocument();
-      expect(document.title).toBe('Dock two spacecraft · Mission to the Moon');
+      expect(document.title).toBe('Fly to orbit · Mission to the Moon');
 
-      await user.click(within(docking).getByRole('button', { name: 'Close' }));
+      await user.click(within(orbit).getByRole('button', { name: 'Close' }));
 
       expect(tryIt).toHaveFocus();
       expect(document.title).toBe('Apollo 11 · Mission to the Moon');
@@ -340,7 +338,7 @@ describe('the extras sheet', () => {
         within(next).getByText('Opens at the first docking. Fly it to collect its patch.'),
       ).toBeVisible();
       const toTry = within(next).getByRole('group', { name: 'Try it yourself' });
-      expect(within(toTry).getByRole('heading', { level: 4 })).toHaveTextContent('Drop the stages');
+      expect(within(toTry).getByRole('heading', { level: 4 })).toHaveTextContent('Fly to orbit');
       const toExplore = within(next).getByRole('group', { name: 'More to explore' });
       expect(within(toExplore).getByRole('heading', { level: 4 })).toHaveTextContent(
         'Three rockets',

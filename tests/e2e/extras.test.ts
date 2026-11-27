@@ -5,6 +5,7 @@ import { ExtraSheetPage } from '../pages/ExtraSheetPage';
 import { HubPage } from '../pages/HubPage';
 import { LandingPage } from '../pages/LandingPage';
 import { MissionPage } from '../pages/MissionPage';
+import { OrbitPage } from '../pages/OrbitPage';
 import { WelcomePage } from '../pages/WelcomePage';
 import { EVENTS, EXTRAS, MISSIONS, URLS } from '../utils/vars';
 
@@ -161,6 +162,52 @@ test.describe('The end of a hands-on extra', () => {
       await missionPage.waitForLoad();
       await expect(missionPage.missionName).toHaveText(realLanding.name);
       await expect(cardPage.title).toHaveText(realLanding.title);
+    });
+  });
+
+  test('a visitor flies the Saturn V to orbit, and flies the real liftoff from Up next', async ({
+    sitePage,
+  }) => {
+    // Climbing to orbit takes about 22 seconds of the toy's time from Start.
+    test.slow();
+    const missionPage = new MissionPage(sitePage);
+    const extraSheetPage = new ExtraSheetPage(sitePage);
+    const orbitPage = new OrbitPage(sitePage);
+    const cardPage = new EventCardPage(sitePage);
+    const realLiftoff = EVENTS.APOLLO_11_LIFTOFF;
+
+    await test.step('Open Fly to orbit on its own, over the welcome, with the Saturn V on the pad', async () => {
+      await sitePage.goto(URLS.EXTRA_ON_ITS_OWN('orbit'));
+      await missionPage.waitForLoad();
+      await extraSheetPage.waitForLoad();
+      await expect(extraSheetPage.sheet).toHaveAttribute('data-extra', 'orbit');
+      await expect(orbitPage.rocket).toHaveText("Apollo 11's rocket: the Saturn V");
+    });
+
+    await test.step('Start, tip over and drop each empty stage with the keys, and reach orbit, with focus on the line that says so', async () => {
+      await orbitPage.start.click();
+      await orbitPage.flyToOrbitByKeys();
+      await expect(orbitPage.result).toHaveText('You are in orbit.');
+      await expect(orbitPage.result).toBeFocused();
+    });
+
+    await test.step('The real orbit follows, and Up next offers the real liftoff, its one button in view', async () => {
+      await expect(orbitPage.realTitle).toBeVisible();
+      await expect(orbitPage.realTitle).toHaveText(`${realLiftoff.name}: In orbit around Earth`);
+      await expect(extraSheetPage.upNext).toBeVisible();
+      await expect(extraSheetPage.upNextTitle).toHaveText('See the real liftoff');
+      await expect(extraSheetPage.upNextPrimary).toHaveText(`Fly ${realLiftoff.name}`);
+      await expect(extraSheetPage.upNextPrimary).toBeInViewport();
+    });
+
+    await test.step('Fly it: the flight opens at its liftoff', async () => {
+      await extraSheetPage.upNextPrimary.click();
+      await expect(sitePage).toHaveURL(
+        new RegExp(`mission=${realLiftoff.mission}&event=${realLiftoff.id}`),
+      );
+      await missionPage.waitForLoad();
+      await expect(missionPage.missionName).toHaveText(realLiftoff.name);
+      await expect(cardPage.title).toHaveText(realLiftoff.title);
     });
   });
 });
