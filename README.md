@@ -85,8 +85,8 @@ Under the missions are seven things to try and explore:
 - [**Three rockets**](https://moon.ryanquellhorst.com/?extra=rockets): the three rockets that launched the Gemini and Apollo crews, side by side at their true heights.
 - [**Mission patches**](https://moon.ryanquellhorst.com/?extra=patches): a book of the crews' patches that fills in, in color, as you open each flight. The book is kept on your own device.
 
-A liftoff card in a mission offers Drop the stages with a "Try it" button, a docking card offers
-Dock two spacecraft, and Apollo 11's "Powered descent begins" card offers Land on the Moon.
+A liftoff card in a mission offers Fly to orbit with a "Try it" button, a docking card offers Dock
+two spacecraft, and Apollo 11's "Powered descent begins" card offers Land on the Moon.
 
 The four hands-on ones end the same way, with **Up next**: one button back to the flight it was
 opened from, or, opened from the list, to the flight where it really happened. Under it are

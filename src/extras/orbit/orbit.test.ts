@@ -11,11 +11,11 @@
  * keys as the frames pass: the arrows tip the rocket, and the space bar
  * presses "Drop it", which has the focus. jsdom draws no 3D view, so it
  * flies over its flat picture (and says so in the console, which these
- * tests keep quiet). It opens from the list and by its address over a
- * flight; no mission's moment offers it yet. That it can fly every flight's
- * own rocket to an event of the flight's own is checked in
- * src/sim/test/all-missions.test.ts, and how a rocket is read from a
- * flight's files in rocket.test.ts. The rules of a run are tested in
+ * tests keep quiet). It opens from the list, by its address over a flight,
+ * and from "Try it" on a liftoff's card. That every flight's liftoff offers
+ * it, with the flight's own rocket and an event of its own to end on, is
+ * checked in src/sim/test/all-missions.test.ts, and how a rocket is read
+ * from a flight's files in rocket.test.ts. The rules of a run are tested in
  * game.test.ts, and what the sheet adds around the extra's own next step in
  * src/ui/extra-sheet.test.ts.
  */
@@ -82,6 +82,9 @@ const OUT_OF_FUEL_LINE =
 
 /** The sheet, open on "Fly to orbit". */
 const theSheet = (): HTMLElement => screen.getByRole('dialog', { name: 'Fly to orbit' });
+
+/** The moment card, always on the screen during a flight. */
+const theCard = (): HTMLElement => screen.getByRole('region', { name: 'What is happening' });
 
 /** The three buttons that fly the rocket. */
 const theControls = (): HTMLElement =>
@@ -281,6 +284,40 @@ describe('fly to orbit', () => {
       await user.click(within(next).getByRole('button', { name: 'Back to Gemini 8' }));
 
       expect(screen.queryByRole('dialog', { name: 'Fly to orbit' })).not.toBeInTheDocument();
+    });
+
+    it("opened with Try it on Apollo 7's liftoff, flies its Saturn IB's two stages to its own orbit, and gives focus back to Try it", async () => {
+      withoutItsView();
+      const { user, frames } = await mountMission('apollo-7', { event: 'liftoff', loadExtra });
+      const tryIt = within(theCard()).getByRole('button', { name: 'Try it: Fly to orbit' });
+      await user.click(tryIt);
+      expect(await within(theSheet()).findByText("Apollo 7's rocket: the Saturn IB")).toBeVisible();
+
+      const next = await flyToOrbit(user, frames, TWO_STAGES);
+
+      expect(
+        within(theSheet()).getByRole('heading', {
+          level: 3,
+          name: 'Apollo 7: In orbit, still on the rocket',
+        }),
+      ).toBeVisible();
+      expect(
+        within(theSheet()).getByText('October 11, 1968. 10 minutes 26.76 seconds after liftoff.'),
+      ).toBeVisible();
+      expect(
+        within(theSheet()).getByText(
+          'The real first stage dropped away at 2 minutes 25.59 seconds.',
+        ),
+      ).toBeVisible();
+      expect(within(theSheet()).queryByText(/^The real second stage/)).not.toBeInTheDocument();
+      expect(
+        within(next).getByRole('heading', { level: 3, name: 'Pick up Apollo 7 after liftoff' }),
+      ).toBeVisible();
+
+      await user.click(within(next).getByRole('button', { name: 'Back to Apollo 7' }));
+
+      expect(screen.queryByRole('dialog', { name: 'Fly to orbit' })).not.toBeInTheDocument();
+      expect(tryIt).toHaveFocus();
     });
 
     it('opened over Apollo 12, whose story has no event at orbit insertion, ends on its liftoff with the day alone and its real drop times', async () => {

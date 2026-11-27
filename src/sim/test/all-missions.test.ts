@@ -6,7 +6,7 @@ import { existsSync, readdirSync } from 'node:fs';
  *
  * A folder with flight.ts is a flight: its plan must build into a sound
  * path, and its story, vehicle, summary, sources, and photos must agree with
- * it and with each other, and give Fly to orbit a rocket it can fly. A folder
+ * it and with each other, and with the game its liftoff offers. A folder
  * with memorial.ts (Apollo 1) is a page of remembrance: its citations and
  * photo are checked.
  *
@@ -622,7 +622,7 @@ for (const folder of flights) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Fly to orbit, over every flight.                                    */
+/* The game each liftoff offers.                                       */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -640,26 +640,28 @@ const rocketNameOf = (story: Mission): string =>
   story.launch?.value.vehicle.replace(/\s*\([^)]*\)\s*$/, '') ?? '';
 
 /**
- * "Fly to orbit", opened over a flight, reads the flight's own files with
- * rocketFrom (src/extras/orbit/rocket.ts): with no rocket there, it would
- * fly Apollo 11's instead. Its climb must start at the flight's liftoff (so
- * "Up next" says "after liftoff" when it was opened there), and its end
- * screen tells an event of the flight's own (realEnd: the one at orbit
- * insertion, or else the liftoff).
+ * "Fly to orbit", opened from a flight's liftoff, reads the flight's own
+ * files with rocketFrom (src/extras/orbit/rocket.ts): with no rocket there,
+ * it would fly Apollo 11's instead. Its climb must start at the liftoff that
+ * offers it (so "Up next" says "after liftoff"), and its end screen tells an
+ * event of the flight's own (realEnd: the one at orbit insertion, or else
+ * the liftoff).
  */
 describe('all missions: Fly to orbit at liftoff', () => {
   it.each(flights.map((folder) => [folder.id, folder] as const))(
-    "%s: Fly to orbit flies the flight's own rocket with that rocket's stages and ends on an event of the flight's own",
+    "%s: its liftoff offers Fly to orbit, which flies the flight's own rocket with that rocket's stages and ends on an event of the flight's own",
     (id, { story, flight, vehicle, leftBehind }) => {
       const rocket = rocketFrom({ mission: story, flight, vehicle, leftBehind });
       const end = rocket && realEnd(rocket);
 
       expect({
+        game: story.events.find((event) => event.id === 'liftoff')?.handsOn,
         flight: rocket?.mission.id,
         rocket: rocket && { stages: rocket.stages, drops: rocket.drops.length },
         climbStartsAt: rocket?.climb.liftoffEvent?.id,
         endsOnItsOwnEvent: story.events.some((event) => event === end?.event),
       }).toEqual({
+        game: 'orbit',
         flight: id,
         rocket: ROCKETS.get(rocketNameOf(story)),
         climbStartsAt: 'liftoff',

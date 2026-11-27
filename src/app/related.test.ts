@@ -10,9 +10,9 @@
 import { describe, expect, it } from 'vitest';
 import { summary as apollo1 } from '../content/missions/apollo-1/summary.ts';
 import { summary as apollo7 } from '../content/missions/apollo-7/summary.ts';
+import { story as apollo8Story } from '../content/missions/apollo-8/story.ts';
 import { story as apollo11Story } from '../content/missions/apollo-11/story.ts';
 import { summary as apollo11 } from '../content/missions/apollo-11/summary.ts';
-import { story as apollo12Story } from '../content/missions/apollo-12/story.ts';
 import { summary as apollo12 } from '../content/missions/apollo-12/summary.ts';
 import { summary as apollo13 } from '../content/missions/apollo-13/summary.ts';
 import { summary as apollo17 } from '../content/missions/apollo-17/summary.ts';
@@ -78,7 +78,7 @@ describe('nextFlight', () => {
 
 describe('handsOnPick', () => {
   it.each([
-    ['a flight that names only its liftoff', apollo12Story, EXTRAS, 'stages', 'liftoff'],
+    ['a flight that names only its liftoff', apollo8Story, EXTRAS, 'orbit', 'liftoff'],
     [
       'a flight with a docking, rather than its liftoff',
       gemini8Story,
@@ -90,8 +90,8 @@ describe('handsOnPick', () => {
     [
       'the liftoff, when the docking is not listed',
       gemini8Story,
-      [stages, rockets],
-      'stages',
+      [orbit, rockets],
+      'orbit',
       'liftoff',
     ],
   ])('picks %s', (_name, mission, extras, extra, event) => {

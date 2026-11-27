@@ -122,9 +122,7 @@ describe('the tour panel', () => {
       const { user, frames } = await mountMission('gemini-8', { start: 'tour' });
       await travelToNextStop(user, frames);
       expect(within(theCard()).getByRole('heading', { level: 3 })).toHaveTextContent('Liftoff');
-      expect(
-        within(theCard()).getByRole('button', { name: 'Try it: Drop the stages' }),
-      ).toBeVisible();
+      expect(within(theCard()).getByRole('button', { name: 'Try it: Fly to orbit' })).toBeVisible();
 
       await user.click(screen.getByRole('button', { name: 'Next' }));
 
@@ -133,7 +131,7 @@ describe('the tour panel', () => {
       );
       expect(within(theCard()).getByRole('heading', { level: 3 })).toHaveTextContent('Liftoff');
       expect(
-        within(theCard()).queryByRole('button', { name: 'Try it: Drop the stages' }),
+        within(theCard()).queryByRole('button', { name: 'Try it: Fly to orbit' }),
       ).not.toBeInTheDocument();
     });
 

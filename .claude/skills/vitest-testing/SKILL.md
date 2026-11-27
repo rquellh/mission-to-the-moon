@@ -466,18 +466,18 @@ it('says the extra did not load and offers to reload it here', async () => {
     start: 'explore',
     loadExtra: () => Promise.reject(new Error('The network went away')),
   });
-  await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
-  const sheet = screen.getByRole('dialog', { name: 'Drop the stages' });
+  await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
+  const sheet = screen.getByRole('dialog', { name: 'Fly to orbit' });
 
   expect(await within(sheet).findByRole('status')).toHaveTextContent(
-    'Drop the stages did not load. Check your connection and reload the page, or go back to the mission.',
+    'Fly to orbit did not load. Check your connection and reload the page, or go back to the mission.',
   );
   expect(within(sheet).getByRole('button', { name: 'Back to the mission' })).toHaveFocus();
 
   await user.click(within(sheet).getByRole('button', { name: 'Reload' }));
 
   expect(navigation.address).toBe(
-    'http://localhost:3000/?mission=apollo-11&event=liftoff&extra=stages',
+    'http://localhost:3000/?mission=apollo-11&event=liftoff&extra=orbit',
   );
 });
 ```
@@ -520,17 +520,17 @@ Every override lasts for its own test only: each test mounts afresh, and the set
 
 The data is the real content. Pick missions that differ in the way the test needs:
 
-| Need                                                                   | Mission                                                                                                                                                                                                                          |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A Moon flight with two craft, a landing, recordings, call signs        | `apollo-11`, `apollo-17`                                                                                                                                                                                                         |
-| Earth orbit, two craft, an event before liftoff, a spin, no call signs | `gemini-8`                                                                                                                                                                                                                       |
-| A short tour (6 stops), one craft                                      | `gemini-3`                                                                                                                                                                                                                       |
-| Sources borrowed from other missions                                   | `gemini-7` (from Gemini 6A and Gemini 8)                                                                                                                                                                                         |
-| A Moon flight with no landing, one craft                               | `apollo-8`                                                                                                                                                                                                                       |
-| A memorial page                                                        | `apollo-1` (opened from the mission list)                                                                                                                                                                                        |
-| A hands-on extra on an event                                           | `liftoff` on most flights ("Drop the stages"); `docking` on Gemini 8 ("Dock two spacecraft"); `powered-descent` on Apollo 11 ("Land on the Moon", so its ending suggests it)                                                     |
-| The end of a flight                                                    | `apollo-11` with `event: 'splashdown'` (the last moment, at the end of the clock: Finish shows); `gemini-8` (suggests the docking and the rockets); `gemini-3` (no crew patch)                                                   |
-| The end of a run in an extra ("Up next")                               | `apollo-11` with `event: 'liftoff'` and Try it (from a flight: back to Apollo 11; the picks are Fly to orbit and the landing sites); the docking opened from the list (Fly Gemini 8; the picks are Fly to orbit and the rockets) |
+| Need                                                                   | Mission                                                                                                                                                                                                                        |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A Moon flight with two craft, a landing, recordings, call signs        | `apollo-11`, `apollo-17`                                                                                                                                                                                                       |
+| Earth orbit, two craft, an event before liftoff, a spin, no call signs | `gemini-8`                                                                                                                                                                                                                     |
+| A short tour (6 stops), one craft                                      | `gemini-3`                                                                                                                                                                                                                     |
+| Sources borrowed from other missions                                   | `gemini-7` (from Gemini 6A and Gemini 8)                                                                                                                                                                                       |
+| A Moon flight with no landing, one craft                               | `apollo-8`                                                                                                                                                                                                                     |
+| A memorial page                                                        | `apollo-1` (opened from the mission list)                                                                                                                                                                                      |
+| A hands-on extra on an event                                           | `liftoff` on every flight ("Fly to orbit"); `docking` on Gemini 8 ("Dock two spacecraft"); `powered-descent` on Apollo 11 ("Land on the Moon", so its ending suggests it)                                                      |
+| The end of a flight                                                    | `apollo-11` with `event: 'splashdown'` (the last moment, at the end of the clock: Finish shows); `gemini-8` (suggests the docking and the rockets); `gemini-3` (no crew patch)                                                 |
+| The end of a run in an extra ("Up next")                               | `apollo-11` with `event: 'liftoff'` and Try it (from a flight: back to Apollo 11; the picks are the stages and the landing sites); the docking opened from the list (Fly Gemini 8; the picks are Fly to orbit and the rockets) |
 
 Assert with the content's own words, written out: `'The Eagle has landed'`, `'Stop 1 of 6'`, `'102:45:39'`. When the test passes text in (a no-3D note), take it from `copy` (`src/content/copy.ts`) as the site does.
 
@@ -597,8 +597,8 @@ An extra's code is the far side of the `loadExtra` edge. To test the sheet, pass
 
 ```ts
 /** A tiny extra: it says where it was opened, and can close itself or open another mission. */
-const tinyStages: Extra = {
-  meta: stages,
+const tinyOrbit: Extra = {
+  meta: orbit,
   mount(host, context, params) {
     const where = document.createElement('p');
     where.textContent = `Opened over ${context.missionId}, at ${params.get('event') ?? 'no event'}`;
@@ -617,8 +617,12 @@ Without a `loadExtra` option the mount loads `standInExtra`, which writes one li
 An extra's own tests (`src/extras/<id>/<id>.test.ts`) run the real extra in the real sheet: pass the registry's real loader, `loadExtra` from `src/extras/index.ts`, as the mount's `loadExtra` (the same way a memorial test hands over the real `loadMemorial`). jsdom draws no canvas, so the extra runs without its 3D view and on its own frame loop, driven by `frames.advance`: "Drop the stages" climbs to orbit by itself (each part drops when it is overdue), and "Dock two spacecraft" docks with its thruster buttons and some frames (it warns in the console that it has no 3D view; spy on `console.warn` to keep it quiet).
 
 ```ts
-const { user, frames } = await mountMission('apollo-11', { event: 'liftoff', loadExtra });
-await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
+// A liftoff's card offers "Fly to orbit", so "Drop the stages" opens over the flight by its address.
+const { user, frames } = await mountMission('apollo-11', {
+  event: 'liftoff',
+  extra: 'stages',
+  loadExtra,
+});
 await user.click(await within(theSheet()).findByRole('button', { name: 'Start' }));
 frames.advance(A_WHOLE_CLIMB);
 expect(within(theSheet()).getByRole('region', { name: 'Up next' })).toHaveTextContent(
@@ -954,18 +958,18 @@ Every test file follows this order. Here is `src/ui/extra-sheet.test.ts`, trimme
 // ── Imports ──────────────────────────────────
 import { describe, expect, it, vi } from 'vitest';
 import type { Mission } from '../content/types.ts';
-import { meta as stages } from '../extras/stages/meta.ts';
+import { meta as orbit } from '../extras/orbit/meta.ts';
 import type { Extra } from '../extras/types.ts';
 import { mountMission, navigation, screen, sound, within } from '../test/test-utils.ts';
 
 // ── Typed fixtures and tiny fakes ────────────
-const tinyStages: Extra = {
-  meta: stages,
+const tinyOrbit: Extra = {
+  meta: orbit,
   mount(host, context, params) {
     /* ... */
   },
 };
-const loadTinyStages = (): Promise<Extra> => Promise.resolve(tinyStages);
+const loadTinyOrbit = (): Promise<Extra> => Promise.resolve(tinyOrbit);
 const tryItOnTheLanding = (mission: Mission): Mission => ({/* ... */});
 
 // ── Test suites ──────────────────────────────
