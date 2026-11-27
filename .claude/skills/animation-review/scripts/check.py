@@ -21,6 +21,12 @@ import math
 import os
 import sys
 
+# rec_common.py sits beside this file, which `python3 -I` leaves off the path. No __pycache__ is
+# written, so a run leaves the checkout as it found it (record.mjs counts its changed files).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.dont_write_bytecode = True
+from rec_common import clock_text, number, parse_ships, read_tsv  # noqa: E402
+
 # Rules of thumb for the marks (see the module docstring).
 JUMP_PX = 40  # the followed craft moves this far on screen between two frames (or 4% of the diagonal)
 TURN_DEG_S = 60  # the camera's view direction turns faster than this
@@ -49,35 +55,6 @@ HANDBACK_LOOK_S = 0.75  # how far either side of a hand-back's move to look for 
 HIDDEN = 0.25
 
 
-def number(text):
-    try:
-        return float(text)
-    except (TypeError, ValueError):
-        return None
-
-
-def read_tsv(path):
-    if not os.path.exists(path):
-        return []
-    with open(path, encoding='utf-8') as handle:
-        lines = handle.read().rstrip('\n').split('\n')
-    head = lines[0].split('\t')
-    rows = []
-    for line in lines[1:]:
-        cells = line.split('\t')
-        if len(cells) == len(head):
-            rows.append(dict(zip(head, cells)))
-    return rows
-
-
-def clock_text(seconds):
-    if seconds is None:
-        return '---:--:--'
-    sign = '-' if seconds < 0 else ''
-    s = int(round(abs(seconds)))
-    return f'{sign}{s // 3600:03d}:{s % 3600 // 60:02d}:{s % 60:02d}'
-
-
 def span_text(seconds):
     s = abs(seconds)
     if s >= 86400:
@@ -87,30 +64,6 @@ def span_text(seconds):
     if s >= 60:
         return f'{int(s // 60)} m {int(s % 60)} s'
     return f'{s:.0f} s'
-
-
-def parse_ships(text):
-    """'csm:943,438,40x18@1.00 lm:gone' -> {'csm': {...}, 'lm': {'gone': True}}"""
-    ships = {}
-    if not text or text == '-':
-        return ships
-    for item in text.split(' '):
-        if ':' not in item:
-            continue
-        name, rest = item.split(':', 1)
-        if rest == 'gone':
-            ships[name] = {'gone': True, 'box': None, 'fade': 0.0, 'dot': False}
-            continue
-        dot = rest.endswith('+dot')
-        rest = rest[:-4] if dot else rest
-        where, _, fade = rest.partition('@')
-        box = None
-        if where != '-':
-            x, y, size = where.split(',')
-            w, h = size.split('x')
-            box = (float(x), float(y), float(w), float(h))
-        ships[name] = {'gone': False, 'box': box, 'fade': number(fade) or 0.0, 'dot': dot}
-    return ships
 
 
 def union_box(boxes):
