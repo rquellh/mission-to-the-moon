@@ -1,11 +1,12 @@
 /**
  * "Drop the stages" ends each climb with "Up next": back to the flight it
- * was opened from, or, opened from the list, the flight where that liftoff
- * really happened. The real extra runs in the real sheet. jsdom draws no 3D
- * picture, so it climbs without one, and as the frames pass each part drops
- * by itself. What the sheet adds around the extra's own next step (the
- * picks, All missions, the phone's "More to explore") is tested in
- * src/ui/extra-sheet.test.ts.
+ * was opened over, or, opened from the list, the flight where that liftoff
+ * really happened. A liftoff's card offers "Fly to orbit", so over a flight
+ * this opens by its address, at Apollo 11's liftoff. The real extra runs in
+ * the real sheet. jsdom draws no 3D picture, so it climbs without one, and
+ * as the frames pass each part drops by itself. What the sheet adds around
+ * the extra's own next step (the picks, All missions, the phone's "More to
+ * explore") is tested in src/ui/extra-sheet.test.ts.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -14,6 +15,7 @@ import {
   screen,
   within,
   type Frames,
+  type MountedMission,
   type User,
 } from '../../test/test-utils.ts';
 import { loadExtra } from '../index.ts';
@@ -23,6 +25,13 @@ const A_WHOLE_CLIMB = 60;
 
 /** The sheet, open on "Drop the stages". */
 const theSheet = (): HTMLElement => screen.getByRole('dialog', { name: 'Drop the stages' });
+
+/** The moment card, always on the screen during a flight. */
+const theCard = (): HTMLElement => screen.getByRole('region', { name: 'What is happening' });
+
+/** Open "Drop the stages" by its address over Apollo 11, at its liftoff. */
+const openOverTheLiftoff = (): Promise<MountedMission> =>
+  mountMission('apollo-11', { event: 'liftoff', extra: 'stages', loadExtra });
 
 /** Press Start once the rocket is on the pad, and let the frames pass until it is in orbit. */
 async function climbToOrbit(user: User, frames: Frames): Promise<HTMLElement> {
@@ -39,10 +48,8 @@ async function openFromTheList(user: User): Promise<void> {
 
 describe('drop the stages', () => {
   describe('the end of a climb', () => {
-    it('puts focus on the result, not on a button, and offers the way back to the flight it was opened from', async () => {
-      const { user, frames } = await mountMission('apollo-11', { event: 'liftoff', loadExtra });
-      const tryIt = screen.getByRole('button', { name: 'Try it: Drop the stages' });
-      await user.click(tryIt);
+    it('puts focus on the result, not on a button, and offers the way back to the flight it was opened over', async () => {
+      const { user, frames } = await openOverTheLiftoff();
 
       const next = await climbToOrbit(user, frames);
 
@@ -57,12 +64,12 @@ describe('drop the stages', () => {
       await user.click(within(next).getByRole('button', { name: 'Back to Apollo 11' }));
 
       expect(screen.queryByRole('dialog', { name: 'Drop the stages' })).not.toBeInTheDocument();
-      expect(tryIt).toHaveFocus();
+      expect(within(theCard()).getByRole('heading', { level: 3 })).toHaveTextContent('Liftoff');
+      expect(within(theCard()).getByRole('button', { name: 'Play' })).toHaveFocus();
     });
 
     it('goes back to the flight without a word of liftoff after another rocket was picked', async () => {
-      const { user, frames } = await mountMission('apollo-11', { event: 'liftoff', loadExtra });
-      await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
+      const { user, frames } = await openOverTheLiftoff();
       const first = await climbToOrbit(user, frames);
       await user.click(within(first).getByRole('button', { name: 'More to explore' }));
       await user.click(within(first).getByRole('button', { name: 'Try another rocket' }));
@@ -97,8 +104,7 @@ describe('drop the stages', () => {
     });
 
     it('climbs again from the pad with Try again, with Drop it to hand', async () => {
-      const { user, frames } = await mountMission('apollo-11', { event: 'liftoff', loadExtra });
-      await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
+      const { user, frames } = await openOverTheLiftoff();
       const next = await climbToOrbit(user, frames);
 
       await user.click(within(next).getByRole('button', { name: 'Try again' }));
@@ -108,8 +114,7 @@ describe('drop the stages', () => {
     });
 
     it('leaves the result as the visitor has it while the screen keeps drawing', async () => {
-      const { user, frames } = await mountMission('apollo-11', { event: 'liftoff', loadExtra });
-      await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
+      const { user, frames } = await openOverTheLiftoff();
       const next = await climbToOrbit(user, frames);
       await user.click(within(next).getByRole('button', { name: 'More to explore' }));
 

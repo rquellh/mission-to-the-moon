@@ -198,9 +198,7 @@ describe('the moment card', () => {
   describe('try it', () => {
     it("offers an event's hands-on extra, and only on that event", async () => {
       const { user } = await mountMission('gemini-8', { event: 'liftoff' });
-      expect(
-        within(theCard()).getByRole('button', { name: 'Try it: Drop the stages' }),
-      ).toBeVisible();
+      expect(within(theCard()).getByRole('button', { name: 'Try it: Fly to orbit' })).toBeVisible();
       await user.click(screen.getByRole('button', { name: 'Controls' }));
 
       await user.click(screen.getByRole('button', { name: 'Next event' }));

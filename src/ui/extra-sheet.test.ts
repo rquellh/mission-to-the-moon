@@ -11,7 +11,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Mission } from '../content/types.ts';
 import { extras } from '../extras/index.ts';
-import { meta as stages } from '../extras/stages/meta.ts';
+import { meta as orbit } from '../extras/orbit/meta.ts';
 import type { Extra, ExtraMeta } from '../extras/types.ts';
 import {
   mountMission,
@@ -24,8 +24,8 @@ import {
 } from '../test/test-utils.ts';
 
 /** A tiny extra: it says where it was opened, and can close itself or open another mission. */
-const tinyStages: Extra = {
-  meta: stages,
+const tinyOrbit: Extra = {
+  meta: orbit,
   mount(host, context, params) {
     const where = document.createElement('p');
     where.textContent = `Opened over ${context.missionId}, at ${params.get('event') ?? 'no event'}`;
@@ -42,7 +42,7 @@ const tinyStages: Extra = {
   },
 };
 
-const loadTinyStages = (): Promise<Extra> => Promise.resolve(tinyStages);
+const loadTinyOrbit = (): Promise<Extra> => Promise.resolve(tinyOrbit);
 
 /**
  * A tiny extra whose run is over as soon as it opens. It says how it was
@@ -110,8 +110,8 @@ const tryItOnTheLanding = (mission: Mission): Mission => ({
 
 /** Try it on Apollo 11's liftoff, and the end of its run: "Up next". */
 async function endFromLiftoff(user: User): Promise<HTMLElement> {
-  await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
-  return within(screen.getByRole('dialog', { name: 'Drop the stages' })).findByRole('region', {
+  await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
+  return within(screen.getByRole('dialog', { name: 'Fly to orbit' })).findByRole('region', {
     name: 'Up next',
   });
 }
@@ -130,34 +130,34 @@ describe('the extras sheet', () => {
     it('opens the extra for the moment it was opened from', async () => {
       const { user } = await mountMission('apollo-11', {
         start: 'explore',
-        loadExtra: loadTinyStages,
+        loadExtra: loadTinyOrbit,
       });
 
-      await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
+      await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
 
-      const sheet = screen.getByRole('dialog', { name: 'Drop the stages' });
+      const sheet = screen.getByRole('dialog', { name: 'Fly to orbit' });
       expect(
         await within(sheet).findByText('Opened over apollo-11, at liftoff'),
       ).toBeInTheDocument();
       expect(within(sheet).getByRole('button', { name: 'Close' })).toHaveFocus();
-      expect(document.title).toBe('Drop the stages · Mission to the Moon');
+      expect(document.title).toBe('Fly to orbit · Mission to the Moon');
     });
 
     it('rests the clock and the 3D view while open, and starts them again when it closes', async () => {
       const { user, director } = await mountMission('apollo-11', {
         start: 'explore',
-        loadExtra: loadTinyStages,
+        loadExtra: loadTinyOrbit,
       });
       await user.click(screen.getByRole('button', { name: 'Play' }));
 
-      await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
+      await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
 
       expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
       expect(director.drawing).toBe(false);
 
       await user.keyboard('{Escape}');
 
-      expect(screen.queryByRole('dialog', { name: 'Drop the stages' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Fly to orbit' })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
       expect(director.drawing).toBe(true);
     });
@@ -166,7 +166,7 @@ describe('the extras sheet', () => {
       const { user } = await mountMission('apollo-11', {
         story: tryItOnTheLanding,
         event: 'landing',
-        loadExtra: loadTinyStages,
+        loadExtra: loadTinyOrbit,
       });
       const card = screen.getByRole('region', { name: 'What is happening' });
       await user.click(
@@ -184,15 +184,15 @@ describe('the extras sheet', () => {
     it('closes when the extra asks, putting the page back as it was', async () => {
       const { user } = await mountMission('apollo-11', {
         start: 'explore',
-        loadExtra: loadTinyStages,
+        loadExtra: loadTinyOrbit,
       });
-      const tryIt = screen.getByRole('button', { name: 'Try it: Drop the stages' });
+      const tryIt = screen.getByRole('button', { name: 'Try it: Fly to orbit' });
       await user.click(tryIt);
-      const sheet = screen.getByRole('dialog', { name: 'Drop the stages' });
+      const sheet = screen.getByRole('dialog', { name: 'Fly to orbit' });
 
       await user.click(await within(sheet).findByRole('button', { name: 'Done' }));
 
-      expect(screen.queryByRole('dialog', { name: 'Drop the stages' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Fly to orbit' })).not.toBeInTheDocument();
       expect(screen.queryByText('Opened over apollo-11, at liftoff')).not.toBeInTheDocument();
       expect(document.title).toBe('Apollo 11 · Mission to the Moon');
       expect(tryIt).toHaveFocus();
@@ -201,9 +201,9 @@ describe('the extras sheet', () => {
     it('lets the extra open another mission', async () => {
       const { user } = await mountMission('apollo-11', {
         start: 'explore',
-        loadExtra: loadTinyStages,
+        loadExtra: loadTinyOrbit,
       });
-      await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
+      await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
 
       await user.click(await screen.findByRole('button', { name: 'Fly Gemini 8' }));
 
@@ -218,18 +218,18 @@ describe('the extras sheet', () => {
         start: 'explore',
         loadExtra: () => Promise.reject(new Error('The network went away')),
       });
-      await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
-      const sheet = screen.getByRole('dialog', { name: 'Drop the stages' });
+      await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
+      const sheet = screen.getByRole('dialog', { name: 'Fly to orbit' });
 
       expect(await within(sheet).findByRole('status')).toHaveTextContent(
-        'Drop the stages did not load. Check your connection and reload the page, or go back to the mission.',
+        'Fly to orbit did not load. Check your connection and reload the page, or go back to the mission.',
       );
       expect(within(sheet).getByRole('button', { name: 'Back to the mission' })).toHaveFocus();
 
       await user.click(within(sheet).getByRole('button', { name: 'Reload' }));
 
       expect(navigation.address).toBe(
-        'http://localhost:3000/?mission=apollo-11&event=liftoff&extra=stages',
+        'http://localhost:3000/?mission=apollo-11&event=liftoff&extra=orbit',
       );
     });
 
@@ -239,11 +239,11 @@ describe('the extras sheet', () => {
         start: 'explore',
         loadExtra: () => Promise.reject(new Error('The network went away')),
       });
-      await user.click(screen.getByRole('button', { name: 'Try it: Drop the stages' }));
+      await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
 
       await user.click(await screen.findByRole('button', { name: 'Back to the mission' }));
 
-      expect(screen.queryByRole('dialog', { name: 'Drop the stages' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Fly to orbit' })).not.toBeInTheDocument();
       expect(document.title).toBe('Apollo 11 · Mission to the Moon');
     });
   });
@@ -258,21 +258,21 @@ describe('the extras sheet', () => {
       const next = await endFromLiftoff(user);
 
       expect(
-        screen.getByText('Drop the stages for apollo-11, opened from a flight'),
+        screen.getByText('Fly to orbit for apollo-11, opened from a flight'),
       ).toBeInTheDocument();
       expect(
         within(next).getByRole('heading', { level: 3, name: 'Pick up Apollo 11' }),
       ).toBeVisible();
       expect(next).toHaveTextContent('Your flight is waiting where you left it.');
       const toTry = within(next).getByRole('group', { name: 'Try it yourself' });
-      expect(within(toTry).getByRole('heading', { level: 4 })).toHaveTextContent('Fly to orbit');
+      expect(within(toTry).getByRole('heading', { level: 4 })).toHaveTextContent('Drop the stages');
       const toExplore = within(next).getByRole('group', { name: 'More to explore' });
       expect(within(toExplore).getByRole('heading', { level: 4 })).toHaveTextContent(
         'Six landings on the Moon',
       );
       expect(within(next).getAllByRole('button')).toEqual([
         within(next).getByRole('button', { name: 'Back to Apollo 11' }),
-        within(toTry).getByRole('button', { name: 'Open Fly to orbit' }),
+        within(toTry).getByRole('button', { name: 'Open Drop the stages' }),
         within(toExplore).getByRole('button', { name: 'Open Six landings on the Moon' }),
         within(next).getByRole('button', { name: 'Try again' }),
         within(next).getByRole('button', { name: 'Pick another' }),
@@ -285,14 +285,14 @@ describe('the extras sheet', () => {
         wide: true,
         loadExtra: loadTinyEnds,
       });
-      const tryIt = screen.getByRole('button', { name: 'Try it: Drop the stages' });
+      const tryIt = screen.getByRole('button', { name: 'Try it: Fly to orbit' });
       const next = await endFromLiftoff(user);
 
       await user.click(within(next).getByRole('button', { name: 'Try again' }));
       expect(screen.getByText('Run 2')).toBeInTheDocument();
 
       await user.click(within(next).getByRole('button', { name: 'Back to Apollo 11' }));
-      expect(screen.queryByRole('dialog', { name: 'Drop the stages' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Fly to orbit' })).not.toBeInTheDocument();
       expect(tryIt).toHaveFocus();
     });
 
@@ -302,21 +302,21 @@ describe('the extras sheet', () => {
         wide: true,
         loadExtra: loadTinyEnds,
       });
-      const tryIt = screen.getByRole('button', { name: 'Try it: Drop the stages' });
+      const tryIt = screen.getByRole('button', { name: 'Try it: Fly to orbit' });
       const next = await endFromLiftoff(user);
 
-      await user.click(within(next).getByRole('button', { name: 'Open Fly to orbit' }));
+      await user.click(within(next).getByRole('button', { name: 'Open Drop the stages' }));
 
-      const orbit = screen.getByRole('dialog', { name: 'Fly to orbit' });
+      const stages = screen.getByRole('dialog', { name: 'Drop the stages' });
       expect(
-        await within(orbit).findByText('Fly to orbit for apollo-11, opened from a flight'),
+        await within(stages).findByText('Drop the stages for apollo-11, opened from a flight'),
       ).toBeInTheDocument();
       expect(
-        within(orbit).queryByText('Drop the stages for apollo-11, opened from a flight'),
+        within(stages).queryByText('Fly to orbit for apollo-11, opened from a flight'),
       ).not.toBeInTheDocument();
-      expect(document.title).toBe('Fly to orbit · Mission to the Moon');
+      expect(document.title).toBe('Drop the stages · Mission to the Moon');
 
-      await user.click(within(orbit).getByRole('button', { name: 'Close' }));
+      await user.click(within(stages).getByRole('button', { name: 'Close' }));
 
       expect(tryIt).toHaveFocus();
       expect(document.title).toBe('Apollo 11 · Mission to the Moon');
@@ -484,7 +484,7 @@ describe('the extras sheet', () => {
         await user.keyboard('{Escape}');
 
         expect(within(next).getByRole('button', { name: 'More to explore' })).toHaveFocus();
-        expect(screen.getByRole('dialog', { name: 'Drop the stages' })).toBeVisible();
+        expect(screen.getByRole('dialog', { name: 'Fly to orbit' })).toBeVisible();
       });
     });
   });

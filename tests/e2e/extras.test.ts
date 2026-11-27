@@ -76,9 +76,10 @@ test.describe('Every extra opens and closes', () => {
  * A hands-on extra opened on its own, with no flight behind it, is played
  * to its end, and "Up next" flies the flight where it really happened: in a
  * real browser on a desktop and on a phone, where the next step is pinned
- * within reach however long the result is. What "Up next" says and offers
- * is tested in the interface tests (src/ui/extra-sheet.test.ts and each
- * extra's own tests).
+ * within reach however long the result is. Fly to orbit's journey goes on
+ * to that flight's liftoff card, whose "Try it" opens the game over it. What
+ * "Up next" says and offers is tested in the interface tests
+ * (src/ui/extra-sheet.test.ts and each extra's own tests).
  */
 test.describe('The end of a hands-on extra', () => {
   test('a visitor docks the Gemini with the Agena, and flies the real first docking from Up next', async ({
@@ -165,7 +166,7 @@ test.describe('The end of a hands-on extra', () => {
     });
   });
 
-  test('a visitor flies the Saturn V to orbit, and flies the real liftoff from Up next', async ({
+  test('a visitor flies the Saturn V to orbit, flies the real liftoff from Up next, and opens the game again from its card', async ({
     sitePage,
   }) => {
     // Climbing to orbit takes about 22 seconds of the toy's time from Start.
@@ -208,6 +209,14 @@ test.describe('The end of a hands-on extra', () => {
       await missionPage.waitForLoad();
       await expect(missionPage.missionName).toHaveText(realLiftoff.name);
       await expect(cardPage.title).toHaveText(realLiftoff.title);
+    });
+
+    await test.step('Try it on the liftoff card opens Fly to orbit over the flight, with its own rocket on the pad', async () => {
+      await expect(cardPage.tryIt).toHaveText('Try it: Fly to orbit');
+      await cardPage.tryIt.click();
+      await extraSheetPage.waitForLoad();
+      await expect(extraSheetPage.sheet).toHaveAttribute('data-extra', 'orbit');
+      await expect(orbitPage.rocket).toHaveText(`${realLiftoff.name}'s rocket: the Saturn V`);
     });
   });
 });

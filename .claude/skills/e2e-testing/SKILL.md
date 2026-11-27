@@ -770,7 +770,7 @@ tests/
 │   ├── doors.test.ts           # The moment card's doors: Tell me more and Controls open, close, and give focus back
 │   ├── ending.test.ts          # Explore to the end, Finish, open More to explore (the ship clear of it), fly the next flight
 │   ├── explore.test.ts         # Choose Explore on my own, open Controls, look through the views, True scale, Play
-│   ├── extras.test.ts          # Every extra opens and closes (desktop); dock, land, and fly to orbit to the end, and fly the real flight from Up next
+│   ├── extras.test.ts          # Every extra opens and closes (desktop); dock, land, and fly to orbit to the end, fly the real flight from Up next, and open Fly to orbit from its liftoff card
 │   ├── missions.test.ts        # Every mission opens in the Ship view (desktop)
 │   ├── no-webgl.test.ts        # Without WebGL the mission can still be read (desktop)
 │   ├── scene.test.ts           # What the scene draws, at moments it has drawn wrong before, and the ship clear of the card and its doors
