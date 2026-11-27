@@ -88,8 +88,11 @@ export interface Director {
   /**
    * Move the camera to a view. "journey" frames Earth and Moon together;
    * "spacecraft" follows the ship the story is following at the moment.
+   * `at` is the mission time the view should frame the spacecraft for, when
+   * that is not now: a tour on its way to a stop asks for the view as it
+   * should look when it arrives.
    */
-  setView(view: EventView): void;
+  setView(view: EventView, options?: { at?: number }): void;
   /** Keep the framed subject clear of the parts of the canvas the interface covers. */
   setViewInsets(insets: ViewInsets): void;
   /**
@@ -100,6 +103,8 @@ export interface Director {
   setDrawing?(drawing: boolean): void;
   /** True while the followed ship circles too fast to follow and the scene shows its calm fast-forward view. Subscribers are told when it changes. */
   readonly fastForward?: boolean;
+  /** True while the camera is on its way to a view, or back to the ship from its fast-forward view. Subscribers are told when it changes. */
+  readonly moving?: boolean;
   /** Hear when the view or the scale mode changes. Returns a function that stops listening. */
   subscribe(listener: (director: Director) => void): () => void;
 }

@@ -249,7 +249,8 @@ export const copy = {
   tour: {
     label: 'Guided tour',
     stopOf: (index: number, total: number) => `Stop ${index} of ${total}`,
-    onTheWay: 'On the way…',
+    /** Before the counter while the tour travels: "On the way to Stop 5 of 12". */
+    onTheWayTo: 'On the way to',
     back: 'Back',
     next: 'Next',
     finish: 'Finish',
@@ -257,6 +258,9 @@ export const copy = {
     skip: 'Skip',
     skipLabel: 'Skip to this stop',
     exit: 'Exit tour',
+    /** Said as the tour sets off: the card stays on the stop just left until the clock reaches the next one. */
+    headingFor: (index: number, total: number, title: string) =>
+      `On the way to stop ${index} of ${total}: ${title}.`,
     arrived: (index: number, total: number, title: string) =>
       `Stop ${index} of ${total}: ${title}.`,
     ended: 'Tour ended. You are exploring on your own.',

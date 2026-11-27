@@ -38,7 +38,13 @@ import {
 } from '../content/types.ts';
 import { extraFor, extras, isExtraReady } from '../extras/index.ts';
 import type { Extra } from '../extras/types.ts';
-import { buildFlightPath, createStoryTime, storyKeyTimes } from '../sim/index.ts';
+import {
+  buildFlightPath,
+  createStoryTime,
+  partingsAtEvents,
+  storyKeyTimes,
+  type Parting,
+} from '../sim/index.ts';
 import { createAudioPlayer } from '../ui/audio-player.ts';
 import { mountInterface, type InterfaceOptions, type MissionInterface } from '../ui/interface.ts';
 import { setScreen } from './browser.ts';
@@ -97,6 +103,7 @@ interface Prepared {
   story: StoryMap;
   start: number;
   end: number;
+  partings: Parting[];
 }
 
 const prepared = new Map<string, Promise<Prepared>>();
@@ -107,12 +114,8 @@ function prepare(id: string): Promise<Prepared> {
     ready = loadBundle(id).then((bundle) => {
       if (bundle.mission.id !== id) throw new Error(`There is no mission "${id}"`);
       const path = buildFlightPath(bundle.flight);
-      const storyTime = createStoryTime(
-        storyKeyTimes(
-          path,
-          bundle.mission.events.map((event) => elapsedToSeconds(event.elapsed)),
-        ),
-      );
+      const eventTimes = bundle.mission.events.map((event) => elapsedToSeconds(event.elapsed));
+      const storyTime = createStoryTime(storyKeyTimes(path, eventTimes));
       const keys = storyTime.keyTimes;
       const story: StoryMap = {
         duration: storyTime.length,
@@ -124,6 +127,7 @@ function prepare(id: string): Promise<Prepared> {
         story,
         start: keys[0] ?? path.start,
         end: keys[keys.length - 1] ?? path.end,
+        partings: partingsAtEvents(path, eventTimes),
       };
     });
     prepared.set(id, ready);
@@ -178,7 +182,7 @@ export async function mountMission(
   id: string,
   options: MountOptions = {},
 ): Promise<MountedMission> {
-  const { bundle, story, start, end } = await prepare(id);
+  const { bundle, story, start, end, partings } = await prepare(id);
   const mission = options.story ? options.story(bundle.mission) : bundle.mission;
   setScreen({ wide: options.wide ?? false });
   freshPage();
@@ -216,6 +220,7 @@ export async function mountMission(
           : Promise.reject(new Error(`There is no extra "${extraId}"`));
       }),
     player,
+    partings,
     director,
     has3D: !options.no3D,
   };

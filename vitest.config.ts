@@ -19,7 +19,12 @@ export default defineConfig({
         test: {
           name: 'flight',
           environment: 'node',
-          include: ['src/sim/**/*.test.ts', 'src/app/**/*.test.ts', 'src/content/**/*.test.ts'],
+          include: [
+            'src/sim/**/*.test.ts',
+            'src/app/**/*.test.ts',
+            'src/content/**/*.test.ts',
+            'src/scene/**/*.test.ts',
+          ],
         },
       },
       {

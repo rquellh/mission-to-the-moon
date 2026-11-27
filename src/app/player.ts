@@ -21,7 +21,7 @@ const TRIP_MAX_FRAME_SECONDS = 1;
  * over as many as it arrives (each at most half the trip), so it neither
  * lurches away from where it was nor slams into where it is going.
  */
-const TRIP_EASE_SECONDS = 1.5;
+export const TRIP_EASE_SECONDS = 1.5;
 
 /*
  * A trip with more story to cover than it has real seconds is squeezed. It
