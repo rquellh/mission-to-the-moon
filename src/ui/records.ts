@@ -88,7 +88,7 @@ export function setUpRecords({ index, reducedMotion }: RecordsOptions): Records 
   const body = byId('records-body', HTMLDivElement);
   const scroll = byId('records-scroll', HTMLDivElement);
 
-  // The short text again, for a phone, where the card's own copy steps aside while this is open.
+  // The short text leads, since the card's own copy steps aside while this is open.
   const short = el('p', 'records__short');
   const story = part('story', copy.records.fullStory);
   const storyText = el('p', 'records__story');

@@ -3,7 +3,7 @@ import type { Locator, Page } from '@playwright/test';
 /**
  * The moment card (`dock`), always at the bottom during a flight: the story
  * of the moment, the photo's small picture, "Finish" (once exploring has
- * reached the end of the clock; it opens EndingPage), "Hear the recording",
+ * reached the end of the clock; it opens EndingPage), "Listen" (the recording),
  * "Try it", Play (TimelinePage), and its two doors, "Tell me more" (`recordsToggle`,
  * which opens RecordsPage) and "Controls" (`controlsToggle`, which opens the
  * tools in TimelinePage and the view buttons in MissionPage). Each door has
@@ -28,7 +28,7 @@ export class EventCardPage {
   // The doors
   readonly recordsToggle: Locator;
   readonly controlsToggle: Locator;
-  // On a phone, beside Play: the chapter and the day (or the clock, with Controls open)
+  // Beside Play while "Tell me more" is open: the chapter and the day (or, on a phone, the clock with Controls open)
   readonly status: Locator;
   readonly statusChapter: Locator;
   readonly statusDay: Locator;

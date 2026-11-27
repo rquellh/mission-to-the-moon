@@ -170,7 +170,7 @@ describe('the extras sheet', () => {
       });
       const card = screen.getByRole('region', { name: 'What is happening' });
       await user.click(
-        within(card).getByRole('button', { name: 'Hear the recording, 15 seconds' }),
+        within(card).getByRole('button', { name: 'Listen to the recording, 15 seconds' }),
       );
       sound.starts();
 

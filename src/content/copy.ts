@@ -178,7 +178,7 @@ export const copy = {
     beforeLiftoff: 'before liftoff',
     /** Beside the clock on flights longer than two days. Day 1 is the first 24 hours. */
     day: (day: number) => `Day ${day}`,
-    /** Under the chapter's name on a phone's card, on flights longer than two days. */
+    /** Under the chapter's name beside Play, on flights longer than two days. */
     dayOf: (day: number, total: number) => `Day ${day} of ${total}`,
     /** Beside the clock while the ship circles too fast to follow and the view holds still. */
     fastForward: 'Fast forward',
@@ -200,7 +200,7 @@ export const copy = {
     tellLess: 'Show less',
     /** The door to the tools for moving through the flight. */
     controls: 'Controls',
-    /** Beside Play on a phone: the chapter and the day, or the clock while Controls are open. */
+    /** Beside Play: the chapter and the day while "Tell me more" is open, or on a phone the clock while Controls are open. */
     where: 'Where the flight is',
     /** The photo's small picture on the card, which opens "Tell me more" at the photo. */
     seePhoto: 'See the photo',
@@ -227,7 +227,7 @@ export const copy = {
     credits: 'Sources and credits',
   },
 
-  /** The recording player on an event card. Its words are always shown as text. */
+  /** The recording player in "Tell me more", and its button on the moment card. Its words are always shown as text. */
   audio: {
     label: 'Recording',
     play: 'Hear the recording',
@@ -235,6 +235,9 @@ export const copy = {
     loading: 'Loading…',
     playLabel: (length: string) => `Hear the recording, ${length}`,
     pauseLabel: 'Pause the recording',
+    /** The card's shorter button for the same recording; its spoken name keeps the length. */
+    listen: 'Listen',
+    listenLabel: (length: string) => `Listen to the recording, ${length}`,
     playing: 'Playing the recording.',
     paused: 'Recording paused.',
     ended: 'The recording has ended.',

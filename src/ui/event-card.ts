@@ -43,7 +43,7 @@ export interface EventCardOptions {
  * The moment card's story: the moment on the clock, with its chapter, day,
  * and date over its title, and its short text in full. Beside it, the
  * photo's small picture, "Finish" once the clock has reached the end of the
- * flight, "Hear the recording", the "Tell me more" door (named "Sources"
+ * flight, "Listen" for its recording, the "Tell me more" door (named "Sources"
  * when the moment has nothing more than its sources), "Try it" when the
  * event has a hands-on extra, and the photo's credit.
  * It keeps "Tell me more" on the same moment, and the previous and next

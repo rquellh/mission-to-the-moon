@@ -22,8 +22,8 @@ export interface Timeline {
 
 /**
  * Play and pause on the moment card, with its progress strip (one segment
- * per chapter) and, on a phone, its status (the chapter and the day); and
- * the tools behind Controls: the mission clock, the scrubber (in story
+ * per chapter) and its status (the chapter and the day, shown while "Tell
+ * me more" is open); and the tools behind Controls: the mission clock, the scrubber (in story
  * time, with a tick for every event and labeled chapters), the chapter
  * menu, and the speed.
  */
@@ -175,7 +175,7 @@ export function setUpTimeline(player: Player, index: MissionIndex): Timeline {
     }
   };
 
-  // How long the flight lasts in days, for "Day 5 of 9" on a phone's card.
+  // How long the flight lasts in days, for "Day 5 of 9" beside Play.
   const totalDays = flightDay(index.end);
 
   /* Keep everything in step with the clock -------------------------- */

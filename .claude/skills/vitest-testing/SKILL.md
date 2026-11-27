@@ -209,7 +209,7 @@ The default screen is a phone's. `wide` switches the layout media query, for beh
 const { user } = await mountMission('apollo-11', { start: 'explore', wide: true });
 ```
 
-jsdom loads no stylesheet, so only the `hidden` attribute hides anything in an interface test. What the stylesheet alone hides on one layout (the card's story stepping aside for "Tell me more" on a phone, the phone's status on a wide screen) is the browser tests' to check.
+jsdom loads no stylesheet, so only the `hidden` attribute hides anything in an interface test. What the stylesheet alone hides (the card's story and its buttons stepping aside while "Tell me more" is open) is the browser tests' to check. Where the flight is, beside Play, is `hidden` itself: it shows the chapter and the day only while "Tell me more" is open (the story's eyebrow says them otherwise), and on a phone the clock while Controls are open.
 
 ### All the Options
 
@@ -713,7 +713,7 @@ within(sheet).getByRole('region', { name: 'Up next' }); // the end of a run in a
 within(upNext).getByRole('group', { name: 'Try it yourself' }); // a pick; also 'More to explore' (on a phone, once pulled up)
 within(ending).getByRole('group', { name: 'Next flight' }); // with More to explore open: also 'Try it yourself', 'More to explore'
 screen.getByRole('group', { name: 'Look at' }); // at the top left, with Controls open
-within(card).getByRole('group', { name: 'Where the flight is' }); // beside Play: the chapter and the day
+within(card).getByRole('group', { name: 'Where the flight is' }); // beside Play, with Tell me more open (or Controls, on a phone)
 within(timeline).getByRole('group', { name: 'Chapters' });
 
 // The card's story is an article named by its title, a level-3 heading ("Tell me more" has the same title)
@@ -734,7 +734,7 @@ within(timeline).getByRole('slider', { name: 'Mission time' });
 within(timeline).getByRole('combobox', { name: 'Speed' });
 within(records).getByRole('region', { name: 'Recording' });
 within(recording).getByRole('status');
-within(card).getByRole('button', { name: 'Hear the recording, 15 seconds' }); // the same recording, from the card
+within(card).getByRole('button', { name: 'Listen to the recording, 15 seconds' }); // the same recording, from the card ("Listen")
 
 // The mission on show in the list
 within(missionList()).getByRole('listitem', { current: true });

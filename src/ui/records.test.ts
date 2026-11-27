@@ -60,21 +60,6 @@ describe('"Tell me more"', () => {
       expect(door).toHaveFocus();
     });
 
-    it('closes with its door, as it opened', async () => {
-      const { user } = await mountMission('apollo-11', { event: 'landing', wide: true });
-      await openRecords(user, 'The Eagle has landed');
-
-      await user.click(within(theCard()).getByRole('button', { name: 'Tell me more' }));
-
-      expect(
-        screen.queryByRole('region', { name: 'The Eagle has landed' }),
-      ).not.toBeInTheDocument();
-      expect(within(theCard()).getByRole('button', { name: 'Tell me more' })).toHaveAttribute(
-        'aria-expanded',
-        'false',
-      );
-    });
-
     it('closes with Escape while focus is inside it', async () => {
       const { user } = await mountMission('apollo-11', { event: 'landing' });
       await openRecords(user, 'The Eagle has landed');

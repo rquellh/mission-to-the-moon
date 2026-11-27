@@ -1,10 +1,10 @@
 /**
  * The moment card: the story of the moment on the clock (its chapter, day,
  * and date, its title, and its short text in full), what sits beside it
- * (the photo's small picture, "Hear the recording", the "Tell me more"
- * door, "Try it"), and, on a phone, where the flight is beside Play. What
- * "Tell me more" holds is in records.test.ts, and the tools behind Controls
- * in timeline.test.ts.
+ * (the photo's small picture, "Listen", the "Tell me more" door, "Try
+ * it"), and where the flight is beside Play while "Tell me more" is open.
+ * What "Tell me more" holds is in records.test.ts, and the tools behind
+ * Controls in timeline.test.ts.
  */
 import { describe, expect, it } from 'vitest';
 import { story as apollo11 } from '../content/missions/apollo-11/story.ts';
@@ -60,9 +60,10 @@ describe('the moment card', () => {
       const card = theCard();
       expect(within(card).getByRole('button', { name: 'See the photo' })).toBeVisible();
       expect(within(card).getByText('Photo: NASA')).toBeVisible();
+      // A short word on the card; its spoken name says what it plays, and for how long.
       expect(
-        within(card).getByRole('button', { name: 'Hear the recording, 15 seconds' }),
-      ).toHaveTextContent('Hear the recording0:15');
+        within(card).getByRole('button', { name: 'Listen to the recording, 15 seconds' }),
+      ).toHaveTextContent('Listen0:15');
       expect(within(card).getByRole('button', { name: 'Tell me more' })).toHaveAttribute(
         'aria-expanded',
         'false',
@@ -81,7 +82,7 @@ describe('the moment card', () => {
       expect(within(card).queryByRole('button', { name: 'See the photo' })).not.toBeInTheDocument();
       expect(within(card).queryByText(/^Photo:/)).not.toBeInTheDocument();
       expect(
-        within(card).queryByRole('button', { name: /^Hear the recording/ }),
+        within(card).queryByRole('button', { name: /^Listen to the recording/ }),
       ).not.toBeInTheDocument();
       expect(within(card).getByRole('button', { name: 'Tell me more' })).toBeVisible();
     });
@@ -123,16 +124,54 @@ describe('the moment card', () => {
   });
 
   describe('where the flight is', () => {
-    it('says the chapter and the day of the flight beside Play on a phone', async () => {
-      await mountMission('apollo-11', { event: 'landing' });
+    it.each([
+      ['on a phone', false],
+      ['on a wide screen', true],
+    ])(
+      'leaves the chapter and the day to the story %s, rather than saying them again beside Play',
+      async (_layout, wide) => {
+        await mountMission('apollo-11', { event: 'landing', wide });
+
+        expect(within(theStory()).getByText('Landing · Day 5 · July 20, 1969')).toBeVisible();
+        expect(
+          within(theCard()).queryByRole('group', { name: 'Where the flight is' }),
+        ).not.toBeInTheDocument();
+      },
+    );
+
+    it('says the chapter and the day beside Play while "Tell me more" has the story\'s place', async () => {
+      const { user } = await mountMission('apollo-11', { event: 'landing' });
+
+      await user.click(within(theCard()).getByRole('button', { name: 'Tell me more' }));
 
       const where = within(theCard()).getByRole('group', { name: 'Where the flight is' });
       expect(within(where).getByText('Landing')).toBeVisible();
       expect(within(where).getByText('Day 5 of 9')).toBeVisible();
+
+      await user.click(screen.getByRole('button', { name: 'Show less' }));
+
+      expect(
+        within(theCard()).queryByRole('group', { name: 'Where the flight is' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('keeps the chapter and the day beside Play with Controls open on a wide screen, where the clock is among the tools', async () => {
+      const { user } = await mountMission('apollo-11', { event: 'landing', wide: true });
+      await user.click(within(theCard()).getByRole('button', { name: 'Tell me more' }));
+
+      await user.click(within(theCard()).getByRole('button', { name: 'Controls' }));
+
+      const where = within(theCard()).getByRole('group', { name: 'Where the flight is' });
+      expect(within(where).getByText('Landing')).toBeVisible();
+      expect(within(where).getByText('Day 5 of 9')).toBeVisible();
+      const timeline = screen.getByRole('region', { name: 'Timeline' });
+      expect(within(timeline).getByText('102:45:39')).toBeVisible();
     });
 
     it('leaves out the day on a flight too short to count days', async () => {
-      await mountMission('gemini-3', { start: 'explore' });
+      const { user } = await mountMission('gemini-3', { start: 'explore' });
+
+      await user.click(within(theCard()).getByRole('button', { name: 'Tell me more' }));
 
       const where = within(theCard()).getByRole('group', { name: 'Where the flight is' });
       expect(within(where).getByText('Launch')).toBeVisible();
