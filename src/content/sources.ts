@@ -91,7 +91,7 @@ const SHARED = {
     publisher: 'NASA Manned Spacecraft Center',
     url: 'https://ntrs.nasa.gov/citations/19700024568',
     checked: '2026-11-15',
-    use: 'How the Apollo 11 lunar module came down and went back up: descent orbit geometry, the direction of travel over the landing site, and orbit insertion after liftoff.',
+    use: 'How the Apollo 11 lunar module came down and went back up: descent orbit geometry, the direction of travel over the landing site, and orbit insertion after liftoff. In "Land on the Moon", that the ascent stage could take the crew back to orbit from an aborted descent, and that the call to land or abort came before the descent fuel ran out.',
   },
   'gemini-rendezvous-summary': {
     title: 'Summary of Rendezvous Operations (Gemini Summary Conference, NASA SP-138, paper 2)',

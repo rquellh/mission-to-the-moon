@@ -5,10 +5,13 @@
  * not a simulator: its rules and made-up numbers are in game.ts, and the
  * screen says what is simplified.
  *
- * The only facts shown come from missions' cited stories, with their own
+ * The facts shown come from missions' cited stories, with their own
  * citations: the real landing (Apollo 11's landing event, or the landing
  * event of the mission this was opened from, when it has one) and the
- * lunar module's name, from that mission's call signs.
+ * lunar module's name, from that mission's call signs. The game's own few
+ * sentences about the real flights (the boulders, the real descent, the
+ * top half flying back to orbit) are cited in facts.ts, and their sources
+ * are folded under the Start button, as "Dock two spacecraft" does.
  */
 import './landing.css';
 import type { Citation, ElapsedTime, Mission, MissionEvent } from '../../content/types.ts';
@@ -16,6 +19,7 @@ import { sourcesBlock } from '../../ui/citations.ts';
 import { button, el, setText } from '../../ui/dom.ts';
 import { formatDate, monthOf } from '../../ui/format.ts';
 import type { Extra, ExtraContext, ExtraMount, UpNextOptions } from '../types.ts';
+import { BACK_TO_ORBIT, BOULDERS, DESCENT } from './facts.ts';
 import {
   RULES,
   advance,
@@ -105,10 +109,15 @@ const TEXT = {
   across: 'Over the ground',
   // Not a fact from a source: what the word means, as the game uses it.
   whatLanding: 'Landing means bringing the lander down so gently that it can fly home again.',
+  // Its first sentence is Apollo 11's, cited in facts.ts (BOULDERS); the
+  // rest says how the game plays.
   howTo:
     'The computer is heading for a field of boulders. Slide over to clear ground, stop your slide, and come down slowly. Things in space keep moving: each push keeps going until you push the other way.',
   fuelRule: 'The engine holds you up, but it burns fuel every second. Do not take too long.',
   start: 'Start',
+  // Over the folded sources under Start: the game's sentences about the real flights that they back.
+  sourcesFor:
+    'Where the sentences on the boulders, the real descent, and the top half flying the crew back to orbit come from:',
   pad: 'Lander controls',
   thrust: {
     up: 'Slower',
@@ -155,6 +164,7 @@ const TEXT = {
   started: 'Started. The lander is coming down fast over the boulders.',
   fuelLow: 'Fuel is getting low.',
   fuelAlmost: 'Fuel is almost out.',
+  // The top half flying the crew back up to orbit is cited in facts.ts (BACK_TO_ORBIT).
   outOfFuel: 'Out of fuel. The top half is flying the crew back up to orbit. No landing this time.',
   landed: (name: string | undefined): string =>
     name ? `Landed. The ${name} is on the Moon.` : 'Landed. The lander is on the Moon.',
@@ -185,7 +195,8 @@ const TEXT = {
   // A landing's title is a sentence ("The Eagle has landed"), not a name for the moment.
   opensAt: 'Opens at the landing.',
   fly: (name: string): string => `Fly ${name}`,
-  // The simplification, said once in plain words.
+  // The simplification, said once in plain words. The real descent and the
+  // computer's help are cited in facts.ts (DESCENT).
   simplified:
     'A practice toy, not a simulator. The real descent took more than twelve minutes, and a computer helped the crew most of the way down. The distances and speeds here are not the real ones.',
 } as const;
@@ -358,7 +369,18 @@ async function mount(
   );
   const startButton = button('button button--primary button--large', TEXT.start);
   startButton.setAttribute('data-testid', 'landing-start');
-  intro.append(words, startButton);
+  // Everything to read before starting comes first, together; the folded
+  // sources of the sentences about the real flights go under the Start
+  // button, labeled as theirs, as "Dock two spacecraft" does.
+  const sources = sourcesBlock([...BOULDERS, ...DESCENT, ...BACK_TO_ORBIT]);
+  sources.setAttribute('aria-describedby', 'landing-sources-for');
+  const sourcesFor = el('p', 'landing__source-for', TEXT.sourcesFor);
+  sourcesFor.id = 'landing-sources-for';
+  // Together in one box, so on a phone held upright they can sit below the
+  // screen without moving the picture or Start (see landing.css).
+  const sourcesBox = el('div', 'landing__sources');
+  sourcesBox.append(sourcesFor, sources);
+  intro.append(words, startButton, sourcesBox);
 
   // While flying, and after the fuel runs out.
   const flying = el('section', 'landing__fly');
