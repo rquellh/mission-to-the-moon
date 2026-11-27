@@ -2,11 +2,13 @@
  * A trip's plan (planTrip): the usual shape where the clock's craft allow it,
  * and one held to the clock's hurry limit where they do not. The clocks here
  * are made up: story seconds map to a thousand mission seconds each, and the
- * limit is set by hand, so each rule is seen on its own.
+ * limit is set by hand, so each rule is seen on its own. And the mission
+ * clock's time, read from the story once for each place the clock stands at.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { StoryMap } from './contract.ts';
 import {
+  MissionPlayer,
   planTrip,
   TRIP_ARRIVE_SECONDS,
   TRIP_DEPART_SECONDS,
@@ -184,5 +186,27 @@ describe('a trip that would take longer than TRIP_LIMITED_MAX_SECONDS', () => {
       if (s > 9 && s < 52) fastestHeld = Math.max(fastestHeld, speed);
     }
     expect(fastestHeld).toBeCloseTo(plan.over, 6);
+  });
+});
+
+describe("the mission clock's time", () => {
+  it('is read from the story once while the clock stands still, and again once it moves', () => {
+    const map = clock();
+    const toElapsed = vi.spyOn(map, 'toElapsed');
+    const player = new MissionPlayer(0, 200_000, map, () => 0);
+
+    expect(player.time).toBe(0);
+    expect(player.time).toBe(0);
+    expect(toElapsed).toHaveBeenCalledTimes(1);
+
+    player.seek(42_000);
+    expect(player.time).toBe(42_000);
+    expect(player.time).toBe(42_000);
+    expect(toElapsed).toHaveBeenCalledTimes(2);
+    expect(toElapsed).toHaveBeenLastCalledWith(42);
+
+    player.seekStory(7);
+    expect(player.time).toBe(7_000);
+    expect(toElapsed).toHaveBeenCalledTimes(3);
   });
 });

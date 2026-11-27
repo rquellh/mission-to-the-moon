@@ -442,6 +442,9 @@ export class MissionPlayer implements Player {
   readonly story: StoryMap;
 
   private storyNow: number;
+  /** The storyNow that `elapsedNow` was read for (see time); none before the first read. */
+  private elapsedFor: number | undefined;
+  private elapsedNow = 0;
   private isPlaying = false;
   private playRate = 1;
   private trip: Trip | null = null;
@@ -465,7 +468,13 @@ export class MissionPlayer implements Player {
   }
 
   get time(): number {
-    return this.story.toElapsed(this.storyNow);
+    // The scene reads this many times a frame and the clock moves at most once a frame, so it is
+    // read from the story only when the clock has moved (by Object.is, so -0 is a move from 0).
+    if (!Object.is(this.elapsedFor, this.storyNow)) {
+      this.elapsedNow = this.story.toElapsed(this.storyNow);
+      this.elapsedFor = this.storyNow;
+    }
+    return this.elapsedNow;
   }
 
   get storyTime(): number {
