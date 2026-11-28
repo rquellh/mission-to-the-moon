@@ -63,7 +63,7 @@
   text-align: center;
 }
 
-/* On a phone the summary needs the room; the picture comes back with Try again. */
+/* On a phone the summary needs the room; the picture comes back with Play again. */
 [data-extra='stages'] .stages[data-screen='done'] .stages__stage {
   display: none;
 }

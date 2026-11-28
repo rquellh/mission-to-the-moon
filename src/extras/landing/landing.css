@@ -41,6 +41,15 @@
   flex: 0 0 260px;
 }
 
+/* With two goals missed, two tips sit under the stars: the picture gives up
+   the room they take, so on a phone Play again still shows above the pinned
+   "Up next". */
+[data-extra='landing']
+  .landing[data-phase='landed']:has(.game-goal--missed ~ .game-goal--missed)
+  .landing__view:not(.landing__view--flat) {
+  flex-basis: 220px;
+}
+
 [data-extra='landing'] .landing__canvas {
   position: absolute;
   inset: 0;
@@ -121,7 +130,7 @@
   gap: 8px;
 }
 
-/* Bars that fill from the left: the fuel, the fuel left, and the height. */
+/* Bars that fill from the left: the fuel, and the height without the 3D view. */
 [data-extra='landing'] .landing__bar {
   display: flex;
   height: 12px;
@@ -252,7 +261,7 @@
   padding-bottom: calc(var(--safe-bottom) + 18px);
 }
 
-/* Read-outs, and the result after landing. */
+/* The read-outs while flying. */
 [data-extra='landing'] .landing__readouts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -269,10 +278,6 @@
   border-radius: 12px;
   background: var(--color-raised);
   transition: border-color 200ms var(--ease-out);
-}
-
-[data-extra='landing'] .landing__readout--spread {
-  justify-content: space-between;
 }
 
 [data-extra='landing'] .landing__readout.is-good {
@@ -496,7 +501,10 @@
     min-height: 200px;
   }
 
-  [data-extra='landing'] .landing[data-phase='landed'] .landing__view:not(.landing__view--flat) {
+  [data-extra='landing'] .landing[data-phase='landed'] .landing__view:not(.landing__view--flat),
+  [data-extra='landing']
+    .landing[data-phase='landed']:has(.game-goal--missed ~ .game-goal--missed)
+    .landing__view:not(.landing__view--flat) {
     flex: 1 1 auto;
   }
 
@@ -583,6 +591,20 @@
 
   [data-extra='landing'] .landing--flying .landing__view {
     grid-area: view;
+  }
+
+  /* Out of fuel the read-outs and the controls step aside: the stars and
+     Play again take their place beside the picture, the coach line under it. */
+  [data-extra='landing'] .landing--flying:is([data-phase='aborting'], [data-phase='aborted']) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'view result'
+      'coach result';
+  }
+
+  [data-extra='landing'] .landing--flying .game-run-end {
+    grid-area: result;
+    align-self: start;
   }
 
   [data-extra='landing'] .landing--flying .landing__readouts {

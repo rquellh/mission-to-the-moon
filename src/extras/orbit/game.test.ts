@@ -1,14 +1,18 @@
 /**
- * The rules of "Fly to orbit", with no drawing and no page: a clean climb
- * to orbit for each rocket, the same climb made late, a climb with nothing
- * pressed, one tipped flat too soon, the path ahead, the stages, the thick
- * air, and the tilt controls. The flights are let along in tenths of a
- * second, as the frames would, and an empty stage is dropped on the frame
- * after it runs dry, as soon as a player could press "Drop it".
+ * The rules of "Fly to orbit", with no drawing and no page, all on Easy (the
+ * game as it first was): a clean climb to orbit for each rocket, the same
+ * climb made late, a climb with nothing pressed, one tipped flat too soon,
+ * the path ahead, the stages, the thick air, and the tilt controls; then
+ * what Hard changes, measured by flying it (a clean run, late runs, and
+ * pressing nothing); and which runs earn which of the three stars on each
+ * level. The flights are let along in tenths of a second, as the frames
+ * would, and an empty stage is dropped on the frame after it runs dry, as
+ * soon as a player could press "Drop it".
  *
  * Run: npx vitest run src/extras/orbit/game.test.ts
  */
 import { describe, expect, it } from 'vitest';
+import type { Level } from '../shared/levels.ts';
 import {
   advance,
   ahead,
@@ -17,7 +21,9 @@ import {
   drop,
   fuelShare,
   heightBand,
+  LEVEL_RULES,
   RULES,
+  runGoals,
   speedShare,
   startFlight,
   tiltDegrees,
@@ -25,11 +31,17 @@ import {
   type Ahead,
   type Flight,
   type Happening,
+  type RunGoals,
+  type Stages,
 } from './game.ts';
 
 /** One frame of the screen's clock. */
 const FRAME = 0.1;
 const ROCKETS = [3, 2] as const;
+const LEVELS = ['easy', 'hard'] as const;
+
+const EASY = LEVEL_RULES.easy;
+const HARD = LEVEL_RULES.hard;
 
 /**
  * The clean run's presses of "Tip over", in seconds from the start, the
@@ -43,9 +55,18 @@ const CLEAN_TIPS = [3.8, 6.3, 8.8, 11.3, 13.8, 16.3];
 const PAD_HEIGHT = RULES.rocketLength / 2;
 const CLEAR_OF_THICK_AIR = RULES.thickAirTop + RULES.rocketLength / 2;
 
-/** Seconds of burning in a full tank. */
-const tank = (stages: 2 | 3, stage: number): number => RULES.stageSeconds[stages][stage] ?? 0;
-const lastStage = (stages: 2 | 3): number => stages - 1;
+/** Seconds of burning in a full tank, on Easy unless another level is named. */
+const tank = (stages: Stages, stage: number, level: Level = 'easy'): number =>
+  LEVEL_RULES[level].stageSeconds[stages][stage] ?? 0;
+const lastStage = (stages: Stages): number => stages - 1;
+/** Seconds of burning in all of a rocket's stages together. */
+const allTanks = (stages: Stages, level: Level): number =>
+  LEVEL_RULES[level].stageSeconds[stages].reduce((sum, seconds) => sum + seconds, 0);
+/** When a stage runs dry if every stage below it is dropped at once: its tank and all those below it. */
+const emptyAt = (stages: Stages, stage: number, level: Level): number =>
+  LEVEL_RULES[level].stageSeconds[stages]
+    .slice(0, stage + 1)
+    .reduce((sum, seconds) => sum + seconds, 0);
 
 interface Pilot {
   /** When to press "Tip over", in seconds from the start. */
@@ -54,16 +75,23 @@ interface Pilot {
   flatOut?: boolean;
   /** Drop each empty stage on the next frame (the default), or leave it to drop by itself. */
   drops?: boolean;
+  /** Stages left on to drop by themselves, while the others are dropped at once. */
+  leaveOn?: readonly number[];
   /** Called at the start of every frame, after the presses. */
   watch?: (flight: Flight, seconds: number) => void;
 }
+
+/** How a run ends. */
+type Ending = Extract<Happening, { kind: 'orbit' | 'out-of-fuel' }>;
+const isEnding = (one: Happening): one is Ending =>
+  one.kind === 'orbit' || one.kind === 'out-of-fuel';
 
 interface Run {
   flight: Flight;
   /** Everything that happened, in order. */
   happened: Happening[];
   /** How the run ended: 'orbit' or 'out-of-fuel'. */
-  end: Happening;
+  end: Ending;
   /** Seconds from the start to the end of the frame the run ended in. */
   seconds: number;
   /** Every press that did something, as [seconds from the start, press]. */
@@ -74,9 +102,9 @@ interface Run {
   farthest: number;
 }
 
-/** Fly a rocket a frame at a time until the run ends, pressing as `pilot` says. */
-function fly(stages: 2 | 3, pilot: Pilot = {}): Run {
-  const flight = startFlight(stages);
+/** Fly a rocket a frame at a time until the run ends, pressing as `pilot` says, on Easy unless another level is named. */
+function fly(stages: Stages, pilot: Pilot = {}, level: Level = 'easy'): Run {
+  const flight = startFlight(level, stages);
   const run: Omit<Run, 'end' | 'seconds'> = {
     flight,
     happened: [],
@@ -94,7 +122,7 @@ function fly(stages: 2 | 3, pilot: Pilot = {}): Run {
     if (pilot.flatOut) {
       while (tip(flight, 'over') === 'tipped') run.presses.push([now, 'over']);
     }
-    if ((pilot.drops ?? true) && canDrop(flight)) {
+    if ((pilot.drops ?? true) && canDrop(flight) && !pilot.leaveOn?.includes(flight.stage)) {
       expect(drop(flight)).toBe('dropped');
       run.presses.push([now, 'drop']);
     }
@@ -103,7 +131,7 @@ function fly(stages: 2 | 3, pilot: Pilot = {}): Run {
     const happened = advance(flight, FRAME);
     run.happened.push(...happened);
     run.farthest = Math.max(run.farthest, flight.x);
-    const end = happened.find((one) => one.kind === 'orbit' || one.kind === 'out-of-fuel');
+    const end = happened.find(isEnding);
     if (end) return { ...run, end, seconds: (frame + 1) / 10 };
   }
   throw new Error('The run never ended.');
@@ -111,6 +139,22 @@ function fly(stages: 2 | 3, pilot: Pilot = {}): Run {
 
 /** The tilt presses of a run, shifted later by `late` seconds. */
 const lateBy = (late: number): number[] => CLEAN_TIPS.map((at) => at + late);
+
+/** The clean run's tilt presses, with those after `from` seconds held back by `wait` seconds more. */
+const waitingAfter = (from: number, wait: number): number[] =>
+  CLEAN_TIPS.map((at) => (at > from ? at + wait : at));
+
+/** Seconds of burning left in the last stage at the end of a run: none when it ran out of fuel. */
+function inHand(run: Run, stages: Stages, level: Level = 'easy'): number {
+  const share = run.end.kind === 'orbit' ? run.end.fuelLeft : 0;
+  return share * tank(stages, lastStage(stages), level);
+}
+
+/** The goals a run met, as stars: reached orbit, dropped every stage, fuel to spare. */
+function stars(run: Run): [boolean, boolean, boolean] {
+  const goals: RunGoals = runGoals(run.flight, run.end);
+  return [goals.orbit, goals.droppedAll, goals.spareFuel];
+}
 
 /**
  * Fly `flight` on by `seconds` (or to its end) with the tilt held, a frame
@@ -139,7 +183,7 @@ function holdOn(flight: Flight): Pick<Ahead, 'end' | 'outcome'> {
 
 /** A flight on its last stage, flat, high above the orbit line, a little short of orbit speed. */
 const nearlyInOrbit = (stages: 2 | 3): Flight => ({
-  ...startFlight(stages),
+  ...startFlight('easy', stages),
   stage: lastStage(stages),
   fuel: tank(stages, lastStage(stages)),
   height: RULES.orbitHeight + 1,
@@ -180,7 +224,7 @@ describe('the orbit game', () => {
     );
 
     it('goes straight up until the tail clears the thick air, then starts tipping', () => {
-      const flight = startFlight(3);
+      const flight = startFlight('easy', 3);
       const frames = Math.round((CLEAN_TIPS[0] ?? 0) * 10);
       for (let frame = 0; frame < frames - 1; frame += 1) advance(flight, FRAME);
 
@@ -324,7 +368,7 @@ describe('the orbit game', () => {
     });
 
     it('starts where the rocket is, puts a point every half second, and ends on the end', () => {
-      const flight = startFlight(3);
+      const flight = startFlight('easy', 3);
       advance(flight, 5);
       tip(flight, 'over');
 
@@ -342,7 +386,7 @@ describe('the orbit game', () => {
     });
 
     it('drops an empty stage at once, before the path sets off', () => {
-      const flight: Flight = { ...startFlight(2), height: 20, fuel: 0, emptyFor: 1 };
+      const flight: Flight = { ...startFlight('easy', 2), height: 20, fuel: 0, emptyFor: 1 };
 
       const look = ahead(flight);
 
@@ -363,7 +407,7 @@ describe('the orbit game', () => {
 
   describe('tipping', () => {
     it('cancels a press over with a press back', () => {
-      const flight: Flight = { ...startFlight(3), height: 20 };
+      const flight: Flight = { ...startFlight('easy', 3), height: 20 };
 
       expect(tip(flight, 'over')).toBe('tipped');
       expect(tip(flight, 'over')).toBe('tipped');
@@ -371,11 +415,11 @@ describe('the orbit game', () => {
       expect(tip(flight, 'back')).toBe('tipped');
       expect(tip(flight, 'back')).toBe('tipped');
 
-      expect(flight).toEqual({ ...startFlight(3), height: 20 });
+      expect(flight).toEqual({ ...startFlight('easy', 3), height: 20 });
     });
 
     it('never tips past straight up or past flat', () => {
-      const flight: Flight = { ...startFlight(3), height: 20 };
+      const flight: Flight = { ...startFlight('easy', 3), height: 20 };
 
       for (let press = 0; press < RULES.maxTilt; press += 1) tip(flight, 'over');
       expect(flight.tilt).toBe(RULES.maxTilt);
@@ -389,7 +433,7 @@ describe('the orbit game', () => {
     });
 
     it('tips only one step in the thick air, and leaves the flight alone when it says no', () => {
-      const flight = startFlight(2);
+      const flight = startFlight('easy', 2);
 
       expect(tip(flight, 'over')).toBe('tipped');
       const before = { ...flight };
@@ -409,10 +453,10 @@ describe('the orbit game', () => {
 
   describe('a step of time', () => {
     it('changes nothing in a step of no time, or after the end', () => {
-      const flight = startFlight(3);
+      const flight = startFlight('easy', 3);
       expect(advance(flight, 0)).toEqual([]);
       expect(advance(flight, -1)).toEqual([]);
-      expect(flight).toEqual(startFlight(3));
+      expect(flight).toEqual(startFlight('easy', 3));
 
       const inOrbit: Flight = { ...nearlyInOrbit(3), inOrbit: true };
       const outOfFuel: Flight = { ...nearlyInOrbit(2), fuel: 0 };
@@ -424,7 +468,7 @@ describe('the orbit game', () => {
     });
 
     it('climbs straight up at the climb speed, burning a second of fuel each second', () => {
-      const flight = startFlight(3);
+      const flight = startFlight('easy', 3);
 
       expect(advance(flight, 2)).toEqual([]);
 
@@ -458,7 +502,12 @@ describe('the orbit game', () => {
     });
 
     it('holds the sideways speed to the thin-air limit below the orbit line, and not above it', () => {
-      const below: Flight = { ...startFlight(3), height: 20, tilt: RULES.maxTilt, sideways: 1.9 };
+      const below: Flight = {
+        ...startFlight('easy', 3),
+        height: 20,
+        tilt: RULES.maxTilt,
+        sideways: 1.9,
+      };
       const above: Flight = { ...below, height: RULES.orbitHeight };
 
       advance(below, 2);
@@ -470,7 +519,7 @@ describe('the orbit game', () => {
 
     it('keeps sideways speed the rocket already had when it sinks back below the orbit line', () => {
       const flight: Flight = {
-        ...startFlight(3),
+        ...startFlight('easy', 3),
         height: RULES.orbitHeight - 0.1,
         tilt: RULES.maxTilt,
         sideways: RULES.thinAirSpeed + 0.3,
@@ -483,7 +532,7 @@ describe('the orbit game', () => {
 
     it('stops the rocket at the top of the picture and at the stop on the right, keeping its speed', () => {
       const flight: Flight = {
-        ...startFlight(3),
+        ...startFlight('easy', 3),
         height: RULES.maxHeight - 1,
         x: RULES.width - 3,
         tilt: 1,
@@ -500,7 +549,7 @@ describe('the orbit game', () => {
 
   describe('the stages', () => {
     it('does not burn past empty when a stage runs out partway through a step', () => {
-      const flight: Flight = { ...startFlight(3), height: 20, fuel: 0.5 };
+      const flight: Flight = { ...startFlight('easy', 3), height: 20, fuel: 0.5 };
 
       expect(advance(flight, 1.5)).toEqual([{ kind: 'stage-empty', stage: 0 }]);
 
@@ -513,7 +562,7 @@ describe('the orbit game', () => {
 
     it('stands a rocket that sinks back into the thick air up to the most tilt it allows', () => {
       const flight: Flight = {
-        ...startFlight(3),
+        ...startFlight('easy', 3),
         height: CLEAR_OF_THICK_AIR + 0.2,
         tilt: RULES.maxTilt,
         fuel: 0,
@@ -527,7 +576,7 @@ describe('the orbit game', () => {
     });
 
     it('sinks more slowly the faster it goes sideways, and never below the pad', () => {
-      const still: Flight = { ...startFlight(3), height: 20, fuel: 0 };
+      const still: Flight = { ...startFlight('easy', 3), height: 20, fuel: 0 };
       const fast: Flight = { ...still, sideways: RULES.orbitSpeed / 2 };
       const low: Flight = { ...still, height: PAD_HEIGHT + 0.1 };
 
@@ -541,9 +590,9 @@ describe('the orbit game', () => {
     });
 
     it('drops an empty stage by itself after a while, and the next one lights with a full tank', () => {
-      const flight: Flight = { ...startFlight(3), height: 20, fuel: 0 };
+      const flight: Flight = { ...startFlight('easy', 3), height: 20, fuel: 0 };
 
-      expect(advance(flight, RULES.dropsItselfAfter - FRAME)).toEqual([]);
+      expect(advance(flight, EASY.dropsItselfAfter - FRAME)).toEqual([]);
       expect(advance(flight, 2 * FRAME)).toEqual([{ kind: 'dropped', stage: 0, byItself: true }]);
 
       expect(flight.stage).toBe(1);
@@ -553,10 +602,10 @@ describe('the orbit game', () => {
     });
 
     it('drops a stage only when it is empty, and never the last one', () => {
-      const flight = startFlight(2);
+      const flight = startFlight('easy', 2);
 
       expect(drop(flight)).toBe('not-yet');
-      expect(flight).toEqual(startFlight(2));
+      expect(flight).toEqual(startFlight('easy', 2));
 
       advance(flight, tank(2, 0));
       expect(drop(flight)).toBe('dropped');
@@ -615,11 +664,11 @@ describe('the orbit game', () => {
       ['thin', 'a hair under the orbit line', RULES.orbitHeight - 0.01],
       ['space', 'on the orbit line', RULES.orbitHeight],
     ])("says '%s' when the rocket is %s", (band, _where, height) => {
-      expect(heightBand({ ...startFlight(3), height })).toBe(band);
+      expect(heightBand({ ...startFlight('easy', 3), height })).toBe(band);
     });
 
     it('gives speed and fuel as shares from 0 to 1', () => {
-      const flight: Flight = { ...startFlight(3), sideways: RULES.orbitSpeed / 4 };
+      const flight: Flight = { ...startFlight('easy', 3), sideways: RULES.orbitSpeed / 4 };
 
       expect(speedShare(flight)).toBeCloseTo(0.25);
       expect(fuelShare(flight)).toBe(1);
@@ -628,5 +677,254 @@ describe('the orbit game', () => {
 
       expect(fuelShare(flight)).toBeCloseTo(0.5);
     });
+  });
+
+  describe('the hard level', () => {
+    it.each(ROCKETS)(
+      'gives a rocket of %i stages less fuel in every stage, a second less in all',
+      (stages) => {
+        const easy = EASY.stageSeconds[stages];
+        const hard = HARD.stageSeconds[stages];
+
+        expect(hard).toHaveLength(easy.length);
+        expect(hard.every((seconds, stage) => seconds < (easy[stage] ?? 0))).toBe(true);
+        expect(allTanks(stages, 'hard')).toBe(allTanks(stages, 'easy') - 1);
+        expect(startFlight('hard', stages)).toMatchObject({ level: 'hard', fuel: hard[0] });
+      },
+    );
+
+    it('leaves an empty stage on twice as long as Easy does, 4 seconds, before it drops by itself', () => {
+      const flight: Flight = { ...startFlight('hard', 3), height: 20, fuel: 0 };
+
+      expect(advance(flight, HARD.dropsItselfAfter - FRAME)).toEqual([]);
+      expect(advance(flight, 2 * FRAME)).toEqual([{ kind: 'dropped', stage: 0, byItself: true }]);
+
+      expect(HARD.dropsItselfAfter).toBe(2 * EASY.dropsItselfAfter);
+      expect(flight.fuel).toBeCloseTo(tank(3, 1, 'hard') - FRAME);
+    });
+
+    it.each(ROCKETS)(
+      'reaches orbit on the clean run with a rocket of %i stages as soon as on Easy and with the same presses, with 1 to 1.5 seconds of burning in hand instead of 2 to 2.5',
+      (stages) => {
+        const easy = fly(stages, { tips: CLEAN_TIPS });
+
+        const run = fly(stages, { tips: CLEAN_TIPS }, 'hard');
+
+        expect(run.end.kind).toBe('orbit');
+        expect(run.seconds).toBe(easy.seconds);
+        expect(run.presses.filter(([, press]) => press !== 'drop')).toHaveLength(6);
+        expect(run.presses.filter(([, press]) => press === 'drop')).toHaveLength(stages - 1);
+        expect(run.refused).toBe(0);
+        expect(inHand(run, stages, 'hard')).toBeGreaterThan(1);
+        expect(inHand(run, stages, 'hard')).toBeLessThan(1.5);
+        expect(inHand(easy, stages)).toBeGreaterThan(2);
+        expect(inHand(easy, stages)).toBeLessThan(2.5);
+      },
+    );
+
+    it.each(ROCKETS)(
+      'still just reaches orbit with a rocket of %i stages when every tilt press is a second late, with less than half a second in hand',
+      (stages) => {
+        const run = fly(stages, { tips: lateBy(1) }, 'hard');
+
+        expect(run.end.kind).toBe('orbit');
+        expect(inHand(run, stages, 'hard')).toBeGreaterThan(0);
+        expect(inHand(run, stages, 'hard')).toBeLessThan(0.5);
+      },
+    );
+
+    it.each(ROCKETS)(
+      'runs out of fuel with a rocket of %i stages when every tilt press is a second and a half late, which Easy forgives',
+      (stages) => {
+        expect(fly(stages, { tips: lateBy(1.5) }, 'hard').end.kind).toBe('out-of-fuel');
+        expect(fly(stages, { tips: lateBy(1.5) }).end.kind).toBe('orbit');
+      },
+    );
+
+    it.each(ROCKETS)(
+      'goes straight up with a rocket of %i stages when nothing is pressed, each empty stage hanging on 4 seconds, and runs out of fuel at the top',
+      (stages) => {
+        const run = fly(stages, { drops: false }, 'hard');
+
+        expect(run.end.kind).toBe('out-of-fuel');
+        expect(run.presses).toEqual([]);
+        expect(run.happened.filter((one) => one.kind === 'dropped')).toHaveLength(stages - 1);
+        expect(run.flight.height).toBe(RULES.maxHeight);
+        expect(run.flight.sideways).toBe(0);
+        // Every tank burned dry, and each stage under the last one left on for the wait.
+        expect(run.seconds).toBeCloseTo(
+          allTanks(stages, 'hard') + (stages - 1) * HARD.dropsItselfAfter,
+          0,
+        );
+      },
+    );
+  });
+
+  describe('the stars', () => {
+    it('earns all three for reaching orbit with every stage dropped by hand and fuel to spare', () => {
+      const run = fly(3, { tips: CLEAN_TIPS });
+
+      expect(runGoals(run.flight, run.end)).toEqual({
+        orbit: true,
+        droppedAll: true,
+        spareFuel: true,
+      });
+    });
+
+    it('earns none when the fuel runs out', () => {
+      const run = fly(3, { tips: lateBy(3) });
+
+      expect(run.end).toEqual({ kind: 'out-of-fuel' });
+      expect(runGoals(run.flight, run.end)).toEqual({
+        orbit: false,
+        droppedAll: false,
+        spareFuel: false,
+      });
+    });
+
+    it('remembers a stage that dropped by itself, and not one dropped with Drop it', () => {
+      const byHand: Flight = { ...startFlight('easy', 3), height: 20, fuel: 0 };
+      const byItself: Flight = { ...byHand };
+
+      drop(byHand);
+      advance(byHand, EASY.dropsItselfAfter + FRAME);
+      advance(byItself, EASY.dropsItselfAfter + FRAME);
+
+      expect(startFlight('easy', 3).droppedItself).toBe(false);
+      expect(byHand.droppedItself).toBe(false);
+      expect(byItself.droppedItself).toBe(true);
+    });
+
+    it.each<[Level, Stages, string, () => Run, [boolean, boolean, boolean]]>([
+      ['easy', 3, 'the clean run', () => fly(3, { tips: CLEAN_TIPS }), [true, true, true]],
+      [
+        'easy',
+        3,
+        'every tip a second late',
+        () => fly(3, { tips: lateBy(1) }),
+        [true, true, false],
+      ],
+      [
+        'easy',
+        3,
+        'the clean tips with the first stage left on, which runs out of fuel',
+        () => fly(3, { tips: CLEAN_TIPS, leaveOn: [0] }),
+        [false, false, false],
+      ],
+      [
+        'easy',
+        3,
+        'the second stage left on and the last tip held back until it drops, as an empty stage burns no fuel',
+        () =>
+          fly(3, {
+            tips: waitingAfter(emptyAt(3, 1, 'easy'), EASY.dropsItselfAfter),
+            leaveOn: [1],
+          }),
+        [true, false, true],
+      ],
+      ['easy', 2, 'the clean run', () => fly(2, { tips: CLEAN_TIPS }), [true, true, true]],
+      [
+        'easy',
+        2,
+        'every tip a second late',
+        () => fly(2, { tips: lateBy(1) }),
+        [true, true, false],
+      ],
+      [
+        'easy',
+        2,
+        'the clean tips with the first stage left on, which runs out of fuel',
+        () => fly(2, { tips: CLEAN_TIPS, leaveOn: [0] }),
+        [false, false, false],
+      ],
+      [
+        'easy',
+        2,
+        'the first stage left on and the tips after it held back until it drops, as an empty stage burns no fuel',
+        () =>
+          fly(2, {
+            tips: waitingAfter(emptyAt(2, 0, 'easy'), EASY.dropsItselfAfter),
+            leaveOn: [0],
+          }),
+        [true, false, true],
+      ],
+      ['hard', 3, 'the clean run', () => fly(3, { tips: CLEAN_TIPS }, 'hard'), [true, true, true]],
+      [
+        'hard',
+        3,
+        'every tip a second late',
+        () => fly(3, { tips: lateBy(1) }, 'hard'),
+        [true, true, false],
+      ],
+      [
+        'hard',
+        3,
+        'the clean tips with the first stage left on, which runs out of fuel',
+        () => fly(3, { tips: CLEAN_TIPS, leaveOn: [0] }, 'hard'),
+        [false, false, false],
+      ],
+      [
+        'hard',
+        3,
+        'the second stage left on and the last tip held back until it drops, which sinks too far',
+        () =>
+          fly(
+            3,
+            {
+              tips: waitingAfter(emptyAt(3, 1, 'hard'), HARD.dropsItselfAfter),
+              leaveOn: [1],
+            },
+            'hard',
+          ),
+        [false, false, false],
+      ],
+      ['hard', 2, 'the clean run', () => fly(2, { tips: CLEAN_TIPS }, 'hard'), [true, true, true]],
+      [
+        'hard',
+        2,
+        'every tip a second late',
+        () => fly(2, { tips: lateBy(1) }, 'hard'),
+        [true, true, false],
+      ],
+      [
+        'hard',
+        2,
+        'the clean tips with the first stage left on, which runs out of fuel',
+        () => fly(2, { tips: CLEAN_TIPS, leaveOn: [0] }, 'hard'),
+        [false, false, false],
+      ],
+      [
+        'hard',
+        2,
+        'the first stage left on and the tips after it held back until it drops, which sinks too far',
+        () =>
+          fly(
+            2,
+            {
+              tips: waitingAfter(emptyAt(2, 0, 'hard'), HARD.dropsItselfAfter),
+              leaveOn: [0],
+            },
+            'hard',
+          ),
+        [false, false, false],
+      ],
+    ])(
+      'on %s with a rocket of %i stages, %s earns these stars',
+      (_level, _stages, _name, run, earned) => {
+        expect(stars(run())).toEqual(earned);
+      },
+    );
+
+    it.each(LEVELS.flatMap((level) => ROCKETS.map((stages) => [level, stages] as const)))(
+      'on %s with a rocket of %i stages, gives the star for fuel to spare to the clean run with about half a second of burning in hand',
+      (level, stages) => {
+        const run = fly(stages, { tips: CLEAN_TIPS }, level);
+        const needed =
+          LEVEL_RULES[level].spareFuel[stages] * tank(stages, lastStage(stages), level);
+
+        expect(inHand(run, stages, level) - needed).toBeGreaterThan(0.3);
+        expect(inHand(run, stages, level) - needed).toBeLessThan(0.7);
+      },
+    );
   });
 });

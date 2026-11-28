@@ -303,12 +303,17 @@ export function setUpEnding(options: EndingOptions): Ending {
         params: URLSearchParams,
       ): HTMLDivElement => {
         const box = tile(shelf, name, 'tile--extra');
+        // A game says Play; an extra to look through says Open.
+        const game = meta.kind === 'hands-on';
         const open = button('button tile__open');
-        open.setAttribute('aria-label', copy.ending.openExtra(meta.title));
+        open.setAttribute(
+          'aria-label',
+          game ? copy.ending.playExtra(meta.title) : copy.ending.openExtra(meta.title),
+        );
         open.setAttribute('aria-haspopup', 'dialog');
         open.setAttribute('data-testid', `ending-pick-${shelf}-open`);
         open.append(
-          el('span', 'tile__open-label', copy.ending.open),
+          el('span', 'tile__open-label', game ? copy.ending.play : copy.ending.open),
           icon('next', 'icon tile__chevron'),
         );
         open.addEventListener('click', () => onExtra(meta.id, params, open));

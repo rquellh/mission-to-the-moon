@@ -83,7 +83,7 @@ export const TOUR = {
 
 /** Events and moments the tests open by address, with what the page shows there. */
 export const EVENTS = {
-  /** Apollo 11's liftoff, where "Fly to orbit" opened from the list leads ("Fly Apollo 11"), and whose card offers it ("Try it"). */
+  /** Apollo 11's liftoff, where "Fly to orbit" opened from the list leads ("Fly Apollo 11"), and whose card offers it ("Play: Fly to orbit"). */
   APOLLO_11_LIFTOFF: {
     mission: 'apollo-11',
     id: 'liftoff',

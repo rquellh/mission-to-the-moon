@@ -31,10 +31,11 @@ let blocks = 0;
 /**
  * "Up next", at the end of a run in a hands-on extra: one recommended next
  * step in amber (what the extra says: back to the flight, or the flight
- * where it really happened), one pick from each shelf (the other hands-on
- * extra, and an extra to explore, from src/app/related.ts), and the quiet
- * actions (the extra's own, then All missions when the sheet was opened
- * from the list).
+ * where it really happened), or plain when the extra asks (`plainPrimary`:
+ * a game's own Play again is the amber one), one pick from each shelf (the
+ * other hands-on extra, and an extra to explore, from src/app/related.ts),
+ * and the quiet actions (the extra's own, then All missions when the sheet
+ * was opened from the list).
  *
  * Wide, it is a softly tinted box in the extra's column. On a phone the
  * next step is pinned at the bottom of the screen with the "again" action
@@ -66,7 +67,7 @@ export function buildUpNext(host: UpNextHost, options: UpNextOptions): HTMLEleme
   less.append(icon('chevron-down'));
   top.append(eyebrow, less);
 
-  /* The next step: its title, a line, a sentence, and the one amber button. */
+  /* The next step: its title, a line, a sentence, and its button (amber unless the extra asks for plain). */
   const step = el('div', 'up-next__step');
   if (options.mission) {
     const collected = readVisits().has(options.mission);
@@ -89,7 +90,10 @@ export function buildUpNext(host: UpNextHost, options: UpNextOptions): HTMLEleme
     .filter(Boolean)
     .join(' ');
   if (sentence) step.append(el('p', 'up-next__sentence', sentence));
-  const go = button('button button--primary up-next__go');
+  // Plain when the run's own main button (a game's Play again) is the amber one.
+  const go = button(
+    options.plainPrimary ? 'button up-next__go' : 'button button--primary up-next__go',
+  );
   go.setAttribute('data-testid', 'up-next-primary');
   go.append(options.primary.label, icon('arrow-right'));
   go.addEventListener('click', () => options.primary.run(), { signal });
@@ -106,11 +110,16 @@ export function buildUpNext(host: UpNextHost, options: UpNextOptions): HTMLEleme
     const label = el('p', 'tile__shelf', name);
     label.id = idOf(`shelf-${shelf}`);
     box.setAttribute('aria-labelledby', label.id);
+    // A game says Play; an extra to look through says Open.
+    const game = meta.kind === 'hands-on';
     const open = button('button tile__open');
-    open.setAttribute('aria-label', copy.upNext.openExtra(meta.title));
+    open.setAttribute(
+      'aria-label',
+      game ? copy.upNext.playExtra(meta.title) : copy.upNext.openExtra(meta.title),
+    );
     open.setAttribute('data-testid', `up-next-pick-${shelf}-open`);
     open.append(
-      el('span', 'tile__open-label', copy.upNext.open),
+      el('span', 'tile__open-label', game ? copy.upNext.play : copy.upNext.open),
       icon('next', 'icon tile__chevron'),
     );
     open.addEventListener(

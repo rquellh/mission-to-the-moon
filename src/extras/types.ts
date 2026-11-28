@@ -21,10 +21,14 @@ import type { MissionBundle } from '../content/missions/bundle.ts';
  *
  * WHERE IT SHOWS
  * - The mission list shows every listed extra under the missions, in two
- *   groups by `kind`, each sorted by `order`.
+ *   groups by `kind`, each sorted by `order`: the hands-on ones (the games)
+ *   under "Play a game", each with a Play button, and the rest under "More
+ *   to explore", each with Open. "Play a game" on the welcome opens the
+ *   list at the games.
  * - An event can point at a hands-on extra with `handsOn: "<id>"` (see
- *   MissionEvent in src/content/types.ts). Its card then shows "Try it",
- *   which opens the extra with `mission=<mission id>&event=<event id>`.
+ *   MissionEvent in src/content/types.ts). Its card then shows an amber
+ *   "Play: <title>" button, which opens the extra with
+ *   `mission=<mission id>&event=<event id>`.
  * - The end of every flight suggests one extra of each kind (see
  *   src/app/related.ts): a hands-on extra one of its events names, and an
  *   explore extra whose `missions` names the flight (otherwise "rockets").
@@ -55,7 +59,7 @@ import type { MissionBundle } from '../content/missions/bundle.ts';
  * call `preventDefault()` on that keydown.
  *
  * `context.origin` says how the sheet was opened: "flight" when a flight
- * is waiting behind it (a moment's "Try it", the end of a flight, or an
+ * is waiting behind it (a moment's Play button, the end of a flight, or an
  * address that names a mission or a place in one), "list" when it was
  * opened from the mission list or by an address that names only the
  * extra. The host decides it; do not guess it from `params`.
@@ -77,8 +81,11 @@ import type { MissionBundle } from '../content/missions/bundle.ts';
  * The host adds the rest: the patch of `mission` (and "Fly it to collect
  * its patch." until it is collected), the other hands-on extra and an
  * extra to explore (src/app/related.ts), each opened in place of yours,
- * and All missions when the sheet was opened from the list. The one amber
- * button at the end is the next step's, so make none of your own there.
+ * and All missions when the sheet was opened from the list. A game shows
+ * its own amber "Play again" under its result and passes `plainPrimary:
+ * true`, so the next step's button is drawn plain and Play again is the one
+ * amber button. An extra that is not a game makes no amber button of its
+ * own there: the next step's is the amber one.
  * Wide, the block sits in your column; on a phone the next step is pinned
  * at the bottom of the screen (the page leaves room for it at its end),
  * and "More to explore" pulls it up into a sheet with the rest. Put focus
@@ -96,7 +103,9 @@ import type { MissionBundle } from '../content/missions/bundle.ts';
  *            --color-surface-solid, --color-raised, --color-hover,
  *            --color-line, --color-line-strong,
  *            --color-accent (amber: the one main action and the active
- *            state), --color-accent-ink (text on amber), --color-accent-soft,
+ *            state; a moment's Play button for a game is the one allowed
+ *            second, so a game is easy to find), --color-accent-ink (text
+ *            on amber), --color-accent-soft,
  *            --color-accent-line, --color-csm (main ship path, amber),
  *            --color-lm (lunar module path, blue)
  *   Type     --font-sans; --font-mono for clock-like numbers (with
@@ -104,8 +113,10 @@ import type { MissionBundle } from '../content/missions/bundle.ts';
  *   Motion   --ease-out; keep transitions near 160 to 320 ms
  *   Space    --extra-gutter (the host's side padding), --gutter, and
  *            --safe-top, --safe-right, --safe-bottom, --safe-left
- *   Buttons  .button (44 px tall), .button--primary (amber, one per view),
- *            .button--quiet, .button--large, .icon-button; and a pressed
+ *   Buttons  .button (44 px tall), .button--primary (amber, one per view;
+ *            the one allowed second is the Play button on a moment's card,
+ *            because a game must be easy to find), .button--quiet,
+ *            .button--large, .icon-button; and a pressed
  *            state with .segmented + .segmented__item[aria-pressed]
  *            or .switch[aria-pressed]
  *   Text     .extra-heading (a section title), .extra-text (body text, 62ch),
@@ -114,7 +125,7 @@ import type { MissionBundle } from '../content/missions/bundle.ts';
  *   Layout   .extra-actions (a row of buttons that wraps)
  *   Folding  .disclosure with aria-expanded (as "Tell me more" does)
  *   Icons    icon() from src/ui/icons.ts (play, pause, previous, next,
- *            chevron-down, external); draw any others as inline SVG on a
+ *            chevron-down, external, game); draw any others as inline SVG on a
  *            24-unit grid with stroke-width 1.75, hidden with aria-hidden.
  *
  * Focus rings come from the global :focus-visible rule (a 2 px amber
@@ -184,7 +195,7 @@ export interface OpenMissionOptions {
 
 /**
  * How the sheet was opened. "flight": over a flight that is waiting behind
- * it (a moment's "Try it", the end of a flight, or an address that names a
+ * it (a moment's Play button, the end of a flight, or an address that names a
  * mission or a place in one). "list": from the mission list, or by an
  * address that names only the extra, with no flight behind it.
  */
@@ -199,7 +210,7 @@ export interface UpNextAction {
 /** One of the extra's own quiet actions at the end of a run. */
 export interface UpNextQuietAction extends UpNextAction {
   /**
-   * The run again ("Try again"): it gets the replay icon, and on a phone it
+   * The run again ("Play again"): it gets the replay icon, and on a phone it
    * stays in reach beside "More to explore". At most one.
    */
   again?: boolean;
@@ -221,9 +232,15 @@ export interface UpNextOptions {
    * picks are then chosen for that flight.
    */
   mission?: string;
-  /** The one amber button: the next step. */
+  /** The next step's button: amber, unless `plainPrimary` is true. */
   primary: UpNextAction;
-  /** The extra's own quiet actions, in order, for example Try again. */
+  /**
+   * Draw the next step's button as a plain button, not the amber one,
+   * because this run's own main button (a game's Play again) is the amber
+   * one. Default false.
+   */
+  plainPrimary?: boolean;
+  /** The extra's own quiet actions, in order, for example Play again. */
   actions?: readonly UpNextQuietAction[];
 }
 

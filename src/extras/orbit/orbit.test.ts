@@ -1,23 +1,27 @@
 /**
- * "Fly to orbit" folds the sources of its own sentences about the real
- * flights under its Start button, and ends each climb to orbit with the
- * flight's own orbit event (or, when its story has none, its liftoff), the
- * real times its stages dropped away, and "Up next": back to the flight it
- * was opened over, or, opened from the list, the flight where that liftoff
- * really happened. Running out of fuel ends a run with "Try again"
- * and no "Up next". Tipping too far in the thick air, pressing "Drop it"
- * too early, and leaving an empty stage on each say why, and the run
- * carries on. The real extra runs in the real sheet and is flown with its
+ * "Fly to orbit" offers Easy and Hard above its Start button and folds the
+ * sources of its own sentences about the real flights under it. Each climb
+ * to orbit ends with its stars and three goals, Play again and the other
+ * level, then the flight's own orbit event (or, when its story has none,
+ * its liftoff), the real times its stages dropped away, and "Up next": back
+ * to the flight it was opened over, or, opened from the list, the flight
+ * where that liftoff really happened, with "Try another rocket" beside it.
+ * Running out of fuel ends a run with no stars, Play again, and no "Up
+ * next". The level last chosen and the best on each level are remembered on
+ * the device, one record whichever rocket is flown. Tipping too far in the
+ * thick air, pressing "Drop it" too early, and leaving an empty stage on
+ * each say why, and the run carries on. The real extra runs in the real sheet and is flown with its
  * keys as the frames pass: the arrows tip the rocket, and the space bar
  * presses "Drop it", which has the focus. jsdom draws no 3D view, so it
  * flies over its flat picture (and says so in the console, which these
  * tests keep quiet). It opens from the list, by its address over a flight,
- * and from "Try it" on a liftoff's card. That every flight's liftoff offers
+ * and from "Play: Fly to orbit" on a liftoff's card. That every flight's liftoff offers
  * it, with the flight's own rocket and an event of its own to end on, is
  * checked in src/sim/test/all-missions.test.ts, and how a rocket is read
- * from a flight's files in rocket.test.ts. The rules of a run are tested in
- * game.test.ts, and what the sheet adds around the extra's own next step in
- * src/ui/extra-sheet.test.ts.
+ * from a flight's files in rocket.test.ts. The rules of a run, on both
+ * levels, are tested in game.test.ts, the shared level picker and end of a
+ * run in src/extras/shared/, and what the sheet adds around the extra's own
+ * next step in src/ui/extra-sheet.test.ts.
  */
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -52,6 +56,21 @@ const THREE_STAGES: readonly Press[] = [
   [15.2, '[Space]'],
   [16.3, '{ArrowRight}'],
 ];
+/**
+ * The same climb on Hard, whose Saturn V stages burn for 6.5, 7.75 and 8.75
+ * seconds: the first stage shows empty at 6.6 seconds, and the second, lit
+ * then, at 14.4. Orbit comes at about 22 seconds, with less fuel in hand.
+ */
+const THREE_STAGES_ON_HARD: readonly Press[] = [
+  [3.8, '{ArrowRight}'],
+  [6.3, '{ArrowRight}'],
+  [6.6, '[Space]'],
+  [8.8, '{ArrowRight}'],
+  [11.3, '{ArrowRight}'],
+  [13.8, '{ArrowRight}'],
+  [14.4, '[Space]'],
+  [16.3, '{ArrowRight}'],
+];
 /** The same climb with a rocket of two stages, whose first stage has 11 seconds of fuel. Orbit comes at about 22 seconds. */
 const TWO_STAGES: readonly Press[] = [
   [3.8, '{ArrowRight}'],
@@ -62,12 +81,28 @@ const TWO_STAGES: readonly Press[] = [
   [13.8, '{ArrowRight}'],
   [16.3, '{ArrowRight}'],
 ];
+/**
+ * The two-stage climb with its first stage left on: it drops by itself 2
+ * seconds after it runs dry, at 13 seconds, and the tips after it wait
+ * those 2 seconds too. An empty stage burns no fuel, so orbit still comes,
+ * at about 24 seconds, with fuel to spare.
+ */
+const TWO_STAGES_LEFT_ON: readonly Press[] = [
+  [3.8, '{ArrowRight}'],
+  [6.3, '{ArrowRight}'],
+  [8.8, '{ArrowRight}'],
+  [13.3, '{ArrowRight}'],
+  [15.8, '{ArrowRight}'],
+  [18.3, '{ArrowRight}'],
+];
 /** Longer than a clean climb takes to reach orbit (about 22 seconds). */
 const TO_ORBIT = 25;
 /** Longer than the Saturn V takes to run out of fuel when nothing is pressed (about 28 seconds). */
 const OUT_OF_FUEL = 30;
 /** The first frame on which the Saturn V's first stage shows empty, in seconds after Start (it has 7 seconds of fuel). */
 const FIRST_STAGE_EMPTY = 7.1;
+/** The same on Hard, where it has 6.5 seconds of fuel. */
+const FIRST_STAGE_EMPTY_ON_HARD = 6.6;
 /** The same for the first stage of Gemini 8's rocket, with 11 seconds of fuel. */
 const TITAN_FIRST_STAGE_EMPTY = 11.1;
 /** Longer than an empty Saturn V first stage, left on, takes to drop by itself (2 seconds after it is empty). */
@@ -100,7 +135,7 @@ const openOver = (id: string): Promise<MountedMission> =>
 /** Open the mission list from the welcome, and "Fly to orbit" from it. */
 async function openFromTheList(user: User): Promise<void> {
   await user.click(screen.getByRole('button', { name: 'All missions' }));
-  await user.click(screen.getByRole('button', { name: 'Open Fly to orbit' }));
+  await user.click(screen.getByRole('button', { name: 'Play Fly to orbit' }));
 }
 
 /** On the start, open "Try another rocket", pick a flight's rocket, and wait for it to stand on the pad. */
@@ -125,13 +160,16 @@ async function start(user: User, frames: Frames): Promise<void> {
   frames.frame();
 }
 
-/** Start, press each key at its time, and fly on to orbit. */
-async function flyToOrbit(
+/**
+ * Once a run has begun (Start, Play again, or the other level's button),
+ * draw its first frame, press each key at its time, and fly on to orbit.
+ */
+async function climbToOrbit(
   user: User,
   frames: Frames,
   presses: readonly Press[],
 ): Promise<HTMLElement> {
-  await start(user, frames);
+  frames.frame();
   let clock = 0;
   for (const [seconds, key] of presses) {
     flyFor(frames, seconds - clock);
@@ -142,11 +180,36 @@ async function flyToOrbit(
   return within(theSheet()).getByRole('region', { name: 'Up next' });
 }
 
+/** Start, press each key at its time, and fly on to orbit. */
+async function flyToOrbit(
+  user: User,
+  frames: Frames,
+  presses: readonly Press[],
+): Promise<HTMLElement> {
+  await user.click(await within(theSheet()).findByRole('button', { name: 'Start' }));
+  return climbToOrbit(user, frames, presses);
+}
+
 /** Start, and press nothing until the last stage runs dry. */
 async function runOutOfFuel(user: User, frames: Frames): Promise<void> {
   await start(user, frames);
   flyFor(frames, OUT_OF_FUEL);
 }
+
+/** On the start screen, choose a level by its name. */
+async function chooseLevel(user: User, name: 'Easy' | 'Hard'): Promise<void> {
+  await user.click(within(theSheet()).getByRole('radio', { name: new RegExp(`^${name}\\.`) }));
+}
+
+/** The goals under the stars, named by the line that counts them. */
+const theGoals = (line: string): HTMLElement =>
+  within(theSheet()).getByRole('list', { name: line });
+
+/** What each goal says, earned or not, with its tip. */
+const goalWords = (line: string): (string | null)[] =>
+  within(theGoals(line))
+    .getAllByRole('listitem')
+    .map((item) => item.textContent);
 
 /** jsdom has no WebGL: the extra says so in the console and flies over its flat picture. */
 const withoutItsView = (): void => {
@@ -190,6 +253,51 @@ describe('fly to orbit', () => {
       );
     });
 
+    it('offers Easy and Hard between the rule and Start, Easy the first time, with a line about the level chosen', async () => {
+      withoutItsView();
+      const { user } = await mountMission('apollo-11', { loadExtra });
+      await openFromTheList(user);
+      const startButton = await within(theSheet()).findByRole('button', { name: 'Start' });
+      const rule = within(theSheet()).getByText(
+        'Each press tips the rocket one step. It stays there until you tip it back.',
+      );
+
+      const levels = within(theSheet()).getByRole('group', { name: 'Level' });
+
+      expect(rule.compareDocumentPosition(levels)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(levels.compareDocumentPosition(startButton)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(within(levels).getByRole('radio', { name: 'Easy. Not tried yet.' })).toBeChecked();
+      expect(within(levels).getByRole('radio', { name: 'Hard. Not tried yet.' })).not.toBeChecked();
+      expect(
+        within(levels).getByText('Plenty of fuel, and an empty stage soon drops by itself.'),
+      ).toBeVisible();
+
+      await chooseLevel(user, 'Hard');
+
+      expect(
+        within(levels).getByText('Less fuel, and an empty stage hangs on longer.'),
+      ).toBeVisible();
+      expect(within(theSheet()).getByRole('button', { name: 'Try another rocket' })).toBeVisible();
+    });
+
+    it('starts a run on Hard once Hard is chosen: the first stage runs dry sooner', async () => {
+      withoutItsView();
+      const { user, frames } = await openOver('apollo-11');
+      await within(theSheet()).findByRole('button', { name: 'Start' });
+      await chooseLevel(user, 'Hard');
+
+      await start(user, frames);
+      flyFor(frames, FIRST_STAGE_EMPTY_ON_HARD);
+
+      expect(dropIt()).toHaveFocus();
+      expect(dropIt()).toHaveAccessibleDescription('the first stage');
+      expect(
+        within(theSheet()).getByText(
+          'The first stage is empty. Drop it, and the second stage will light.',
+        ),
+      ).toBeVisible();
+    });
+
     it("says in its practice-toy note that computers steered the real rocket, not the crew, with the flight's own climb time", async () => {
       withoutItsView();
 
@@ -212,8 +320,14 @@ describe('fly to orbit', () => {
       const next = await flyToOrbit(user, frames, THREE_STAGES);
 
       expect(within(theSheet()).getByText('You are in orbit.')).toHaveFocus();
-      expect(within(theSheet()).getByText('Orbit speed')).toBeVisible();
-      expect(within(theSheet()).getByText('Some')).toBeVisible();
+      expect(within(theSheet()).getByText('All 3 stars on Easy')).toBeVisible();
+      expect(within(theSheet()).getByText('New best!')).toBeVisible();
+      expect(goalWords('All 3 stars on Easy')).toEqual([
+        'Earned: Reached orbit',
+        'Earned: Dropped every stage yourself',
+        'Earned: Fuel to spare',
+      ]);
+      expect(within(theSheet()).queryByText('Fuel left')).not.toBeInTheDocument();
       expect(
         within(theSheet()).getByRole('heading', {
           level: 3,
@@ -286,10 +400,10 @@ describe('fly to orbit', () => {
       expect(screen.queryByRole('dialog', { name: 'Fly to orbit' })).not.toBeInTheDocument();
     });
 
-    it("opened with Try it on Apollo 7's liftoff, flies its Saturn IB's two stages to its own orbit, and gives focus back to Try it", async () => {
+    it("opened with Play on Apollo 7's liftoff, flies its Saturn IB's two stages to its own orbit, and gives focus back to Play", async () => {
       withoutItsView();
       const { user, frames } = await mountMission('apollo-7', { event: 'liftoff', loadExtra });
-      const tryIt = within(theCard()).getByRole('button', { name: 'Try it: Fly to orbit' });
+      const tryIt = within(theCard()).getByRole('button', { name: 'Play: Fly to orbit' });
       await user.click(tryIt);
       expect(await within(theSheet()).findByText("Apollo 7's rocket: the Saturn IB")).toBeVisible();
 
@@ -375,50 +489,218 @@ describe('fly to orbit', () => {
       ).toBeVisible();
     });
 
-    it('climbs again from the pad with Try again, with Drop it to hand', async () => {
+    it("leaves Play again as the one amber button: Up next's own is plain, with no Try again", async () => {
+      withoutItsView();
+      const { user, frames } = await mountMission('apollo-11', { loadExtra });
+      await openFromTheList(user);
+
+      const next = await flyToOrbit(user, frames, THREE_STAGES);
+
+      expect(within(theSheet()).getByRole('button', { name: 'Play again' })).toHaveClass(
+        'button--primary',
+      );
+      expect(within(theSheet()).getByRole('button', { name: 'Play on Hard' })).not.toHaveClass(
+        'button--primary',
+      );
+      expect(within(next).getByRole('button', { name: 'Fly Apollo 11' })).not.toHaveClass(
+        'button--primary',
+      );
+      expect(
+        within(theSheet()).queryByRole('button', { name: 'Try again' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('climbs again from the pad with Play again, on the same level and rocket, with Drop it to hand', async () => {
+      withoutItsView();
+      const { user, frames } = await openOver('apollo-11');
+      await flyToOrbit(user, frames, THREE_STAGES);
+
+      await user.click(within(theSheet()).getByRole('button', { name: 'Play again' }));
+
+      expect(dropIt()).toHaveFocus();
+      expect(within(theSheet()).queryByRole('region', { name: 'Up next' })).not.toBeInTheDocument();
+      expect(within(theSheet()).getByText('All 3 stars on Easy')).not.toBeVisible();
+      expect(within(theSheet()).getByText('Straight up')).toBeVisible();
+      expect(within(theSheet()).getByText('First stage fuel')).toBeVisible();
+      expect(within(theSheet()).getByText(ON_THE_PAD)).toBeVisible();
+
+      await climbToOrbit(user, frames, THREE_STAGES);
+
+      expect(within(theSheet()).getByText('You are in orbit.')).toHaveFocus();
+      expect(within(theSheet()).getByText('All 3 stars on Easy')).toBeVisible();
+      expect(within(theSheet()).getByText('New best!')).not.toBeVisible();
+    });
+
+    it('starts on Hard at once with Play on Hard, and climbs to orbit there for a new best on Hard', async () => {
+      withoutItsView();
+      const { user, frames } = await openOver('apollo-11');
+      await flyToOrbit(user, frames, THREE_STAGES);
+
+      await user.click(within(theSheet()).getByRole('button', { name: 'Play on Hard' }));
+
+      expect(dropIt()).toHaveFocus();
+      expect(within(theSheet()).getByText(ON_THE_PAD)).toBeVisible();
+
+      await climbToOrbit(user, frames, THREE_STAGES_ON_HARD);
+
+      expect(within(theSheet()).getByText('You are in orbit.')).toHaveFocus();
+      expect(within(theSheet()).getByText('All 3 stars on Hard')).toBeVisible();
+      expect(within(theSheet()).getByText('New best!')).toBeVisible();
+      expect(within(theSheet()).getByRole('button', { name: 'Play on Easy' })).toBeVisible();
+    });
+
+    it('misses the star for dropping every stage when one is left on to drop by itself, with a tip under it', async () => {
+      withoutItsView();
+      const { user, frames } = await openOver('gemini-8');
+
+      await flyToOrbit(user, frames, TWO_STAGES_LEFT_ON);
+
+      expect(within(theSheet()).getByText('You are in orbit.')).toHaveFocus();
+      expect(goalWords('2 of 3 stars on Easy')).toEqual([
+        'Earned: Reached orbit',
+        'Not yet: Drop every stage yourself. Press Drop it as soon as a stage is empty.',
+        'Earned: Fuel to spare',
+      ]);
+    });
+
+    it('still offers Try another rocket at the end, beside the next step', async () => {
       withoutItsView();
       const { user, frames } = await openOver('apollo-11');
       const next = await flyToOrbit(user, frames, THREE_STAGES);
 
-      await user.click(within(next).getByRole('button', { name: 'Try again' }));
+      await user.click(within(next).getByRole('button', { name: 'More to explore' }));
+      await user.click(within(next).getByRole('button', { name: 'Try another rocket' }));
 
-      expect(dropIt()).toHaveFocus();
-      expect(within(theSheet()).queryByRole('region', { name: 'Up next' })).not.toBeInTheDocument();
-      expect(within(theSheet()).getByText('Straight up')).toBeVisible();
-      expect(within(theSheet()).getByText('First stage fuel')).toBeVisible();
-      expect(within(theSheet()).getByText(ON_THE_PAD)).toBeVisible();
+      expect(
+        within(theSheet()).getByRole('heading', { level: 3, name: 'Pick a rocket' }),
+      ).toBeVisible();
+      expect(within(theSheet()).getByRole('button', { name: "Gemini 8's rocket" })).toHaveFocus();
+    });
+  });
+
+  describe('remembering', () => {
+    it('opens on the level last played, with the best on each, after the game is closed and opened again', async () => {
+      withoutItsView();
+      const { user, frames } = await mountMission('apollo-11', { loadExtra });
+      await openFromTheList(user);
+      await flyToOrbit(user, frames, THREE_STAGES);
+      await user.click(within(theSheet()).getByRole('button', { name: 'Play on Hard' }));
+      await user.click(within(theSheet()).getByRole('button', { name: 'Close' }));
+      expect(screen.queryByRole('dialog', { name: 'Fly to orbit' })).not.toBeInTheDocument();
+
+      await openFromTheList(user);
+      await within(theSheet()).findByRole('button', { name: 'Start' });
+
+      const levels = within(theSheet()).getByRole('group', { name: 'Level' });
+      expect(within(levels).getByRole('radio', { name: 'Hard. Not tried yet.' })).toBeChecked();
+      expect(
+        within(levels).getByRole('radio', { name: 'Easy. Your best: 3 of 3 stars.' }),
+      ).not.toBeChecked();
+      expect(within(levels).getByText('Your best')).toBeVisible();
+    });
+
+    it('keeps one record whichever rocket is flown', async () => {
+      withoutItsView();
+      const { user, frames } = await openOver('apollo-11');
+      await flyToOrbit(user, frames, THREE_STAGES);
+      const next = within(theSheet()).getByRole('region', { name: 'Up next' });
+      await user.click(within(next).getByRole('button', { name: 'More to explore' }));
+      await user.click(within(next).getByRole('button', { name: 'Try another rocket' }));
+
+      await user.click(within(theSheet()).getByRole('button', { name: "Gemini 8's rocket" }));
+
+      expect(await within(theSheet()).findByRole('button', { name: 'Start' })).toHaveFocus();
+      expect(
+        within(theSheet()).getByRole('radio', { name: 'Easy. Your best: 3 of 3 stars.' }),
+      ).toBeChecked();
+    });
+  });
+
+  // The announcer waits half a second for things to settle, then speaks on the next frame.
+  describe('announcements', () => {
+    const settle = (frames: Frames): void => {
+      vi.advanceTimersByTime(500);
+      frames.frame();
+    };
+
+    it('says orbit and its stars in one message', async () => {
+      withoutItsView();
+      const { user, frames } = await openOver('apollo-11');
+      await user.click(await within(theSheet()).findByRole('button', { name: 'Start' }));
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+      await climbToOrbit(user, frames, THREE_STAGES);
+      settle(frames);
+
+      expect(screen.getByText('You are in orbit. All 3 stars on Easy. New best!')).toHaveAttribute(
+        'aria-live',
+        'polite',
+      );
+    });
+
+    it('says the fuel ran out and that the run earned no stars in one message', async () => {
+      withoutItsView();
+      const { user, frames } = await openOver('apollo-11');
+      await start(user, frames);
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+      flyFor(frames, OUT_OF_FUEL);
+      settle(frames);
+
+      expect(screen.getByText(`${OUT_OF_FUEL_LINE} No stars this time, on Easy.`)).toHaveAttribute(
+        'aria-live',
+        'polite',
+      );
     });
   });
 
   describe('running out of fuel', () => {
-    it('says the fuel ran out with focus on it, turns the controls off, and offers no Up next', async () => {
+    it('says the fuel ran out with focus on it, shows no stars, puts the controls away, and offers no Up next', async () => {
       withoutItsView();
       const { user, frames } = await openOver('apollo-11');
 
       await runOutOfFuel(user, frames);
 
       expect(within(theSheet()).getByText(OUT_OF_FUEL_LINE)).toHaveFocus();
-      for (const name of ['Tip back', 'Drop it', 'Tip over'])
-        expect(within(theControls()).getByRole('button', { name })).toBeDisabled();
-      expect(within(theSheet()).queryByRole('region', { name: 'Up next' })).not.toBeInTheDocument();
-      expect(within(theSheet()).getByRole('button', { name: 'Try again' })).toBeVisible();
+      expect(within(theSheet()).getByText('No stars this time, on Easy')).toBeVisible();
+      expect(goalWords('No stars this time, on Easy')).toEqual([
+        'Not yet: Reach orbit. Tip over a step at a time once the air thins, and save the fuel for speed.',
+        'Not yet: Drop every stage yourself',
+        'Not yet: Fuel to spare',
+      ]);
+      expect(
+        within(theSheet()).queryByRole('group', { name: 'Rocket controls' }),
+      ).not.toBeInTheDocument();
+      expect(within(theSheet()).getByText('Sideways speed')).not.toBeVisible();
+      expect(
+        within(theSheet()).getByText(
+          'Each press tips the rocket one step. It stays there until you tip it back.',
+        ),
+      ).not.toBeVisible();
       expect(
         within(theSheet()).queryByRole('button', { name: 'Start over' }),
       ).not.toBeInTheDocument();
+      expect(within(theSheet()).queryByRole('region', { name: 'Up next' })).not.toBeInTheDocument();
+      expect(within(theSheet()).getByRole('button', { name: 'Play again' })).toBeVisible();
+      expect(within(theSheet()).getByRole('button', { name: 'Play on Hard' })).toBeVisible();
+      expect(
+        within(theSheet()).queryByRole('button', { name: 'Try again' }),
+      ).not.toBeInTheDocument();
     });
 
-    it('climbs again from the pad with Try again, with the controls back on and Drop it to hand', async () => {
+    it('climbs again from the pad with Play again, with the controls back and Drop it to hand', async () => {
       withoutItsView();
       const { user, frames } = await openOver('apollo-11');
       await runOutOfFuel(user, frames);
 
-      await user.click(within(theSheet()).getByRole('button', { name: 'Try again' }));
+      await user.click(within(theSheet()).getByRole('button', { name: 'Play again' }));
 
       expect(dropIt()).toHaveFocus();
       for (const name of ['Tip back', 'Drop it', 'Tip over'])
         expect(within(theControls()).getByRole('button', { name })).toBeEnabled();
       expect(within(theSheet()).getByText(ON_THE_PAD)).toBeVisible();
       expect(within(theSheet()).getByRole('button', { name: 'Start over' })).toBeVisible();
+      expect(within(theSheet()).getByText('No stars this time, on Easy')).not.toBeVisible();
     });
   });
 
@@ -561,8 +843,11 @@ describe('fly to orbit', () => {
 
       await user.keyboard('{ArrowRight}[Space]');
 
-      expect(within(theSheet()).getByText('Straight up')).toBeVisible();
       expect(within(theSheet()).getByText(OUT_OF_FUEL_LINE)).toHaveFocus();
+      expect(within(theSheet()).getByText('No stars this time, on Easy')).toBeVisible();
+      expect(
+        within(theSheet()).queryByRole('group', { name: 'Rocket controls' }),
+      ).not.toBeInTheDocument();
     });
   });
 

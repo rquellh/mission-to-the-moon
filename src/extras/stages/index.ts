@@ -517,7 +517,7 @@ function mount(host: HTMLElement, context: ExtraContext, params: URLSearchParams
 
     // What's next: back to the flight waiting behind the sheet, or the flight where this liftoff really happened.
     const runs = [
-      { label: 'Try again', again: true, run: () => startClimb(climb) },
+      { label: 'Play again', again: true, run: () => startClimb(climb) },
       { label: 'Try another rocket', run: showChoose },
     ];
     if (context.origin === 'flight') {

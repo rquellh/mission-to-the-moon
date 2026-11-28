@@ -12,15 +12,25 @@
  * sentences about the real flights (the boulders, the real descent, the
  * top half flying back to orbit) are cited in facts.ts, and their sources
  * are folded under the Start button, as "Dock two spacecraft" does.
+ *
+ * It has two levels (game.ts says what differs), chosen above Start with
+ * the games' shared level picker; each run ends with the shared stars, its
+ * three goals, and Play again (src/extras/shared/). The level last chosen
+ * and the most stars on each level are remembered on this device.
  */
 import './landing.css';
 import type { Citation, ElapsedTime, Mission, MissionEvent } from '../../content/types.ts';
 import { sourcesBlock } from '../../ui/citations.ts';
 import { button, el, setText } from '../../ui/dom.ts';
 import { formatDate, monthOf } from '../../ui/format.ts';
+import { createLevelPicker } from '../shared/level-picker.ts';
+import type { Level } from '../shared/levels.ts';
+import { gameRecord } from '../shared/record.ts';
+import { createRunEnd, type Goal } from '../shared/run-end.ts';
 import type { Extra, ExtraContext, ExtraMount, UpNextOptions } from '../types.ts';
 import { BACK_TO_ORBIT, BOULDERS, DESCENT } from './facts.ts';
 import {
+  LEVEL_RULES,
   RULES,
   advance,
   ahead,
@@ -29,12 +39,15 @@ import {
   groundUnder,
   isStill,
   isTooFast,
+  landingRoom,
   overClear,
   pastClear,
   push,
+  runGoals,
   startFlight,
   type Contact,
   type Flight,
+  type RunGoals,
   type Thrust,
 } from './game.ts';
 import { meta } from './meta.ts';
@@ -133,6 +146,11 @@ const TEXT = {
   howTo:
     'The computer is heading for a field of boulders. Slide over to clear ground, stop your slide, and come down slowly. Things in space keep moving: each push keeps going until you push the other way.',
   fuelRule: 'The engine holds you up, but it burns fuel every second. Do not take too long.',
+  // Under the level picker, for the level chosen.
+  levels: {
+    easy: 'Plenty of fuel, and a wide patch of clear ground.',
+    hard: 'Less fuel, a smaller patch, and you start out sliding.',
+  } satisfies Record<Level, string>,
   start: 'Start',
   // Over the folded sources under Start: the game's sentences about the real flights that they back.
   sourcesFor:
@@ -146,7 +164,6 @@ const TEXT = {
   } satisfies Record<Thrust, string>,
   rule: 'Each press is one push. It keeps going until you push the other way.',
   startOver: 'Start over',
-  tryAgain: 'Try again',
   fuel: 'Fuel',
   fuelWord: { plenty: 'Plenty', low: 'Getting low', almost: 'Almost out', empty: 'Empty' },
   falling: 'Falling speed',
@@ -188,15 +205,31 @@ const TEXT = {
   outOfFuel: 'Out of fuel. The top half is flying the crew back up to orbit. No landing this time.',
   landed: (name: string | undefined): string =>
     name ? `Landed. The ${name} is on the Moon.` : 'Landed. The lander is on the Moon.',
-  touchdown: 'Touchdown',
-  touchdownWord: { gentle: 'Gentle', firm: 'Firm' },
-  fuelLeft: 'Fuel left',
-  fuelLeftWord: {
-    most: 'More than half',
-    half: 'About half',
-    quarter: 'About a quarter',
-    none: 'Almost none',
-  },
+  // The three stars of a run: what each is for when it was earned and when not, and a tip when not
+  // (the fuel star's depends on the level: on Hard it needs a bold run).
+  goals: {
+    landed: {
+      met: 'Landed on clear ground',
+      missed: 'Land on clear ground',
+      tip: 'Stop your slide first, then come down.',
+    },
+    gentle: {
+      met: 'Gentle touchdown',
+      missed: 'Gentle touchdown',
+      tip: 'Slow down a little more before you touch.',
+    },
+    spareFuel: {
+      met: 'Fuel to spare',
+      missed: 'Fuel to spare',
+      tip: {
+        easy: 'Do not hover. Head for the clear ground right away.',
+        hard: 'Be bolder: slide across faster and slow down later.',
+      },
+    },
+  } satisfies Record<
+    keyof RunGoals,
+    { met: string; missed: string; tip: string | Record<Level, string> }
+  >,
   // The line over the real landing: its flight and the day it happened.
   realLine: (mission: Mission, event: MissionEvent): string =>
     event.utc ? `${mission.name} · ${formatDate(new Date(event.utc))}` : mission.name,
@@ -250,8 +283,11 @@ const SLIDE_STEP = 8;
 const BUMP_MESSAGE_SECONDS = 4;
 /** How long the lander settles on its footpads before the result shows, in seconds. */
 const SETTLE_SECONDS = 0.8;
-/** Where the "Clear ground" label goes: under the middle of the clear patch's marker, in front of the lander's path. */
-const CLEAR_LABEL = { x: (RULES.clearFrom + RULES.clearTo) / 2, height: -2.5 };
+/** Where the "Clear ground" label goes on a level: under the middle of the clear patch's marker, in front of the lander's path. */
+const clearLabelAt = (level: Level) => ({
+  x: (LEVEL_RULES[level].clearFrom + RULES.clearTo) / 2,
+  height: -2.5,
+});
 
 /** What the falling-speed read-out says. */
 function fallingWord(f: Flight): string {
@@ -274,17 +310,24 @@ function fuelWord(f: Flight): string {
   return left > 0 ? TEXT.fuelWord.almost : TEXT.fuelWord.empty;
 }
 
-/** What the result says of the fuel left after landing. */
-function fuelLeftWord(f: Flight): string {
-  const left = fuelLeft(f);
-  if (left >= 0.6) return TEXT.fuelLeftWord.most;
-  if (left >= 0.4) return TEXT.fuelLeftWord.half;
-  if (left >= 0.18) return TEXT.fuelLeftWord.quarter;
-  return TEXT.fuelLeftWord.none;
-}
-
 /** True when the ground under where the lander will be in 5 seconds is the clear patch. */
-const clearAhead = (f: Flight): boolean => groundUnder(ahead(f).x) === 0;
+const clearAhead = (f: Flight): boolean => groundUnder(f.level, ahead(f).x) === 0;
+
+/**
+ * The three goals of a run that ended on a level, for the stars: worded for
+ * how it went, with a tip under each one missed. A run that ran out of fuel
+ * missed them all, and only the first, the landing, gets its tip.
+ */
+function goalsOf(goals: RunGoals, level: Level): readonly [Goal, Goal, Goal] {
+  const goal = (key: keyof RunGoals, withTip: boolean): Goal => {
+    const words = TEXT.goals[key];
+    if (goals[key]) return { label: words.met, met: true };
+    if (!withTip) return { label: words.missed, met: false };
+    const tip = typeof words.tip === 'string' ? words.tip : words.tip[level];
+    return { label: words.missed, met: false, tip };
+  };
+  return [goal('landed', true), goal('gentle', goals.landed), goal('spareFuel', goals.landed)];
+}
 
 /** Why a bump did not land: the boulders first, then too fast, still sliding, or both. */
 function bumpWord({ tooFast, sliding, rocks }: Extract<Contact, { kind: 'bump' }>): string {
@@ -338,7 +381,7 @@ interface FillBar {
   fill: HTMLSpanElement;
 }
 
-/** A bar for the fuel, the fuel left, and the height without the 3D view. */
+/** A bar for the fuel, and the height without the 3D view. */
 function fillBar(): FillBar {
   const bar = el('div', 'landing__bar');
   bar.setAttribute('aria-hidden', 'true');
@@ -423,7 +466,7 @@ function realStory({ mission, event }: RealLanding): HTMLDivElement {
   return story;
 }
 
-/** After landing: the landed line, the result, and the real landing; "Up next" goes at its end. */
+/** After landing: the landed line and the real landing; the stars go under the line, and "Up next" at the end. */
 function afterLanding(landedText: string, real: RealLanding | null) {
   const after = el('section', 'landing__after');
   after.hidden = true;
@@ -431,40 +474,36 @@ function afterLanding(landedText: string, real: RealLanding | null) {
   landedLine.setAttribute('data-testid', 'landing-landed');
   // Focus goes here on landing, so a screen reader reads on from it.
   landedLine.tabIndex = -1;
-
-  const results = el('div', 'landing__readouts');
-  const touchdownPanel = el('div', 'landing__readout landing__readout--spread');
-  const touchdownValue = el('p', 'landing__value');
-  touchdownPanel.append(el('p', 'landing__label', TEXT.touchdown), touchdownValue);
-  const leftPanel = el('div', 'landing__readout');
-  const { bar: leftBar, fill: leftFill } = fillBar();
-  const leftValue = el('p', 'landing__value');
-  leftPanel.append(el('p', 'landing__label', TEXT.fuelLeft), leftBar, leftValue);
-  results.append(touchdownPanel, leftPanel);
-  after.append(landedLine, results);
+  after.append(landedLine);
   if (real) after.append(realStory(real));
-  return { after, landedLine, touchdownValue, leftFill, leftValue };
+  return { after, landedLine };
 }
 
 /** The picture without the 3D view, and how to show a moment of the flight on it. */
 interface FlatView {
   element: HTMLDivElement;
+  /** Shows a level's ground: where the clear patch is. */
+  setLevel(level: Level): void;
   /** Shows how high the lander is and where it is over the ground. */
   show(flight: Flight): void;
 }
 
-/** Without the 3D view: a note, and two plain bars for how high the lander is and where it is over the ground. */
-function flatView(): FlatView {
+/** Without the 3D view: a note, and two plain bars for how high the lander is and where it is over a level's ground. */
+function flatView(level: Level): FlatView {
   const element = el('div', 'landing__fallback');
   const { bar: heightBar, fill: heightFill } = fillBar();
   const acrossTrack = el('div', 'landing__track');
   acrossTrack.setAttribute('aria-hidden', 'true');
   // The outlined part is where the lander's middle is when both footpads are over the clear patch.
   const clearZone = el('span', 'landing__zone');
-  const clearStart = acrossPercent(RULES.clearFrom + RULES.footHalfSpan);
-  const clearEnd = acrossPercent(RULES.clearTo - RULES.footHalfSpan);
-  clearZone.style.left = `${clearStart.toFixed(2)}%`;
-  clearZone.style.width = `${(clearEnd - clearStart).toFixed(2)}%`;
+  const setLevel = (shown: Level): void => {
+    const room = landingRoom(shown);
+    const clearStart = acrossPercent(room.from);
+    const clearEnd = acrossPercent(room.to);
+    clearZone.style.left = `${clearStart.toFixed(2)}%`;
+    clearZone.style.width = `${(clearEnd - clearStart).toFixed(2)}%`;
+  };
+  setLevel(level);
   const acrossMarker = el('span', 'landing__marker');
   acrossTrack.append(clearZone, acrossMarker);
   element.append(
@@ -476,6 +515,7 @@ function flatView(): FlatView {
   );
   return {
     element,
+    setLevel,
     show(flight) {
       const high = Math.max(0, Math.min(1, flight.height / RULES.startHeight));
       heightFill.style.width = `${(high * 100).toFixed(1)}%`;
@@ -559,6 +599,8 @@ async function mount(
   context.onReducedMotionChange((reduced) => {
     still = reduced;
   });
+  // The level last chosen on this device, and the most stars on each.
+  const record = gameRecord(context.store);
 
   /* ----------------------------- Layout ----------------------------- */
 
@@ -586,6 +628,13 @@ async function mount(
     el('p', 'extra-note landing__how', TEXT.howTo),
     el('p', 'extra-note landing__how', TEXT.fuelRule),
   );
+  // Choosing a level shows its ground at once.
+  const picker = createLevelPicker({
+    record,
+    describe: TEXT.levels,
+    onChange: (level) => showLevel(level),
+    signal,
+  });
   const startButton = button('button button--primary button--large', TEXT.start);
   startButton.setAttribute('data-testid', 'landing-start');
   // Everything to read before starting comes first, together; the folded
@@ -599,7 +648,7 @@ async function mount(
   // screen without moving the picture or Start (see landing.css).
   const sourcesBox = el('div', 'landing__sources');
   sourcesBox.append(sourcesFor, sources);
-  intro.append(words, startButton, sourcesBox);
+  intro.append(words, picker.element, startButton, sourcesBox);
 
   // While flying, and after the fuel runs out.
   const flying = el('section', 'landing__fly');
@@ -609,7 +658,7 @@ async function mount(
 
   const coach = el('p', 'landing__coach');
   coach.setAttribute('data-testid', 'landing-coach');
-  // Focus goes here when the fuel runs out, so a screen reader reads on from it.
+  // When the fuel runs out this is the result, and focus goes here, so a screen reader reads on from it.
   coach.tabIndex = -1;
 
   const controls = el('div', 'landing__controls');
@@ -642,15 +691,23 @@ async function mount(
 
   // After landing.
   const landedText = TEXT.landed(landerName(real?.mission));
-  const { after, landedLine, touchdownValue, leftFill, leftValue } = afterLanding(landedText, real);
+  const { after, landedLine } = afterLanding(landedText, real);
 
-  // Built afresh at each landing, where the run's buttons go, so it always starts folded on a phone.
+  // The stars of a run that ended, its goals, and Play again: under the landed line, or under the coach line when the fuel ran out.
+  const runEnd = createRunEnd({
+    record,
+    onPlay: (level) => {
+      picker.refresh();
+      begin(level, true);
+    },
+    signal,
+  });
+
+  // Built afresh at each landing, at the end, so it always starts folded on a phone. Its button
+  // is plain, as Play again is the amber one, and Play again is not repeated in it.
   let upNext: HTMLElement | null = null;
   const showUpNext = (): void => {
-    const block = context.upNext({
-      ...nextStep(context, params, real),
-      actions: [{ label: TEXT.tryAgain, again: true, run: () => begin(true) }],
-    });
+    const block = context.upNext({ ...nextStep(context, params, real), plainPrimary: true });
     if (upNext) upNext.replaceWith(block);
     else after.append(block);
     upNext = block;
@@ -667,7 +724,7 @@ async function mount(
   let labels: { clear: PictureLabel; ahead: PictureLabel } | null = null;
   let flat: FlatView | null = null;
   try {
-    scene = createLandingScene(canvas);
+    scene = createLandingScene(canvas, picker.level);
     // Two small labels over the picture, under the fuel strip, placed each frame where the scene says.
     labels = {
       clear: pictureLabel('landing__tag', TEXT.clearGround),
@@ -680,7 +737,7 @@ async function mount(
     console.warn(error);
     canvas.remove();
     // Without the 3D view, two plain bars show how high the lander is and where it is over the ground.
-    flat = flatView();
+    flat = flatView(picker.level);
     stage.append(flat.element);
     stage.classList.add('landing__view--flat');
   }
@@ -688,7 +745,8 @@ async function mount(
   /* ------------------------------ Playing ----------------------------- */
 
   let phase: Phase = 'intro';
-  let flight = startFlight();
+  // Started on the level chosen; a new run starts a new flight on its level.
+  let flight = startFlight(picker.level);
   let touchFalling = 0;
   let settleLeft = 0;
   let bumpMessage = '';
@@ -747,7 +805,8 @@ async function mount(
   /** The two labels over the picture: the clear ground while its marker shows, and the drift while it is drawn. */
   const placeLabels = (): void => {
     if (!scene || !labels) return;
-    labels.clear.place(isDown(phase) ? null : scene.spot(CLEAR_LABEL.x, CLEAR_LABEL.height));
+    const clearLabel = clearLabelAt(flight.level);
+    labels.clear.place(isDown(phase) ? null : scene.spot(clearLabel.x, clearLabel.height));
     const drift = ahead(flight);
     const drawn = (phase === 'intro' || phase === 'flying') && driftShows(flight, drift);
     const spot = drawn ? scene.spot(drift.x, drift.height) : null;
@@ -765,10 +824,9 @@ async function mount(
     fuelStrip.hidden = phase === 'landed';
     root.dataset['phase'] = phase;
     root.classList.toggle('landing--flying', flyingLayout);
-    // Out of fuel the controls stay on screen, but only the run again works: it becomes the one main action.
-    for (const control of Object.values(thrustButtons)) control.disabled = out;
-    setText(startOver, out ? TEXT.tryAgain : TEXT.startOver);
-    startOver.classList.toggle('button--primary', out);
+    // Out of fuel the coach line is the result, with the stars under it: the read-outs and the controls step aside.
+    readouts.hidden = out;
+    controls.hidden = out;
     canvas.setAttribute(
       'aria-label',
       isDown(phase) ? TEXT.canvasLanded : out ? TEXT.canvasAborted : TEXT.canvas,
@@ -895,7 +953,7 @@ async function mount(
         bumpLeft = BUMP_MESSAGE_SECONDS;
         if (still) {
           // Under reduced motion, a bump is a plain reset: straight back to the start.
-          flight = startFlight();
+          flight = startFlight(flight.level);
           bumpMessage = `${bumpMessage} ${TEXT.backToStart}`;
         }
         shownFalling = Number.NaN;
@@ -906,37 +964,65 @@ async function mount(
     }
   }
 
-  /** Down and settled: the result, the real landing, and what's next. */
+  /** Shows how a run ended, under its result line: the stars, the goals, and Play again. What to tell a screen reader of the stars. */
+  const showStars = (goals: RunGoals, under: HTMLElement): string => {
+    const { spoken } = runEnd.show({ level: flight.level, goals: goalsOf(goals, flight.level) });
+    under.after(runEnd.element);
+    picker.refresh();
+    return spoken;
+  };
+
+  /** Down and settled: the result and its stars, the real landing, and what's next. */
   function settle(): void {
     phase = 'landed';
-    setText(
-      touchdownValue,
-      touchFalling <= RULES.lightFalling ? TEXT.touchdownWord.gentle : TEXT.touchdownWord.firm,
+    const stars = showStars(
+      runGoals(flight, { kind: 'landed', falling: touchFalling }),
+      landedLine,
     );
-    leftFill.style.width = `${(fuelLeft(flight) * 100).toFixed(1)}%`;
-    setText(leftValue, fuelLeftWord(flight));
     showUpNext();
     showPhase();
-    context.announce(landedText);
+    context.announce(`${landedText} ${stars}`);
     landedLine.focus();
     startLoop();
   }
 
-  /** The tank is dry: the top half takes the crew back up, and the run can start again. */
+  /** The tank is dry: the top half takes the crew back up, and the coach line says so over no stars. */
   function runOut(): void {
     scene?.abort(flight, still);
     phase = still || !scene ? 'aborted' : 'aborting';
     shownFalling = Number.NaN;
+    const stars = showStars(runGoals(flight, { kind: 'empty' }), coach);
     showPhase();
     showReadouts();
-    context.announce(TEXT.outOfFuel);
+    context.announce(`${TEXT.outOfFuel} ${stars}`);
     coach.focus();
     startLoop();
   }
 
-  const begin = (focus: boolean): void => {
+  /** A level's ground in the picture, from the start screen's choice or a new run's level. */
+  const showGround = (level: Level): void => {
+    scene?.setLevel(level);
+    flat?.setLevel(level);
+  };
+
+  /** The start screen, after choosing a level: that level's ground, with the lander where a run on it starts. */
+  function showLevel(level: Level): void {
+    if (phase !== 'intro') return;
+    flight = startFlight(level);
+    showGround(level);
+    shownFalling = Number.NaN;
+    hearNothingNew();
+    showReadouts();
+    scene?.fly(flight, 0, still);
+    placeLabels();
+  }
+
+  /** A new run on a level, from Start, Start over, Play again, or the other level's button. */
+  const begin = (level: Level, focus: boolean): void => {
     scene?.reset();
-    flight = startFlight();
+    showGround(level);
+    flight = startFlight(level);
+    runEnd.hide();
     settleLeft = 0;
     bumpLeft = 0;
     shownFalling = Number.NaN;
@@ -950,9 +1036,8 @@ async function mount(
     startLoop();
   };
 
-  startButton.addEventListener('click', () => begin(true), { signal });
-  // Out of fuel this is "Try again", the end of a run, so focus goes to the controls as it does from the end screen.
-  startOver.addEventListener('click', () => begin(isOut(phase)), { signal });
+  startButton.addEventListener('click', () => begin(picker.level, true), { signal });
+  startOver.addEventListener('click', () => begin(flight.level, false), { signal });
 
   document.addEventListener(
     'keydown',
@@ -984,7 +1069,7 @@ async function mount(
     resizing.observe(canvas);
   }
 
-  // The opening picture: the lander high over the boulders, already coming down too fast.
+  // The opening picture: the lander high over the boulders, already coming down too fast (and on Hard, sliding away).
   showPhase();
   showReadouts();
   scene?.fly(flight, 0, still);

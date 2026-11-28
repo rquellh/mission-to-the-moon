@@ -19,7 +19,7 @@ import { setUpEventCard } from './event-card';
 import { setUpExtraSheet } from './extra-sheet';
 import { fillFastForwardMark, orbitsInFastForward } from './fast-forward-mark';
 import { missionDates, speakMissionTime } from './format';
-import { setUpHub, type HubOptions } from './hub';
+import { setUpHub, type HubOptions, type HubPlace } from './hub';
 import { icon } from './icons';
 import { watchViewInsets } from './layout';
 import { setUpMemorial } from './memorial-dialog';
@@ -272,7 +272,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
       card.show(target);
       announce(describe(target));
     },
-    // "Try it" only for an extra the list shows, so a draft stays hidden in a published build.
+    // A game's Play button only for an extra the list shows, so a draft stays hidden in a published build.
     extraTitle: (id) => extras.find((meta) => meta.id === id)?.title,
     onTryIt: (extraId, event, from) =>
       extraSheet.open(
@@ -387,7 +387,7 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     if (tour.phase !== 'finished' && tourPhase === 'finished') hideEnding();
     offerFinish();
     // Opening an extra pauses the clock, which would end a tour's travel early, so
-    // "Try it" waits for the stop. At a stop the clock is already still.
+    // a game's Play button waits for the stop. At a stop the clock is already still.
     card.setTryItAllowed(tour.phase !== 'traveling');
     const stop = tour.stop;
     const setOff =
@@ -420,9 +420,12 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
     mission,
     tourStops: tour.total,
     summaries,
+    // The games the list shows (a draft only on the dev server, as in the list).
+    games: extras.filter((meta) => meta.kind === 'hands-on').length,
     onTour: () => startTour(),
     onExplore: () => startExploring(),
     onAllMissions: (from) => openList(from),
+    onGames: (from) => openList(from, 'games'),
   };
   // Without a 3D view, the welcome says so.
   if (options.no3D) welcomeOptions.no3D = options.no3D;
@@ -500,12 +503,12 @@ export function mountInterface(options: InterfaceOptions): MissionInterface {
   // Without a 3D view, the list opens with a line that says so.
   if (options.no3D) hubOptions.lede = copy.hub.ledeNo3D;
   const hub = setUpHub(hubOptions);
-  const openList = (from: HTMLElement): void => {
+  const openList = (from: HTMLElement, at?: HubPlace): void => {
     // A tour on its way to a stop arrives there when the clock pauses.
     resumeAfterHub = player.playing && !tour.active;
     player.pause();
     pauseAllAudio();
-    hub.open(from);
+    hub.open(from, at);
   };
   hubButton.addEventListener('click', () => openList(hubButton));
 

@@ -170,7 +170,7 @@ describe('the end of a flight', () => {
       expect(within(theEnding()).getByRole('heading', { level: 3 })).toHaveFocus();
     });
 
-    it('ends a flight in Earth orbit with its own last moment, and suggests the docking to try', async () => {
+    it('ends a flight in Earth orbit with its own last moment, and suggests the docking game', async () => {
       const { user } = await finishExploring('gemini-8');
 
       const ending = theEnding();
@@ -179,7 +179,7 @@ describe('the end of a flight', () => {
 
       await openMore(user);
 
-      const toTry = within(ending).getByRole('group', { name: 'Try it yourself' });
+      const toTry = within(ending).getByRole('group', { name: 'Play a game' });
       expect(within(toTry).getByRole('heading', { level: 4 })).toHaveTextContent(
         'Dock two spacecraft',
       );
@@ -276,7 +276,7 @@ describe('the end of a flight', () => {
       const ending = await openMore(user);
 
       const next = within(ending).getByRole('group', { name: 'Next flight' });
-      const toTry = within(ending).getByRole('group', { name: 'Try it yourself' });
+      const toTry = within(ending).getByRole('group', { name: 'Play a game' });
       const toExplore = within(ending).getByRole('group', { name: 'More to explore' });
       expect(within(ending).getAllByRole('group')).toEqual([next, toTry, toExplore]);
       expect(within(next).getByRole('heading', { level: 4 })).toHaveTextContent('Apollo 12');
@@ -310,7 +310,7 @@ describe('the end of a flight', () => {
     it("opens each extra over the ending, on this flight's page, and gives focus back", async () => {
       const { user } = await finishExploring('gemini-8', { loadExtra: sayWhereOpened });
       const ending = await openMore(user);
-      const openDocking = within(ending).getByRole('button', { name: 'Open Dock two spacecraft' });
+      const openDocking = within(ending).getByRole('button', { name: 'Play Dock two spacecraft' });
 
       await user.click(openDocking);
 
@@ -329,7 +329,7 @@ describe('the end of a flight', () => {
       ).toBeInTheDocument();
     });
 
-    it('leaves out the shelf to try when no moment of the flight names something to try', async () => {
+    it('leaves out the games shelf when no moment of the flight names a game', async () => {
       const { user } = await atTheEndOfApollo11({ story: withoutTryIt });
 
       const ending = await openMore(user);

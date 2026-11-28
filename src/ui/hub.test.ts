@@ -107,7 +107,7 @@ describe('the mission list', () => {
       const { user } = await mountMission('apollo-11');
       const list = await openTheList(user);
 
-      expect(namesIn(within(list).getByRole('region', { name: 'Try it yourself' }))).toEqual([
+      expect(namesIn(within(list).getByRole('region', { name: 'Play a game' }))).toEqual([
         'Fly to orbit',
         'Drop the stages',
         'Dock two spacecraft',
@@ -118,6 +118,20 @@ describe('the mission list', () => {
         'Six landings on the Moon',
         'Three rockets',
       ]);
+    });
+
+    it('offers Play for a game, and Open for something to look through', async () => {
+      const { user } = await mountMission('apollo-11');
+      const list = await openTheList(user);
+
+      const games = within(list).getByRole('region', { name: 'Play a game' });
+      expect(
+        within(games).getByRole('button', { name: 'Play Dock two spacecraft' }),
+      ).toHaveTextContent(/^Play$/);
+      const toExplore = within(list).getByRole('region', { name: 'More to explore' });
+      expect(
+        within(toExplore).getByRole('button', { name: 'Open Three rockets' }),
+      ).toHaveTextContent(/^Open$/);
     });
   });
 

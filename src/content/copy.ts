@@ -8,6 +8,13 @@ const ALL_MISSIONS = 'All missions';
 /** Leaving the guided way in to roam the mission freely. */
 const EXPLORE_ON_MY_OWN = 'Explore on my own';
 
+/** The name of the games (the hands-on extras), wherever they are offered together. */
+const PLAY_A_GAME = 'Play a game';
+
+/** The button that opens a game: "Play", and spoken with the game's name. */
+const PLAY = 'Play';
+const playGame = (title: string) => `${PLAY} ${title}`;
+
 /** How to move the 3D view, the second half of the canvas label. */
 const CANVAS_CONTROLS =
   'Drag or swipe to turn the view; scroll or pinch to zoom. When focused, arrow keys turn the view and the plus and minus keys zoom.';
@@ -48,6 +55,12 @@ export const copy = {
     span: (programs: string, years: string) => `${programs}, ${years}`,
     /** The number beside "All missions", read out. */
     count: (count: number) => `${count} ${count === 1 ? 'mission' : 'missions'}`,
+    /** The row under "All missions" that opens the list at the games. */
+    games: PLAY_A_GAME,
+    /** Under "Play a game": what the games are. */
+    gamesLine: 'Fly to orbit, dock, and land on the Moon',
+    /** The number beside "Play a game", read out. */
+    gamesCount: (count: number) => `${count} ${count === 1 ? 'game' : 'games'}`,
   },
 
   /** The list of every mission: opened from the welcome, and from the mission's name in the header. */
@@ -78,9 +91,13 @@ export const copy = {
     },
     /** The extras, in two small groups under the missions. */
     extras: {
-      'hands-on': 'Try it yourself',
+      'hands-on': PLAY_A_GAME,
       explore: 'More to explore',
     },
+    /** A game's button. */
+    play: PLAY,
+    playExtra: playGame,
+    /** The button of an extra to look through. */
     open: 'Open',
     openExtra: (title: string) => `Open ${title}`,
   },
@@ -109,8 +126,12 @@ export const copy = {
     more: 'More to explore',
     lessLabel: 'Show less',
     /** The two shelves, one pick each. */
-    handsOn: 'Try it yourself',
+    handsOn: PLAY_A_GAME,
     explore: 'More to explore',
+    /** A game's button. */
+    play: PLAY,
+    playExtra: playGame,
+    /** The button of an extra to look through. */
     open: 'Open',
     openExtra: (title: string) => `Open ${title}`,
     /** Only when the extra was opened from the list (or on its own): back to every mission. */
@@ -215,9 +236,8 @@ export const copy = {
     photoCredit: 'Photo:',
     original: 'Original',
     nowShowing: (title: string, spokenTime: string) => `${title}, ${spokenTime}.`,
-    /** The button that opens an event's hands-on extra. */
-    tryIt: 'Try it',
-    tryItLabel: (title: string) => `Try it: ${title}`,
+    /** The amber button that opens an event's game. */
+    playExtra: (title: string) => `${PLAY}: ${title}`,
     /** Once the clock has reached the end of the flight: shows what comes next. */
     finish: 'Finish',
   },
@@ -300,11 +320,15 @@ export const copy = {
       `Its page in your book is filled in: ${count} of ${total}.`,
     /** The three shelves, one pick each. */
     nextFlight: 'Next flight',
-    handsOn: 'Try it yourself',
+    handsOn: PLAY_A_GAME,
     explore: 'More to explore',
     fly: (missionName: string) => `Fly ${missionName}`,
     /** In place of the next flight, once this device has flown them all. */
     allFlown: 'You have flown every flight! Pick any one to fly again from All missions.',
+    /** A game's button. */
+    play: PLAY,
+    playExtra: playGame,
+    /** The button of an extra to look through. */
     open: 'Open',
     openExtra: (title: string) => `Open ${title}`,
     /** The quiet actions at the bottom. After the guided tour, one keeps exploring the flight. */

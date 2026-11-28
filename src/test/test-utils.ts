@@ -38,7 +38,7 @@ import {
   type MissionSummary,
 } from '../content/types.ts';
 import { extraFor, extras, isExtraReady } from '../extras/index.ts';
-import type { Extra } from '../extras/types.ts';
+import type { Extra, ExtraMeta } from '../extras/types.ts';
 import {
   buildFlightPath,
   createStoryTime,
@@ -73,6 +73,8 @@ export interface MountOptions {
   story?: (mission: Mission) => Mission;
   /** Make the real mission list into a typed fixture, for an entry no real mission gives. */
   missionList?: (summaries: readonly MissionSummary[]) => readonly MissionSummary[];
+  /** Make the real extras list into a typed fixture, for a list no real build gives (no games, say). */
+  extraList?: (extras: readonly ExtraMeta[]) => readonly ExtraMeta[];
   /** Which missions count as unfinished. The default is the site's own rule (none are, today). */
   isDraft?: (summary: MissionSummary) => boolean;
   /** Load a memorial page. The default loads the real one; pass another for loading, failure, and late answers. */
@@ -215,7 +217,7 @@ export async function mountMission(
     loadMemorial: options.loadMemorial ?? loadMemorial,
     addressOf,
     loadBundle,
-    extras,
+    extras: options.extraList ? options.extraList(extras) : extras,
     extraTitleOf: (extraId) => extraFor(extraId)?.title,
     isExtraDraft: (meta) => !isExtraReady(meta),
     loadExtra:
