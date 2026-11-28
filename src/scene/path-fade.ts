@@ -19,6 +19,8 @@
  * through the craft.
  */
 
+import { smoothstepBetween } from '../sim/vec';
+
 /**
  * A stretch of a path that stays low over one body (see orbitStays) is a
  * stay in orbit once it goes round more than this many times. Less is a
@@ -75,11 +77,6 @@ export interface WayDimming {
   readonly dim: number;
 }
 
-const smoothstep = (edge0: number, edge1: number, x: number): number => {
-  const u = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return u * u * (3 - 2 * u);
-};
-
 /**
  * How the way in is drawn with the craft at a fractional sample index: the
  * samples before the start of the stay it is in, or last left, are dimmed
@@ -99,12 +96,12 @@ export function wayDimming(
   const now = valueAtIndex(revolutions, index);
   const start = valueAtIndex(revolutions, first);
   const end = valueAtIndex(revolutions, last);
-  const into = smoothstep(
+  const into = smoothstepBetween(
     WAY_DIM_REVOLUTIONS[0],
     WAY_DIM_REVOLUTIONS[1],
     Math.min(now, end) - start,
   );
-  const back = smoothstep(0, WAY_BACK_REVOLUTIONS, now - end);
+  const back = smoothstepBetween(0, WAY_BACK_REVOLUTIONS, now - end);
   return { before: first, dim: into * (1 - back) };
 }
 
@@ -173,7 +170,7 @@ export function returnStarts(near: ArrayLike<number>): Int32Array {
  * over its surface.
  */
 export function returnFade(zone: number, moonRadii: number): number {
-  if (zone === 2) return 1 - smoothstep(1.1, RETURN_MOON_ZONE_RADII, moonRadii);
+  if (zone === 2) return 1 - smoothstepBetween(1.1, RETURN_MOON_ZONE_RADII, moonRadii);
   const span = Math.log(RETURN_AWAY_MOON_RADII / RETURN_MOON_ZONE_RADII);
   const t = Math.min(1, Math.max(0, Math.log(moonRadii / RETURN_MOON_ZONE_RADII) / span));
   return 1 - (1 - t) * (1 - t);

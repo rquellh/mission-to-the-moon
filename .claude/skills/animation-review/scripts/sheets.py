@@ -30,6 +30,12 @@ import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
+# rec_common.py sits beside this file, which `python3 -I` leaves off the path. No __pycache__ is
+# written, so a run leaves the checkout as it found it (record.mjs counts its changed files).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.dont_write_bytecode = True
+from rec_common import clock_text, number, parse_ships, read_tsv  # noqa: E402
+
 MAX_SIDE = 1980
 LABEL_H = 30
 GAP = 4
@@ -53,44 +59,9 @@ def font(size):
         return ImageFont.load_default()
 
 
-def number(text):
-    try:
-        return float(text)
-    except (TypeError, ValueError):
-        return None
-
-
-def read_tsv(path):
-    if not os.path.exists(path):
-        return []
-    with open(path, encoding='utf-8') as handle:
-        lines = handle.read().rstrip('\n').split('\n')
-    head = lines[0].split('\t')
-    return [dict(zip(head, line.split('\t'))) for line in lines[1:] if len(line.split('\t')) == len(head)]
-
-
-def clock_text(seconds):
-    if seconds is None:
-        return '---:--:--'
-    sign = '-' if seconds < 0 else ''
-    s = int(round(abs(seconds)))
-    return f'{sign}{s // 3600:03d}:{s % 3600 // 60:02d}:{s % 60:02d}'
-
-
 def ship_boxes(text):
-    boxes = {}
-    for item in (text or '').split(' '):
-        if ':' not in item:
-            continue
-        name, rest = item.split(':', 1)
-        where, _, fade = rest.replace('+dot', '').partition('@')
-        if where in ('-', 'gone') or ',' not in where:
-            continue
-        x, y, size = where.split(',')
-        w, h = size.split('x')
-        if (number(fade) or 0) > 0.05:
-            boxes[name] = (float(x), float(y), float(w), float(h))
-    return boxes
+    """Each craft drawn with a box in a timeline ships cell: {id: (centre x, centre y, width, height)}."""
+    return {name: ship['box'] for name, ship in parse_ships(text).items() if ship['box'] is not None and ship['fade'] > 0.05}
 
 
 class Recording:

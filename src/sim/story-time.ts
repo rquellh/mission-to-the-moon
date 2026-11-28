@@ -381,18 +381,25 @@ export function turnsOf(path: Pick<FlightPath, 'ships' | 'polyline' | 'moonPosit
     return Math.max(0, (after - before) / (2 * TURN_WINDOW_SECONDS));
   };
   // Where the rates change course: each path sample either side of the window, and each phase change.
-  const all = new Float64Array(
-    [
-      ...ships.flatMap((ship) =>
-        Array.from(ship.times).flatMap((t) => [
-          t - TURN_WINDOW_SECONDS,
-          t,
-          t + TURN_WINDOW_SECONDS,
-        ]),
-      ),
-      ...ships.flatMap((ship) => ship.bounds),
-    ].sort((a, b) => a - b),
-  );
+  let count = 0;
+  for (const ship of ships) count += 3 * ship.times.length + ship.bounds.length;
+  const all = new Float64Array(count);
+  let filled = 0;
+  for (const ship of ships) {
+    const { times, bounds } = ship;
+    for (let i = 0; i < times.length; i += 1) {
+      const t = times[i] as number;
+      all[filled] = t - TURN_WINDOW_SECONDS;
+      all[filled + 1] = t;
+      all[filled + 2] = t + TURN_WINDOW_SECONDS;
+      filled += 3;
+    }
+    for (let i = 0; i < bounds.length; i += 1) all[filled + i] = bounds[i] as number;
+    filled += bounds.length;
+  }
+  // In numeric order. The typed sort differs from sorting by a - b only in putting -0 before 0 and
+  // NaN last, and a flight's times are neither.
+  all.sort();
   const firstAtOrAfter = (t: number): number => {
     let lo = 0;
     let hi = all.length;
@@ -403,10 +410,18 @@ export function turnsOf(path: Pick<FlightPath, 'ships' | 'polyline' | 'moonPosit
     }
     return lo;
   };
+  // Each rate is the fastest ship's, and 0 with none (Math.max, unlike >, passes a NaN on).
   return {
-    rate: (t) => Math.max(0, ...ships.map((ship) => rateOf(ship, t))),
-    openRate: (t) =>
-      Math.max(0, ...ships.map((ship) => (within(ship.open, t) ? rateOf(ship, t) : 0))),
+    rate(t) {
+      let top = 0;
+      for (const ship of ships) top = Math.max(top, rateOf(ship, t));
+      return top;
+    },
+    openRate(t) {
+      let top = 0;
+      for (const ship of ships) top = Math.max(top, within(ship.open, t) ? rateOf(ship, t) : 0);
+      return top;
+    },
     open: joined(ships.flatMap((ship) => ship.open)),
     samples(from, to) {
       const out: number[] = [];

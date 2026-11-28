@@ -55,9 +55,8 @@
  * moves the camera, and a page turn jumps the clock and plays nothing.
  */
 import { writeFile } from 'node:fs/promises';
-import { openBrowser, sleep } from './cast.mjs';
+import { BASE, openBrowser, sleep } from './cast.mjs';
 
-const BASE = (process.env.BASE ?? 'http://localhost:5199').replace(/\/$/, '');
 /** The working limit for a drawn craft, laps per real second: one lap in 20 seconds (see the top of this file). */
 const LIMIT_LAP_SECONDS = 20;
 const LIMIT = 1 / LIMIT_LAP_SECONDS;
