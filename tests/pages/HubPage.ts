@@ -3,8 +3,11 @@ import { expect, type Locator, type Page } from '@playwright/test';
 /**
  * The mission list, titled "All missions": a modal dialog opened from the
  * welcome's All missions (WelcomePage) and from the mission's name in the
- * header. Each mission is an entry with Tour and Explore (or Read, for a
- * memorial page); the extras follow, each with Open.
+ * header, or from the welcome's "Play a game", which opens it at the games
+ * with focus on their heading. Each mission is an entry with Tour and
+ * Explore (or Read, for a memorial page); the extras follow in two groups,
+ * the games ("hands-on"), each with Play, then the rest ("explore"), each
+ * with Open (`extraOpen` finds either).
  */
 export class HubPage {
   readonly page: Page;
@@ -22,6 +25,8 @@ export class HubPage {
   readonly missionRead: (id: string) => Locator;
   readonly extra: (id: string) => Locator;
   readonly extraOpen: (id: string) => Locator;
+  /** The heading of a group of extras, by kind: "hands-on" (Play a game) or "explore" (More to explore). */
+  readonly extrasTitle: (kind: string) => Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -37,6 +42,7 @@ export class HubPage {
     this.missionRead = (id: string) => page.getByTestId(`hub-mission-${id}-read`);
     this.extra = (id: string) => page.getByTestId(`hub-extra-${id}`);
     this.extraOpen = (id: string) => page.getByTestId(`hub-extra-${id}-open`);
+    this.extrasTitle = (kind: string) => page.getByTestId(`hub-extras-${kind}-title`);
   }
 
   /** Wait until the list is open and filled. */

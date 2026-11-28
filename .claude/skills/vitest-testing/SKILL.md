@@ -220,6 +220,7 @@ jsdom loads no stylesheet, so only the `hidden` attribute hides anything in an i
 | `no3D`         | `{ note, offerReload }`: no 3D view                                                                                                                                           |
 | `story`        | Make the real mission into a typed fixture (section 6)                                                                                                                        |
 | `missionList`  | Make the real mission list into a typed fixture (section 6)                                                                                                                   |
+| `extraList`    | Make the real extras list into a typed fixture (no games listed, say), as `missionList` does for the missions                                                                 |
 | `isDraft`      | Which list entries count as unfinished                                                                                                                                        |
 | `loadMemorial` | Replace the memorial loader (section 5)                                                                                                                                       |
 | `loadExtra`    | Replace the extra loader; the default loads a stand-in extra                                                                                                                  |
@@ -426,7 +427,7 @@ The welcome is not a dialog: it is a region named by its heading ("Ride along on
 
 "Tell me more" is not a dialog either: it is a region named by the moment's title, `hidden` until its door opens it. Opening it moves focus to its heading; Close (Show less on a phone), its door, and Escape while focus is inside it close it and give focus back to the door. The tools behind Controls work the same way, with focus staying on the door.
 
-An extra's sheet is a dialog named by the extra's title. At the end of a run in a hands-on extra, "Up next" is a region named "Up next" inside it, which the sheet builds from what the extra says: the next step as a level-3 heading and its one amber button (back to the flight the sheet was opened over, or, opened from the list, "Fly" the flight where it really happened), the two picks as groups ("Try it yourself", "More to explore") whose Open buttons open that extra in place of this one, and the quiet actions ("Try again", then "All missions" only when the sheet was opened from the list). On a phone only the next step, "Try again", and "More to explore" (`aria-expanded`) are in the role queries; that door pulls up the rest with focus on the next step's heading, and Show less and Escape put it back with focus on the door, the sheet still open. On a wide screen everything shows and there is no door.
+An extra's sheet is a dialog named by the extra's title. At the end of a run in a hands-on extra, "Up next" is a region named "Up next" inside it, which the sheet builds from what the extra says: the next step as a level-3 heading and its button (back to the flight the sheet was opened over, or, opened from the list, "Fly" the flight where it really happened), amber unless the extra passes `plainPrimary` because its own "Play again" is the amber one, the two picks as groups ("Play a game", "More to explore") whose buttons (Play for a game, named "Play <title>"; Open for the rest, named "Open <title>") open that extra in place of this one, and the quiet actions (the run again, such as "Play again", then "All missions" only when the sheet was opened from the list). On a phone only the next step, the run again, and "More to explore" (`aria-expanded`) are in the role queries; that door pulls up the rest with focus on the next step's heading, and Show less and Escape put it back with focus on the door, the sheet still open. On a wide screen everything shows and there is no door.
 
 The end of a flight is not a dialog either: a region named "That’s the flight!" inside the moment card, shown after the tour's last stop, or with "Finish" (on the card once exploring has reached the end of the clock). It takes the moment's place, so the story, Tell me more, Controls, Play, and the tour panel leave the role queries while it shows, and its heading has focus. Its "More to explore" door (`aria-expanded`) opens the card with focus on the opened heading; that part is built the first time it opens, so its text is not in the page before. Show less and Escape close it and give focus back to the door. After the tour, its quiet ways on include "Explore on my own", which leaves the tour and explores from the last stop with Play focused; after exploring it is not offered. The ending reads the device's visits each time it shows: prepare them with `rememberVisits` (section 10).
 
@@ -466,7 +467,7 @@ it('says the extra did not load and offers to reload it here', async () => {
     start: 'explore',
     loadExtra: () => Promise.reject(new Error('The network went away')),
   });
-  await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
+  await user.click(screen.getByRole('button', { name: 'Play: Fly to orbit' }));
   const sheet = screen.getByRole('dialog', { name: 'Fly to orbit' });
 
   expect(await within(sheet).findByRole('status')).toHaveTextContent(
@@ -528,9 +529,9 @@ The data is the real content. Pick missions that differ in the way the test need
 | Sources borrowed from other missions                                   | `gemini-7` (from Gemini 6A and Gemini 8)                                                                                                                                                                                       |
 | A Moon flight with no landing, one craft                               | `apollo-8`                                                                                                                                                                                                                     |
 | A memorial page                                                        | `apollo-1` (opened from the mission list)                                                                                                                                                                                      |
-| A hands-on extra on an event                                           | `liftoff` on every flight ("Fly to orbit"); `docking` on Gemini 8 ("Dock two spacecraft"); `powered-descent` on Apollo 11 ("Land on the Moon", so its ending suggests it)                                                      |
+| A hands-on extra (a game) on an event, offered by "Play: <title>"      | `liftoff` on every flight ("Fly to orbit"); `docking` on Gemini 8 ("Dock two spacecraft"); `powered-descent` on Apollo 11 ("Land on the Moon", so its ending suggests it)                                                      |
 | The end of a flight                                                    | `apollo-11` with `event: 'splashdown'` (the last moment, at the end of the clock: Finish shows); `gemini-8` (suggests the docking and the rockets); `gemini-3` (no crew patch)                                                 |
-| The end of a run in an extra ("Up next")                               | `apollo-11` with `event: 'liftoff'` and Try it (from a flight: back to Apollo 11; the picks are the stages and the landing sites); the docking opened from the list (Fly Gemini 8; the picks are Fly to orbit and the rockets) |
+| The end of a run in an extra ("Up next")                               | `apollo-11` with `event: 'liftoff'` and "Play" (from a flight: back to Apollo 11; the picks are the stages and the landing sites); the docking opened from the list (Fly Gemini 8; the picks are Fly to orbit and the rockets) |
 
 Assert with the content's own words, written out: `'The Eagle has landed'`, `'Stop 1 of 6'`, `'102:45:39'`. When the test passes text in (a no-3D note), take it from `copy` (`src/content/copy.ts`) as the site does.
 
@@ -711,14 +712,15 @@ screen.getByRole('dialog', { name: 'About Apollo 11' });
 
 // Landmarks and groups named in index.html
 screen.getByRole('region', { name: 'Ride along on Apollo 11' }); // the welcome, by its heading
+screen.getByRole('button', { name: 'Play a game' }); // on the welcome: the list, opened at its games with focus on their heading
 screen.getByRole('region', { name: 'What is happening' }); // the moment card, always there during a flight
 screen.getByRole('region', { name: 'The Eagle has landed' }); // "Tell me more", once open, by the moment's title
 screen.getByRole('region', { name: 'Timeline' }); // the tools behind Controls, once open
 screen.getByRole('region', { name: 'Guided tour' }); // in the card, on the tour
 screen.getByRole('region', { name: 'That’s the flight!' }); // the end of a flight, in the card
 within(sheet).getByRole('region', { name: 'Up next' }); // the end of a run in an extra, in its sheet
-within(upNext).getByRole('group', { name: 'Try it yourself' }); // a pick; also 'More to explore' (on a phone, once pulled up)
-within(ending).getByRole('group', { name: 'Next flight' }); // with More to explore open: also 'Try it yourself', 'More to explore'
+within(upNext).getByRole('group', { name: 'Play a game' }); // a pick; also 'More to explore' (on a phone, once pulled up)
+within(ending).getByRole('group', { name: 'Next flight' }); // with More to explore open: also 'Play a game', 'More to explore'
 screen.getByRole('group', { name: 'Look at' }); // at the top left, with Controls open
 within(card).getByRole('group', { name: 'Where the flight is' }); // beside Play, with Tell me more open (or Controls, on a phone)
 within(timeline).getByRole('group', { name: 'Chapters' });
@@ -735,7 +737,8 @@ within(card).getByRole('button', { name: 'Finish' }); // exploring, once the clo
 within(ending).getByRole('button', { name: 'More to explore' }); // the ending's door, with aria-expanded
 within(upNext).getByRole('button', { name: 'More to explore' }); // on a phone, the door that pulls "Up next" up
 
-// Controls
+// Controls. Names match whole, so the clock's 'Play' never finds a game's
+// 'Play: Fly to orbit' (the card) or 'Play Fly to orbit' (a list); no button is named 'Play' alone but the clock's.
 within(card).getByRole('button', { name: 'Play' });
 within(timeline).getByRole('slider', { name: 'Mission time' });
 within(timeline).getByRole('combobox', { name: 'Speed' });
@@ -950,7 +953,7 @@ Every test file follows this order. Here is `src/ui/extra-sheet.test.ts`, trimme
 ```ts
 // ── What the file covers ─────────────────────
 /**
- * The extras sheet, opened from "Try it" on Apollo 11's liftoff. The extra
+ * The extras sheet, opened from "Play: Fly to orbit" on Apollo 11's liftoff. The extra
  * inside is a tiny stand-in passed through `loadExtra` (the interface's
  * edge): each real extra's own code is tested on its own.
  */
@@ -999,17 +1002,17 @@ Each test reads in three steps, separated by blank lines: mount (and get to the 
 
 ### Standard Behavioral Describe Groupings
 
-| Grouping                                    | When to use                                                                                                                                                       |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `rendering`                                 | What a part shows for a mission, and what it leaves out                                                                                                           |
-| `opening` / `closing`                       | A dialog, sheet, or panel coming and going, focus, the tab title                                                                                                  |
-| `loading` / `failing to load`               | A loader's waiting, answer, and failure                                                                                                                           |
-| `choosing`                                  | Picking an entry, a view, a chapter                                                                                                                               |
-| `stepping` / `traveling`                    | The card's Previous and Next; the tour's trips and Skip                                                                                                           |
-| `exploring` / `touring` / `during the tour` | States of the whole interface                                                                                                                                     |
-| `the ending` / `leaving`                    | The end of a flight (after the tour or exploring) and the ways out of it                                                                                          |
-| `announcements`                             | What screen readers hear (fake timers allowed here)                                                                                                               |
-| Domain groups                               | `the door`, `photo`, `sources`, `try it`, `recording`, `true scale`, `one at a time`, `one recording, two buttons`, `up next`, `on a phone`, `the end of a climb` |
+| Grouping                                    | When to use                                                                                                                                                               |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rendering`                                 | What a part shows for a mission, and what it leaves out                                                                                                                   |
+| `opening` / `closing`                       | A dialog, sheet, or panel coming and going, focus, the tab title                                                                                                          |
+| `loading` / `failing to load`               | A loader's waiting, answer, and failure                                                                                                                                   |
+| `choosing`                                  | Picking an entry, a view, a chapter                                                                                                                                       |
+| `stepping` / `traveling`                    | The card's Previous and Next; the tour's trips and Skip                                                                                                                   |
+| `exploring` / `touring` / `during the tour` | States of the whole interface                                                                                                                                             |
+| `the ending` / `leaving`                    | The end of a flight (after the tour or exploring) and the ways out of it                                                                                                  |
+| `announcements`                             | What screen readers hear (fake timers allowed here)                                                                                                                       |
+| Domain groups                               | `the door`, `photo`, `sources`, `a game to play`, `recording`, `true scale`, `one at a time`, `one recording, two buttons`, `up next`, `on a phone`, `the end of a climb` |
 
 ---
 

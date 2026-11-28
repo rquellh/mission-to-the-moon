@@ -77,13 +77,14 @@ test.describe('Every extra opens and closes', () => {
  * to its end, and "Up next" flies the flight where it really happened: in a
  * real browser on a desktop and on a phone, where the next step is pinned
  * within reach however long the result is. Fly to orbit's journey goes on
- * to that flight's liftoff card, whose "Try it" opens the game over it. What
+ * to that flight's liftoff card, whose "Play: Fly to orbit" opens the game over it. What
  * "Up next" says and offers is tested in the interface tests
  * (src/ui/extra-sheet.test.ts and each extra's own tests).
  */
 test.describe('The end of a hands-on extra', () => {
-  test('a visitor docks the Gemini with the Agena, and flies the real first docking from Up next', async ({
+  test('a visitor docks the Gemini with the Agena, sees the stars it earned, and flies the real first docking from Up next', async ({
     sitePage,
+    isMobile,
   }) => {
     // Closing in on the Agena at the toy's gentlest top speed takes over 20 seconds.
     test.slow();
@@ -106,10 +107,18 @@ test.describe('The end of a hands-on extra', () => {
       await expect(dockingPage.docked).toBeFocused();
     });
 
-    await test.step('Up next offers the real docking, its one button in view', async () => {
+    await test.step('The docking earns two of the three stars, with Play again in view under them', async () => {
+      // The scripted docking is on the first try, and closes at the fastest gentle speed (no star for a soft touch).
+      await expect(dockingPage.starsLine).toHaveText('2 of 3 stars on Easy');
+      await expect(dockingPage.playAgain).toBeInViewport();
+    });
+
+    await test.step('Up next offers the real docking: pinned in view on a phone, a scroll away at most on a computer', async () => {
       await expect(extraSheetPage.upNext).toBeVisible();
       await expect(extraSheetPage.upNextTitle).toHaveText('See the real docking');
       await expect(extraSheetPage.upNextPrimary).toHaveText(`Fly ${realDocking.name}`);
+      // On a computer the stars and Play again come first in the column, so the next step can start below the fold.
+      if (!isMobile) await extraSheetPage.upNextPrimary.scrollIntoViewIfNeeded();
       await expect(extraSheetPage.upNextPrimary).toBeInViewport();
     });
 
@@ -124,8 +133,9 @@ test.describe('The end of a hands-on extra', () => {
     });
   });
 
-  test('a visitor lands the lunar module on clear ground, and flies the real first landing from Up next', async ({
+  test('a visitor lands the lunar module on clear ground, sees the stars it earned, and flies the real first landing from Up next', async ({
     sitePage,
+    isMobile,
   }) => {
     // Sliding over to the clear ground and coming down on it takes about 18 seconds of the toy's time.
     test.slow();
@@ -148,10 +158,18 @@ test.describe('The end of a hands-on extra', () => {
       await expect(landingPage.landed).toBeFocused();
     });
 
-    await test.step('Up next offers the real landing, its one button in view', async () => {
+    await test.step('The landing earns two of the three stars, with Play again in view under them', async () => {
+      // The scripted landing touches down firmly (no star for a gentle touchdown) with fuel to spare.
+      await expect(landingPage.starsLine).toHaveText('2 of 3 stars on Easy');
+      await expect(landingPage.playAgain).toBeInViewport();
+    });
+
+    await test.step('Up next offers the real landing: pinned in view on a phone, a scroll away at most on a computer', async () => {
       await expect(extraSheetPage.upNext).toBeVisible();
       await expect(extraSheetPage.upNextTitle).toHaveText('See the real landing');
       await expect(extraSheetPage.upNextPrimary).toHaveText(`Fly ${realLanding.name}`);
+      // On a computer the stars and Play again come first in the column, so the next step can start below the fold.
+      if (!isMobile) await extraSheetPage.upNextPrimary.scrollIntoViewIfNeeded();
       await expect(extraSheetPage.upNextPrimary).toBeInViewport();
     });
 
@@ -168,6 +186,7 @@ test.describe('The end of a hands-on extra', () => {
 
   test('a visitor flies the Saturn V to orbit, flies the real liftoff from Up next, and opens the game again from its card', async ({
     sitePage,
+    isMobile,
   }) => {
     // Climbing to orbit takes about 22 seconds of the toy's time from Start.
     test.slow();
@@ -192,12 +211,20 @@ test.describe('The end of a hands-on extra', () => {
       await expect(orbitPage.result).toBeFocused();
     });
 
-    await test.step('The real orbit follows, and Up next offers the real liftoff, its one button in view', async () => {
+    await test.step('The climb earns its stars, with Play again in view under them', async () => {
+      // How many depends on how promptly the browser pressed each key, so only the level is checked.
+      await expect(orbitPage.starsLine).toContainText('stars on Easy');
+      await expect(orbitPage.playAgain).toBeInViewport();
+    });
+
+    await test.step('The real orbit follows, and Up next offers the real liftoff: pinned in view on a phone, a scroll away at most on a computer', async () => {
       await expect(orbitPage.realTitle).toBeVisible();
       await expect(orbitPage.realTitle).toHaveText(`${realLiftoff.name}: In orbit around Earth`);
       await expect(extraSheetPage.upNext).toBeVisible();
       await expect(extraSheetPage.upNextTitle).toHaveText('See the real liftoff');
       await expect(extraSheetPage.upNextPrimary).toHaveText(`Fly ${realLiftoff.name}`);
+      // On a computer the stars and Play again come first in the column, so the next step can start below the fold.
+      if (!isMobile) await extraSheetPage.upNextPrimary.scrollIntoViewIfNeeded();
       await expect(extraSheetPage.upNextPrimary).toBeInViewport();
     });
 
@@ -211,8 +238,8 @@ test.describe('The end of a hands-on extra', () => {
       await expect(cardPage.title).toHaveText(realLiftoff.title);
     });
 
-    await test.step('Try it on the liftoff card opens Fly to orbit over the flight, with its own rocket on the pad', async () => {
-      await expect(cardPage.tryIt).toHaveText('Try it: Fly to orbit');
+    await test.step('Play on the liftoff card opens Fly to orbit over the flight, with its own rocket on the pad', async () => {
+      await expect(cardPage.tryIt).toHaveText('Play: Fly to orbit');
       await cardPage.tryIt.click();
       await extraSheetPage.waitForLoad();
       await expect(extraSheetPage.sheet).toHaveAttribute('data-extra', 'orbit');

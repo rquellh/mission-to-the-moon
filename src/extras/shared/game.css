@@ -1,0 +1,190 @@
+/* What the games share on screen: the level picker above Start
+   (level-picker.ts) and the end of a run with its stars, goals and Play
+   again (run-end.ts). Loaded with whichever game uses them, and shared by
+   all, so every selector starts with `.game-`. Phone first; amber and blue
+   only, so what went well and what did not are said in words and stars. */
+
+/* Stars: filled amber when earned, an outline when not. */
+.game-star {
+  flex: none;
+  fill: none;
+  stroke: var(--color-text-faint);
+}
+
+.game-star--on {
+  fill: var(--color-accent);
+  stroke: var(--color-accent);
+}
+
+.game-star--small {
+  width: 18px;
+  height: 18px;
+}
+
+.game-star--large {
+  width: 36px;
+  height: 36px;
+}
+
+/* The level picker: two cards side by side, the chosen one outlined in amber. */
+.game-levels {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.game-levels__legend {
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.game-levels__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.game-level {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 8px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 12px;
+  background: var(--color-raised);
+  cursor: pointer;
+  transition:
+    background-color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out);
+}
+
+.game-level:hover {
+  background: var(--color-hover);
+}
+
+.game-level:has(.game-level__input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+/* The radio itself is hidden; its card shows the focus ring. */
+.game-level:has(.game-level__input:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.game-level__name {
+  font-size: 1.0625rem;
+  font-weight: 700;
+}
+
+.game-level__stars {
+  display: flex;
+  gap: 1px;
+}
+
+.game-level__best {
+  grid-column: 1 / -1;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.game-levels__line {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+/* The end of a run: the stars box, then Play again and the other level. */
+.game-run-end {
+  display: grid;
+  gap: 16px;
+}
+
+.game-result {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 14px;
+  background: var(--color-raised);
+}
+
+.game-result__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.game-result__stars {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.game-result__words {
+  display: grid;
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.game-result__best {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.game-goals {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.game-goal {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  font-size: 0.9375rem;
+  line-height: 1.3;
+}
+
+.game-goal .game-star {
+  margin-top: 1px;
+}
+
+.game-goal--missed {
+  color: var(--color-text-muted);
+}
+
+.game-goal__tip {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.8125rem;
+}
+
+.game-again {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.game-again .button {
+  min-width: 0;
+  padding: 0 10px;
+}

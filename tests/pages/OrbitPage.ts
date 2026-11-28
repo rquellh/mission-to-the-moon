@@ -4,7 +4,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 type Press = { key: 'ArrowRight'; fuelLeft: number } | { key: 'Space' };
 
 /**
- * A clean climb with the Saturn V, as the interface tests fly it
+ * A clean climb with the Saturn V on Easy, as the interface tests fly it
  * (THREE_STAGES in src/extras/orbit/orbit.test.ts): Tip over at 3.8, 6.3,
  * 8.8, 11.3, 13.8 and 16.3 seconds after Start, and Drop it as soon as each
  * stage is empty (at about 7.1 and 15.2). The toy runs slower than the clock
@@ -37,23 +37,31 @@ const WATCH = { intervals: [50], timeout: 30_000 };
 
 /**
  * "Fly to orbit", inside the extra's sheet (ExtraSheetPage): the rocket on
- * the pad (`rocket`: "Apollo 11's rocket: the Saturn V"), Start, and while
- * flying the fuel strip's word for the stage burning (`fuel`: Plenty,
+ * the pad (`rocket`: "Apollo 11's rocket: the Saturn V"), the level picker
+ * above Start (`levels`, a group of two radio buttons, `levelEasy` and
+ * `levelHard`, named like "Easy. Your best: 3 of 3 stars."), Start, and
+ * while flying the fuel strip's word for the stage burning (`fuel`: Plenty,
  * Getting low, Almost out, Empty) and its bar's fill (`fuelFill`, as wide
  * as the share of the tank left, to a tenth of a percent), the height
  * (`height`: Thick air, Thin air, Space), the sideways speed (`speed`:
  * Slow, Picking up, Fast, Orbit speed), the tilt (`tilt`: Straight up,
  * Leaning over, Halfway over, Nearly flat, Flat), and the coach line
  * (`coach`, which has focus when the fuel runs out). In orbit: the result
- * line (`result`, which has focus when it shows), the sideways speed and
- * the fuel left (`resultSpeed`, `fuelLeft`: Plenty, Some, A little), and the
- * title of the real event at orbit (`realTitle`). Its end, "Up next", is
+ * line (`result`: "You are in orbit.", which has focus when it shows) and
+ * the title of the real event at orbit (`realTitle`). Each run ends with
+ * the games' shared end of a run under its result line (or under the coach
+ * line when the fuel runs out): the stars box (`starsBox`, with
+ * `starsLine`: "All 3 stars on Easy"), `playAgain` (amber) and `otherLevel`
+ * ("Play on Hard" or "Play on Easy"). Its end, "Up next", is
  * ExtraSheetPage's. The keys work on the page: the arrows tip the rocket,
  * and the space bar presses Drop it, which has the focus from Start.
  */
 export class OrbitPage {
   readonly page: Page;
   readonly rocket: Locator;
+  readonly levels: Locator;
+  readonly levelEasy: Locator;
+  readonly levelHard: Locator;
   readonly start: Locator;
   readonly fuel: Locator;
   readonly fuelFill: Locator;
@@ -62,13 +70,18 @@ export class OrbitPage {
   readonly tilt: Locator;
   readonly coach: Locator;
   readonly result: Locator;
-  readonly resultSpeed: Locator;
-  readonly fuelLeft: Locator;
   readonly realTitle: Locator;
+  readonly starsBox: Locator;
+  readonly starsLine: Locator;
+  readonly playAgain: Locator;
+  readonly otherLevel: Locator;
 
   constructor(page: Page) {
     this.page = page;
     this.rocket = page.getByTestId('orbit-rocket');
+    this.levels = page.getByTestId('game-levels');
+    this.levelEasy = page.getByTestId('game-level-easy');
+    this.levelHard = page.getByTestId('game-level-hard');
     this.start = page.getByTestId('orbit-start');
     this.fuel = page.getByTestId('orbit-fuel');
     this.fuelFill = page.getByTestId('orbit-fuel-fill');
@@ -77,13 +90,16 @@ export class OrbitPage {
     this.tilt = page.getByTestId('orbit-tilt');
     this.coach = page.getByTestId('orbit-coach');
     this.result = page.getByTestId('orbit-result');
-    this.resultSpeed = page.getByTestId('orbit-result-speed');
-    this.fuelLeft = page.getByTestId('orbit-fuel-left');
     this.realTitle = page.getByTestId('orbit-real-title');
+    this.starsBox = page.getByTestId('game-result');
+    this.starsLine = page.getByTestId('game-stars-line');
+    this.playAgain = page.getByTestId('game-play-again');
+    this.otherLevel = page.getByTestId('game-other-level');
   }
 
   /**
-   * Fly the Saturn V to orbit with the keys, once started (CLIMB above).
+   * Fly the Saturn V to orbit with the keys, once started on Easy (the level
+   * a first visit starts on; CLIMB above).
    * Each tip waits until the bar shows the share of the tank left at its
    * second; the bar is rounded to a tenth of a percent, so it must read a
    * twentieth below that share for the tank to be there. Each drop waits for

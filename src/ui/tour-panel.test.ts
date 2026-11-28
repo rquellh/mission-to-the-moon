@@ -117,12 +117,12 @@ describe('the tour panel', () => {
       ).toBeInTheDocument();
     });
 
-    it('offers "Try it" at a stop, and holds it back on the way, even on the stop just left', async () => {
-      // Gemini 8's tour starts at the target's launch, before its own liftoff, which has "Try it".
+    it("offers a game's Play button at a stop, and holds it back on the way, even on the stop just left", async () => {
+      // Gemini 8's tour starts at the target's launch, before its own liftoff, which has a game.
       const { user, frames } = await mountMission('gemini-8', { start: 'tour' });
       await travelToNextStop(user, frames);
       expect(within(theCard()).getByRole('heading', { level: 3 })).toHaveTextContent('Liftoff');
-      expect(within(theCard()).getByRole('button', { name: 'Try it: Fly to orbit' })).toBeVisible();
+      expect(within(theCard()).getByRole('button', { name: 'Play: Fly to orbit' })).toBeVisible();
 
       await user.click(screen.getByRole('button', { name: 'Next' }));
 
@@ -131,7 +131,7 @@ describe('the tour panel', () => {
       );
       expect(within(theCard()).getByRole('heading', { level: 3 })).toHaveTextContent('Liftoff');
       expect(
-        within(theCard()).queryByRole('button', { name: 'Try it: Fly to orbit' }),
+        within(theCard()).queryByRole('button', { name: 'Play: Fly to orbit' }),
       ).not.toBeInTheDocument();
     });
 

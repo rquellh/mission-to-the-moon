@@ -1,6 +1,6 @@
 ---
 name: hands-on-games
-description: Designs, mocks up, builds, tunes, and reviews hands-on games for Mission to the Moon - the "Try it yourself" extras under src/extras/, such as Land on the Moon, Dock two spacecraft, and Drop the stages. Use whenever the user asks for a new game or a game idea, mock-ups for a game, a playable moment from a flight, or a "Try it" button on a mission card; says a game feels too easy, too hard, confusing, or not fun; or wants a draft game made ready. Use it even when they do not say "extra" or "hands-on".
+description: Designs, mocks up, builds, tunes, and reviews hands-on games for Mission to the Moon - the "Play a game" extras under src/extras/, such as Land on the Moon, Fly to orbit, and Dock two spacecraft. Use whenever the user asks for a new game or a game idea, mock-ups for a game, a playable moment from a flight, or a "Play" button on a mission card; says a game feels too easy, too hard, confusing, or not fun; asks about levels, stars, or playing again; or wants a draft game made ready. Use it even when they do not say "extra" or "hands-on".
 ---
 
 # Hands-On Games Skill - Mission to the Moon
@@ -19,7 +19,8 @@ You are designing and building a hands-on game for Mission to the Moon: a short 
 | -------------------------------------- | ---------------------------------- |
 | An idea or mock-ups                    | Sections 2 to 4, then stop and ask |
 | A game made easier, harder, or clearer | Sections 4, 5, and 7               |
-| A "Try it" button on a card            | Section 8                          |
+| Levels, stars, or Play again           | Sections 4 to 6                    |
+| A "Play" button on a card              | Section 8                          |
 | A draft made ready                     | Section 9                          |
 
 ---
@@ -33,7 +34,7 @@ You are designing and building a hands-on game for Mission to the Moon: a short 
 | 3. Build it as a draft      | Rules, view, and screen in `src/extras/<id>/`, with `status: 'draft'`     | You                                   |
 | 4. Look at it               | Screenshots at phone and computer sizes, and the fixes they call for      | You                                   |
 | 5. Have it played           | Their words about how it feels, then tuning                               | They play it                          |
-| 6. Offer it from the flight | A "Try it" button on one event's card                                     | They choose the card                  |
+| 6. Offer it from the flight | A "Play" button on one event's card                                       | They choose the card                  |
 | 7. Deliver it               | A stack of small pull requests                                            | When they ask                         |
 | 8. Make it ready            | Everything in section 9                                                   | Later, as its own piece of work       |
 
@@ -112,8 +113,11 @@ The options you do not recommend need only their mid-play board.
 | **Words, not numbers**                       | Falling speed reads "Going up", "Hovering", "Slow and steady", or "Too fast"                                                                                   | A word says whether it is good. A number needs a second fact to judge it                                          |
 | **One line says what to do next**            | A coach line changes with the state of the run: "Push Forward to close in."                                                                                    | The player never has to work out which read-out matters now                                                       |
 | **A clock, if there is one, is the story's** | Landing: fuel burns every second, whatever is pressed. Docking has no clock                                                                                    | A clock is the reason not to creep. An invented one is only pressure                                              |
-| **It ends on the real event**                | The result in a word ("Touchdown", "Gentle"), then the flight's own event with its sources, then Up next                                                       | The toy is a way into the story, not a detour from it                                                             |
-| **It looks like its siblings**               | The same tokens and buttons in all three, and the same wide-layout rule in docking and landing                                                                 | Three games should feel like one site                                                                             |
+| **It ends on the real event**                | The result in a sentence, the stars and goals, then the flight's own event with its sources, then Up next                                                      | The toy is a way into the story, not a detour from it                                                             |
+| **Two levels, chosen above Start**           | Easy and Hard, from one shared picker. The level last chosen and the best stars on each are remembered on the device                                           | A player who has won wants a harder go. One who has not wants a kinder one                                        |
+| **Three stars, as three goals**              | Each ending lists three goals with a star for each one met. Star 1 is for finishing the job. A missed goal carries one short tip                               | A count says how well it went. The list says what to try next                                                     |
+| **Play again is the amber button**           | "Play again" and "Play on Hard" (or "Play on Easy") sit under the stars at every ending, and Up next's own button goes plain                                   | A ten-year-old could not find how to play again when it was a small button under the way back                     |
+| **It looks like its siblings**               | The same tokens and buttons, the same level picker and end-of-run block (`src/extras/shared/`), and the same wide-layout rule                                  | Three games should feel like one site                                                                             |
 
 **Games you fly** (docking, landing, and the next one like them)
 
@@ -157,13 +161,25 @@ Start from the rules, not from a feeling. These are the dials, and each turns bo
 - **Doing nothing:** what happens, and when.
 - **The window:** how exact the player must be at the hardest step.
 
-Keep these as tests in `game.test.ts`, so a later change to the numbers shows what it did to the game. Docking has no rules tests yet: measure it with a throwaway script, and add the tests with your change.
+Keep these as tests in `game.test.ts`, for each level, so a later change to the numbers shows what it did to the game.
 
-**Know what else moves.** Every number lives once, in `RULES` in `game.ts`, so tuning is a one-line change that the view, the screen, and the copy follow. If you find a number restated somewhere else, move it into `RULES` or report it. A game that is already ready also has tests that fly scripted runs with today's numbers (`src/extras/docking/docking.test.ts`, `tests/pages/DockingPage.ts`), so run the interface and browser tests and expect to update those runs.
+**Two levels.** Easy is the game as it was liked. Hard turns two or three dials, never all of them:
+
+| Game                | Hard's start                        | Hard's window                  | Hard's clock or speed                                                     |
+| ------------------- | ----------------------------------- | ------------------------------ | ------------------------------------------------------------------------- |
+| Land on the Moon    | Already sliding away, by two pushes | 2.5 m to stop in, not 5.1 m    | 23 seconds of fuel, not 32                                                |
+| Dock two spacecraft | Further off, drifting faster and up | Lined up within 0.25, not 0.35 | Gentle at three pushes or fewer, not four                                 |
+| Fly to orbit        | Unchanged                           | Unchanged                      | Less fuel in each stage, and an empty stage hangs on for 4 seconds, not 2 |
+
+The owner's son played landing's Hard and the answer was "the difficulty was right on". So that is the size of step to aim for: a careful clean run still wins, with about 6 seconds of fuel in hand where Easy leaves about 15.
+
+**The third star is tuned by measuring too.** On Easy, a clean and careful run earns all three. On Hard the third star can ask for more than a win: landing's needs about 8.7 seconds of fuel left, which a careful run (5 to 6 seconds left) misses and a bold one (slide across fast, brake late: 9.7 seconds left) earns. Script the bold run before you set the number, and set it about a second under what that run leaves. Do not make a star need more than a practised person can do.
+
+**Know what else moves.** Every number lives once, in `game.ts`: `RULES` for what both levels share, and `LEVEL_RULES` beside it for the few that differ. A run knows its level (`startFlight(level)`), and nothing reads a "current level" from the module. So tuning is a one-line change that the view, the screen, and the copy follow. If you find a number restated somewhere else, move it into `RULES` or report it. A game that is already ready also has tests that fly scripted runs with today's numbers (`src/extras/docking/docking.test.ts`, `tests/pages/DockingPage.ts`), so run the interface and browser tests and expect to update those runs.
 
 **Report it so the next answer is useful.** Name each number you moved, with its value before and after. When all you were told is "too hard" or "they gave up", work out the likely causes from the rules, propose the change, and ask the one thing only they know: where did the player get stuck?
 
-Stay on the kind side. A ten-year-old should win within a few tries, and a mistake should cost time, not the run.
+Stay on the kind side. A ten-year-old should win Easy within a few tries, and Hard within several once Easy is beaten. A mistake should cost time, not the run.
 
 ---
 
@@ -171,20 +187,35 @@ Stay on the kind side. A ten-year-old should win within a few tries, and a mista
 
 Copy the shape of the nearest game: `landing`, `orbit`, or `docking` for something you fly, `stages` for something you time. Landing has the most to copy.
 
-| File           | Holds                                                        | Keep in mind                                                                                |
-| -------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| `meta.ts`      | Title, blurb, `kind: 'hands-on'`, `order`, `status: 'draft'` | Tiny. It imports only the type                                                              |
-| `game.ts`      | The rules: `RULES`, the state, one push, one step of time    | No drawing, no page, no 3D. Its header says what is simplified                              |
-| `game.test.ts` | The rules, flown by tests                                    | Section 5. Only landing has one so far, and a new game should                               |
-| `scene.ts`     | The 3D view, through `src/scene/kit.ts` only                 | A small set of calls for the screen to make (`fly`, `land`, `reset`, `tick`, `dispose`)     |
-| `index.ts`     | The screen: the start, playing, each ending                  | All copy in one `TEXT` object. The words for each read-out are small functions of their own |
-| `<id>.css`     | Styles, every selector under `[data-extra='<id>']`           | Phone first                                                                                 |
-| `<id>.test.ts` | The game in the real sheet                                   | The `vitest-testing` skill                                                                  |
+| File           | Holds                                                                                               | Keep in mind                                                                                |
+| -------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `meta.ts`      | Title, blurb, `kind: 'hands-on'`, `order`, `status: 'draft'`                                        | Tiny. It imports only the type                                                              |
+| `game.ts`      | The rules: `RULES`, `LEVEL_RULES`, the state, one push, one step of time, and the run's three goals | No drawing, no page, no 3D. Its header says what is simplified                              |
+| `game.test.ts` | The rules, flown by tests on each level                                                             | Section 5. Landing, orbit, and docking each have one                                        |
+| `scene.ts`     | The 3D view, through `src/scene/kit.ts` only                                                        | A small set of calls for the screen to make (`fly`, `land`, `reset`, `tick`, `dispose`)     |
+| `index.ts`     | The screen: the start, playing, each ending                                                         | All copy in one `TEXT` object. The words for each read-out are small functions of their own |
+| `<id>.css`     | Styles, every selector under `[data-extra='<id>']`                                                  | Phone first                                                                                 |
+| `<id>.test.ts` | The game in the real sheet                                                                          | The `vitest-testing` skill                                                                  |
 
 The three code files do not overlap, so they can be written at the same time once one written spec fixes what they share: the names and types `game.ts` exports, the calls the view offers, every constant, and every word of copy. Without the spec the pieces will not fit.
 
+**Levels, stars, and Play again come from `src/extras/shared/`.** Do not write them again. Landing shows the wiring (`src/extras/landing/index.ts`):
+
+1. At mount: `const record = gameRecord(context.store)`. It remembers the level last chosen and the best stars on each.
+2. `createLevelPicker({ record, describe, onChange: showLevel, signal })`, placed between the words and Start. `describe` is one short line for each level.
+3. Build the rules, the view, and the flat picture on `picker.level`. `showLevel(level)` redraws them, so the picture changes the moment the level does.
+4. `createRunEnd({ record, onPlay: (level) => { picker.refresh(); begin(level, true); }, signal })`.
+5. Start calls `begin(picker.level, true)`. `begin` hides the run-end block and starts the rules on that level.
+6. At each ending: `runEnd.show({ level, goals })`, put its element right after the result line, then `picker.refresh()`.
+7. Announce the result and the stars in one message, and put focus on the result line.
+8. Call `context.upNext({ ...next, plainPrimary: true })` with no run-again action.
+
+The three goals are the game's own: a function in `game.ts` (`runGoals`) says which were met, so tests can pin which runs earn which stars. The words are in the screen's `TEXT`.
+
 **What every game does**, beyond the contract in `src/extras/types.ts`:
 
+- It has Easy and Hard, three stars, and Play again, wired as above. An ending that is not a win (out of fuel) shows the same block with no stars, the goals as things to do, and Play again in the same place.
+- It never says "Try again". A run in progress has a plain "Start over".
 - It plays fully without 3D. Docking and landing draw a flat view when WebGL is missing.
 - Its whole playing screen fits a 390x844 phone with no scrolling: the view takes the height the controls leave. A note that is not needed mid-play can hide on a phone while playing.
 - It takes reduced motion from `context.reducedMotion()` and passes it to the view, which jumps to end states.
@@ -227,13 +258,15 @@ What the landing game's pictures showed, as a guide to what to look for:
 - An effect too faint to see (the engine flame).
 - At one ending, the thing the words were about had flown out of view.
 
+On a 390x844 phone, check two more things. On the start screen, the level picker and Start are on screen without scrolling. At every ending, the result line, the stars box, and both buttons are fully above the pinned "Up next". When two tips show, the stars box is taller: landing and docking make the picture shorter to keep the buttons in view.
+
 Play it by keyboard alone as well. Then report what you saw and what you did not. Pictures are not motion.
 
 ---
 
 ## 8. Offer It From the Flight, and Deliver It
 
-**The "Try it" button** is one line of content: `handsOn: '<id>'` on an event in the flight's `story.ts`.
+**The "Play" button** is one line of content: `handsOn: '<id>'` on an event in the flight's `story.ts`. The card then shows an amber button with a game controller, "Play: Land on the Moon". It is the one place a second amber button is allowed, because a game must be easy to find.
 
 - Put it on the event where the crew's job begins. The landing game is offered from Apollo 11's "Powered descent begins", not from "The Eagle has landed".
 - The end screen shows the event where the job ends. These are often two different events, so the game looks up its end event itself. The landing game first took whichever event offered it as the landing, and showed the wrong one as soon as the button moved.
@@ -245,7 +278,7 @@ Play it by keyboard alone as well. Then report what you saw and what you did not
 1. The rules and their tests. Nothing shows yet.
 2. The 3D view.
 3. The game itself, as a draft.
-4. The "Try it" button and its tests.
+4. The "Play" button and its tests.
 
 Title each by the change it makes, with its place in the stack: "Add the rules of the Moon landing game (1 of 4)". In each description say what it adds, how to try it, what was tested, what you decided along the way, and what is left for ready.
 
@@ -255,7 +288,8 @@ Title each by the change it makes, with its place in the stack: "Add the rules o
 
 A draft can go in early, because nobody outside the dev server sees it. Before `status: 'ready'`:
 
-- [ ] It has been played, and the person you built it for is happy with how it feels.
+- [ ] It has been played on both levels, and the person you built it for is happy with how each feels.
+- [ ] It has Easy and Hard, three stars, and Play again, from the shared pieces (section 6).
 - [ ] Every real-history sentence in the game's own copy has a source registered in `src/content/extras/<id>.ts`, opened and checked (`docs/accuracy.md`).
 - [ ] A browser test plays it, and it is in `EXTRAS` in `tests/utils/vars.ts` (the `e2e-testing` skill).
 - [ ] `README.md` ("Things to try", and the counts of extras in its text) and `docs/links.md` name it.
@@ -271,6 +305,7 @@ When time is short, these are the ones not to trade away:
 - Pictures before code, and a person's choice between them.
 - Nobody crashes, and the game says it is a toy.
 - Words, not numbers, written for a ten-year-old.
-- Every number once, in `RULES`.
+- Every number once, in `RULES` and `LEVEL_RULES`.
+- Play again is the amber button at every ending.
 - The playing screen fits a 390x844 phone.
 - You say what you have not seen.

@@ -1,12 +1,13 @@
 /**
  * The welcome, the first thing a visitor sees on a plain address: what it
- * says about the mission on show, the ways in, Escape, "All missions", and
- * what it says without a 3D view. Choosing in the list itself is in
- * hub.test.ts.
+ * says about the mission on show, the ways in, Escape, "All missions",
+ * "Play a game", and what it says without a 3D view. Choosing in the list
+ * itself is in hub.test.ts.
  */
 import { describe, expect, it } from 'vitest';
 import { copy } from '../content/copy.ts';
 import type { Mission } from '../content/types.ts';
+import type { ExtraMeta } from '../extras/types.ts';
 import { mountMission, navigation, screen, visitedMissions, within } from '../test/test-utils.ts';
 
 /**
@@ -18,6 +19,10 @@ const withoutATour = (mission: Mission): Mission => ({
   tour: 'key-moments',
   events: mission.events.map((event) => ({ ...event, keyMoment: false })),
 });
+
+/** The real extras list with no game in it: every real build lists some, so a typed fixture. */
+const withoutGames = (extras: readonly ExtraMeta[]): ExtraMeta[] =>
+  extras.filter((meta) => meta.kind !== 'hands-on');
 
 const theWelcome = (missionName: string): HTMLElement =>
   screen.getByRole('region', { name: `Ride along on ${missionName}` });
@@ -41,7 +46,8 @@ describe('the welcome', () => {
       const tour = within(welcome).getByRole('button', { name: 'Take the tour' });
       const explore = within(welcome).getByRole('button', { name: 'Explore on my own' });
       const allMissions = within(welcome).getByRole('button', { name: 'All missions' });
-      expect(within(welcome).getAllByRole('button')).toEqual([tour, explore, allMissions]);
+      const games = within(welcome).getByRole('button', { name: 'Play a game' });
+      expect(within(welcome).getAllByRole('button')).toEqual([tour, explore, allMissions, games]);
     });
 
     it.each([
@@ -67,6 +73,24 @@ describe('the welcome', () => {
       expect(within(allMissions).getByText('22')).toBeVisible();
     });
 
+    it('sums up the games behind "Play a game"', async () => {
+      await mountMission('gemini-3');
+
+      const games = within(theWelcome('Gemini 3')).getByRole('button', { name: 'Play a game' });
+      expect(games).toHaveAccessibleDescription(
+        'Fly to orbit, dock, and land on the Moon, 4 games',
+      );
+      expect(within(games).getByText('4')).toBeVisible();
+    });
+
+    it('leaves out "Play a game" when the list shows no game', async () => {
+      await mountMission('apollo-11', { extraList: withoutGames });
+
+      expect(
+        within(theWelcome('Apollo 11')).queryByRole('button', { name: 'Play a game' }),
+      ).not.toBeInTheDocument();
+    });
+
     it('offers only exploring when the mission has no tour', async () => {
       await mountMission('apollo-11', { story: withoutATour });
       const welcome = theWelcome('Apollo 11');
@@ -76,7 +100,8 @@ describe('the welcome', () => {
       ).not.toBeInTheDocument();
       const explore = within(welcome).getByRole('button', { name: 'Explore on my own' });
       const allMissions = within(welcome).getByRole('button', { name: 'All missions' });
-      expect(within(welcome).getAllByRole('button')).toEqual([explore, allMissions]);
+      const games = within(welcome).getByRole('button', { name: 'Play a game' });
+      expect(within(welcome).getAllByRole('button')).toEqual([explore, allMissions, games]);
     });
   });
 
@@ -142,6 +167,27 @@ describe('the welcome', () => {
       expect(document.body).toHaveClass('is-welcome');
       expect(allMissions).toHaveFocus();
       expect(document.title).toBe('Mission to the Moon');
+      expect(visitedMissions()).toBeUndefined();
+    });
+  });
+
+  describe('play a game', () => {
+    it('opens the list at the games, with focus on their heading, and comes back to "Play a game" when it closes', async () => {
+      const { user } = await mountMission('apollo-11');
+      const games = screen.getByRole('button', { name: 'Play a game' });
+
+      await user.click(games);
+
+      const list = screen.getByRole('dialog', { name: 'All missions' });
+      expect(list).toBeVisible();
+      expect(within(list).getByRole('heading', { level: 3, name: 'Play a game' })).toHaveFocus();
+      expect(within(list).getByRole('button', { name: 'Play Fly to orbit' })).toBeInTheDocument();
+
+      await user.keyboard('{Escape}');
+
+      expect(screen.queryByRole('dialog', { name: 'All missions' })).not.toBeInTheDocument();
+      expect(theWelcome('Apollo 11')).toBeVisible();
+      expect(games).toHaveFocus();
       expect(visitedMissions()).toBeUndefined();
     });
   });

@@ -263,14 +263,14 @@ Each page object is the documentation of the test ids in its part of the site. K
 | `MissionPage`    | `site`, header, the view buttons and True scale with its note (shown with Controls), the no-3D note, loading, messages                                                                                    | `waitForLoad()`             |
 | `ScenePage`      | the canvas, and the scene report                                                                                                                                                                          | `waitForLoad()`, `report()` |
 | `TourPanelPage`  | the tour panel in the card (hidden once the tour is finished)                                                                                                                                             | `skipTrip()`                |
-| `EventCardPage`  | the moment card (`dock`): the story, the photo, Finish, the recording, Try it, its two doors, the status beside Play, previous and next                                                                   | none                        |
+| `EventCardPage`  | the moment card (`dock`): the story, the photo, Finish, the recording, a game's "Play: <title>" (`tryIt`), its two doors, the status beside Play, previous and next                                       | none                        |
 | `EndingPage`     | the end of a flight in the card: Watch again, the title, the patch collected, the next flight, the "More to explore" door, and, opened, its picks and quiet ways on (with Explore on my own after a tour) | none                        |
 | `RecordsPage`    | "Tell me more": its head and Close, its parts, and the links to the mission's own pages                                                                                                                   | none                        |
 | `TimelinePage`   | Play, and the tools behind Controls: the clock, the scrubber, chapters, speed                                                                                                                             | none                        |
-| `WelcomePage`    | the welcome: the mission on show, Take the tour, Explore on my own, All missions, the no-3D note                                                                                                          | `waitForLoad()`             |
-| `HubPage`        | the mission list, opened from the welcome or the header                                                                                                                                                   | `waitForLoad()`             |
+| `WelcomePage`    | the welcome: the mission on show, Take the tour, Explore on my own, All missions, Play a game (`games`), the no-3D note                                                                                   | `waitForLoad()`             |
+| `HubPage`        | the mission list, opened from the welcome or the header, or at its games (`extrasTitle('hands-on')`) from Play a game                                                                                     | `waitForLoad()`             |
 | `DialogsPage`    | About this mission, How this is drawn, Sources and credits (opened from "Tell me more"), a memorial page                                                                                                  | none                        |
-| `ExtraSheetPage` | the full-screen sheet an extra opens in, and "Up next" at the end of a run: its title, its one amber button, the picks, Try again, All missions, and on a phone "More to explore" and Show less           | `waitForLoad()`             |
+| `ExtraSheetPage` | the full-screen sheet an extra opens in, and "Up next" at the end of a run: its title, the next step's button, the picks, the run again, All missions, and on a phone "More to explore" and Show less     | `waitForLoad()`             |
 | `DockingPage`    | "Dock two spacecraft" inside the sheet: Start, the aim read-out, the docked line                                                                                                                          | `dockByKeys()`              |
 | `LandingPage`    | "Land on the Moon" inside the sheet: Start, the fuel, falling speed and sideways slide read-outs, the coach line, the landed line                                                                         | `landByKeys()`              |
 
@@ -775,7 +775,7 @@ tests/
 │   ├── no-webgl.test.ts        # Without WebGL the mission can still be read (desktop)
 │   ├── scene.test.ts           # What the scene draws, at moments it has drawn wrong before, and the ship clear of the card and its doors
 │   ├── tour.test.ts            # Take the guided tour to its end, start it again, and leave it
-│   ├── welcome.test.ts         # Arrive: the scene framed beside the welcome, All missions and back, take the tour
+│   ├── welcome.test.ts         # Arrive: the scene framed beside the welcome, All missions and back, Play a game and back, take the tour
 │   ├── report/                 # HTML report (git-ignored)
 │   └── results/                # Traces of failed tests (git-ignored)
 ├── pages/                      # Page objects (locators + complex methods)

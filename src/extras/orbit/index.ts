@@ -16,6 +16,12 @@
  * thick air, the computers that steered, the spacecraft coming down in the
  * ocean) are cited in facts.ts, and their sources are folded under the Start
  * button, as "Land on the Moon" does.
+ *
+ * It has two levels (game.ts says what differs), chosen above Start with
+ * the games' shared level picker; each run ends with the shared stars, its
+ * three goals, and Play again (src/extras/shared/), as "Land on the Moon"
+ * does. The level last chosen and the most stars on each level are
+ * remembered on this device, one record whichever rocket is flown.
  */
 import './orbit.css';
 import {
@@ -30,6 +36,10 @@ import { button, el, setText } from '../../ui/dom.ts';
 import { formatDate, monthOf } from '../../ui/format.ts';
 import { createFrameLoop } from '../shared/frame-loop.ts';
 import { onGameKeys } from '../shared/keys.ts';
+import { createLevelPicker, type LevelPicker } from '../shared/level-picker.ts';
+import type { Level } from '../shared/levels.ts';
+import { gameRecord } from '../shared/record.ts';
+import { createRunEnd, type Goal } from '../shared/run-end.ts';
 import { capitalize, sayElapsed, type Climb } from '../stages/climb.ts';
 import type { Extra, ExtraContext, ExtraMount, UpNextOptions } from '../types.ts';
 import { COMING_DOWN, COMPUTERS_STEERED, THE_CLIMB, WHAT_AN_ORBIT_IS } from './facts.ts';
@@ -42,6 +52,7 @@ import {
   drop,
   fuelShare,
   heightBand,
+  runGoals,
   speedShare,
   startFlight,
   tiltDegrees,
@@ -49,6 +60,7 @@ import {
   type Ahead,
   type Flight,
   type Happening,
+  type RunGoals,
   type Tip,
 } from './game.ts';
 import { meta } from './meta.ts';
@@ -63,9 +75,8 @@ const FALLBACK = 'apollo-11';
 const MESSAGE_SECONDS = 4;
 /** How long a tilt button stays lit after a press, in milliseconds. */
 const FIRE_MS = 180;
-/** How many pips the sideways speed and the fuel left read-outs have. */
+/** How many pips the sideways speed read-out has. */
 const SPEED_PIPS = 6;
-const FUEL_LEFT_PIPS = 4;
 /** The height bands from the ground up, one pip each on the height read-out. */
 const BANDS = ['thick', 'thin', 'space'] as const;
 
@@ -96,13 +107,17 @@ const TEXT = {
   rocketLine: (flight: string, rocket: string | undefined): string =>
     rocket ? `${flight}'s rocket: the ${rocket}` : `${flight}'s rocket`,
   rule: 'Each press tips the rocket one step. It stays there until you tip it back.',
+  // Under the level picker, for the level chosen.
+  levels: {
+    easy: 'Plenty of fuel, and an empty stage soon drops by itself.',
+    hard: 'Less fuel, and an empty stage hangs on longer.',
+  } satisfies Record<Level, string>,
   start: 'Start',
   // Over the folded sources under Start: the game's sentences about the real flights that they back.
   sourcesFor:
     'Where the sentences on what an orbit is, the climb through the thick air, the computers that steered, and the spacecraft coming down in the ocean come from:',
   another: 'Try another rocket',
   startOver: 'Start over',
-  tryAgain: 'Try again',
   tip: { back: 'Tip back', over: 'Tip over' } satisfies Record<Tip, string>,
   drop: 'Drop it',
   dropWhen: 'when a stage is empty',
@@ -155,11 +170,27 @@ const TEXT = {
     `${capitalize(stage)} stage dropped. The ${next} stage is burning.`,
   // The endings.
   inOrbit: 'You are in orbit.',
-  fuelLeft: 'Fuel left',
-  fuelLeftWord: { plenty: 'Plenty', some: 'Some', little: 'A little' },
   // The spacecraft letting go and coming down in the ocean is cited in facts.ts (COMING_DOWN).
   outOfFuel:
     'Out of fuel, and not fast enough to stay up. The spacecraft lets go of the rocket and comes down in the ocean under its parachutes. No orbit this time.',
+  // The three stars of a run: what each is for when it was earned and when not, and a tip when not.
+  goals: {
+    orbit: {
+      met: 'Reached orbit',
+      missed: 'Reach orbit',
+      tip: 'Tip over a step at a time once the air thins, and save the fuel for speed.',
+    },
+    droppedAll: {
+      met: 'Dropped every stage yourself',
+      missed: 'Drop every stage yourself',
+      tip: 'Press Drop it as soon as a stage is empty.',
+    },
+    spareFuel: {
+      met: 'Fuel to spare',
+      missed: 'Fuel to spare',
+      tip: 'Tip over as soon as the air lets you, and drop each stage at once.',
+    },
+  } satisfies Record<keyof RunGoals, { met: string; missed: string; tip: string }>,
   realLabel: 'What really happened',
   realHeading: (flight: string, title: string): string => `${flight}: ${title}`,
   realWhen: (day: string, elapsed: ElapsedTime): string =>
@@ -260,10 +291,20 @@ function fuelWord(flight: Flight): string {
   return share > 0 ? TEXT.fuelWord.almost : TEXT.fuelWord.empty;
 }
 
-/** What the result says of the fuel left at orbit, as a share of the last stage's tank. */
-function fuelLeftWord(left: number): string {
-  if (left > 0.5) return TEXT.fuelLeftWord.plenty;
-  return left > 0.2 ? TEXT.fuelLeftWord.some : TEXT.fuelLeftWord.little;
+/**
+ * The three goals of a run that ended, for the stars: worded for how it
+ * went, with a tip under each one missed. A run that ran out of fuel missed
+ * them all, and only the first, orbit, gets its tip.
+ */
+function goalsOf(goals: RunGoals): readonly [Goal, Goal, Goal] {
+  const goal = (key: keyof RunGoals, tip: boolean): Goal => {
+    const words = TEXT.goals[key];
+    if (goals[key]) return { label: words.met, met: true };
+    return tip
+      ? { label: words.missed, met: false, tip: words.tip }
+      : { label: words.missed, met: false };
+  };
+  return [goal('orbit', true), goal('droppedAll', goals.orbit), goal('spareFuel', goals.orbit)];
 }
 
 /**
@@ -452,11 +493,12 @@ function fuelStrip() {
 }
 
 /**
- * Before a run: the rocket, what an orbit is, how to fly, the rule, Start,
- * and Try another rocket, then the folded sources of the sentences about the
- * real flights, labeled as theirs, as "Land on the Moon" does.
+ * Before a run: the rocket, what an orbit is, how to fly, the rule, the
+ * level picker, Start, and Try another rocket, then the folded sources of
+ * the sentences about the real flights, labeled as theirs, as "Land on the
+ * Moon" does.
  */
-function introSection() {
+function introSection(picker: LevelPicker) {
   const section = el('section', 'orbit__intro');
   const rocketLine = el('p', 'orbit__label');
   rocketLine.setAttribute('data-testid', 'orbit-rocket');
@@ -482,6 +524,7 @@ function introSection() {
     el('p', 'extra-text', TEXT.how),
     el('p', 'extra-text', TEXT.goal),
     el('p', 'extra-note orbit__intro-rule', TEXT.rule),
+    picker.element,
     start,
     another,
     sourcesBox,
@@ -564,7 +607,6 @@ function rocketControls(press: { tip(way: Tip): void; drop(): void }, signal: Ab
   return {
     group,
     drop: dropButton,
-    all: [tilt.back, dropButton, tilt.over],
     /** A tilt that worked lights its button for a moment. */
     light(way: Tip): void {
       const control = tilt[way];
@@ -667,7 +709,7 @@ function realStory(rocket: Rocket): HTMLDivElement | null {
   return story;
 }
 
-/** In orbit: the result line, the sideways speed and the fuel left; the real climb and "Up next" follow. */
+/** In orbit: the result line, then the real climb and "Up next"; the stars go under the line. */
 function afterOrbit() {
   const section = el('section', 'orbit__after');
   section.hidden = true;
@@ -675,19 +717,11 @@ function afterOrbit() {
   result.setAttribute('data-testid', 'orbit-result');
   // Focus goes here at orbit, so a screen reader reads on from it.
   result.tabIndex = -1;
-  const row = el('div', 'orbit__readouts orbit__readouts--two');
-  const speed = readout(TEXT.speed, SPEED_PIPS, 'orbit-result-speed', true);
-  const left = readout(TEXT.fuelLeft, FUEL_LEFT_PIPS, 'orbit-fuel-left');
-  row.append(speed.card, left.card);
   return {
     section,
     result,
-    show(flight: Flight, fuelLeft: number, story: HTMLElement | null, upNext: HTMLElement): void {
-      const fast = speedPips(flight);
-      showReadout(speed, (index) => index < fast, speedWord(flight));
-      const lit = Math.ceil(fuelLeft * FUEL_LEFT_PIPS);
-      showReadout(left, (index) => index < lit, fuelLeftWord(fuelLeft));
-      section.replaceChildren(...[result, row, story, upNext].filter((part) => part !== null));
+    show(story: HTMLElement | null, upNext: HTMLElement): void {
+      section.replaceChildren(...[result, story, upNext].filter((part) => part !== null));
     },
   };
 }
@@ -1185,6 +1219,8 @@ async function mount(
   context.onReducedMotionChange((reduced) => {
     still = reduced;
   });
+  // The level last chosen on this device, and the most stars on each: one record whichever rocket is flown.
+  const record = gameRecord(context.store);
 
   /* ----------------------------- Layout ----------------------------- */
 
@@ -1198,7 +1234,14 @@ async function mount(
   // A picked rocket loading, in the place of the start.
   const picking = el('p', 'extra-note', TEXT.loading);
   picking.setAttribute('role', 'status');
-  const intro = introSection();
+  // Choosing a level stands a rocket of that level on the pad at once.
+  const picker = createLevelPicker({
+    record,
+    describe: TEXT.levels,
+    onChange: (level) => showLevel(level),
+    signal,
+  });
+  const intro = introSection(picker);
   const choose = chooseSection(context, (id) => pick(id));
 
   const flying = el('section', 'orbit__fly');
@@ -1213,6 +1256,15 @@ async function mount(
   flying.append(readouts.row, coach, controls.group, rule, startOver);
 
   const after = afterOrbit();
+  // The stars of a run that ended, its goals, and Play again: under the result line, or under the coach line when the fuel ran out.
+  const runEnd = createRunEnd({
+    record,
+    onPlay: (level) => {
+      picker.refresh();
+      begin(level, TEXT.liftoff);
+    },
+    signal,
+  });
   const toyNote = el('p', 'extra-note orbit__note orbit__note--toy');
   const side = el('div', 'orbit__side');
   side.append(picking, intro.section, choose.section, flying, after.section, toyNote);
@@ -1244,7 +1296,8 @@ async function mount(
   /* ------------------------------ Playing ----------------------------- */
 
   let phase: Phase = 'intro';
-  let flight = startFlight(rocket.stages);
+  // Started on the level chosen; a new run starts a new flight on its level.
+  let flight = startFlight(picker.level, rocket.stages);
   /** Counts the rockets asked for, so a slow load cannot replace a newer choice. */
   let turn = 0;
   let loadingRocket = false;
@@ -1297,12 +1350,10 @@ async function mount(
     flying.hidden = !flyingLayout;
     after.section.hidden = phase !== 'orbit';
     fuel.strip.hidden = !flyingLayout;
-    rule.hidden = out;
     root.dataset['phase'] = phase;
     root.classList.toggle('orbit--flying', flyingLayout);
-    // Out of fuel the controls stay on screen, turned off, and Start over becomes Try again.
-    for (const control of controls.all) control.disabled = out;
-    setText(startOver, out ? TEXT.tryAgain : TEXT.startOver);
+    // Out of fuel the coach line is the result, with the stars under it: the read-outs, the controls, the rule, and Start over step aside.
+    for (const part of [readouts.row, controls.group, rule, startOver]) part.hidden = out;
     picture.setAttribute('aria-label', pictureWords(phase));
   };
 
@@ -1355,7 +1406,7 @@ async function mount(
       case 'stood-up':
         break;
       case 'orbit':
-        reachOrbit(happening.fuelLeft);
+        reachOrbit(happening);
         break;
       case 'out-of-fuel':
         runOut();
@@ -1394,53 +1445,70 @@ async function mount(
     refresh();
   }
 
-  /** In orbit: the result, the real climb, and what's next. */
-  function reachOrbit(fuelLeft: number): void {
+  /** Shows how a run ended, under its result line: the stars, the goals, and Play again. What to tell a screen reader of the stars. */
+  const showStars = (goals: RunGoals, under: HTMLElement): string => {
+    const { spoken } = runEnd.show({ level: flight.level, goals: goalsOf(goals) });
+    under.after(runEnd.element);
+    picker.refresh();
+    return spoken;
+  };
+
+  /** In orbit: the result and its stars, the real climb, and what's next. */
+  function reachOrbit(end: Extract<Happening, { kind: 'orbit' }>): void {
     phase = 'orbit';
     scene?.orbit(flight, still);
     flat?.show(flight, null, false);
+    // Its button is plain, as Play again is the amber one, and Play again is not repeated in it.
     const upNext = context.upNext({
       ...nextStep(context, params, rocket.climb),
-      actions: [
-        { label: TEXT.tryAgain, again: true, run: () => begin(TEXT.liftoff) },
-        { label: TEXT.another, run: toChoosing },
-      ],
+      plainPrimary: true,
+      actions: [{ label: TEXT.another, run: toChoosing }],
     });
-    after.show(flight, fuelLeft, realStory(rocket), upNext);
+    after.show(realStory(rocket), upNext);
+    const stars = showStars(runGoals(flight, end), after.result);
     showPhase();
-    context.announce(TEXT.inOrbit);
+    context.announce(`${TEXT.inOrbit} ${stars}`);
     after.result.focus();
   }
 
-  /** Out of fuel: the spacecraft lets go and comes home under its parachutes, and the run can start again. */
+  /** Out of fuel: the spacecraft lets go and comes home under its parachutes, and the coach line says so over no stars. */
   function runOut(): void {
     scene?.comeHome(flight, still);
     flat?.comeHome(flight);
     phase = still || !scene ? 'home' : 'coming-home';
+    const stars = showStars(runGoals(flight, { kind: 'out-of-fuel' }), coach);
     showPhase();
     showPanel(null);
-    context.announce(TEXT.outOfFuel);
+    context.announce(`${TEXT.outOfFuel} ${stars}`);
     coach.focus();
   }
 
-  /** The whole rocket back on the pad, with no paths. */
-  function toPad(): void {
+  /** The whole rocket back on the pad, on a level, with no paths. */
+  function toPad(level: Level): void {
     scene?.reset();
     flat?.reset();
-    flight = startFlight(rocket.stages);
+    flight = startFlight(level, rocket.stages);
     messageLeft = 0;
   }
 
-  /** Before a run: the rocket on the pad, drawn by one frame. */
+  /** Before a run: the rocket on the pad, on the level chosen, drawn by one frame. */
   function standOnPad(): void {
-    toPad();
+    toPad(picker.level);
     refresh();
     loop.start();
   }
 
-  /** A run starts from the pad, with focus on "Drop it" so the space bar is ready. */
-  function begin(saying: string): void {
-    toPad();
+  /** The start screen, after choosing a level: a rocket of that level on the pad, which looks the same on either. */
+  function showLevel(level: Level): void {
+    if (phase !== 'intro') return;
+    flight = startFlight(level, rocket.stages);
+    refresh();
+  }
+
+  /** A new run on a level from the pad, with focus on "Drop it" so the space bar is ready: from Start, Start over, Play again, or the other level's button. */
+  function begin(level: Level, saying: string): void {
+    toPad(level);
+    runEnd.hide();
     news.hush();
     phase = 'flying';
     showPhase();
@@ -1488,12 +1556,9 @@ async function mount(
       .catch((error: unknown) => console.warn(error));
   }
 
-  intro.start.addEventListener('click', () => begin(TEXT.liftoff), { signal });
+  intro.start.addEventListener('click', () => begin(picker.level, TEXT.liftoff), { signal });
   intro.another.addEventListener('click', toChoosing, { signal });
-  // Out of fuel this is "Try again", a new run like any other.
-  startOver.addEventListener('click', () => begin(isOut(phase) ? TEXT.liftoff : TEXT.backOnPad), {
-    signal,
-  });
+  startOver.addEventListener('click', () => begin(flight.level, TEXT.backOnPad), { signal });
 
   onGameKeys(
     [

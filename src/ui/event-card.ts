@@ -14,11 +14,11 @@ export interface EventCard {
   readonly shown: number;
   /** Hide the moment (for the end of the flight, which takes its place) or show it again. */
   setHidden(hidden: boolean): void;
-  /** Allow "Try it" or hide it (it is hidden while the tour travels between stops). */
+  /** Allow the game's Play button or hide it (it is hidden while the tour travels between stops). */
   setTryItAllowed(allowed: boolean): void;
   /** Offer "Finish" or take it away (it is offered while exploring, once the clock has reached the end). */
   setFinishOffered(offered: boolean): void;
-  /** The "Try it" button, while it is showing, so focus can come back to it. */
+  /** The game's Play button, while it is showing, so focus can come back to it. */
   readonly tryItButton: HTMLButtonElement | null;
 }
 
@@ -29,9 +29,9 @@ export interface EventCardOptions {
   /** Asked to step to the previous (-1) or next (+1) event, from the buttons in Controls. */
   onStep(step: 1 | -1): void;
   reducedMotion(): boolean;
-  /** The title of a listed extra by id, or undefined when it is not listed (so no "Try it"). */
+  /** The title of a listed extra by id, or undefined when it is not listed (so no Play button). */
   extraTitle(id: string): string | undefined;
-  /** "Try it" was pressed on an event. */
+  /** The game's Play button was pressed on an event. */
   onTryIt(extraId: string, event: MissionEvent, from: HTMLButtonElement): void;
   /** The photo's small picture was pressed: open "Tell me more" at the photo. */
   onPhoto(): void;
@@ -44,8 +44,8 @@ export interface EventCardOptions {
  * and date over its title, and its short text in full. Beside it, the
  * photo's small picture, "Finish" once the clock has reached the end of the
  * flight, "Listen" for its recording, the "Tell me more" door (named "Sources"
- * when the moment has nothing more than its sources), "Try it" when the
- * event has a hands-on extra, and the photo's credit.
+ * when the moment has nothing more than its sources), the amber "Play: <game>"
+ * when the event has a hands-on extra, and the photo's credit.
  * It keeps "Tell me more" on the same moment, and the previous and next
  * buttons in Controls in step with it.
  */
@@ -99,13 +99,19 @@ export function setUpEventCard(options: EventCardOptions): EventCard {
     }
   };
 
+  // A game is offered in amber with a controller before its name, so it is easy to find.
   let tryAllowed = true;
   let tryTarget: { extra: string; event: MissionEvent } | null = null;
+  const gameIcon = icon('game', 'icon card__try-icon');
+  const tryLabel = el('span', 'card__try-label');
   const renderTryIt = (event: MissionEvent | undefined): void => {
     const id = event?.handsOn;
     const name = id ? extraTitle(id) : undefined;
     tryTarget = event && id && name ? { extra: id, event } : null;
-    if (name) tryButton.textContent = copy.card.tryItLabel(name);
+    if (name) {
+      tryLabel.textContent = copy.card.playExtra(name);
+      tryButton.replaceChildren(gameIcon, tryLabel);
+    }
     tryButton.hidden = !tryTarget || !tryAllowed;
   };
   tryButton.addEventListener('click', () => {

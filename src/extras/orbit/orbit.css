@@ -42,6 +42,15 @@
   min-height: 0;
 }
 
+/* With two goals missed, two tips sit under the stars: the picture gives up
+   the room they take, so on a phone Play again still shows above the pinned
+   "Up next", as in "Land on the Moon". */
+[data-extra='orbit']
+  .orbit[data-phase='orbit']:has(.game-goal--missed ~ .game-goal--missed)
+  .orbit__view {
+  flex-basis: 210px;
+}
+
 [data-extra='orbit'] .orbit__canvas {
   position: absolute;
   inset: 0;
@@ -386,15 +395,11 @@
   text-transform: uppercase;
 }
 
-/* The read-outs: three across while flying, in the approved pictures' shares, and two at orbit. */
+/* The read-outs: three across while flying, in the approved pictures' shares. */
 [data-extra='orbit'] .orbit__readouts {
   display: grid;
   grid-template-columns: minmax(0, 86fr) minmax(0, 130fr) minmax(0, 122fr);
   gap: 10px;
-}
-
-[data-extra='orbit'] .orbit__readouts--two {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 [data-extra='orbit'] .orbit__readout {
@@ -639,7 +644,10 @@
     min-height: 200px;
   }
 
-  [data-extra='orbit'] .orbit[data-phase='orbit'] .orbit__view {
+  [data-extra='orbit'] .orbit[data-phase='orbit'] .orbit__view,
+  [data-extra='orbit']
+    .orbit[data-phase='orbit']:has(.game-goal--missed ~ .game-goal--missed)
+    .orbit__view {
     flex: 1 1 auto;
     min-height: 200px;
   }
@@ -726,6 +734,74 @@
 
   [data-extra='orbit'] .orbit__key {
     line-height: 14px;
+  }
+
+  /* Out of fuel the read-outs and the controls step aside: the stars and
+     Play again take their place beside the picture, the coach line under
+     it, as in "Land on the Moon". */
+  [data-extra='orbit'] .orbit:is([data-phase='coming-home'], [data-phase='home']) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'view result'
+      'coach result';
+    gap: 8px 16px;
+  }
+
+  [data-extra='orbit'] .orbit:is([data-phase='coming-home'], [data-phase='home']) .orbit__side,
+  [data-extra='orbit'] .orbit:is([data-phase='coming-home'], [data-phase='home']) .orbit__fly {
+    display: contents;
+  }
+
+  [data-extra='orbit'] .orbit:is([data-phase='coming-home'], [data-phase='home']) .orbit__view {
+    grid-area: view;
+    position: relative;
+    top: auto;
+    align-self: stretch;
+    height: auto;
+    min-height: 0;
+  }
+
+  [data-extra='orbit'] .orbit:is([data-phase='coming-home'], [data-phase='home']) .orbit__coach {
+    grid-area: coach;
+    min-height: 0;
+  }
+
+  [data-extra='orbit'] .orbit--flying .game-run-end {
+    grid-area: result;
+    align-self: start;
+  }
+
+  /* Before a run, Start stays in reach at the bottom of the screen while
+     the words and the level picker scroll under it: they fade out just above
+     it, and the sheet's own color hides them in its rounded corners and
+     below it, as in "Land on the Moon". */
+  [data-extra='orbit'] .orbit__intro > .button--primary {
+    position: sticky;
+    bottom: 12px;
+    box-shadow: 0 0 0 5px var(--color-surface-solid);
+  }
+
+  [data-extra='orbit'] .orbit__intro > .button--primary::before,
+  [data-extra='orbit'] .orbit__intro > .button--primary::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    left: -1px;
+    pointer-events: none;
+  }
+
+  [data-extra='orbit'] .orbit__intro > .button--primary::before {
+    bottom: 100%;
+    height: 16px;
+    background: linear-gradient(to bottom, transparent, var(--color-surface-solid));
+  }
+
+  [data-extra='orbit'] .orbit__intro > .button--primary::after {
+    top: 100%;
+    height: 12px;
+    background: var(--color-surface-solid);
   }
 }
 

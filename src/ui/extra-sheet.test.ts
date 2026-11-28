@@ -1,5 +1,5 @@
 /**
- * The extras sheet, opened from "Try it" on Apollo 11's liftoff, from the
+ * The extras sheet, opened from "Play: Fly to orbit" on Apollo 11's liftoff, from the
  * mission list, and by an address. The extra inside is a tiny stand-in
  * passed through `loadExtra` (the interface's edge): each real extra's own
  * code is tested on its own (src/extras/<id>/*.test.ts). What is tested
@@ -48,8 +48,10 @@ const loadTinyOrbit = (): Promise<Extra> => Promise.resolve(tinyOrbit);
  * A tiny extra whose run is over as soon as it opens. It says how it was
  * opened, and ends with "Up next" the way a real one does: back to the
  * flight behind the sheet, or, from the list, the flight of the real docking.
+ * With `ownPlayAgain`, it is a game with its own amber Play again under its
+ * result, so it asks for the next step's button plain.
  */
-const tinyWithAnEnd = (meta: ExtraMeta): Extra => ({
+const tinyWithAnEnd = (meta: ExtraMeta, ownPlayAgain = false): Extra => ({
   meta,
   mount(host, context, params) {
     const where = document.createElement('p');
@@ -78,16 +80,27 @@ const tinyWithAnEnd = (meta: ExtraMeta): Extra => ({
               run: () => context.openMission('gemini-8', { event: 'docking' }),
             },
           };
-    const again = {
-      label: 'Try again',
-      again: true,
-      run: () => {
-        run += 1;
-        runs.textContent = `Run ${run}`;
-      },
+    const playAgain = (): void => {
+      run += 1;
+      runs.textContent = `Run ${run}`;
     };
     const other = { label: 'Pick another', run: () => {} };
-    host.append(where, runs, context.upNext({ ...next, actions: [again, other] }));
+    if (ownPlayAgain) {
+      const again = document.createElement('button');
+      again.type = 'button';
+      again.className = 'button button--primary';
+      again.textContent = 'Play again';
+      again.addEventListener('click', playAgain);
+      host.append(
+        where,
+        runs,
+        again,
+        context.upNext({ ...next, plainPrimary: true, actions: [other] }),
+      );
+    } else {
+      const again = { label: 'Play again', again: true, run: playAgain };
+      host.append(where, runs, context.upNext({ ...next, actions: [again, other] }));
+    }
     return { dispose() {} };
   },
 });
@@ -100,7 +113,15 @@ const loadTinyEnds = (id: string): Promise<Extra> => {
     : Promise.reject(new Error(`There is no extra "${id}"`));
 };
 
-/** Apollo 11 with "Try it" on the landing too, which has a recording (no real event has both). */
+/** Every extra opened as a tiny game that ends at once with its own amber Play again. */
+const loadTinyGameEnds = (id: string): Promise<Extra> => {
+  const meta = extras.find((listed) => listed.id === id);
+  return meta
+    ? Promise.resolve(tinyWithAnEnd(meta, true))
+    : Promise.reject(new Error(`There is no extra "${id}"`));
+};
+
+/** Apollo 11 with a game on the landing too, which has a recording (no real event has both). */
 const tryItOnTheLanding = (mission: Mission): Mission => ({
   ...mission,
   events: mission.events.map((event) =>
@@ -108,18 +129,18 @@ const tryItOnTheLanding = (mission: Mission): Mission => ({
   ),
 });
 
-/** Try it on Apollo 11's liftoff, and the end of its run: "Up next". */
+/** "Play: Fly to orbit" on Apollo 11's liftoff, and the end of its run: "Up next". */
 async function endFromLiftoff(user: User): Promise<HTMLElement> {
-  await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
+  await user.click(screen.getByRole('button', { name: 'Play: Fly to orbit' }));
   return within(screen.getByRole('dialog', { name: 'Fly to orbit' })).findByRole('region', {
     name: 'Up next',
   });
 }
 
-/** The mission list from the welcome, then an extra from it, and the end of its run. */
+/** The mission list from the welcome, then a game from it, and the end of its run. */
 async function endFromTheList(user: User, title: string): Promise<HTMLElement> {
   await user.click(screen.getByRole('button', { name: 'All missions' }));
-  await user.click(screen.getByRole('button', { name: `Open ${title}` }));
+  await user.click(screen.getByRole('button', { name: `Play ${title}` }));
   return within(screen.getByRole('dialog', { name: title })).findByRole('region', {
     name: 'Up next',
   });
@@ -133,7 +154,7 @@ describe('the extras sheet', () => {
         loadExtra: loadTinyOrbit,
       });
 
-      await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
+      await user.click(screen.getByRole('button', { name: 'Play: Fly to orbit' }));
 
       const sheet = screen.getByRole('dialog', { name: 'Fly to orbit' });
       expect(
@@ -150,7 +171,7 @@ describe('the extras sheet', () => {
       });
       await user.click(screen.getByRole('button', { name: 'Play' }));
 
-      await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
+      await user.click(screen.getByRole('button', { name: 'Play: Fly to orbit' }));
 
       expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
       expect(director.drawing).toBe(false);
@@ -174,7 +195,7 @@ describe('the extras sheet', () => {
       );
       sound.starts();
 
-      await user.click(within(card).getByRole('button', { name: 'Try it: Drop the stages' }));
+      await user.click(within(card).getByRole('button', { name: 'Play: Drop the stages' }));
 
       expect(within(card).getByRole('status')).toHaveTextContent('Recording paused.');
     });
@@ -186,7 +207,7 @@ describe('the extras sheet', () => {
         start: 'explore',
         loadExtra: loadTinyOrbit,
       });
-      const tryIt = screen.getByRole('button', { name: 'Try it: Fly to orbit' });
+      const tryIt = screen.getByRole('button', { name: 'Play: Fly to orbit' });
       await user.click(tryIt);
       const sheet = screen.getByRole('dialog', { name: 'Fly to orbit' });
 
@@ -203,7 +224,7 @@ describe('the extras sheet', () => {
         start: 'explore',
         loadExtra: loadTinyOrbit,
       });
-      await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
+      await user.click(screen.getByRole('button', { name: 'Play: Fly to orbit' }));
 
       await user.click(await screen.findByRole('button', { name: 'Fly Gemini 8' }));
 
@@ -218,7 +239,7 @@ describe('the extras sheet', () => {
         start: 'explore',
         loadExtra: () => Promise.reject(new Error('The network went away')),
       });
-      await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
+      await user.click(screen.getByRole('button', { name: 'Play: Fly to orbit' }));
       const sheet = screen.getByRole('dialog', { name: 'Fly to orbit' });
 
       expect(await within(sheet).findByRole('status')).toHaveTextContent(
@@ -239,7 +260,7 @@ describe('the extras sheet', () => {
         start: 'explore',
         loadExtra: () => Promise.reject(new Error('The network went away')),
       });
-      await user.click(screen.getByRole('button', { name: 'Try it: Fly to orbit' }));
+      await user.click(screen.getByRole('button', { name: 'Play: Fly to orbit' }));
 
       await user.click(await screen.findByRole('button', { name: 'Back to the mission' }));
 
@@ -264,7 +285,10 @@ describe('the extras sheet', () => {
         within(next).getByRole('heading', { level: 3, name: 'Pick up Apollo 11' }),
       ).toBeVisible();
       expect(next).toHaveTextContent('Your flight is waiting where you left it.');
-      const toTry = within(next).getByRole('group', { name: 'Try it yourself' });
+      expect(within(next).getByRole('button', { name: 'Back to Apollo 11' })).toHaveClass(
+        'button--primary',
+      );
+      const toTry = within(next).getByRole('group', { name: 'Play a game' });
       expect(within(toTry).getByRole('heading', { level: 4 })).toHaveTextContent('Drop the stages');
       const toExplore = within(next).getByRole('group', { name: 'More to explore' });
       expect(within(toExplore).getByRole('heading', { level: 4 })).toHaveTextContent(
@@ -272,11 +296,33 @@ describe('the extras sheet', () => {
       );
       expect(within(next).getAllByRole('button')).toEqual([
         within(next).getByRole('button', { name: 'Back to Apollo 11' }),
-        within(toTry).getByRole('button', { name: 'Open Drop the stages' }),
+        within(toTry).getByRole('button', { name: 'Play Drop the stages' }),
         within(toExplore).getByRole('button', { name: 'Open Six landings on the Moon' }),
-        within(next).getByRole('button', { name: 'Try again' }),
+        within(next).getByRole('button', { name: 'Play again' }),
         within(next).getByRole('button', { name: 'Pick another' }),
       ]);
+    });
+
+    it("draws the next step plain when the game's own Play again is the amber one", async () => {
+      const { user } = await mountMission('apollo-11', {
+        event: 'liftoff',
+        wide: true,
+        loadExtra: loadTinyGameEnds,
+      });
+      const tryIt = screen.getByRole('button', { name: 'Play: Fly to orbit' });
+      const next = await endFromLiftoff(user);
+      const sheet = screen.getByRole('dialog', { name: 'Fly to orbit' });
+      const back = within(next).getByRole('button', { name: 'Back to Apollo 11' });
+
+      expect(back).not.toHaveClass('button--primary');
+      expect(within(sheet).getByRole('button', { name: 'Play again' })).toHaveClass(
+        'button--primary',
+      );
+
+      await user.click(back);
+
+      expect(screen.queryByRole('dialog', { name: 'Fly to orbit' })).not.toBeInTheDocument();
+      expect(tryIt).toHaveFocus();
     });
 
     it("runs the extra's own next step and quiet actions", async () => {
@@ -285,10 +331,10 @@ describe('the extras sheet', () => {
         wide: true,
         loadExtra: loadTinyEnds,
       });
-      const tryIt = screen.getByRole('button', { name: 'Try it: Fly to orbit' });
+      const tryIt = screen.getByRole('button', { name: 'Play: Fly to orbit' });
       const next = await endFromLiftoff(user);
 
-      await user.click(within(next).getByRole('button', { name: 'Try again' }));
+      await user.click(within(next).getByRole('button', { name: 'Play again' }));
       expect(screen.getByText('Run 2')).toBeInTheDocument();
 
       await user.click(within(next).getByRole('button', { name: 'Back to Apollo 11' }));
@@ -302,10 +348,10 @@ describe('the extras sheet', () => {
         wide: true,
         loadExtra: loadTinyEnds,
       });
-      const tryIt = screen.getByRole('button', { name: 'Try it: Fly to orbit' });
+      const tryIt = screen.getByRole('button', { name: 'Play: Fly to orbit' });
       const next = await endFromLiftoff(user);
 
-      await user.click(within(next).getByRole('button', { name: 'Open Drop the stages' }));
+      await user.click(within(next).getByRole('button', { name: 'Play Drop the stages' }));
 
       const stages = screen.getByRole('dialog', { name: 'Drop the stages' });
       expect(
@@ -337,7 +383,7 @@ describe('the extras sheet', () => {
       expect(
         within(next).getByText('Opens at the first docking. Fly it to collect its patch.'),
       ).toBeVisible();
-      const toTry = within(next).getByRole('group', { name: 'Try it yourself' });
+      const toTry = within(next).getByRole('group', { name: 'Play a game' });
       expect(within(toTry).getByRole('heading', { level: 4 })).toHaveTextContent('Fly to orbit');
       const toExplore = within(next).getByRole('group', { name: 'More to explore' });
       expect(within(toExplore).getByRole('heading', { level: 4 })).toHaveTextContent(
@@ -348,7 +394,7 @@ describe('the extras sheet', () => {
 
       expect(screen.queryByRole('dialog', { name: 'Dock two spacecraft' })).not.toBeInTheDocument();
       expect(screen.getByRole('dialog', { name: 'All missions' })).toBeVisible();
-      expect(screen.getByRole('button', { name: 'Open Dock two spacecraft' })).toHaveFocus();
+      expect(screen.getByRole('button', { name: 'Play Dock two spacecraft' })).toHaveFocus();
     });
 
     it('opens the picks for the flight the next step flies', async () => {
@@ -433,7 +479,7 @@ describe('the extras sheet', () => {
         const next = await endFromLiftoff(user);
 
         const back = within(next).getByRole('button', { name: 'Back to Apollo 11' });
-        const again = within(next).getByRole('button', { name: 'Try again' });
+        const again = within(next).getByRole('button', { name: 'Play again' });
         const more = within(next).getByRole('button', { name: 'More to explore' });
         expect(within(next).getAllByRole('button')).toEqual([back, again, more]);
         expect(more).toHaveAttribute('aria-expanded', 'false');
@@ -455,7 +501,7 @@ describe('the extras sheet', () => {
         ).toHaveFocus();
         expect(more).toHaveAttribute('aria-expanded', 'true');
         expect(within(next).getAllByRole('group')).toEqual([
-          within(next).getByRole('group', { name: 'Try it yourself' }),
+          within(next).getByRole('group', { name: 'Play a game' }),
           within(next).getByRole('group', { name: 'More to explore' }),
         ]);
         expect(within(next).getByRole('button', { name: 'Pick another' })).toBeVisible();

@@ -29,13 +29,17 @@ export interface HubOptions {
   onExtra(id: string, from: HTMLElement): void;
 }
 
+/** Where the list opens: at the loaded mission, or at its games ("Play a game"). */
+export type HubPlace = 'mission' | 'games';
+
 export interface Hub {
   /**
-   * Open as a modal dialog over the page, scrolled to the loaded mission.
-   * Leaving without a choice (Close, Escape, or a click outside) returns to
-   * where the visitor was, with focus on `returnTo`.
+   * Open as a modal dialog over the page, scrolled to the loaded mission,
+   * or with `at` "games", scrolled so the games are at the top, with focus
+   * on their heading. Leaving without a choice (Close, Escape, or a click
+   * outside) returns to where the visitor was, with focus on `returnTo`.
    */
-  open(returnTo: HTMLElement): void;
+  open(returnTo: HTMLElement, at?: HubPlace): void;
   /** True while it is open (an extra opened from it sits over it). */
   readonly showing: boolean;
 }
@@ -222,9 +226,14 @@ export function setUpHub(options: HubOptions): Hub {
     if (isExtraDraft(meta))
       name.append(' ', el('span', 'hub__mark hub__mark--draft', copy.hub.draft));
     heading.append(name, el('p', 'hub__summary', meta.blurb));
-    const open = button('button hub__open', copy.hub.open);
+    // A game says Play; an extra to look through says Open.
+    const game = meta.kind === 'hands-on';
+    const open = button('button hub__open', game ? copy.hub.play : copy.hub.open);
     open.setAttribute('data-testid', `hub-extra-${meta.id}-open`);
-    open.setAttribute('aria-label', copy.hub.openExtra(meta.title));
+    open.setAttribute(
+      'aria-label',
+      game ? copy.hub.playExtra(meta.title) : copy.hub.openExtra(meta.title),
+    );
     open.setAttribute('aria-haspopup', 'dialog');
     open.addEventListener('click', () => onExtra(meta.id, open));
     const buttons = el('div', 'hub__actions');
@@ -234,6 +243,8 @@ export function setUpHub(options: HubOptions): Hub {
     item.append(top);
     return item;
   };
+  /** The games' group and its heading, which "Play a game" on the welcome opens the list at. */
+  let games: { section: HTMLElement; heading: HTMLHeadingElement } | null = null;
   for (const kind of ['hands-on', 'explore'] as const) {
     const group = extras.filter((meta) => meta.kind === kind);
     if (!group.length) continue;
@@ -241,6 +252,11 @@ export function setUpHub(options: HubOptions): Hub {
     const heading = el('h3', 'hub__program-title', copy.hub.extras[kind]);
     heading.id = `hub-extras-${kind}`;
     section.setAttribute('aria-labelledby', heading.id);
+    heading.setAttribute('data-testid', `hub-extras-${kind}-title`);
+    if (kind === 'hands-on') {
+      heading.tabIndex = -1;
+      games = { section, heading };
+    }
     const items = el('ul', 'hub__entries');
     items.append(...group.map(extraEntry));
     section.append(heading, items);
@@ -255,6 +271,14 @@ export function setUpHub(options: HubOptions): Hub {
     const box = loaded.getBoundingClientRect();
     const frame = list.getBoundingClientRect();
     list.scrollTop = Math.max(0, box.top - frame.top - (list.clientHeight - box.height) / 2);
+  };
+
+  /** Scroll the list so a group starts at its top. */
+  const revealGroup = (section: HTMLElement): void => {
+    list.scrollTop = 0;
+    const box = section.getBoundingClientRect();
+    const frame = list.getBoundingClientRect();
+    list.scrollTop = Math.max(0, box.top - frame.top);
   };
 
   /* Opening and closing ------------------------------------------------ */
@@ -285,15 +309,20 @@ export function setUpHub(options: HubOptions): Hub {
   });
 
   return {
-    open(from) {
+    open(from, at = 'mission') {
       if (dialog.open) return;
       isOpen = true;
       returnTo = from;
       titleBefore = document.title;
       document.title = copy.siteTitle;
       dialog.showModal();
-      reveal();
-      closeButton.focus({ preventScroll: true });
+      if (at === 'games' && games) {
+        revealGroup(games.section);
+        games.heading.focus({ preventScroll: true });
+      } else {
+        reveal();
+        closeButton.focus({ preventScroll: true });
+      }
     },
     get showing() {
       return isOpen;

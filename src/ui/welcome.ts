@@ -11,6 +11,8 @@ export interface WelcomeOptions {
   tourStops: number;
   /** The mission list, in date order, for the line under "All missions". */
   summaries: readonly MissionSummary[];
+  /** How many games (hands-on extras) the list shows. With none, "Play a game" is hidden. */
+  games: number;
   /** Without a 3D view: the note to show under the dates, and whether reloading may help. */
   no3D?: { note: string; offerReload: boolean };
   /** Start the guided tour of the mission. */
@@ -19,6 +21,8 @@ export interface WelcomeOptions {
   onExplore(): void;
   /** Open the list of every mission over the welcome; focus comes back to `from` when it closes. */
   onAllMissions(from: HTMLElement): void;
+  /** Open the same list at its games; focus comes back to `from` when it closes. */
+  onGames(from: HTMLElement): void;
 }
 
 export interface Welcome {
@@ -52,10 +56,12 @@ function listSpan(summaries: readonly MissionSummary[]): string {
 /**
  * The first thing a visitor sees: one mission, the one loaded, and one
  * obvious way in (the guided tour), with exploring beside it. The list of
- * every mission is one step away, behind "All missions".
+ * every mission is one step away, behind "All missions", and its games
+ * behind "Play a game".
  */
 export function setUpWelcome(options: WelcomeOptions): Welcome {
-  const { mission, tourStops, summaries, no3D, onTour, onExplore, onAllMissions } = options;
+  const { mission, tourStops, summaries, games, no3D, onTour, onExplore } = options;
+  const { onAllMissions, onGames } = options;
   const section = byId('welcome', HTMLElement);
   const title = byId('welcome-title', HTMLHeadingElement);
   const tourButton = byId('welcome-tour', HTMLButtonElement);
@@ -105,6 +111,19 @@ export function setUpWelcome(options: WelcomeOptions): Welcome {
   byId('welcome-all-missions-count', HTMLSpanElement).textContent = String(summaries.length);
   allMissions.append(icon('next', 'icon welcome__chevron'));
   allMissions.addEventListener('click', () => onAllMissions(allMissions));
+
+  // "Play a game": the same list, opened at its games, so a game is easy to find.
+  const gamesButton = byId('welcome-games', HTMLButtonElement);
+  const gamesName = byId('welcome-games-name', HTMLSpanElement);
+  gamesName.textContent = copy.welcome.games;
+  gamesName.prepend(icon('game', 'icon welcome__game'));
+  const gamesLine = byId('welcome-games-line', HTMLSpanElement);
+  gamesLine.textContent = copy.welcome.gamesLine;
+  gamesLine.append(hiddenText(`, ${copy.welcome.gamesCount(games)}`));
+  byId('welcome-games-count', HTMLSpanElement).textContent = String(games);
+  gamesButton.append(icon('next', 'icon welcome__chevron'));
+  gamesButton.hidden = games === 0;
+  gamesButton.addEventListener('click', () => onGames(gamesButton));
 
   /* Showing and leaving ------------------------------------------------ */
   let showing = false;

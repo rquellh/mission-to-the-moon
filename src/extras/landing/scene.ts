@@ -24,6 +24,11 @@
  * marker's far end inside the view, with room left at the top for the fuel
  * strip. A narrow canvas is fitted by its width, a wide one by its height,
  * and on a wide one the boulders run on past both sides of the patch.
+ *
+ * The ground is a level's (see LEVEL_RULES in game.ts): the patch starts
+ * nearer on Easy, and on Hard more boulders cover the ground it gives up.
+ * `setLevel` shows a level's ground at once, so the start screen can show
+ * each level as it is chosen.
  */
 import {
   BufferGeometry,
@@ -56,10 +61,21 @@ import {
   type MiniView,
   type VehiclePart,
 } from '../../scene/kit.ts';
-import { RULES, ahead, driftShows, groundUnder, type Flight, type Thrust } from './game.ts';
+import type { Level } from '../shared/levels.ts';
+import {
+  LEVEL_RULES,
+  RULES,
+  ahead,
+  driftShows,
+  groundUnder,
+  type Flight,
+  type Thrust,
+} from './game.ts';
 
 export interface LandingScene {
   readonly view: MiniView;
+  /** Shows a level's ground: where the clear-ground marker starts, and the boulders before it. */
+  setLevel(level: Level): void;
   /** Places the whole lander, its flame, its shadow and the drift line for this moment of a flight. */
   fly(flight: Flight, seconds: number, still: boolean): void;
   /** Shows one press: the lander leans for a sideways push, the flame swells or shrinks for an engine push. */
@@ -130,7 +146,7 @@ const ROCK_HALF = 0.7;
 /**
  * The boulders, fixed: [x, z, width, top, depth, turn, shape]. `top` is how
  * high each stands above the clear ground. They cover the rough ground on
- * both sides of the clear patch (left of RULES.clearFrom and right of
+ * both sides of the clear patch (left of Easy's clearFrom and right of
  * RULES.clearTo, out past either side of a wide canvas) from behind the
  * lander's path to in front of it, closest together on the path itself (z
  * near 0), where their tops are near RULES.roughHeight so a bump looks like
@@ -138,6 +154,7 @@ const ROCK_HALF = 0.7;
  * over (z near +-3.7) are low, so the pads never sink into them. The ones
  * nearest the patch are unturned, so their edges are exact and stay off it.
  * Two pebbles lie on the patch, away from where the footpads come down.
+ * These show on both levels; HARD_ONLY_BOULDERS adds the rest on Hard.
  */
 export type Boulder = readonly [
   x: number,
@@ -226,6 +243,27 @@ export const BOULDERS: readonly Boulder[] = [
   [14.6, -6, 0.28, 0.16, 0.26, 1.9, 1],
 ];
 
+/**
+ * More boulders on Hard, the same way round: on the strip from Easy's
+ * clearFrom to Hard's, which is clear ground on Easy and rough on Hard.
+ * The one nearest Hard's patch, on the path, is unturned.
+ */
+export const HARD_ONLY_BOULDERS: readonly Boulder[] = [
+  // On the lander's path.
+  [4.45, -0.5, 1.4, 1.1, 1.3, 0.6, 1],
+  [5.85, 0.6, 1.4, 1.2, 1.3, 0, 0],
+  // In front of the path.
+  [4.9, 3.6, 0.8, 0.5, 0.7, 1.3, 0],
+  [5.9, 6.2, 1.2, 0.8, 1, 0, 1],
+  // Behind the path.
+  [4.6, -3.8, 0.9, 0.6, 0.8, 0.9, 1],
+  [6, -6.8, 1.1, 0.75, 1, 0, 0],
+];
+
+/** The boulders a level's ground shows. */
+export const bouldersOn = (level: Level): readonly Boulder[] =>
+  level === 'hard' ? [...BOULDERS, ...HARD_ONLY_BOULDERS] : BOULDERS;
+
 /** The engine's light, as stages draws it. */
 const FLAME = 0xffa64a;
 /** One glow of a flame: how far below the top of the flame it sits, its size, and its brightness. */
@@ -301,7 +339,7 @@ const SHADOW_DARKEST = 0.7;
 const SHADOW_FAINTEST = 0.2;
 const SHADOW_Y = 0.04;
 
-/** The clear-ground marker: in front of the lander's path, across the patch from RULES.clearFrom to RULES.clearTo, in even dashes. */
+/** The clear-ground marker: in front of the lander's path, across the patch from the level's clearFrom to RULES.clearTo, in even dashes. */
 const MARKER_Z = 5;
 const MARKER_DASHES = 10;
 /** The drift line: dash length and spacing in meters, the most dashes it can need, and its gaps at each end. */
@@ -436,10 +474,43 @@ function dashShape(count: number, length: number, period: number, from = 0): Buf
   return geometry;
 }
 
+/** A list of boulders as meshes, one for each rock shape, each boulder an instance placed and tinted. */
+function boulderMeshes(
+  list: readonly Boulder[],
+  shapes: readonly BufferGeometry[],
+  material: MeshStandardMaterial,
+): InstancedMesh[] {
+  const up = new Vector3(0, 1, 0);
+  const matrix = new Matrix4();
+  const turn = new Quaternion();
+  const where = new Vector3();
+  const size = new Vector3();
+  const tint = new Color();
+  return shapes.map((shape, which) => {
+    const ofShape = list.filter((boulder) => boulder[6] === which);
+    const mesh = new InstancedMesh(shape, material, ofShape.length);
+    ofShape.forEach(([x, z, width, top, depth, yaw], i) => {
+      // Turned only about the vertical, so the top stays where it is set.
+      const half = top * ROCK_HALF;
+      where.set(x, top - half, z);
+      size.set(width / 2, half, depth / 2);
+      turn.setFromAxisAngle(up, yaw);
+      mesh.setMatrixAt(i, matrix.compose(where, turn, size));
+      // A slightly different gray for each, so neighbors do not merge.
+      mesh.setColorAt(i, tint.setScalar(0.84 + 0.28 * ((i * 0.618 + which * 0.31) % 1)));
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.computeBoundingSphere();
+    return mesh;
+  });
+}
+
 /**
  * The ground, the hills, the crater and the boulders, in one group that is
- * drawn once and never moved. The boulders' meshes come back too: freeing
- * the group's shapes and materials does not free their instances.
+ * drawn once and never moved; the boulders only Hard has are a group of
+ * their own in it, shown on Hard. The boulders' meshes come back too:
+ * freeing the group's shapes and materials does not free their instances.
  */
 function createTerrain() {
   const terrain = new Group();
@@ -480,32 +551,12 @@ function createTerrain() {
     rockShape(new IcosahedronGeometry(1, 0), 0.37),
     rockShape(new DodecahedronGeometry(1, 0), 1.91),
   ];
-  const up = new Vector3(0, 1, 0);
-  const rocks = rockShapes.map((shape, which) => {
-    const list = BOULDERS.filter((boulder) => boulder[6] === which);
-    const mesh = new InstancedMesh(shape, rockMaterial, list.length);
-    const matrix = new Matrix4();
-    const turn = new Quaternion();
-    const where = new Vector3();
-    const size = new Vector3();
-    const tint = new Color();
-    list.forEach(([x, z, width, top, depth, yaw], i) => {
-      // Turned only about the vertical, so the top stays where it is set.
-      const half = top * ROCK_HALF;
-      where.set(x, top - half, z);
-      size.set(width / 2, half, depth / 2);
-      turn.setFromAxisAngle(up, yaw);
-      mesh.setMatrixAt(i, matrix.compose(where, turn, size));
-      // A slightly different gray for each, so neighbors do not merge.
-      mesh.setColorAt(i, tint.setScalar(0.84 + 0.28 * ((i * 0.618 + which * 0.31) % 1)));
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    mesh.computeBoundingSphere();
-    terrain.add(mesh);
-    return mesh;
-  });
-  return { terrain, rocks };
+  const bothLevels = boulderMeshes(BOULDERS, rockShapes, rockMaterial);
+  const hardOnly = boulderMeshes(HARD_ONLY_BOULDERS, rockShapes, rockMaterial);
+  const hardRocks = new Group();
+  hardRocks.add(...hardOnly);
+  terrain.add(...bothLevels, hardRocks);
+  return { terrain, rocks: [...bothLevels, ...hardOnly], hardRocks };
 }
 
 /**
@@ -523,19 +574,20 @@ function createGuideLines() {
     depthWrite: false,
     side: DoubleSide,
   });
-  const markerDash = (RULES.clearTo - RULES.clearFrom) / (2 * MARKER_DASHES - 1);
+  // The dashes span one meter here; a level stretches them across its patch (see placeMarker).
+  const markerDash = 1 / (2 * MARKER_DASHES - 1);
   const marker = new Group();
-  const markerLine = new Mesh(
-    dashShape(MARKER_DASHES, markerDash, markerDash * 2, RULES.clearFrom),
-    amber,
-  );
+  const markerLine = new Mesh(dashShape(MARKER_DASHES, markerDash, markerDash * 2), amber);
   const tickShape = new PlaneGeometry(1, 1);
-  const ticks = [RULES.clearFrom, RULES.clearTo].map((x) => {
+  const tickAt = (x: number): Mesh<PlaneGeometry, MeshBasicMaterial> => {
     const tick = new Mesh(tickShape, amber);
     tick.position.set(x, 0, 0);
     tick.renderOrder = MARKER_ORDER;
     return tick;
-  });
+  };
+  // The near tick moves with the level's clearFrom; the far one stays at RULES.clearTo.
+  const nearTick = tickAt(0);
+  const ticks = [nearTick, tickAt(RULES.clearTo)];
   markerLine.renderOrder = MARKER_ORDER;
   marker.add(markerLine, ...ticks);
   marker.position.set(0, 0, MARKER_Z);
@@ -546,7 +598,7 @@ function createGuideLines() {
   const ring = new Mesh(new RingGeometry(0.7, 1, 32), amber);
   ring.renderOrder = DRIFT_ORDER;
   ring.visible = false;
-  return { marker, markerLine, ticks, drift, ring };
+  return { marker, markerLine, ticks, nearTick, drift, ring };
 }
 
 /** A flame's glows, one for each row, drawn after the ground and the shadow, which would otherwise paint over them. */
@@ -619,7 +671,8 @@ interface Split {
   restY: number;
 }
 
-export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
+/** The landing's 3D view, showing the ground of the level it opens on until `setLevel` shows another's. */
+export function createLandingScene(canvas: HTMLCanvasElement, opensOn: Level): LandingScene {
   const view = createMiniView(canvas, { stars: true, controls: false, fov: FOV });
   const { camera, scene } = view;
   // Everything drawn is tens of meters away: a far-off near plane keeps the depth sharp where the shadow lies on the ground.
@@ -649,7 +702,7 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
     glow.visible = false;
   }
 
-  const { terrain, rocks } = createTerrain();
+  const { terrain, rocks, hardRocks } = createTerrain();
 
   // The shadow, lying on the ground under the lander.
   const shadowMaterial = new MeshBasicMaterial({
@@ -666,7 +719,17 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
   shadow.rotation.x = -Math.PI / 2;
   shadow.renderOrder = SHADOW_ORDER;
 
-  const { marker, markerLine, ticks, drift, ring } = createGuideLines();
+  const { marker, markerLine, ticks, nearTick, drift, ring } = createGuideLines();
+
+  /** A level's ground: the marker stretched across its patch, and the boulders only Hard has. */
+  const showGround = (shown: Level): void => {
+    const { clearFrom } = LEVEL_RULES[shown];
+    markerLine.position.x = clearFrom;
+    markerLine.scale.x = RULES.clearTo - clearFrom;
+    nearTick.position.x = clearFrom;
+    hardRocks.visible = shown === 'hard';
+  };
+  showGround(opensOn);
 
   scene.add(terrain, lander, shadow, marker, drift, ring, ...ascentGlows.map(({ glow }) => glow));
 
@@ -735,7 +798,7 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
     camera.updateMatrixWorld();
     pixel = (2 * distance * t) / Math.max(1, size.y);
     // Line widths in pixels, whatever the canvas's size.
-    markerLine.scale.set(1, LINE_PX * pixel, 1);
+    markerLine.scale.y = LINE_PX * pixel;
     for (const tick of ticks) tick.scale.set(LINE_PX * pixel, TICK_PX * pixel, 1);
     ring.scale.setScalar(RING_PX * pixel);
     ring.quaternion.copy(camera.quaternion);
@@ -747,7 +810,7 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
   const at: Place = {
     x: RULES.startX,
     height: RULES.startHeight,
-    ground: groundUnder(RULES.startX),
+    ground: groundUnder(opensOn, RULES.startX),
   };
   let clock = 0;
   // Under reduced motion the lander never leans, and the flame changes size at once.
@@ -761,7 +824,7 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
   const placeAt = (flight: Flight): void => {
     at.x = flight.x;
     at.height = flight.height;
-    at.ground = groundUnder(flight.x);
+    at.ground = groundUnder(flight.level, flight.x);
   };
 
   const placeLander = (): void => {
@@ -884,6 +947,10 @@ export function createLandingScene(canvas: HTMLCanvasElement): LandingScene {
 
   return {
     view,
+    setLevel(shown) {
+      showGround(shown);
+      view.requestRender();
+    },
     fly(flight, seconds, still) {
       placeCamera();
       // After a landing or a split, the picture stays until reset puts the lander back together.

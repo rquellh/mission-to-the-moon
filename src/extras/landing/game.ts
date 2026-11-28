@@ -16,18 +16,24 @@
  * whole pushes, so that two pushes one way and two the other always cancel
  * exactly. The engine burns fuel every second of the flight, whatever the
  * player does, so taking too long runs the tank dry.
+ *
+ * There are two levels. RULES holds the numbers both share, and
+ * LEVEL_RULES the few that differ: how the run starts sliding, where the
+ * patch of clear ground begins, the fuel, and the fuel a run must save for
+ * its third star. A flight is started on a level and carries it, so every
+ * rule below reads that level's numbers from the flight it is given.
  */
+import type { Level } from '../shared/levels.ts';
 
 /** One press of a control. "up" slows the fall by one step; "down" speeds it up by one step. */
 export type Thrust = 'up' | 'down' | 'left' | 'right';
 
-/** The toy's numbers: generous, slow, and made up. */
+/** The toy's numbers on both levels: generous, slow, and made up. */
 export const RULES = {
   /** Where a run starts: over the boulders, coming down too fast to land. */
   startX: -10,
   startHeight: 18,
   startFalling: 5,
-  startSideways: 0,
   /** Speed added by one press, in meters a second. */
   sidePush: 0.6,
   fallPush: 0.35,
@@ -43,22 +49,51 @@ export const RULES = {
   maxSideways: 6,
   /** From the middle of the lander out to the edge of a footpad. */
   footHalfSpan: 4.2,
-  /** The patch of clear, flat ground, from one edge to the other. Boulders lie on both sides of it. */
-  clearFrom: 4,
+  /** The far edge of the patch of clear, flat ground; its near edge is each level's `clearFrom`. Boulders lie on both sides of it. */
   clearTo: 17.5,
   /** How high the boulders stand above the clear ground. */
   roughHeight: 1.2,
   /** The edges of the play area: how far the lander's middle can go to each side, and how high its footpads can go. */
   maxSide: 16.5,
   maxHeight: 24,
-  /** Seconds of engine time in the tank: about twice what a clean run takes. */
-  fuelSeconds: 32,
   /** How far ahead the drift line looks, and the shortest drift worth drawing, in meters. */
   aheadSeconds: 5,
   aheadMin: 1.5,
 } as const;
 
+/** The numbers that differ between the levels. */
+export interface LevelRules {
+  /** Whole sideways pushes at the start; negative is to the left, away from the clear ground. */
+  startSideways: number;
+  /** The near edge of the patch of clear ground (its far edge is RULES.clearTo). */
+  clearFrom: number;
+  /** Seconds of engine time in the tank. */
+  fuelSeconds: number;
+  /** The third star, "Fuel to spare": the least share of the tank left at touchdown that earns it. */
+  spareFuel: number;
+}
+
+/**
+ * Each level's own numbers, measured by the scripted runs in game.test.ts.
+ * On Easy, `spareFuel` is set so that a clean, gentle run earns the third
+ * star with 2 to 3 seconds in hand, and a run with a bump on the boulders,
+ * or about 5 seconds of hovering, does not. On Hard the third star is for a
+ * bold run: a careful clean run lands with about 5 seconds left and misses
+ * it, and a bold, gentle run a practised player can fly (sliding across at
+ * five pushes without slowing first, then slowing the fall and stopping the
+ * slide late) lands with about 9.7 seconds left and earns it, with about a
+ * second in hand.
+ */
+export const LEVEL_RULES: Readonly<Record<Level, Readonly<LevelRules>>> = {
+  /** The game as it first was: no slide at the start, 5.1 m to stop in, and about twice the fuel a clean run takes. */
+  easy: { startSideways: 0, clearFrom: 4, fuelSeconds: 32, spareFuel: 0.36 },
+  /** Sliding away from the clear ground at the start, 2.5 m to stop in, about 6 seconds to spare after a clean run, and a star for about 8.7 of them. */
+  hard: { startSideways: -2, clearFrom: 6.6, fuelSeconds: 23, spareFuel: 0.38 },
+};
+
 export interface Flight {
+  /** The level it is flown on, whose numbers the rules read (LEVEL_RULES). */
+  readonly level: Level;
   x: number;
   height: number;
   /** Whole sideways pushes; positive is to the right. */
@@ -82,14 +117,16 @@ export type Contact =
 const clamp = (value: number, low: number, high: number): number =>
   Math.min(Math.max(value, low), high);
 
-/** A fresh start: high over the boulders, coming down too fast to land, with a full tank. */
-export function startFlight(): Flight {
+/** A fresh start on a level: high over the boulders, coming down too fast to land, with a full tank. */
+export function startFlight(level: Level): Flight {
+  const { startSideways, fuelSeconds } = LEVEL_RULES[level];
   return {
+    level,
     x: RULES.startX,
     height: RULES.startHeight,
-    pushesX: RULES.startSideways,
+    pushesX: startSideways,
     pushesDown: RULES.startFalling,
-    fuel: RULES.fuelSeconds,
+    fuel: fuelSeconds,
   };
 }
 
@@ -121,13 +158,22 @@ export const fallingSpeed = (flight: Flight): number => flight.pushesDown * RULE
  * are over it only while the lander's middle is at least half its span in
  * from each edge.
  */
-const clearUnder = (x: number): boolean =>
-  x - RULES.footHalfSpan >= RULES.clearFrom && x + RULES.footHalfSpan <= RULES.clearTo;
+const clearUnder = (level: Level, x: number): boolean =>
+  x - RULES.footHalfSpan >= LEVEL_RULES[level].clearFrom && x + RULES.footHalfSpan <= RULES.clearTo;
 
-/** The height of whatever a lander centered at `x` would touch first. */
-export const groundUnder = (x: number): number => (clearUnder(x) ? 0 : RULES.roughHeight);
+/** The room the lander's middle has to stop in on a level: where both footpads are over the clear patch. */
+export function landingRoom(level: Level) {
+  return {
+    from: LEVEL_RULES[level].clearFrom + RULES.footHalfSpan,
+    to: RULES.clearTo - RULES.footHalfSpan,
+  };
+}
+
+/** The height of whatever a lander centered at `x` would touch first, on a level's ground. */
+export const groundUnder = (level: Level, x: number): number =>
+  clearUnder(level, x) ? 0 : RULES.roughHeight;
 /** Both footpads are over clear ground. */
-export const overClear = (flight: Flight): boolean => clearUnder(flight.x);
+export const overClear = (flight: Flight): boolean => clearUnder(flight.level, flight.x);
 /** The lander has slid on past the clear patch: its right footpad is over the boulders beyond it. */
 export const pastClear = (flight: Flight): boolean => flight.x + RULES.footHalfSpan > RULES.clearTo;
 /** Falling faster than a soft touchdown allows. */
@@ -135,14 +181,15 @@ export const isTooFast = (flight: Flight): boolean => flight.pushesDown > RULES.
 /** Sliding so little that it counts as almost still. */
 export const isStill = (flight: Flight): boolean => Math.abs(flight.pushesX) <= RULES.stillSideways;
 /** 1 with a full tank, 0 when empty. */
-export const fuelLeft = (flight: Flight): number => flight.fuel / RULES.fuelSeconds;
+export const fuelLeft = (flight: Flight): number =>
+  flight.fuel / LEVEL_RULES[flight.level].fuelSeconds;
 
 /** Where the lander will be in `seconds` if nothing is pressed, kept inside the play area and above the ground. */
 export function ahead(flight: Flight, seconds: number = RULES.aheadSeconds) {
   const x = clamp(flight.x + slideSpeed(flight) * seconds, -RULES.maxSide, RULES.maxSide);
   const height = clamp(
     flight.height - fallingSpeed(flight) * seconds,
-    groundUnder(x),
+    groundUnder(flight.level, x),
     RULES.maxHeight,
   );
   return { x, height };
@@ -189,7 +236,7 @@ export function advance(flight: Flight, seconds: number): Contact | null {
   }
 
   // The touch comes before the empty tank, so a landing on the last of the fuel still counts.
-  const ground = groundUnder(flight.x);
+  const ground = groundUnder(flight.level, flight.x);
   if (flight.height <= ground) {
     const tooFast = isTooFast(flight);
     const sliding = !isStill(flight);
@@ -208,4 +255,30 @@ export function advance(flight: Flight, seconds: number): Contact | null {
 
   if (flight.fuel <= 0) return { kind: 'empty' };
   return null;
+}
+
+/** How a run that ended went, goal by goal: one star for each. */
+export interface RunGoals {
+  /** Down on clear ground, both footpads on the patch. */
+  landed: boolean;
+  /** A gentle touchdown: falling no faster than RULES.lightFalling steps at the touch. */
+  gentle: boolean;
+  /** At least the level's share of the tank still left at touchdown (LEVEL_RULES spareFuel). */
+  spareFuel: boolean;
+}
+
+/**
+ * The goals a run met, from how it ended: a landing (with its falling steps
+ * at the touch) or the tank running dry, which meets none of them.
+ */
+export function runGoals(
+  flight: Flight,
+  end: Extract<Contact, { kind: 'landed' | 'empty' }>,
+): RunGoals {
+  if (end.kind === 'empty') return { landed: false, gentle: false, spareFuel: false };
+  return {
+    landed: true,
+    gentle: end.falling <= RULES.lightFalling,
+    spareFuel: fuelLeft(flight) >= LEVEL_RULES[flight.level].spareFuel,
+  };
 }

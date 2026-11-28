@@ -7,6 +7,13 @@
 }
 
 [data-extra='docking'] .docking {
+  /* The sheet's title bar and the room around the extra, apart from the two
+     safe edges, all in src/styles/main.css: the Close button's 44px
+     (`.button` min-height), the title bar's 10px bottom padding
+     (`.dialog--full .dialog__head`) and 1px border (`.dialog__head`), and the
+     18px above and below the extra (`.extra-host`). Keep it in step with
+     those rules, as "Land on the Moon" does. */
+  --docking-sheet-room: 91px;
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
@@ -22,6 +29,15 @@
   border: 1px solid var(--color-line);
   border-radius: 12px;
   background: var(--color-bg);
+}
+
+/* With two goals missed, two tips sit under the stars: the picture gives up
+   the room they take, so on a phone Play again still shows above the pinned
+   "Up next". */
+[data-extra='docking']
+  .docking[data-phase='docked']:has(.game-goal--missed ~ .game-goal--missed)
+  .docking__view:not(.docking__view--flat) {
+  min-height: 180px;
 }
 
 [data-extra='docking'] .docking__canvas {
@@ -82,11 +98,6 @@
 [data-extra='docking'] .docking__intro .sources,
 [data-extra='docking'] .docking__after .sources {
   margin-top: 0;
-}
-
-[data-extra='docking'] .docking__start {
-  align-self: flex-start;
-  min-width: 140px;
 }
 
 /* Read-outs. */
@@ -280,11 +291,16 @@
   }
 }
 
+/* After docking: the result line, then the stars and Play again set a little apart from it and from the real docking below. */
 [data-extra='docking'] .docking__docked {
   margin: 0;
-  color: var(--color-accent);
-  font-size: 1.0625rem;
-  font-weight: 700;
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+[data-extra='docking'] .docking__after .game-run-end {
+  margin: 6px 0;
 }
 
 [data-extra='docking'] .docking__simple {
@@ -303,6 +319,23 @@
     min-height: 300px;
   }
 
+  /* The picture keeps to the height of the screen (less the sheet's title
+     bar and the room around the extra, --docking-sheet-room with the two
+     safe edges) and stays put while a long side column scrolls beside it,
+     as in "Land on the Moon". Stretched to the long column after a docking
+     (the stars, the real docking, and "Up next"), it would put the docked
+     pair in its middle off the bottom of the screen. */
+  [data-extra='docking'] .docking__view:not(.docking__view--flat),
+  [data-extra='docking']
+    .docking[data-phase='docked']:has(.game-goal--missed ~ .game-goal--missed)
+    .docking__view:not(.docking__view--flat) {
+    position: sticky;
+    top: 18px;
+    align-self: flex-start;
+    height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--docking-sheet-room));
+    min-height: 200px;
+  }
+
   [data-extra='docking'] .docking__view--flat {
     flex: 1 1 auto;
     align-self: flex-start;
@@ -315,6 +348,108 @@
   [data-extra='docking'] .docking__pad {
     grid-template-columns: repeat(3, 64px) minmax(0, 1fr);
     grid-template-rows: repeat(3, 60px);
+  }
+}
+
+/* A phone held sideways: a short, wide screen (a computer window is taller,
+   and a phone held upright is not wide), laid out as "Land on the Moon"
+   does. While flying, the whole game fits with no scrolling: the picture,
+   the read-outs in a narrow column beside it, and the thrusters (with Start
+   over) at the right edge, with the coach line under the picture. The key
+   note and the practice-toy note are left out (the start screen shows the
+   second). */
+@media (min-width: 600px) and (orientation: landscape) and (max-height: 500px) {
+  [data-extra='docking'] .docking:is([data-phase='flying'], [data-phase='latching']) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 172px auto;
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'view readouts pad'
+      'coach coach pad';
+    gap: 8px 12px;
+  }
+
+  /* Their boxes step aside, so the read-outs, the coach line, and the thrusters sit in the grid. */
+  [data-extra='docking']
+    .docking:is([data-phase='flying'], [data-phase='latching'])
+    :is(.docking__side, .docking__fly) {
+    display: contents;
+  }
+
+  [data-extra='docking']
+    .docking:is([data-phase='flying'], [data-phase='latching'])
+    .docking__view:not(.docking__view--flat) {
+    position: relative;
+    top: auto;
+    align-self: stretch;
+    height: auto;
+    min-height: 0;
+  }
+
+  [data-extra='docking']
+    .docking:is([data-phase='flying'], [data-phase='latching'])
+    .docking__view {
+    grid-area: view;
+  }
+
+  [data-extra='docking'] .docking__readouts {
+    grid-area: readouts;
+    grid-template-columns: minmax(0, 1fr);
+    align-self: start;
+  }
+
+  [data-extra='docking'] .docking__readout {
+    padding: 8px 12px;
+  }
+
+  [data-extra='docking'] .docking__coach {
+    grid-area: coach;
+    align-self: center;
+  }
+
+  [data-extra='docking'] .docking__pad {
+    grid-area: pad;
+    align-self: center;
+    grid-template-columns: repeat(3, 48px) 96px;
+    grid-template-rows: repeat(3, 48px);
+    gap: 6px;
+  }
+
+  [data-extra='docking'] .docking:is([data-phase='flying'], [data-phase='latching']) .docking__keys,
+  [data-extra='docking']
+    .docking:is([data-phase='flying'], [data-phase='latching'])
+    .docking__simple {
+    display: none;
+  }
+
+  /* Before starting, Start stays in reach at the bottom of the screen while
+     the words scroll under it: they fade out just above it, and the sheet's
+     own color hides them in its rounded corners and below it. */
+  [data-extra='docking'] .docking__intro > .button {
+    position: sticky;
+    bottom: 12px;
+    box-shadow: 0 0 0 5px var(--color-surface-solid);
+  }
+
+  [data-extra='docking'] .docking__intro > .button::before,
+  [data-extra='docking'] .docking__intro > .button::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    left: -1px;
+    pointer-events: none;
+  }
+
+  [data-extra='docking'] .docking__intro > .button::before {
+    bottom: 100%;
+    height: 16px;
+    background: linear-gradient(to bottom, transparent, var(--color-surface-solid));
+  }
+
+  [data-extra='docking'] .docking__intro > .button::after {
+    top: 100%;
+    height: 12px;
+    background: var(--color-surface-solid);
   }
 }
 

@@ -2,9 +2,10 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
  * The welcome: the first screen on an address with no `start`. It features
- * the mission on show, with Take the tour, Explore on my own, and All
- * missions, which opens the mission list (HubPage). While it shows, `site`
- * has the class is-welcome and the rest of the interface is hidden.
+ * the mission on show, with Take the tour, Explore on my own, All missions,
+ * which opens the mission list (HubPage), and Play a game (`games`), which
+ * opens the same list at its games. While it shows, `site` has the class
+ * is-welcome and the rest of the interface is hidden.
  */
 export class WelcomePage {
   readonly page: Page;
@@ -15,6 +16,7 @@ export class WelcomePage {
   readonly tour: Locator;
   readonly explore: Locator;
   readonly allMissions: Locator;
+  readonly games: Locator;
   // Without a 3D view
   readonly note: Locator;
   readonly reload: Locator;
@@ -28,6 +30,7 @@ export class WelcomePage {
     this.tour = page.getByTestId('welcome-tour');
     this.explore = page.getByTestId('welcome-explore');
     this.allMissions = page.getByTestId('welcome-all-missions');
+    this.games = page.getByTestId('welcome-games');
     this.note = page.getByTestId('welcome-note');
     this.reload = page.getByTestId('welcome-reload');
   }

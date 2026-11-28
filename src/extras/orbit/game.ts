@@ -25,11 +25,20 @@
  * a stage runs dry, the rocket reaches the orbit line, it reaches orbit
  * speed, or an empty stage drops by itself. So the same presses at the
  * same moments fly the same flight, however the frames fall.
+ *
+ * There are two levels. RULES holds the numbers both share, and
+ * LEVEL_RULES the few that differ, none of which the picture draws: the
+ * fuel in each stage, how long an empty stage hangs on before it drops by
+ * itself, and the fuel a run must save for its third star. A flight is
+ * started on a level and carries it, so every rule below reads that
+ * level's numbers from the flight it is given.
  */
+import type { Level } from '../shared/levels.ts';
 
 /** One press of a tilt control: "over" tips toward flat, "back" toward straight up. */
 export type Tip = 'over' | 'back';
 
+/** The toy's numbers on both levels: made up, and the same whatever the level. */
 export const RULES = {
   /** The picture: its width, how far it shows above the ground, and how far below. */
   width: 36,
@@ -55,16 +64,55 @@ export const RULES = {
   /** The sideways speed that counts as orbit, and the most the air allows below the orbit line. */
   orbitSpeed: 2.75,
   thinAirSpeed: 2.05,
-  /** Seconds of burning in each stage, for a rocket of two stages and one of three. */
-  stageSeconds: { 2: [11, 13], 3: [7, 8, 9] },
-  /** With no engine burning: how fast the rocket sinks, and how long an empty stage stays on before it drops by itself. */
+  /** With no engine burning, how fast the rocket sinks. */
   sinkSpeed: 0.8,
-  dropsItselfAfter: 2,
   /** Seconds between the points of the path ahead. */
   aheadStep: 0.5,
 } as const;
 
+/** How many stages a rocket has. */
+export type Stages = 2 | 3;
+
+/** The numbers that differ between the levels. */
+export interface LevelRules {
+  /** Seconds of burning in each stage, from the first up, for a rocket of two stages and one of three. */
+  stageSeconds: Readonly<Record<Stages, readonly number[]>>;
+  /** How long an empty stage stays on before it drops by itself, in seconds. */
+  dropsItselfAfter: number;
+  /** The third star, "Fuel to spare": the least share of the last stage's tank left at orbit that earns it, for each rocket size. */
+  spareFuel: Readonly<Record<Stages, number>>;
+}
+
+/**
+ * Each level's own numbers, measured by the scripted runs in game.test.ts.
+ * The rocket flies the same whichever stage is burning, so a clean run
+ * burns about 21.8 seconds of fuel on either rocket, and each second a run
+ * is late burns about one second more. `spareFuel` is set so that a clean
+ * run earns the third star with about half a second of burning in hand,
+ * and a run one second late on every tip does not. An empty stage left on
+ * burns no fuel, though: it costs height and time, so a run that waits for
+ * it to drop can still have fuel to spare (it misses the second star).
+ */
+export const LEVEL_RULES: Readonly<Record<Level, Readonly<LevelRules>>> = {
+  /** The game as it first was: 24 seconds of fuel on either rocket, so a clean run has about 2.2 seconds in hand and every tip may come 2 seconds late. */
+  easy: {
+    stageSeconds: { 2: [11, 13], 3: [7, 8, 9] },
+    dropsItselfAfter: 2,
+    // About 1.6 seconds of burning left in the last stage.
+    spareFuel: { 2: 0.12, 3: 0.18 },
+  },
+  /** A second less fuel, in every stage, so a clean run has about 1.2 seconds in hand and every tip may come only 1 second late; and an empty stage left on hangs on twice as long. */
+  hard: {
+    stageSeconds: { 2: [10.5, 12.5], 3: [6.5, 7.75, 8.75] },
+    dropsItselfAfter: 4,
+    // About 0.8 seconds of burning left in the last stage.
+    spareFuel: { 2: 0.06, 3: 0.09 },
+  },
+};
+
 export interface Flight {
+  /** The level it is flown on, whose numbers the rules read (LEVEL_RULES). */
+  readonly level: Level;
   x: number;
   height: number;
   /** Whole steps of tilt, 0 to RULES.maxTilt. */
@@ -72,12 +120,14 @@ export interface Flight {
   /** Sideways speed, units a second. */
   sideways: number;
   /** How many stages the rocket has, and which one is on the bottom now (0 is the first). */
-  stages: 2 | 3;
+  stages: Stages;
   stage: number;
   /** Seconds of burning left in the bottom stage. */
   fuel: number;
   /** Seconds the bottom stage has been empty and still on. 0 while it burns. */
   emptyFor: number;
+  /** Set once a stage has been left on until it dropped by itself in this run. */
+  droppedItself: boolean;
   /** Set once orbit is reached; nothing moves the flight after that. */
   inOrbit: boolean;
 }
@@ -107,8 +157,9 @@ const CLEAR_OF_THICK_AIR = RULES.thickAirTop + RULES.rocketLength / 2;
 /** The farthest right the rocket's middle can go, so it stays in the picture. */
 const X_STOP = RULES.width - 2;
 
-/** Seconds of burning in a full tank of this stage. */
-const tank = (stages: 2 | 3, stage: number): number => RULES.stageSeconds[stages][stage] ?? 0;
+/** Seconds of burning in a full tank of one of the flight's stages, on its level. */
+const tank = ({ level, stages }: Pick<Flight, 'level' | 'stages'>, stage: number): number =>
+  LEVEL_RULES[level].stageSeconds[stages][stage] ?? 0;
 
 const onLastStage = (flight: Flight): boolean => flight.stage >= flight.stages - 1;
 
@@ -131,29 +182,31 @@ function lean(tilt: number) {
 function fuelOnBoard(flight: Flight): number {
   let seconds = flight.fuel;
   for (let stage = flight.stage + 1; stage < flight.stages; stage += 1) {
-    seconds += tank(flight.stages, stage);
+    seconds += tank(flight, stage);
   }
-  return Math.min(1, seconds / tank(flight.stages, flight.stages - 1));
+  return Math.min(1, seconds / tank(flight, flight.stages - 1));
 }
 
 /** The empty bottom stage comes off, and the next one lights with a full tank. */
 function nextStage(flight: Flight): void {
   flight.stage += 1;
-  flight.fuel = tank(flight.stages, flight.stage);
+  flight.fuel = tank(flight, flight.stage);
   flight.emptyFor = 0;
 }
 
-/** A fresh start: standing on the pad, straight up, with the first stage full and burning. */
-export function startFlight(stages: 2 | 3): Flight {
+/** A fresh start on a level: standing on the pad, straight up, with the first stage full and burning. */
+export function startFlight(level: Level, stages: Stages): Flight {
   return {
+    level,
     x: RULES.padX,
     height: PAD_HEIGHT,
     tilt: 0,
     sideways: 0,
     stages,
     stage: 0,
-    fuel: tank(stages, 0),
+    fuel: tank({ level, stages }, 0),
     emptyFor: 0,
+    droppedItself: false,
     inOrbit: false,
   };
 }
@@ -249,16 +302,18 @@ function burn(flight: Flight, seconds: number, happened: Happening[]): number {
  * many seconds it used.
  */
 function coast(flight: Flight, seconds: number, happened: Happening[]): number {
-  const untilItDrops = RULES.dropsItselfAfter - flight.emptyFor;
+  const { dropsItselfAfter } = LEVEL_RULES[flight.level];
+  const untilItDrops = dropsItselfAfter - flight.emptyFor;
   const step = Math.max(0, Math.min(seconds, untilItDrops));
   const sink = RULES.sinkSpeed * (1 - speedShare(flight));
 
   flight.height = Math.max(flight.height - sink * step, PAD_HEIGHT);
   flight.x = Math.min(flight.x + flight.sideways * step, X_STOP);
-  flight.emptyFor = step === untilItDrops ? RULES.dropsItselfAfter : flight.emptyFor + step;
+  flight.emptyFor = step === untilItDrops ? dropsItselfAfter : flight.emptyFor + step;
 
-  if (flight.emptyFor >= RULES.dropsItselfAfter) {
+  if (flight.emptyFor >= dropsItselfAfter) {
     happened.push({ kind: 'dropped', stage: flight.stage, byItself: true });
+    flight.droppedItself = true;
     nextStage(flight);
   }
   return step;
@@ -330,5 +385,28 @@ export function speedShare(flight: Flight): number {
 
 /** 0 to 1 of the bottom stage's tank. */
 export function fuelShare(flight: Flight): number {
-  return Math.min(1, Math.max(0, flight.fuel / tank(flight.stages, flight.stage)));
+  return Math.min(1, Math.max(0, flight.fuel / tank(flight, flight.stage)));
+}
+
+/** How a run that ended went, goal by goal: one star for each. */
+export interface RunGoals {
+  /** Reached orbit. */
+  orbit: boolean;
+  /** Every stage dropped with "Drop it": none was left on until it dropped by itself. */
+  droppedAll: boolean;
+  /** At least the level's share of the last stage's tank still left at orbit (LEVEL_RULES spareFuel). */
+  spareFuel: boolean;
+}
+
+/** The goals a run met, from how it ended: orbit (with the fuel left) or out of fuel, which meets none of them. */
+export function runGoals(
+  flight: Flight,
+  end: Extract<Happening, { kind: 'orbit' | 'out-of-fuel' }>,
+): RunGoals {
+  if (end.kind === 'out-of-fuel') return { orbit: false, droppedAll: false, spareFuel: false };
+  return {
+    orbit: true,
+    droppedAll: !flight.droppedItself,
+    spareFuel: end.fuelLeft >= LEVEL_RULES[flight.level].spareFuel[flight.stages],
+  };
 }

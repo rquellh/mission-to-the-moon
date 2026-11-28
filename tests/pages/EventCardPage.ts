@@ -4,7 +4,7 @@ import type { Locator, Page } from '@playwright/test';
  * The moment card (`dock`), always at the bottom during a flight: the story
  * of the moment, the photo's small picture, "Finish" (once exploring has
  * reached the end of the clock; it opens EndingPage), "Listen" (the recording),
- * "Try it", Play (TimelinePage), and its two doors, "Tell me more" (`recordsToggle`,
+ * a game's amber "Play: <game>" (`tryIt`), Play (TimelinePage), and its two doors, "Tell me more" (`recordsToggle`,
  * which opens RecordsPage) and "Controls" (`controlsToggle`, which opens the
  * tools in TimelinePage and the view buttons in MissionPage). Each door has
  * `aria-expanded` true or false. Previous and next show with Controls.

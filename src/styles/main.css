@@ -628,7 +628,7 @@ body.is-welcome .hud {
 
 /* The photo's small picture and the moment's buttons, in one row as tall
    with a photo as without, so the card keeps its height from one moment to
-   the next. "Finish" and "Try it" take a row of their own under it. */
+   the next. "Finish" and a game's Play button take a row of their own under it. */
 .dock__media {
   order: 2;
   display: flex;
@@ -660,7 +660,7 @@ body.is-welcome .hud {
   opacity: 0.85;
 }
 
-/* The buttons join the photo's row, so "Finish" and "Try it" can run under the photo too. */
+/* The buttons join the photo's row, so "Finish" and a game's Play button can run under the photo too. */
 .card__actions {
   display: contents;
 }
@@ -671,11 +671,22 @@ body.is-welcome .hud {
   padding-bottom: 6px;
 }
 
+/* A game's way in: amber, with a game controller before "Play: <game>", so it is easy to find. */
+.card__try {
+  gap: 8px;
+}
+
+.card__try .card__try-icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+
 /* The phone's layout only: everything the wide layout's query leaves out
    (keep in step with wideLayoutQuery() in dom.ts), for what the wide
    layout would otherwise have to undo. The recording and the door share
    the row evenly, each at least as wide as its words and as tall as the
-   photo; "Finish" and "Try it" each take the whole width of a row under
+   photo; "Finish" and a game's Play button each take the whole width of a row under
    them, where a long name wraps. */
 @media (max-width: 599px), (max-width: 859px) and (orientation: portrait) {
   /* Both grow from the same start. (From 0 the door would come out wider:
@@ -2403,7 +2414,8 @@ body.is-welcome .hud {
   min-height: 48px;
 }
 
-/* "All missions": one quiet row under a rule, with the count and a chevron. */
+/* "All missions", and "Play a game" under it: each one quiet row under a rule, with the count
+   and a chevron. */
 .welcome__all {
   display: flex;
   align-items: center;
@@ -2462,6 +2474,26 @@ body.is-welcome .hud {
 .welcome__all:hover .welcome__chevron,
 .welcome__all:hover .welcome__count {
   color: var(--color-text);
+}
+
+/* The two rows sit together, so only the first keeps the space above it, at every size. */
+.welcome__all.welcome__games {
+  margin-top: 0;
+}
+
+/* "Play a game" starts with an amber game controller, the same as a game's Play button. */
+.welcome__games-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.welcome__game {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--color-accent);
+  filter: drop-shadow(0 1px 4px rgb(0 0 0 / 0.9));
 }
 
 /* ------------------------------------------------------------------ */
@@ -2544,7 +2576,8 @@ body.is-welcome .hud {
 }
 
 /* Program names, with the years their missions span, stay in sight while
-   their missions scroll under them. */
+   their missions scroll under them. "Play a game" on the welcome puts focus
+   on the games' name, as a heading takes focus elsewhere, with no ring. */
 .hub__program-title {
   position: sticky;
   top: 0;
@@ -2560,6 +2593,7 @@ body.is-welcome .hud {
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--color-text-muted);
+  outline: none;
 }
 
 .hub__years {
@@ -3795,7 +3829,7 @@ body.is-welcome .hud {
 
   /* With "Tell me more" open, the panel beside the card tells the moment, as
      the sheet does on a phone. The card steps back to one row: Play, where
-     the flight is, "Try it" or "Finish" while they show, and Controls, with
+     the flight is, a game's Play button or "Finish" while they show, and Controls, with
      the tools opening under it. The story, the photo, the recording, the
      door, and the credit are all in the panel. */
   .hud:has(> .records:not([hidden])) .dock {
@@ -3851,9 +3885,11 @@ body.is-welcome .hud {
     width: min(760px, 100% - 2 * var(--dock-margin));
   }
 
-  /* A card too narrow for the longest row ("Try it: Dock two spacecraft"
-     beside where the flight is): "Try it" or "Finish" takes a row of its own, under Play. */
-  @container dock (max-width: 504px) {
+  /* A card too narrow for the longest row ("Play: Dock two spacecraft", with
+     its controller, beside where the flight is, which keeps room for the
+     clock): a game's Play button or "Finish" takes a row of its own, under
+     the clock's Play. */
+  @container dock (max-width: 524px) {
     body:not(.is-touring) .hud:has(> .records:not([hidden])) .card__actions {
       grid-area: 2 / 1 / 3 / -1;
       margin-top: 12px;
@@ -3865,8 +3901,8 @@ body.is-welcome .hud {
   }
 
   /* On the tour, its row takes the place of Play and where the flight is, as
-     on a phone, and the card keeps the width the row needs. "Try it" sits
-     over the row while it shows. */
+     on a phone, and the card keeps the width the row needs. A game's Play
+     button sits over the row while it shows. */
   .is-touring .hud:has(> .records:not([hidden])) .dock {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
@@ -3888,7 +3924,7 @@ body.is-welcome .hud {
     margin: 0 -16px -12px;
   }
 
-  /* Without "Try it", the tour's row is the whole card. */
+  /* Without a game's Play button, the tour's row is the whole card. */
   .is-touring .hud:has(> .records:not([hidden])) .dock:not(:has(.card__try:not([hidden]))) .tour {
     border-top: 0;
   }
@@ -4571,9 +4607,12 @@ body.is-welcome .hud {
     min-height: 48px;
   }
 
+  /* Two rows now ("All missions" and "Play a game"), so each is as short as a finger allows
+     and both fit a sideways phone without scrolling. */
   .welcome__all {
-    min-height: 52px;
-    margin-top: 16px;
+    min-height: 44px;
+    margin-top: 12px;
+    padding: 2px 0;
   }
 
   /* "More to explore" keeps to the names and the buttons, so a sliver of the scene stays in sight. */

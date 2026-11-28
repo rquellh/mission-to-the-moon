@@ -15,7 +15,8 @@ type IconName =
   | 'close'
   | 'external'
   | 'replay'
-  | 'arrow-right';
+  | 'arrow-right'
+  | 'game';
 
 const SHAPES: Record<IconName, { fill?: string[]; stroke?: string[] }> = {
   play: {
@@ -42,6 +43,16 @@ const SHAPES: Record<IconName, { fill?: string[]; stroke?: string[] }> = {
   // Round and back to the start: "Watch again".
   replay: { stroke: ['M3.5 12a8.5 8.5 0 1 0 2.8-6.3', 'M3.5 4.5v5h5'] },
   'arrow-right': { stroke: ['M5 12h14', 'M13 6l6 6-6 6'] },
+  // A game controller, with a cross of arrows on the left and two buttons on the right: "Play".
+  game: {
+    stroke: [
+      'M7.5 7.5h9a5 5 0 0 1 5 5v.5a4 4 0 0 1-7.2 2.4l-.3-.4h-4l-.3.4A4 4 0 0 1 2.5 13v-.5a5 5 0 0 1 5-5z',
+      'M7.5 10.2v3',
+      'M6 11.7h3',
+      'M15.4 10.6h.01',
+      'M17.6 12.8h.01',
+    ],
+  },
 };
 
 /** An inline SVG icon, hidden from assistive technology. */

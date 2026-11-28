@@ -114,7 +114,7 @@ function settle(scene: OrbitScene, still: boolean): void {
 /** A Saturn V run out of fuel high up and nearly flat, near the right side: its two lower stages dropped, the last one empty. */
 function outOfFuel(scene: OrbitScene, still: boolean): Flight {
   scene.setRocket(SATURN_V);
-  const flight = startFlight(3);
+  const flight = startFlight('easy', 3);
   scene.fly(flight, null, 0, still);
   scene.drop(FIRST_DROP, still);
   scene.drop(SECOND_DROP, still);
@@ -183,7 +183,7 @@ describe('the orbit view', () => {
     it('draws the ground over everything else, so nothing shows below its edge', () => {
       const scene = sceneOn(358, 440);
       scene.setRocket(SATURN_V);
-      scene.fly(startFlight(3), null, FRAME, false);
+      scene.fly(startFlight('easy', 3), null, FRAME, false);
       const ground = named(scene, 'ground') as Mesh<BufferGeometry, MeshBasicMaterial>;
       const onTheGround = new Set(['ground', 'pad', 'ground-edge']);
       let latest = -Infinity;
@@ -201,7 +201,7 @@ describe('the orbit view', () => {
     it('ends a drop with the middle of the stack that is left on the flight point', () => {
       const scene = sceneOn(358, 440);
       scene.setRocket(SATURN_V);
-      const flight = startFlight(3);
+      const flight = startFlight('easy', 3);
       scene.fly(flight, null, 0, false);
       scene.drop(FIRST_DROP, false);
       for (let frame = 0; frame < 300; frame += 1) {

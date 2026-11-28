@@ -10,12 +10,12 @@ import { MISSIONS, URLS } from '../utils/vars';
 /**
  * A visitor arrives at the welcome, in a real browser with the real 3D
  * scene: the scene frames itself beside the welcome (on a desktop) or above
- * it (on a phone), the mission list opens from it and gives focus back, and
- * the tour starts from it. What the welcome says is tested in the interface
- * tests (src/ui/welcome.test.ts).
+ * it (on a phone), the mission list opens from it and gives focus back, Play
+ * a game opens the list at the games, and the tour starts from it. What the
+ * welcome says is tested in the interface tests (src/ui/welcome.test.ts).
  */
 test.describe('The welcome', () => {
-  test('a visitor arrives, looks at all missions, comes back, and takes the tour', async ({
+  test('a visitor arrives, looks at all missions and at the games, comes back, and takes the tour', async ({
     sitePage,
   }) => {
     const missionPage = new MissionPage(sitePage);
@@ -55,6 +55,21 @@ test.describe('The welcome', () => {
       await expect(welcomePage.welcome).toBeVisible();
       await expect(missionPage.site).toHaveClass(/\bis-welcome\b/);
       await expect(welcomePage.allMissions).toBeFocused();
+    });
+
+    await test.step('Play a game opens the same list at the games, with focus on their heading', async () => {
+      await welcomePage.games.click();
+      await hubPage.waitForLoad();
+      await expect(hubPage.extrasTitle('hands-on')).toBeFocused();
+      await expect(hubPage.extrasTitle('hands-on')).toBeInViewport();
+      await expect(hubPage.extraOpen('orbit')).toBeInViewport();
+    });
+
+    await test.step('Escape closes the list, and focus returns to Play a game', async () => {
+      await sitePage.keyboard.press('Escape');
+      await expect(hubPage.hub).toBeHidden();
+      await expect(welcomePage.welcome).toBeVisible();
+      await expect(welcomePage.games).toBeFocused();
     });
 
     await test.step('Take the tour starts the tour at its first stop', async () => {

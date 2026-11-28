@@ -1,8 +1,8 @@
 /**
  * The moment card: the story of the moment on the clock (its chapter, day,
  * and date, its title, and its short text in full), what sits beside it
- * (the photo's small picture, "Listen", the "Tell me more" door, "Try
- * it"), and where the flight is beside Play while "Tell me more" is open.
+ * (the photo's small picture, "Listen", the "Tell me more" door, a game's
+ * "Play: <game>"), and where the flight is beside Play while "Tell me more" is open.
  * What "Tell me more" holds is in records.test.ts, and the tools behind
  * Controls in timeline.test.ts.
  */
@@ -25,7 +25,7 @@ const withoutMoreOnStaging = (mission: Mission): Mission => ({
   ),
 });
 
-/** Apollo 11 with a "Try it" on its launch pointing at an extra the list does not show (a draft). */
+/** Apollo 11 with a game on its launch pointing at an extra the list does not show (a draft). */
 const unlistedExtraOnLiftoff = (mission: Mission): Mission => ({
   ...mission,
   events: mission.events.map((event) =>
@@ -195,22 +195,32 @@ describe('the moment card', () => {
     });
   });
 
-  describe('try it', () => {
-    it("offers an event's hands-on extra, and only on that event", async () => {
+  describe('a game to play', () => {
+    it("offers an event's game, and only on that event", async () => {
       const { user } = await mountMission('gemini-8', { event: 'liftoff' });
-      expect(within(theCard()).getByRole('button', { name: 'Try it: Fly to orbit' })).toBeVisible();
+      expect(within(theCard()).getByRole('button', { name: 'Play: Fly to orbit' })).toBeVisible();
       await user.click(screen.getByRole('button', { name: 'Controls' }));
 
       await user.click(screen.getByRole('button', { name: 'Next event' }));
 
-      expect(within(theCard()).queryByRole('button', { name: /^Try it/ })).not.toBeInTheDocument();
+      expect(within(theCard()).queryByRole('button', { name: /^Play:/ })).not.toBeInTheDocument();
+    });
+
+    it("says Play with the game's name, in amber with a game controller, so it is easy to find", async () => {
+      await mountMission('apollo-11', { event: 'liftoff' });
+
+      const play = within(theCard()).getByRole('button', { name: 'Play: Fly to orbit' });
+
+      expect(play).toHaveTextContent(/^Play: Fly to orbit$/);
+      expect(play).toHaveClass('button--primary');
+      expect(play.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument();
     });
 
     it('opens the extra for this moment of this mission', async () => {
       const { user } = await mountMission('gemini-8', { event: 'docking' });
 
       await user.click(
-        within(theCard()).getByRole('button', { name: 'Try it: Dock two spacecraft' }),
+        within(theCard()).getByRole('button', { name: 'Play: Dock two spacecraft' }),
       );
 
       const sheet = screen.getByRole('dialog', { name: 'Dock two spacecraft' });
@@ -220,7 +230,7 @@ describe('the moment card', () => {
     it('is not offered for an extra the list leaves out', async () => {
       await mountMission('apollo-11', { story: unlistedExtraOnLiftoff, start: 'explore' });
 
-      expect(within(theCard()).queryByRole('button', { name: /^Try it/ })).not.toBeInTheDocument();
+      expect(within(theCard()).queryByRole('button', { name: /^Play:/ })).not.toBeInTheDocument();
     });
   });
 });

@@ -43,7 +43,7 @@ async function climbToOrbit(user: User, frames: Frames): Promise<HTMLElement> {
 /** Open the mission list from the welcome, and "Drop the stages" from it. */
 async function openFromTheList(user: User): Promise<void> {
   await user.click(screen.getByRole('button', { name: 'All missions' }));
-  await user.click(screen.getByRole('button', { name: 'Open Drop the stages' }));
+  await user.click(screen.getByRole('button', { name: 'Play Drop the stages' }));
 }
 
 describe('drop the stages', () => {
@@ -103,11 +103,11 @@ describe('drop the stages', () => {
       expect(navigation.address).toBe('http://localhost:3000/?mission=apollo-11&event=liftoff');
     });
 
-    it('climbs again from the pad with Try again, with Drop it to hand', async () => {
+    it('climbs again from the pad with Play again, with Drop it to hand', async () => {
       const { user, frames } = await openOverTheLiftoff();
       const next = await climbToOrbit(user, frames);
 
-      await user.click(within(next).getByRole('button', { name: 'Try again' }));
+      await user.click(within(next).getByRole('button', { name: 'Play again' }));
 
       expect(within(theSheet()).getByRole('button', { name: 'Drop it' })).toHaveFocus();
       expect(within(theSheet()).queryByRole('region', { name: 'Up next' })).not.toBeInTheDocument();

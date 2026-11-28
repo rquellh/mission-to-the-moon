@@ -8,6 +8,12 @@
  * citations: why docking mattered (Gemini 8's accomplishment), and the real
  * docking (Gemini 8's docking event, or the docking event of the mission
  * this was opened from, when it has one).
+ *
+ * It has two levels (game.ts says what differs), chosen above Start with
+ * the games' shared level picker; each docking ends with the shared stars,
+ * its three goals, and Play again (src/extras/shared/), as "Land on the
+ * Moon" does. The level last chosen and the most stars on each level are
+ * remembered on this device.
  */
 import './docking.css';
 import type { MissionBundle } from '../../content/missions/bundle.ts';
@@ -16,18 +22,26 @@ import type { VehiclePart } from '../../content/vehicle-types.ts';
 import { sourcesBlock } from '../../ui/citations.ts';
 import { button, el, setText } from '../../ui/dom.ts';
 import { formatDate, monthOf } from '../../ui/format.ts';
+import { createLevelPicker } from '../shared/level-picker.ts';
+import type { Level } from '../shared/levels.ts';
+import { gameRecord } from '../shared/record.ts';
+import { createRunEnd, type Goal } from '../shared/run-end.ts';
 import type { Extra, ExtraContext, ExtraMount, UpNextOptions } from '../types.ts';
 import {
+  LEVEL_RULES,
   RULES,
   advance,
+  backToStart,
   isLinedUp,
   isTooFast,
   push,
+  runGoals,
   speedX,
   speedY,
   startFlight,
   type Contact,
   type Flight,
+  type RunGoals,
   type Thrust,
 } from './game.ts';
 import { meta } from './meta.ts';
@@ -111,6 +125,11 @@ const TEXT = {
   whatDocking: 'Docking means flying one spacecraft into another until they latch together.',
   howTo:
     "Line up the Gemini's nose with the Agena's docking cone, then close in slowly. Things in space keep moving: each push keeps going until you push the other way.",
+  // Under the level picker, for the level chosen.
+  levels: {
+    easy: 'The Gemini starts almost lined up, and drifts slowly.',
+    hard: 'It starts further off and drifts faster, and the cone is a tighter fit.',
+  } satisfies Record<Level, string>,
   storyMissing: 'The story of the first docking could not be loaded.',
   sourcesFor: 'Where the sentence on why docking mattered comes from:',
   start: 'Start',
@@ -124,7 +143,6 @@ const TEXT = {
     back: 'Back',
   } satisfies Record<Thrust, string>,
   startOver: 'Start over',
-  tryAgain: 'Try again',
   keys: 'Keys: the arrow keys move up, down, left, and right. F is forward and B is back.',
   offCenter: 'Off center',
   closing: 'Closing speed',
@@ -147,6 +165,21 @@ const TEXT = {
   backToStart: 'You are back at the start.',
   started: 'Started. The Gemini is drifting toward the Agena.',
   docked: 'Docked. The Gemini and the Agena are joined.',
+  // The three stars of a run: what each is for when it was earned and when not, and a tip when not.
+  // Docking is the one way a run ends, so the first is always earned.
+  goals: {
+    docked: 'Docked',
+    firstTry: {
+      met: 'On the first try',
+      missed: 'First try',
+      tip: 'Line up and slow down before the nose reaches the cone.',
+    },
+    softTouch: {
+      met: 'A soft touch',
+      missed: 'A soft touch',
+      tip: 'Push Back to come in slower.',
+    },
+  },
   realHeading: (mission: Mission, event: MissionEvent): string => `${mission.name}: ${event.title}`,
   when: (mission: Mission, event: MissionEvent): string =>
     mission.launch
@@ -190,8 +223,8 @@ const KEY_LABEL: Readonly<Record<Thrust, string>> = {
   back: 'B',
 };
 
-/** How many pips the speed read-out has: the gentle ones, then two too fast. */
-const PIPS = RULES.gentlePushes + 2;
+/** How many too-fast pips the speed read-out has after a level's gentle ones. */
+const FAST_PIPS = 2;
 /** How long a bump's message stays before the usual advice comes back, in seconds. */
 const BUMP_MESSAGE_SECONDS = 4;
 /** How long the nose takes to slide the last bit into the cone before the latches catch, in seconds. */
@@ -248,6 +281,128 @@ function arrowIcon(thrust: 'up' | 'down' | 'left' | 'right'): SVGSVGElement {
   return icon;
 }
 
+/** What the closing speed read-out says. */
+function speedWord(f: Flight): string {
+  if (f.pushesClosing < 0) return TEXT.speed.back;
+  if (f.pushesClosing === 0) return TEXT.speed.stopped;
+  return isTooFast(f) ? TEXT.speed.fast : TEXT.speed.gentle;
+}
+
+/** What the off-center read-out says: lined up, or which ways to go. */
+function aimWord(f: Flight): string {
+  if (isLinedUp(f)) return TEXT.linedUp;
+  const ways: string[] = [];
+  const near = 0.12;
+  if (f.x > near) ways.push('left');
+  else if (f.x < -near) ways.push('right');
+  if (f.y > near) ways.push('down');
+  else if (f.y < -near) ways.push('up');
+  return TEXT.go(ways);
+}
+
+/**
+ * The three goals of a run that docked, for the stars: worded for how it
+ * went, with a tip under each one missed. Docking is the one way a run
+ * ends, so the first is always earned.
+ */
+function goalsOf(goals: RunGoals): readonly [Goal, Goal, Goal] {
+  const goal = (key: 'firstTry' | 'softTouch'): Goal => {
+    const words = TEXT.goals[key];
+    return goals[key]
+      ? { label: words.met, met: true }
+      : { label: words.missed, met: false, tip: words.tip };
+  };
+  return [{ label: TEXT.goals.docked, met: true }, goal('firstTry'), goal('softTouch')];
+}
+
+/* ------------------------------------------------------------------ */
+/* Pieces of the screen.                                               */
+/* ------------------------------------------------------------------ */
+
+/** The off-center and closing speed read-outs, and how to show a level and a moment of the flight on them. */
+interface Readouts {
+  element: HTMLDivElement;
+  /** Shows a level's lined-up ring on the sight, and its gentle and too-fast pips. */
+  setLevel(level: Level): void;
+  /** Shows where the nose is, where it drifts, and how fast it closes in. */
+  show(flight: Flight): void;
+}
+
+/** The read-outs while flying: the aim sight, and the closing speed in pips, each with its word. */
+function flightReadouts(level: Level): Readouts {
+  const element = el('div', 'docking__readouts');
+  const aimPanel = el('div', 'docking__readout');
+  const sight = svg('svg', {
+    viewBox: '-30 -30 60 60',
+    class: 'docking__sight',
+    'aria-hidden': 'true',
+  });
+  // A sight seen from behind the Gemini: the ring is the lined-up zone around the cone's middle, the dot is the nose.
+  const ring = svg('circle', { cx: 0, cy: 0, r: 0, class: 'docking__zone' });
+  const drift = svg('line', { x1: 0, y1: 0, x2: 0, y2: 0, class: 'docking__drift' });
+  const dot = svg('circle', { cx: 0, cy: 0, r: 3, class: 'docking__nose' });
+  sight.append(
+    svg('line', { x1: -28, y1: 0, x2: 28, y2: 0, class: 'docking__cross' }),
+    svg('line', { x1: 0, y1: -28, x2: 0, y2: 28, class: 'docking__cross' }),
+    ring,
+    drift,
+    dot,
+  );
+  const aimValue = el('p', 'docking__value');
+  aimValue.setAttribute('data-testid', 'docking-aim');
+  const aimRow = el('div', 'docking__readout-row');
+  aimRow.append(sight, aimValue);
+  aimPanel.append(el('p', 'docking__label', TEXT.offCenter), aimRow);
+
+  const speedPanel = el('div', 'docking__readout');
+  const pipRow = el('div', 'docking__pips');
+  pipRow.setAttribute('aria-hidden', 'true');
+  const speedValue = el('p', 'docking__value');
+  speedPanel.append(el('p', 'docking__label', TEXT.closing), pipRow, speedValue);
+  element.append(aimPanel, speedPanel);
+
+  let pips: HTMLSpanElement[] = [];
+  // The closing speed and level last shown, so the pips are only lit again when one changes.
+  let shown = '';
+
+  const setLevel = (chosen: Level): void => {
+    const { linedUp, gentlePushes } = LEVEL_RULES[chosen];
+    ring.setAttribute('r', sightRadius(linedUp).toFixed(2));
+    // The gentle pips, then the too-fast ones.
+    pips = Array.from({ length: gentlePushes + FAST_PIPS }, (_, index) =>
+      el('span', index < gentlePushes ? 'docking__pip' : 'docking__pip docking__pip--fast'),
+    );
+    pipRow.replaceChildren(...pips);
+    shown = '';
+  };
+  setLevel(level);
+
+  return {
+    element,
+    setLevel,
+    show(flight) {
+      const [sx, sy] = sightPoint(flight.x, flight.y);
+      dot.setAttribute('cx', sx.toFixed(2));
+      dot.setAttribute('cy', sy.toFixed(2));
+      // The drift line points where the nose will be in a few seconds.
+      const [dx, dy] = sightPoint(flight.x + speedX(flight) * 5, flight.y + speedY(flight) * 5);
+      drift.setAttribute('x1', sx.toFixed(2));
+      drift.setAttribute('y1', sy.toFixed(2));
+      drift.setAttribute('x2', dx.toFixed(2));
+      drift.setAttribute('y2', dy.toFixed(2));
+      aimPanel.classList.toggle('is-good', isLinedUp(flight));
+      setText(aimValue, aimWord(flight));
+      const now = `${flight.level} ${flight.pushesClosing}`;
+      if (shown === now) return;
+      shown = now;
+      pips.forEach((pip, index) => pip.classList.toggle('is-on', index < flight.pushesClosing));
+      speedPanel.classList.toggle('is-good', flight.pushesClosing > 0 && !isTooFast(flight));
+      speedPanel.classList.toggle('is-warn', isTooFast(flight));
+      setText(speedValue, speedWord(flight));
+    },
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /* The extra.                                                          */
 /* ------------------------------------------------------------------ */
@@ -291,6 +446,8 @@ async function mount(
   context.onReducedMotionChange((reduced) => {
     still = reduced;
   });
+  // The level last chosen on this device, and the most stars on each.
+  const record = gameRecord(context.store);
 
   /* ----------------------------- Layout ----------------------------- */
 
@@ -309,13 +466,26 @@ async function mount(
   const introHeading = el('h3', 'extra-heading', TEXT.introHeading);
   introHeading.id = 'docking-intro-heading';
   intro.append(introHeading, el('p', 'extra-text', TEXT.whatDocking));
-  // Everything to read before starting comes first, together; the folded
-  // sources of the cited sentence go under the Start button, labeled as its own.
+  // Everything to read before starting comes first, together; then the
+  // level, and Start. The folded sources of the cited sentence go under the
+  // Start button, labeled as its own.
   const whyLine = el('p', 'extra-text', why?.text ?? TEXT.storyMissing);
   if (!why) whyLine.className = 'extra-note';
-  const startButton = button('button button--primary button--large docking__start', TEXT.start);
+  // Choosing a level shows where the Gemini starts on it at once.
+  const picker = createLevelPicker({
+    record,
+    describe: TEXT.levels,
+    onChange: (level) => showLevel(level),
+    signal,
+  });
+  const startButton = button('button button--primary button--large', TEXT.start);
   startButton.setAttribute('data-testid', 'docking-start');
-  intro.append(whyLine, el('p', 'extra-note docking__how', TEXT.howTo), startButton);
+  intro.append(
+    whyLine,
+    el('p', 'extra-note docking__how', TEXT.howTo),
+    picker.element,
+    startButton,
+  );
   if (why) {
     const sources = sourcesBlock(why.fact.citations, why.fact.discrepancy);
     sources.classList.add('docking__why-sources');
@@ -328,44 +498,7 @@ async function mount(
   // While flying.
   const flying = el('section', 'docking__fly');
   flying.hidden = true;
-
-  const readouts = el('div', 'docking__readouts');
-  const aimPanel = el('div', 'docking__readout');
-  const aimLabel = el('p', 'docking__label', TEXT.offCenter);
-  const sight = svg('svg', {
-    viewBox: '-30 -30 60 60',
-    class: 'docking__sight',
-    'aria-hidden': 'true',
-  });
-  // A sight seen from behind the Gemini: the ring is the lined-up zone around the cone's middle, the dot is the nose.
-  sight.append(
-    svg('line', { x1: -28, y1: 0, x2: 28, y2: 0, class: 'docking__cross' }),
-    svg('line', { x1: 0, y1: -28, x2: 0, y2: 28, class: 'docking__cross' }),
-    svg('circle', { cx: 0, cy: 0, r: sightRadius(RULES.linedUp), class: 'docking__zone' }),
-  );
-  const drift = svg('line', { x1: 0, y1: 0, x2: 0, y2: 0, class: 'docking__drift' });
-  const dot = svg('circle', { cx: 0, cy: 0, r: 3, class: 'docking__nose' });
-  sight.append(drift, dot);
-  const aimValue = el('p', 'docking__value');
-  aimValue.setAttribute('data-testid', 'docking-aim');
-  const aimRow = el('div', 'docking__readout-row');
-  aimRow.append(sight, aimValue);
-  aimPanel.append(aimLabel, aimRow);
-
-  const speedPanel = el('div', 'docking__readout');
-  const pipRow = el('div', 'docking__pips');
-  pipRow.setAttribute('aria-hidden', 'true');
-  const pips = Array.from({ length: PIPS }, (_, index) => {
-    const pip = el(
-      'span',
-      index < RULES.gentlePushes ? 'docking__pip' : 'docking__pip docking__pip--fast',
-    );
-    pipRow.append(pip);
-    return pip;
-  });
-  const speedValue = el('p', 'docking__value');
-  speedPanel.append(el('p', 'docking__label', TEXT.closing), pipRow, speedValue);
-  readouts.append(aimPanel, speedPanel);
+  const readouts = flightReadouts(picker.level);
 
   const coach = el('p', 'docking__coach');
 
@@ -390,9 +523,9 @@ async function mount(
   }
   const startOver = button('button button--quiet docking__over', TEXT.startOver);
   pad.append(startOver);
-  flying.append(readouts, coach, pad, el('p', 'extra-note docking__keys', TEXT.keys));
+  flying.append(readouts.element, coach, pad, el('p', 'extra-note docking__keys', TEXT.keys));
 
-  // After docking.
+  // After docking: the docked line, the stars under it, the real docking, and "Up next" at the end.
   const after = el('section', 'docking__after');
   after.hidden = true;
   const dockedLine = el('p', 'docking__docked', TEXT.docked);
@@ -411,6 +544,16 @@ async function mount(
       sourcesBlock(citations, event.discrepancy, mission.launch?.discrepancy),
     );
   }
+
+  // The stars of a run that docked, its goals, and Play again: under the docked line.
+  const runEnd = createRunEnd({
+    record,
+    onPlay: (level) => {
+      picker.refresh();
+      begin(level, true);
+    },
+    signal,
+  });
 
   /** What's next: back to the flight waiting behind the sheet, or the flight where the docking really happened. */
   const nextStep = (): UpNextOptions => {
@@ -455,13 +598,11 @@ async function mount(
       },
     };
   };
-  // Built afresh at each docking, where the run's buttons go, so it always starts folded on a phone.
+  // Built afresh at each docking, at the end, so it always starts folded on a phone. Its button
+  // is plain, as Play again is the amber one, and Play again is not repeated in it.
   let upNext: HTMLElement | null = null;
   const showUpNext = (): void => {
-    const block = context.upNext({
-      ...nextStep(),
-      actions: [{ label: TEXT.tryAgain, again: true, run: () => begin(true) }],
-    });
+    const block = context.upNext({ ...nextStep(), plainPrimary: true });
     if (upNext) upNext.replaceWith(block);
     else after.append(block);
     upNext = block;
@@ -499,33 +640,15 @@ async function mount(
 
   type Phase = 'intro' | 'flying' | 'latching' | 'docked';
   let phase: Phase = 'intro';
-  let flight = startFlight();
+  // Started on the level chosen; a new run starts a new flight on its level.
+  let flight = startFlight(picker.level);
   let latch: { from: Flight; t: number } | null = null;
+  // The closing speed when the nose touched and the latches began to catch.
+  let touchClosing = 0;
   let bumpMessage = '';
   let bumpLeft = 0;
   let wasLinedUp = isLinedUp(flight);
-  let shownPushes = Number.NaN;
   const timers = new Set<number>();
-
-  const speedWord = (f: Flight): string =>
-    f.pushesClosing < 0
-      ? TEXT.speed.back
-      : f.pushesClosing === 0
-        ? TEXT.speed.stopped
-        : isTooFast(f)
-          ? TEXT.speed.fast
-          : TEXT.speed.gentle;
-
-  const aimWord = (f: Flight): string => {
-    if (isLinedUp(f)) return TEXT.linedUp;
-    const ways: string[] = [];
-    const near = 0.12;
-    if (f.x > near) ways.push('left');
-    else if (f.x < -near) ways.push('right');
-    if (f.y > near) ways.push('down');
-    else if (f.y < -near) ways.push('up');
-    return TEXT.go(ways);
-  };
 
   const coachWord = (f: Flight): string => {
     if (bumpLeft > 0) return bumpMessage;
@@ -535,27 +658,9 @@ async function mount(
     return TEXT.coach.keepGoing;
   };
 
-  /** The read-outs, from the flight as it is now. */
+  /** The read-outs, the coach line, and without the 3D view the distance bar, from the flight as it is now. */
   const showReadouts = (): void => {
-    const [sx, sy] = sightPoint(flight.x, flight.y);
-    dot.setAttribute('cx', sx.toFixed(2));
-    dot.setAttribute('cy', sy.toFixed(2));
-    // The drift line points where the nose will be in a few seconds.
-    const [dx, dy] = sightPoint(flight.x + speedX(flight) * 5, flight.y + speedY(flight) * 5);
-    drift.setAttribute('x1', sx.toFixed(2));
-    drift.setAttribute('y1', sy.toFixed(2));
-    drift.setAttribute('x2', dx.toFixed(2));
-    drift.setAttribute('y2', dy.toFixed(2));
-    const lined = isLinedUp(flight);
-    aimPanel.classList.toggle('is-good', lined);
-    setText(aimValue, aimWord(flight));
-    if (shownPushes !== flight.pushesClosing) {
-      shownPushes = flight.pushesClosing;
-      pips.forEach((pip, index) => pip.classList.toggle('is-on', index < flight.pushesClosing));
-      speedPanel.classList.toggle('is-good', flight.pushesClosing > 0 && !isTooFast(flight));
-      speedPanel.classList.toggle('is-warn', isTooFast(flight));
-      setText(speedValue, speedWord(flight));
-    }
+    readouts.show(flight);
     setText(coach, coachWord(flight));
     if (distanceFill)
       distanceFill.style.width = `${Math.max(0, Math.min(1, flight.gap / RULES.startGap)) * 100}%`;
@@ -645,8 +750,10 @@ async function mount(
     startLoop();
   }
 
+  /** The nose reached the cone: the latches catch, or it bumps and backs away. */
   function touch(contact: Contact): void {
     if (contact.kind === 'docked') {
+      touchClosing = contact.closing;
       if (still) {
         flight.x = 0;
         flight.y = 0;
@@ -661,34 +768,52 @@ async function mount(
     bumpMessage = TEXT.bump(contact.tooFast, contact.offCenter);
     bumpLeft = BUMP_MESSAGE_SECONDS;
     if (still) {
-      // Under reduced motion, a bump is a plain reset: straight back to the start.
-      flight = startFlight();
+      // Under reduced motion, a bump is a plain reset: straight back to the start, the bump still counted.
+      flight = backToStart(flight);
       wasLinedUp = isLinedUp(flight);
       bumpMessage = `${bumpMessage} ${TEXT.backToStart}`;
     }
-    shownPushes = Number.NaN;
     context.announce(bumpMessage);
   }
 
+  /** Docked: the result and its stars, the real docking, and what's next. */
   function join(): void {
     phase = 'docked';
     latch = null;
     scene?.fly(flight, 0, true);
     scene?.join(still);
+    const { spoken } = runEnd.show({
+      level: flight.level,
+      goals: goalsOf(runGoals(flight, { kind: 'docked', closing: touchClosing })),
+    });
+    dockedLine.after(runEnd.element);
+    picker.refresh();
     showUpNext();
     showPhase();
-    context.announce(TEXT.docked);
+    context.announce(`${TEXT.docked} ${spoken}`);
     dockedLine.focus();
     startLoop();
   }
 
-  const begin = (focus: boolean): void => {
+  /** The start screen, after choosing a level: the Gemini where a run on it starts, and its read-outs ready. */
+  function showLevel(level: Level): void {
+    if (phase !== 'intro') return;
+    flight = startFlight(level);
+    readouts.setLevel(level);
+    wasLinedUp = isLinedUp(flight);
+    showReadouts();
+    scene?.fly(flight, 0, true);
+  }
+
+  /** A new run on a level, from Start, Start over, Play again, or the other level's button. */
+  const begin = (level: Level, focus: boolean): void => {
     scene?.separate();
-    flight = startFlight();
+    flight = startFlight(level);
+    readouts.setLevel(level);
+    runEnd.hide();
     latch = null;
     bumpLeft = 0;
     wasLinedUp = isLinedUp(flight);
-    shownPushes = Number.NaN;
     phase = 'flying';
     showPhase();
     showReadouts();
@@ -698,8 +823,8 @@ async function mount(
     startLoop();
   };
 
-  startButton.addEventListener('click', () => begin(true), { signal });
-  startOver.addEventListener('click', () => begin(false), { signal });
+  startButton.addEventListener('click', () => begin(picker.level, true), { signal });
+  startOver.addEventListener('click', () => begin(flight.level, false), { signal });
 
   document.addEventListener(
     'keydown',
@@ -722,7 +847,7 @@ async function mount(
     { signal },
   );
 
-  // The opening picture: both craft, the Gemini a short way back and off to one side.
+  // The opening picture: both craft, the Gemini a short way back and off to one side (further off on Hard).
   showPhase();
   showReadouts();
   scene?.fly(flight, 0, true);
